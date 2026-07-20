@@ -71,7 +71,7 @@
 
 **Not a design spec — this is the shape, not the details.**
 
-**实现状态（2026-07-20）：** 项目处于 MVP Phase 2：内置官方插件路径已具备 Manifest v2、能力依赖解析、逐项授权、主进程持久化、headless 生命周期、刷新依赖排序、provenance 和脱敏诊断；profile/课表/考试/成绩能力与 `calendar.events@1` 已支持多个 provider。官方校历能力与配置的节次表已让课表按学季、周次、单双周和节次展开为课程事件，工作区提供月历、周视图、线性日程和单日时间线。当前仓库约束为数据源只使用 mock fixture：连接器协议解析与刷新链路可被 fixture 覆盖，但任何真实账号或真实校园数据均未作为完成证据。`.campusmod` 已具备原生文件选择、ZIP/manifest 校验、权限审查、一次性确认、原子安装升级、崩溃恢复、完整性扫描、动态注册和卸载。Electron 43.1.1 的主 renderer 开启 Chromium OS sandbox 与严格 CSP；受限单活动视图通过独立 `campusmod://` origin iframe 激活，其他第三方包保持 install-only。工作区快照、官方 capability provenance 与下载队列已迁入同一 SQLite 数据库；v3 工作区 JSON 与旧下载队列 JSON 仅在首次读取时迁移，随后不再作为正式数据源。下载仍通过主进程引擎、受限 IPC、preload、工作区状态合并和材料面板控制，fixture 不伪造队列进度。2026-07-20 本地通过 typecheck、lint、162 项单测（1 项真实账号测试按环境跳过）、首次引导 Electron E2E 与 x64 NSIS 安装包构建。第三方 headless 的权限代理、签名和完整恶意包 E2E 尚未完成；`verify:headless-sandbox` 在当前环境超时，不能作为验收通过。真实账号验收、完整成绩口径/隐私遮罩、完整 E2E 覆盖、全新 Windows 安装和 Release 验收仍不计入完整业务闭环。
+**实现状态（2026-07-21）：** 项目处于 MVP Phase 2。内置官方 connector 已通过主进程的受控业务会话发布课表、考试、作业与 `calendar.events@1`；已验证账号的工作区从空的正式快照开始，只接受当前账号的 capability 记录，绝不回退为固定课程或 DDL。核心教务 connector 不可用时，引导同步明确失败并保留重试入口，缓存仅用于同一账号的上次真实数据。密码、Cookie、Session、ticket、token 与原始响应均不进入 renderer、日志或版本库。未认证的本地开发路径仍使用隔离 fixture。桌面端左侧导航固定，右侧主内容区负责纵向滚动；周视图在桌面宽度直接使用可用空间，只有窄屏允许横向滚动。真实账号现场验收尚未通过：2026-07-21 的脱敏验证在 ZJUAM 返回 `service-unavailable`，因此不能把真实链路视为已验收。
 
 ### Core user flow
 
@@ -86,7 +86,7 @@
 - **插件框架（MVP 核心骨架）** — `.campusmod` 生命周期、manifest v2、版本化 `provides/requires` 能力解析、headless connector、React 视图、JS 沙箱和权限系统。认证、Session、刷新、缓存、诊断与通知由核心统一提供，不能由插件各自伪造。
 - **Celechron 启发的官方插件集** — 不再使用一个大而全的“教务抓取插件”。本科教务、研究生教务、学在浙大、素拓、在线校历和校园卡作为数据连接器；课表、考试、成绩/GPA、DDL、实践、任务规划、日历桥接和搜索作为能力消费者。完整清单与依赖图见 [官方插件集设计](docs/design/celechron-inspired-plugin-suite.md)。
 - **校内数据接入稳定性基线** — 教务网、学在浙大、素质拓展平台及后续校内 adapter 必须严格参考 Celechron 1.3.0 已验证的认证状态机、局部成功、重试分类、缓存回退、刷新互斥、下一学年探测、解析隔离和脱敏诊断设计。详细基线见 [Celechron 1.3.0 校内数据接入参考](docs/references/celechron-1.3.0-ingestion-baseline.md)。
-- **统一身份认证核心登录** — 设置页“连接并保存”已接通 ZJUAM 动态公钥登录、本科教务网 Session、素拓 CAS/正式 `SESSION`、非匿名 `ctx` 与 `getMyInfo` 账号匹配汇总；只有取得真实认证后业务数据才写入凭据并展示回执。本科课表、考试、成绩和学在浙大作业已走正式 capability 链路，工作台仍保留 mock 课程 fixture，直到可信节次钟点允许把抽象课表展开为具体事件。完整状态机见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)。
+- **统一身份认证核心登录** — 设置页“连接并保存”已接通 ZJUAM 动态公钥登录、本科教务网 Session、素拓 CAS/正式 `SESSION`、非匿名 `ctx` 与 `getMyInfo` 账号匹配汇总；只有取得真实认证后业务数据才写入凭据并展示回执。本科课表、考试、成绩和学在浙大作业通过正式 capability 链路进入当前账号的正式 workspace；关键 connector 不可用时同步失败，不能伪造成功或以 mock 项替代。完整状态机见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)。
 - **日历 + 提醒系统** — 月历、线性日程、单日时间线、桌面系统通知、课程/作业/考试统一展示与悬停详情。MVP 先把桌面场景下的"尽量不漏事"做到可用，再由 post-MVP 安卓端补齐离开电脑后的最后一公里提醒。
 - **首次引导向导** — 5 步流程降低首次使用门槛；教务账号认证 + 连接测试用于快速进入可用状态。
 - **安全存储** — Electron `safeStorage` + 操作系统加密系统；Windows 由 DPAPI 保护密钥。密码明文不落盘，凭据安全是所有自动化抓取的前提和产品底线。

@@ -5,6 +5,7 @@ import type {
   CampusWorkspaceSnapshot
 } from "@campusos/shared";
 import {
+  createLiveWorkspaceSnapshot,
   findCalendarEventRecords,
   mergeAcademicCalendarIntoWorkspace,
   mergeCalendarEventsIntoWorkspace
@@ -134,6 +135,49 @@ const learningEventsRecord: CapabilityRecord<CalendarEventsData> = {
 };
 
 describe("workspace capability integration", () => {
+  it("starts verified accounts from an empty live snapshot instead of mock courses", () => {
+    const snapshot = createLiveWorkspaceSnapshot({
+      generatedAt: "2026-07-19T04:00:00.000Z",
+      accountId: "3240100001"
+    });
+
+    expect(snapshot.courses).toEqual([]);
+    expect(snapshot.deadlines).toEqual([]);
+    expect(snapshot.sourceStates).toContainEqual(
+      expect.objectContaining({
+        sourceId: "academic-affairs",
+        connectionState: "connected",
+        configuredUsername: "3240100001",
+        summary: expect.stringContaining("真实数据源")
+      })
+    );
+    expect(snapshot.sourceStates).not.toContainEqual(
+      expect.objectContaining({ summary: expect.stringContaining("mock") })
+    );
+  });
+
+  it("fills a verified account workspace only from capability events", () => {
+    const snapshot = mergeCalendarEventsIntoWorkspace(
+      createLiveWorkspaceSnapshot({
+        generatedAt: "2026-07-19T04:00:00.000Z",
+        accountId: "3240100001"
+      }),
+      [examEventsRecord],
+      [15]
+    );
+
+    expect(snapshot.courses).toEqual([]);
+    expect(snapshot.deadlines).toEqual([
+      expect.objectContaining({
+        id: "org.campusos.academic-exams:concrete-final",
+        title: "真实课程期末考试"
+      })
+    ]);
+    expect(snapshot.deadlines).not.toContainEqual(
+      expect.objectContaining({ id: "exam-seat-confirmation" })
+    );
+  });
+
   it("derives upcoming and active terms from the official Shanghai calendar", () => {
     const calendarRecord = {
       capability: "academic.calendar-config@1" as const,

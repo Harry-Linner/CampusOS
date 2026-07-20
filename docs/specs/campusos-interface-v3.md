@@ -13,13 +13,15 @@ CampusOS is an academic calendar for students, not a system dashboard. The inter
 The primary navigation always contains four core destinations:
 
 1. **总览** — today’s course timeline and an ordered to-do list.
-2. **日历** — switchable month, agenda, and day views containing courses, assignments, and exams.
+2. **日历** — switchable month, week, agenda, and day views containing courses, assignments, and exams.
 3. **扩展** — installed extensions as a compact management list.
 4. **设置** — data refresh, account, and reminder controls.
 
 An active feature plugin may contribute an additional first-level destination when it has a complete user-facing view. Those destinations are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient. Connector plugins never add empty navigation placeholders.
 
 Course materials and grades may occupy first-level destinations only while their corresponding feature plugins are active and have complete views; they are not hard-coded core destinations.
+
+On desktop, the navigation rail is fixed within the viewport. The main content pane is the sole vertical scroll owner; page content must not make the rail scroll away.
 
 ## Page contracts
 
@@ -33,7 +35,8 @@ Course materials and grades may occupy first-level destinations only while their
 ### 日历
 
 - Use a Monday-first, continuous 7 × 6 monthly grid with thin shared borders.
-- Provide exactly three views in one page: 月历, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
+- Provide exactly four views in one page: 月历, 周视图, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
+- 周视图 uses the available desktop content width directly and must not create a nested horizontal scroll container. At narrow widths, horizontal scrolling is allowed on the calendar page itself.
 - 月历 places courses, assignments, and exams directly inside the matching date cell.
 - 日程 is a linear, chronological list grouped by date for the visible month, rather than a secondary summary panel.
 - 日视图 uses 24 hourly event containers labeled `00:00` through `23:00`. `24:00` belongs to the next day and is not rendered as a separate row; the day view’s outer border closes directly after the `23:00` container. Items in the same start hour are ordered by their exact time and stacked vertically; that hour grows with its content so no item crosses the next hour’s guide line.
@@ -78,7 +81,7 @@ Course materials and grades may occupy first-level destinations only while their
 
 - The main navigation always exposes 总览、日历、扩展、设置; active feature views add and remove their own reachable destinations from runtime contributions.
 - The homepage contains one course timeline and one to-do list, without duplicate reminder items.
-- The calendar switches correctly among 月历、日程、日视图; month navigation and day navigation retain their appropriate period granularity.
+- The calendar switches correctly among 月历、周视图、日程、日视图; month, week, and day navigation retain their appropriate period granularity.
 - The monthly grid is usable at desktop width and can horizontally scroll at narrow widths; agenda and day timeline remain readable on narrow screens.
 - All interactive controls have visible keyboard focus and do not rely on hover alone.
 - Settings retain existing credential and reminder persistence behavior; test builds expose a working data refresh action with visible result feedback.

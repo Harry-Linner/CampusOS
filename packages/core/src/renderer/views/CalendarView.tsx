@@ -550,41 +550,39 @@ export const CalendarView = ({
       ) : null}
 
       {viewMode === "week" ? (
-        <div className="calendar-scroll">
-          <section className="week-view" aria-label={`${formatWeekRange(weekDays)}周视图`}>
-            {weekDays.map((day) => {
-              const dayKey = toDayKey(day);
-              const tasks = taskGroups.get(dayKey) ?? [];
-              const isToday = dayKey === todayKey;
+        <section className="week-view" aria-label={`${formatWeekRange(weekDays)}周视图`}>
+          {weekDays.map((day) => {
+            const dayKey = toDayKey(day);
+            const tasks = taskGroups.get(dayKey) ?? [];
+            const isToday = dayKey === todayKey;
 
-              return (
-                <section
-                  className={isToday ? "week-day is-today" : "week-day"}
-                  key={dayKey}
-                  aria-label={formatDateHeading(day)}
-                >
-                  <header className="week-day-heading">
-                    <span>{getWeekdayLabel(day)}</span>
-                    <h2>
-                      <time dateTime={day.toISOString()}>{day.getDate()}</time>
-                    </h2>
-                  </header>
-                  <div className="week-day-events">
-                    {tasks.map((task) => (
-                      <CalendarTaskButton
-                        key={task.id}
-                        task={task}
-                        variant="week"
-                        selected={selectedTaskId === task.id}
-                        onToggle={toggleTask}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </section>
-        </div>
+            return (
+              <section
+                className={isToday ? "week-day is-today" : "week-day"}
+                key={dayKey}
+                aria-label={formatDateHeading(day)}
+              >
+                <header className="week-day-heading">
+                  <span>{getWeekdayLabel(day)}</span>
+                  <h2>
+                    <time dateTime={day.toISOString()}>{day.getDate()}</time>
+                  </h2>
+                </header>
+                <div className="week-day-events">
+                  {tasks.map((task) => (
+                    <CalendarTaskButton
+                      key={task.id}
+                      task={task}
+                      variant="week"
+                      selected={selectedTaskId === task.id}
+                      onToggle={toggleTask}
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </section>
       ) : null}
 
       {viewMode === "day" ? (

@@ -29,10 +29,11 @@
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，原始分数显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
-- `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。当前阶段的数据源限定为 mock fixture，协议解析与刷新链路可在不接触真实账号的前提下验证；真实账号脱敏验收仍待执行。2026-07-20 本地复核通过 `pnpm typecheck`、`pnpm lint`、`pnpm build` 和 Electron 首次引导 E2E；Vitest 的 4 个 SQLite 测试因本机 `better-sqlite3` 被 Electron ABI 重建、与 Node 22 ABI 不匹配而未通过，属于本地依赖状态，未作为测试全绿证据。
+- `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。2026-07-21 起，引导中已验证账号的 workspace 只从当前账号的正式 capability 记录生成，固定 mock 课程、考试和 DDL 不可进入该路径；核心教务 connector 失败会让同步如实失败。未认证开发路径继续在 fixture 边界内测试。真实账号脱敏验收仍待通过。
 - 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability/网络权限代理。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不开放第三方 headless 生命周期。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
+- 桌面壳层已调整为固定左侧导航与右侧主内容滚动；周视图在桌面直接填充主内容宽度，窄屏才使用横向滚动。
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。
 - 日历冲突检测：`detectCalendarConflicts` 扫描课程与待办时间轴重叠，标记 overlapping/double-booked 两种严重度。
 - 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消和状态广播已用本地 HTTP fixture 覆盖。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移；资料 fixture 不再伪造下载进度，未返回 URL 时如实显示为无下载入口。

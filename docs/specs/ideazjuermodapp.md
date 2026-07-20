@@ -96,7 +96,7 @@
 
 ## 4. 插件系统
 
-> **实现检查点（2026-07-20）：** 内置官方插件已迁移到 Manifest v2，并具备主进程持久化授权、能力解析、headless 生命周期、刷新协调和 provenance。本科与研究生教务连接器已通过核心托管的不可导出 Session/token 接入真实课表、考试和成绩操作，学在浙大作业、考试/DDL 事件与成绩 feature 纵向链路均已完成；插件不能读取密码、Cookie 或 token，renderer capability 读取按 manifest binding 和当前验证账号隔离。设置页首次连接已支持显式本科/研究生路径，研究生必须验证私有成绩结构后才保存脱敏 v4 回执。工作区快照、官方 capability provenance 与下载队列已由 SQLite v1/v2 migration 持久化，旧 JSON 仅用于一次性导入。`.campusmod` 文件选择、真实 ZIP/manifest 校验、权限确认、原子安装升级、崩溃恢复、动态注册和卸载已经完成；受限本地单视图可在 Electron 43 OS sandbox + 独立 origin iframe 中激活。第三方 headless QuickJS/WASM 内层已验证无 Node/网络全局、deadline 和普通 JS 堆上限，但尚未接入 utility process/lifecycle。研究生真实账号、可信节次与课程日期展开、第三方权限代理/进程级资源回收和完整成绩分析仍未完成。
+> **实现检查点（2026-07-21）：** 内置官方插件已迁移到 Manifest v2，并具备主进程持久化授权、能力解析、headless 生命周期、刷新协调和 provenance。本科与研究生教务连接器通过核心托管的不可导出 Session/token 接入真实课表、考试和成绩操作，学在浙大作业、考试/DDL 事件与成绩 feature 纵向链路均已完成；插件不能读取密码、Cookie 或 token，renderer capability 读取按 manifest binding 和当前验证账号隔离。已验证账号的 workspace 从空的正式快照开始，仅消费当前账号的 capability 记录；选定教务 connector 不可用时同步失败，不使用 mock 内容替代。设置页首次连接已支持显式本科/研究生路径，研究生必须验证私有成绩结构后才保存脱敏 v4 回执。真实账号验收仍待通过。
 
 ### 4.1 核心能力
 

@@ -22,6 +22,7 @@ describe("CalendarView", () => {
 
     expect(screen.getByRole("region", { name: /周视图$/ })).toBeDefined();
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(7);
+    expect(document.querySelector(".calendar-scroll .week-view")).toBeNull();
 
     const currentPeriod = screen.getByLabelText("周导航").textContent;
     fireEvent.click(screen.getByRole("button", { name: "下一个周" }));

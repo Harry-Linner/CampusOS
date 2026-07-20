@@ -65,7 +65,7 @@ export const App = (): JSX.Element => {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      void workspace.sync();
+      void workspace.sync().catch(() => undefined);
     }, WORKSPACE_AUTO_SYNC_INTERVAL_MS);
 
     return () => {

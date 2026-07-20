@@ -8,12 +8,70 @@ import type {
   CampusCourseSession,
   CampusDeadline,
   CampusSourceId,
+  CampusSourceSyncState,
   CampusWorkspaceSnapshot
 } from "@campusos/shared";
+import { firstWaveSourceCatalog } from "@campusos/shared";
 import { buildReminderQueue } from "../shared/campusWorkspace";
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 const DAY_IN_MS = 24 * HOUR_IN_MS;
+
+export const createLiveWorkspaceSnapshot = ({
+  generatedAt,
+  accountId
+}: {
+  generatedAt: string;
+  accountId: string;
+}): CampusWorkspaceSnapshot => {
+  const sourceStates: CampusSourceSyncState[] = firstWaveSourceCatalog.map(
+    (source) => {
+      const usesUnifiedAuthentication =
+        source.id === "academic-affairs" || source.id === "learning-platform";
+
+      return {
+        sourceId: source.id,
+        label: source.label,
+        status: usesUnifiedAuthentication ? "partial" : "planned",
+        connectionState: usesUnifiedAuthentication ? "connected" : "not-required",
+        lastSyncedAt: generatedAt,
+        itemCount: 0,
+        summary: usesUnifiedAuthentication
+          ? "已验证账号，正在等待真实数据源返回。"
+          : "该数据源尚未接入真实连接器。",
+        actionLabel: usesUnifiedAuthentication
+          ? "正在刷新真实数据"
+          : "等待连接器接入",
+        configuredUsername: usesUnifiedAuthentication ? accountId : null
+      };
+    }
+  );
+
+  return {
+    generatedAt,
+    term: {
+      label: "校历待同步",
+      phase: "unavailable",
+      currentWeek: null,
+      progressPercent: 0
+    },
+    sourceStates,
+    courses: [],
+    todayCourses: [],
+    deadlines: [],
+    materials: [],
+    downloads: [],
+    reminders: [],
+    summary: {
+      readySources: 0,
+      totalSources: sourceStates.length,
+      downloadsInFlight: 0,
+      materialsReady: 0,
+      remindersQueued: 0,
+      deadlinesDueSoon: 0
+    }
+  };
+};
 
 export const findAcademicCalendarRecord = (
   records: CapabilityRecord<AcademicCalendarConfigData>[],

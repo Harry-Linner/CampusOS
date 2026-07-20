@@ -13,8 +13,12 @@ import {
 import { readAcademicCredentialRecord } from "./academicCredentialStore";
 import { readReminderSettingsRecord } from "./reminderSettingsStore";
 import { scheduleWorkspaceReminders } from "./reminderScheduler";
-import { pluginRefreshCoordinator } from "./refreshCoordinator";
 import {
+  pluginRefreshCoordinator,
+  type RefreshSourceResult
+} from "./refreshCoordinator";
+import {
+  createLiveWorkspaceSnapshot,
   findAcademicCalendarRecord,
   findCalendarEventRecords,
   mergeAcademicCalendarIntoWorkspace,
@@ -37,27 +41,55 @@ const getWorkspaceSnapshotStore = () =>
     legacyStoragePath: getLegacyWorkspaceStorePath()
   });
 
+const getAcademicConnectorSourceId = (
+  program: "undergraduate" | "graduate"
+): "zju-undergraduate" | "zju-graduate" =>
+  program === "undergraduate" ? "zju-undergraduate" : "zju-graduate";
+
+const assertAcademicRefreshAvailable = (
+  refreshResults: readonly RefreshSourceResult[],
+  program: "undergraduate" | "graduate"
+): void => {
+  const sourceId = getAcademicConnectorSourceId(program);
+  const result = refreshResults.find((candidate) => candidate.sourceId === sourceId);
+
+  if (result && result.status !== "unavailable") return;
+
+  throw new Error(
+    `教务数据同步失败：${result?.message ?? "真实教务连接器未启动。"}`
+  );
+};
+
 const buildGeneratedRecord = async (
   hydratedFrom: "generated" | "synced"
 ): Promise<CampusWorkspaceRecord> => {
   const pluginRuntime = await getOfficialPluginRuntimeService().load();
-  await pluginRefreshCoordinator.runAll();
+  const refreshResults = await pluginRefreshCoordinator.runAll();
   const academicCredential = await readAcademicCredentialRecord();
   const verifiedAcademicAccountId =
     academicCredential.verificationState === "verified" &&
     academicCredential.authenticatedProfile
       ? academicCredential.authenticatedProfile.studentId
       : null;
+  if (verifiedAcademicAccountId && academicCredential.program) {
+    assertAcademicRefreshAvailable(refreshResults, academicCredential.program);
+  }
   const reminderSettings = await readReminderSettingsRecord();
-  const baseSnapshot = await loadCampusWorkspace(
-    createDefaultCampusAdapterContext(new Date(), {
-      "academic-affairs": {
-        configured: academicCredential.configured,
-        username: academicCredential.username,
-        savedAt: academicCredential.savedAt
-      }
-    }, reminderSettings.leadMinutes)
-  );
+  const now = new Date();
+  const baseSnapshot = verifiedAcademicAccountId
+    ? createLiveWorkspaceSnapshot({
+        generatedAt: now.toISOString(),
+        accountId: verifiedAcademicAccountId
+      })
+    : await loadCampusWorkspace(
+        createDefaultCampusAdapterContext(now, {
+          "academic-affairs": {
+            configured: academicCredential.configured,
+            username: academicCredential.username,
+            savedAt: academicCredential.savedAt
+          }
+        }, reminderSettings.leadMinutes)
+      );
   const eventRecords =
     await getOfficialCapabilityRepository().read<CalendarEventsData>(
       "calendar.events@1"
