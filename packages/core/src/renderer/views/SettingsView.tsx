@@ -12,6 +12,8 @@ import {
 
 interface SettingsViewProps {
   onRefresh: () => Promise<void>;
+  showDevelopmentTools?: boolean;
+  onRestartOnboarding?: () => void;
 }
 
 const reminderLeadOptions = [15, 60, 120];
@@ -23,7 +25,9 @@ const formatPoints = (value: number): string =>
   new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
 
 export const SettingsView = ({
-  onRefresh
+  onRefresh,
+  showDevelopmentTools = false,
+  onRestartOnboarding
 }: SettingsViewProps): JSX.Element => {
   const academicCredential = useAcademicCredential();
   const reminderSettings = useReminderSettings();
@@ -276,6 +280,26 @@ export const SettingsView = ({
             <div className="quiet-empty-state quiet-empty-compact">暂无刷新日志</div>
           ) : null}
         </section>
+
+        {showDevelopmentTools && onRestartOnboarding ? (
+          <section className="settings-section" aria-labelledby="development-heading">
+            <header className="settings-section-heading">
+              <h2 id="development-heading">开发工具</h2>
+            </header>
+            <p className="page-copy">
+              仅重置首次引导完成状态，保留账号、插件和本地数据。
+            </p>
+            <div className="settings-actions">
+              <button
+                className="text-button"
+                type="button"
+                onClick={onRestartOnboarding}
+              >
+                跳回初始引导界面
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="settings-section" aria-labelledby="account-heading">
           <header className="settings-section-heading">

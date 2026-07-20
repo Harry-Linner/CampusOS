@@ -3,7 +3,8 @@ import type { ActivityItemId } from "@campusos/shared";
 import { ActivityBar } from "./components/ActivityBar";
 import {
   OnboardingWizard,
-  readOnboardingCompleted
+  readOnboardingCompleted,
+  resetOnboardingCompleted
 } from "./components/OnboardingWizard";
 import { useCampusWorkspace } from "./hooks/useCampusWorkspace";
 import { usePluginHost } from "./hooks/usePluginHost";
@@ -21,6 +22,8 @@ import {
 } from "./lib/downloadBridge";
 
 const WORKSPACE_AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+const isDevelopmentBuild =
+  (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
 
 export const App = (): JSX.Element => {
   const [onboardingComplete, setOnboardingComplete] = useState(() =>
@@ -42,6 +45,11 @@ export const App = (): JSX.Element => {
 
   const handleOnboardingComplete = useCallback(() => {
     setOnboardingComplete(true);
+  }, []);
+
+  const handleRestartOnboarding = useCallback(() => {
+    resetOnboardingCompleted();
+    setOnboardingComplete(false);
   }, []);
 
   const activityItems = useMemo(
@@ -128,7 +136,13 @@ export const App = (): JSX.Element => {
       />
     );
   } else if (activeView === "settings") {
-    content = <SettingsView onRefresh={() => workspace.sync()} />;
+    content = (
+      <SettingsView
+        onRefresh={() => workspace.sync()}
+        showDevelopmentTools={isDevelopmentBuild}
+        onRestartOnboarding={handleRestartOnboarding}
+      />
+    );
   } else if (activityPlugins.length > 0) {
     const selected = activityPlugins[0];
     content = (

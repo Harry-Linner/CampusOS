@@ -64,6 +64,10 @@ const ONBOARDING_STORAGE_KEY = "campusos.onboarding.completed";
 export const readOnboardingCompleted = (): boolean =>
   globalThis.localStorage?.getItem(ONBOARDING_STORAGE_KEY) === "1";
 
+export const resetOnboardingCompleted = (): void => {
+  globalThis.localStorage?.removeItem(ONBOARDING_STORAGE_KEY);
+};
+
 const persistOnboardingCompleted = (): void => {
   globalThis.localStorage?.setItem(ONBOARDING_STORAGE_KEY, "1");
 };

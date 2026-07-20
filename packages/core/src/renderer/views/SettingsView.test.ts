@@ -182,6 +182,20 @@ describe("SettingsView", () => {
     expect(screen.getByText("live · 320ms")).toBeDefined();
   });
 
+  it("returns to onboarding only from the development tools section", async () => {
+    installBridge(vi.fn(async () => connectedRecord));
+    const onRestartOnboarding = vi.fn();
+
+    render(createElement(SettingsView, {
+      onRefresh: vi.fn().mockResolvedValue(undefined),
+      showDevelopmentTools: true,
+      onRestartOnboarding
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "跳回初始引导界面" }));
+    expect(onRestartOnboarding).toHaveBeenCalledTimes(1);
+  });
+
   it("reports connected only after the main-process authentication succeeds", async () => {
     const connect = vi.fn(async () => connectedRecord);
     installBridge(connect);
