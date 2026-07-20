@@ -263,6 +263,39 @@ export const validateManifestV2 = (
     issues.push("Manifest v2 releaseStage 无效");
   }
 
+  const signatureFields = [
+    "contentHash",
+    "developerSignature",
+    "developerPublicKey"
+  ] as const;
+  const suppliedSignatureFields = signatureFields.filter(
+    (field) => candidate[field] !== undefined
+  );
+  if (
+    suppliedSignatureFields.length > 0 &&
+    suppliedSignatureFields.length !== signatureFields.length
+  ) {
+    issues.push("Manifest v2 签名字段必须同时提供");
+  } else if (suppliedSignatureFields.length === signatureFields.length) {
+    if (
+      typeof candidate.contentHash !== "string" ||
+      !/^[a-f0-9]{64}$/.test(candidate.contentHash)
+    ) {
+      issues.push("Manifest v2 contentHash 必须是 SHA-256 十六进制摘要");
+    }
+    for (const field of ["developerSignature", "developerPublicKey"] as const) {
+      const value = candidate[field];
+      if (
+        typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > 512 ||
+        !/^[A-Za-z0-9_-]+$/.test(value)
+      ) {
+        issues.push(`Manifest v2 ${field} 必须是 base64url 编码`);
+      }
+    }
+  }
+
   if (!Array.isArray(candidate.permissions)) {
     issues.push("Manifest v2 permissions 必须是数组");
   } else {

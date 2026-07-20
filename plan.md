@@ -30,7 +30,7 @@
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
 - `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。当前阶段的数据源限定为 mock fixture，协议解析与刷新链路可在不接触真实账号的前提下验证；真实账号脱敏验收仍待执行。2026-07-20 本地复核通过 `pnpm typecheck`、`pnpm lint`、`pnpm build` 和 Electron 首次引导 E2E；Vitest 的 4 个 SQLite 测试因本机 `better-sqlite3` 被 Electron ABI 重建、与 Node 22 ABI 不匹配而未通过，属于本地依赖状态，未作为测试全绿证据。
-- 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability 权限代理与签名。
+- 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability/网络权限代理。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不开放第三方 headless 生命周期。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。

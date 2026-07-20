@@ -20,6 +20,10 @@ import {
   validateManifestV2,
   type PluginManifestV2
 } from "@campusos/shared";
+import {
+  createCampusmodSigningPayload,
+  verifyPackageContent
+} from "./packageSignature";
 
 const MANIFEST_PATH = "manifest.json";
 const INSTALL_METADATA_PATH = ".campusmod-install.json";
@@ -99,6 +103,27 @@ interface StoredInstallMetadata extends InstalledCampusmodPackage {
   dataVersion: 1;
   files: Record<string, string>;
 }
+
+const determineSignatureStatus = (
+  parsed: Pick<ParsedCampusmodPackage, "manifest" | "entrypoints" | "entries">
+): CampusmodPackageInspection["signatureStatus"] => {
+  const { contentHash, developerSignature, developerPublicKey } = parsed.manifest;
+  if (!contentHash || !developerSignature || !developerPublicKey) {
+    return "unsigned";
+  }
+
+  const payload = createCampusmodSigningPayload(
+    { ...parsed.manifest, entrypoints: parsed.entrypoints },
+    parsed.entries
+  );
+  return verifyPackageContent(payload, {
+    sha256: contentHash,
+    signature: developerSignature,
+    publicKey: developerPublicKey
+  }).valid
+    ? "verified"
+    : "invalid";
+};
 
 export interface CampusmodPackageRegistry {
   inspect: (sourcePath: string) => Promise<CampusmodPackageInspection>;
@@ -409,6 +434,15 @@ const parseManifest = (
     optionalRequires: [
       ...candidate.optionalRequires as PluginManifestV2["optionalRequires"]
     ],
+    ...(typeof candidate.contentHash === "string"
+      ? { contentHash: candidate.contentHash }
+      : {}),
+    ...(typeof candidate.developerSignature === "string"
+      ? { developerSignature: candidate.developerSignature }
+      : {}),
+    ...(typeof candidate.developerPublicKey === "string"
+      ? { developerPublicKey: candidate.developerPublicKey }
+      : {}),
     contributes
   };
   return { manifest, entrypoints };
@@ -488,7 +522,9 @@ const parseInstalledMetadata = (value: unknown): StoredInstallMetadata => {
     candidate.sourceFilename.length > 255 ||
     typeof candidate.sha256 !== "string" ||
     !/^[a-f0-9]{64}$/.test(candidate.sha256) ||
-    candidate.signatureStatus !== "unsigned" ||
+    (candidate.signatureStatus !== "unsigned" &&
+      candidate.signatureStatus !== "verified" &&
+      candidate.signatureStatus !== "invalid") ||
     !Number.isSafeInteger(candidate.archiveSize) ||
     (candidate.archiveSize ?? -1) < 0 ||
     !Number.isSafeInteger(candidate.unpackedSize) ||
@@ -555,7 +591,7 @@ const parseInstalledMetadata = (value: unknown): StoredInstallMetadata => {
     unpackedSize: candidate.unpackedSize as number,
     fileCount: candidate.fileCount as number,
     sha256: candidate.sha256,
-    signatureStatus: "unsigned",
+    signatureStatus: candidate.signatureStatus,
     installedAt: candidate.installedAt,
     sourceFilename: candidate.sourceFilename,
     files
@@ -688,6 +724,13 @@ export const createCampusmodPackageRegistry = ({
     ) {
       throw new Error("安装 manifest 与安装记录不一致。");
     }
+    if (determineSignatureStatus({
+      manifest: parsedManifest.manifest,
+      entrypoints: parsedManifest.entrypoints,
+      entries
+    }) !== metadata.signatureStatus) {
+      throw new Error("安装包签名状态与安装记录不一致。");
+    }
     return {
       installedPackage: {
         manifest: metadata.manifest,
@@ -755,17 +798,7 @@ export const createCampusmodPackageRegistry = ({
       const parsed = await parseArchive(archive, limits);
       const token = randomUUID();
 
-      let signatureStatus: CampusmodPackageInspection["signatureStatus"] = "unsigned";
-      const { contentHash, developerSignature, developerPublicKey } = parsed.manifest;
-      if (contentHash && developerSignature && developerPublicKey) {
-        const { verifyPackageContent } = await import("./packageSignature");
-        const result = verifyPackageContent(archive, {
-          sha256: contentHash,
-          signature: developerSignature,
-          publicKey: developerPublicKey
-        });
-        signatureStatus = result.valid ? "verified" : "invalid";
-      }
+      const signatureStatus = determineSignatureStatus(parsed);
 
       const inspection: CampusmodPackageInspection = {
         token,
@@ -804,7 +837,8 @@ export const createCampusmodPackageRegistry = ({
         if (
           parsed.sha256 !== pending.inspection.sha256 ||
           parsed.manifest.id !== pending.inspection.manifest.id ||
-          parsed.manifest.version !== pending.inspection.manifest.version
+          parsed.manifest.version !== pending.inspection.manifest.version ||
+          determineSignatureStatus(parsed) !== pending.inspection.signatureStatus
         ) {
           throw new Error("插件包在确认后发生变化，请重新选择。");
         }
@@ -817,7 +851,7 @@ export const createCampusmodPackageRegistry = ({
           unpackedSize: parsed.unpackedSize,
           fileCount: parsed.fileCount,
           sha256: parsed.sha256,
-          signatureStatus: "unsigned",
+          signatureStatus: pending.inspection.signatureStatus,
           installedAt,
           sourceFilename: pending.sourceFilename
         };

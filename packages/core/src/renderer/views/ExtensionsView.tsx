@@ -66,6 +66,18 @@ const statusLabel: Record<PluginRuntimeStatus, string> = {
   placeholder: "尚未开放"
 };
 
+const signatureLabel: Record<PluginPackageInspection["signatureStatus"], string> = {
+  unsigned: "未签名",
+  verified: "签名已验证",
+  invalid: "签名无效"
+};
+
+const signatureNotice: Record<PluginPackageInspection["signatureStatus"], string> = {
+  unsigned: "此包未签名。",
+  verified: "开发者签名已验证。",
+  invalid: "此包的开发者签名无效。"
+};
+
 export const ExtensionsView = ({
   plugins,
   loading,
@@ -227,7 +239,9 @@ export const ExtensionsView = ({
               <h2>{packageInspection.manifest.displayName}</h2>
               <p>{packageInspection.manifest.description}</p>
             </div>
-            <span className="package-signature is-unsigned">未签名</span>
+            <span className={`package-signature is-${packageInspection.signatureStatus}`}>
+              {signatureLabel[packageInspection.signatureStatus]}
+            </span>
           </header>
           <dl className="package-review-facts">
             <div>
@@ -263,8 +277,8 @@ export const ExtensionsView = ({
           </div>
           <p className="package-sandbox-note">
             {inspectionSandboxIssue
-              ? `此包尚未签名。确认只会安装并保持停用；当前不能执行：${inspectionSandboxIssue}`
-              : "此包尚未签名。安装后仍保持停用；只有逐项授权后，视图才会在无 Node、无网络、拒绝系统权限的独立 origin 沙箱中运行。"}
+              ? `${signatureNotice[packageInspection.signatureStatus]} 确认只会安装并保持停用；当前不能执行：${inspectionSandboxIssue}`
+              : `${signatureNotice[packageInspection.signatureStatus]} 安装后仍保持停用；只有逐项授权后，视图才会在无 Node、无网络、拒绝系统权限的独立 origin 沙箱中运行。`}
           </p>
           <div className="package-review-actions">
             <button
@@ -353,7 +367,7 @@ export const ExtensionsView = ({
                           <dt>来源</dt>
                           <dd>
                             {installedPackage
-                              ? `本地 .campusmod · ${installedPackage.signatureStatus === "unsigned" ? "未签名" : installedPackage.signatureStatus}`
+                              ? `本地 .campusmod · ${signatureLabel[installedPackage.signatureStatus]}`
                               : plugin.manifest.sourceScope.length > 0
                               ? plugin.manifest.sourceScope.join("、")
                               : "本地"}

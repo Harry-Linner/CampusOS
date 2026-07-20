@@ -103,7 +103,7 @@ zip hello-world.campusmod manifest.json renderer.js
 - **沙箱隔离**：第三方 renderer 运行在独立 `campusmod://` origin iframe，无 Node/网络全局
 - **headless 沙箱**：第三方 headless 代码在 QuickJS/WASM 内执行，CPU/内存/堆栈受限
 - **权限最小化**：manifest 中声明的权限在安装时逐项确认
-- **包签名**：支持 Ed25519 数字签名验证
+- **包签名**：`contentHash`、`developerSignature` 与 `developerPublicKey` 必须同时出现；它们对移除自身后的 manifest 和所有其他文件摘要构成的规范载荷执行 Ed25519 验证。`verified` 仅证明签发密钥，不授予额外权限或 headless 执行权。
 
 ## 调试方法
 

@@ -12,6 +12,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { strToU8, zipSync } from "fflate";
 import { createCampusmodPackageRegistry } from "./campusmodPackageRegistry";
+import {
+  createCampusmodSigningPayload,
+  generateEd25519KeyPair,
+  signPackageContent
+} from "./packageSignature";
 
 const temporaryDirectories: string[] = [];
 
@@ -56,6 +61,29 @@ const createArchive = (
   ...extraEntries
 });
 
+const createSignedArchive = (): Uint8Array => {
+  const manifest = createManifest();
+  const main = strToU8("export const activate = () => ({ deactivate() {} });");
+  const signaturePayload = createCampusmodSigningPayload(
+    manifest,
+    new Map([
+      ["manifest.json", strToU8(JSON.stringify(manifest))],
+      ["dist/main.js", main]
+    ])
+  );
+  const { privateKey } = generateEd25519KeyPair();
+  const signature = signPackageContent(signaturePayload, privateKey);
+
+  return createArchive({
+    ...manifest,
+    contentHash: signature.sha256,
+    developerSignature: signature.signature,
+    developerPublicKey: signature.publicKey
+  }, {
+    "dist/main.js": main
+  });
+};
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((path) =>
@@ -65,6 +93,37 @@ afterEach(async () => {
 });
 
 describe("CampusmodPackageRegistry", () => {
+  it("persists a verified developer signature through installation and reload", async () => {
+    const workspace = await createTemporaryDirectory();
+    const rootPath = join(workspace, "installed");
+    const sourcePath = join(workspace, "signed.campusmod");
+    await writeFile(sourcePath, createSignedArchive());
+    const registry = createCampusmodPackageRegistry({ rootPath });
+
+    const inspection = await registry.inspect(sourcePath);
+    expect(inspection.signatureStatus).toBe("verified");
+
+    await expect(registry.install(inspection.token)).resolves.toMatchObject({
+      signatureStatus: "verified"
+    });
+    await expect(registry.load()).resolves.toMatchObject({
+      packages: [{ signatureStatus: "verified" }]
+    });
+  });
+
+  it("rejects incomplete developer signature metadata", async () => {
+    const workspace = await createTemporaryDirectory();
+    const sourcePath = join(workspace, "partial-signature.campusmod");
+    await writeFile(sourcePath, createArchive(createManifest({
+      contentHash: "a".repeat(64)
+    })));
+    const registry = createCampusmodPackageRegistry({
+      rootPath: join(workspace, "installed")
+    });
+
+    await expect(registry.inspect(sourcePath)).rejects.toThrow("签名字段必须同时提供");
+  });
+
   it("inspects, atomically installs, upgrades and loads a real campusmod archive", async () => {
     const workspace = await createTemporaryDirectory();
     const rootPath = join(workspace, "installed");

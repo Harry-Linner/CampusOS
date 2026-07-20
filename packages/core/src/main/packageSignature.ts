@@ -15,6 +15,47 @@ export interface PackageSignatureMetadata {
 
 const SIGNATURE_ENCODING: BufferEncoding = "base64url";
 const KEY_ENCODING: BufferEncoding = "base64url";
+const signingMetadataKeys = new Set([
+  "contentHash",
+  "developerSignature",
+  "developerPublicKey"
+]);
+
+const canonicalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, canonicalize(entry)])
+    );
+  }
+  return value;
+};
+
+/**
+ * Produces the stable content a .campusmod author signs. The signature
+ * metadata itself is deliberately excluded to avoid a circular archive
+ * signature, while every executable/resource file remains covered by digest.
+ */
+export const createCampusmodSigningPayload = (
+  manifest: Record<string, unknown>,
+  entries: ReadonlyMap<string, Uint8Array>
+): Buffer => {
+  const unsignedManifest = Object.fromEntries(
+    Object.entries(manifest).filter(([key]) => !signingMetadataKeys.has(key))
+  );
+  const files = [...entries]
+    .filter(([path]) => path !== "manifest.json")
+    .map(([path, content]) => ({ path, sha256: computeSha256(Buffer.from(content)) }))
+    .sort((left, right) => left.path.localeCompare(right.path));
+
+  return Buffer.from(
+    JSON.stringify(canonicalize({ version: 1, manifest: unsignedManifest, files })),
+    "utf8"
+  );
+};
 
 export const generateEd25519KeyPair = (): {
   publicKey: Buffer;

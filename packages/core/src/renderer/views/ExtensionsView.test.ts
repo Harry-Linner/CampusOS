@@ -113,6 +113,35 @@ describe("ExtensionsView", () => {
     });
   });
 
+  it("shows verified signature status during package review", async () => {
+    const inspection: PluginPackageInspection = {
+      token: "58ac2bea-45ab-497e-85e5-1856063b674d",
+      manifest: {
+        ...calendarManifest,
+        id: "dev.example.signed-countdown",
+        name: "signed-countdown",
+        displayName: "已签名倒计时",
+        permissions: ["storage:local"],
+        requires: [],
+        optionalRequires: []
+      },
+      entrypoints: { renderer: "dist/renderer.js" },
+      archiveSize: 2048,
+      unpackedSize: 4096,
+      fileCount: 3,
+      sha256: "a".repeat(64),
+      signatureStatus: "verified"
+    };
+    render(createElement(ExtensionsView, {
+      ...createProps(),
+      onSelectPackage: vi.fn(async () => inspection)
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
+
+    expect(await screen.findByText("签名已验证")).toBeTruthy();
+  });
+
   it("grants and enables only an eligible installed sandbox view", async () => {
     const manifest = {
       ...calendarManifest,

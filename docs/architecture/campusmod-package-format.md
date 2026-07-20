@@ -8,7 +8,7 @@
 
 `.campusmod` 是 ZIP 归档。当前版本支持通过扩展页文件选择器检查、确认、原子安装、升级、持久注册、损坏隔离和卸载。安装成功的第三方插件默认停用。只有符合 renderer sandbox v1 严格 profile、且用户明确授予 `storage:local` 的单活动视图插件可以启用；其他包继续保持 install-only，主进程不会执行其 `main`，renderer 也不会直接 `import()` 其代码。
 
-当前安装包均标记为 `unsigned`。SHA-256 和逐文件摘要用于发现确认后换包、文件损坏或安装记录不一致，不证明作者身份，也不能抵御能够同时修改插件目录和安装记录的本机同账号攻击者。
+安装器会显示 `unsigned`、`verified` 或 `invalid`。当 manifest 同时提供 `contentHash`、`developerSignature` 和 `developerPublicKey` 时，主进程使用 Ed25519 验证规范载荷：载荷包含移除签名字段后的完整 manifest（包括 entrypoint）以及所有非 manifest 文件的路径和 SHA-256。检查、安装和每次重载都会重算；部分签名字段会被拒绝，签名状态与安装记录不一致的目录会被隔离。签名只证明该包由对应私钥签发，不建立开发者信任目录，也不自动授权或开放第三方 headless 执行。
 
 ## 2. 归档结构
 
@@ -116,7 +116,7 @@ export function run(input) {
 
 ## 7. 后续开放条件
 
-renderer sandbox v1 已能承载无网络的本地单视图，但不等于完整第三方执行平台。自动化测试已使用真实 ZIP 完成“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”链路；这不替代 Electron 窗口内的进程隔离验收。开放 headless/main、capability 或网络权限前必须完成并验证：独立 worker/isolate、受控 capability API、精确 origin 网络代理、资源与超时限制、崩溃回收和恶意插件测试。还需验证跨 origin frame 是否稳定落入独立 renderer 进程，并增加 CPU/内存失控恢复。包签名属于后续版本，不能用当前摘要字段冒充签名。
+renderer sandbox v1 已能承载无网络的本地单视图，但不等于完整第三方执行平台。自动化测试已使用真实 ZIP 完成“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”链路；这不替代 Electron 窗口内的进程隔离验收。开放 headless/main、capability 或网络权限前必须完成并验证：独立 worker/isolate、受控 capability API、精确 origin 网络代理、资源与超时限制、崩溃回收和恶意插件测试。还需验证跨 origin frame 是否稳定落入独立 renderer 进程，并增加 CPU/内存失控恢复。包签名验证已实现，但信任目录和签名密钥连续性仍属于后续工作。
 
 实现采用 Electron 官方安全基线与自定义协议生命周期：scheme 在 `ready` 前注册，handler 在 `ready` 后安装；BrowserWindow 显式启用 OS sandbox、context isolation 与 web security，并禁用 Node integration、webview、新窗口和网页权限。依赖安装只允许固定版本 Electron 与 esbuild 执行生命周期脚本，未审查的新增脚本会使安装失败。
 

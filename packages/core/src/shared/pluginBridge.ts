@@ -22,7 +22,7 @@ export interface PluginPackageInspection {
   unpackedSize: number;
   fileCount: number;
   sha256: string;
-  signatureStatus: "unsigned";
+  signatureStatus: "unsigned" | "verified" | "invalid";
 }
 
 export type PluginPackageSelection =
@@ -36,7 +36,7 @@ export interface InstalledPluginPackage {
   unpackedSize: number;
   fileCount: number;
   sha256: string;
-  signatureStatus: "unsigned";
+  signatureStatus: "unsigned" | "verified" | "invalid";
   installedAt: string;
   sourceFilename: string;
 }

@@ -1297,6 +1297,18 @@ input:focus-visible {
   color: #805f1f;
 }
 
+.package-signature.is-verified {
+  border-color: #71a983;
+  background: #edf8ef;
+  color: #2f7041;
+}
+
+.package-signature.is-invalid {
+  border-color: #cf7773;
+  background: #fff0ef;
+  color: #963d39;
+}
+
 .package-review-facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
