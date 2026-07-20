@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ZjuUnifiedAuthError,
+  createNodeHttpsZjuAuthTransport,
   createZjuUnifiedAuthClient,
   type ZjuAuthHttpRequest,
   type ZjuAuthHttpResponse,
@@ -70,6 +71,22 @@ const authenticatedServicePrelude = (): ZjuAuthHttpResponse[] => [
 ];
 
 describe("ZjuUnifiedAuthClient", () => {
+  it("rejects non-HTTPS requests in the native transport", async () => {
+    const transport = createNodeHttpsZjuAuthTransport();
+
+    await expect(
+      transport({
+        method: "GET",
+        url: "http://zjuam.zju.edu.cn/cas/login",
+        headers: {},
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({
+      code: "protocol-error",
+      message: "统一认证请求必须使用 HTTPS。"
+    });
+  });
+
   it("reuses an opaque undergraduate session without exposing service cookies", async () => {
     const { requests, transport } = createSequenceTransport([
       response(200, '<input name="execution" value="e1s1">'),

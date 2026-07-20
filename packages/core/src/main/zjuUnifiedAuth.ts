@@ -1,3 +1,5 @@
+import { request as httpsRequest } from "node:https";
+
 const ZJU_AUTH_LOGIN_URL = "https://zjuam.zju.edu.cn/cas/login";
 const ZJU_AUTH_PUBLIC_KEY_URL =
   "https://zjuam.zju.edu.cn/cas/v2/getPubKey";
@@ -389,6 +391,82 @@ export const createFetchZjuAuthTransport = (
     };
   };
 };
+
+export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport =>
+  async (request) =>
+    new Promise<ZjuAuthHttpResponse>((resolve, reject) => {
+      const target = new URL(request.url);
+      if (target.protocol !== "https:") {
+        reject(
+          new ZjuUnifiedAuthError(
+            "protocol-error",
+            "统一认证请求必须使用 HTTPS。"
+          )
+        );
+        return;
+      }
+
+      const nativeRequest = httpsRequest(
+        target,
+        {
+          method: request.method,
+          headers: request.headers,
+          signal: request.signal
+        },
+        (response) => {
+          const contentLength = Number.parseInt(
+            String(response.headers["content-length"] ?? "0"),
+            10
+          );
+          if (contentLength > MAX_RESPONSE_LENGTH) {
+            response.resume();
+            reject(
+              new ZjuUnifiedAuthError(
+                "protocol-error",
+                "统一认证服务返回了超出限制的响应。",
+                { statusCode: response.statusCode }
+              )
+            );
+            return;
+          }
+
+          const chunks: Buffer[] = [];
+          let receivedLength = 0;
+          response.on("data", (chunk: Buffer) => {
+            receivedLength += chunk.length;
+            if (receivedLength > MAX_RESPONSE_LENGTH) {
+              nativeRequest.destroy(
+                new ZjuUnifiedAuthError(
+                  "protocol-error",
+                  "统一认证服务返回了超出限制的响应。",
+                  { statusCode: response.statusCode }
+                )
+              );
+              return;
+            }
+            chunks.push(chunk);
+          });
+          response.once("error", reject);
+          response.once("end", () => {
+            const headers: Record<string, string | readonly string[]> = {};
+            const location = response.headers.location;
+            const contentType = response.headers["content-type"];
+            const setCookie = response.headers["set-cookie"];
+            if (location) headers.location = location;
+            if (contentType) headers["content-type"] = contentType;
+            if (setCookie) headers["set-cookie"] = setCookie;
+            resolve({
+              status: response.statusCode ?? 0,
+              headers,
+              body: Buffer.concat(chunks).toString("utf8")
+            });
+          });
+        }
+      );
+      nativeRequest.once("error", reject);
+      if (request.body) nativeRequest.write(request.body, "utf8");
+      nativeRequest.end();
+    });
 
 const decodeHtmlAttribute = (value: string): string =>
   value
@@ -815,7 +893,7 @@ class ZjuUnifiedAuthClient {
   readonly #pendingGraduateSessions = new Map<string, Promise<string>>();
 
   constructor(options: ZjuUnifiedAuthClientOptions = {}) {
-    this.#transport = options.transport ?? createFetchZjuAuthTransport();
+    this.#transport = options.transport ?? createNodeHttpsZjuAuthTransport();
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => new Date());
   }

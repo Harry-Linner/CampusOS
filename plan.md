@@ -40,7 +40,7 @@
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
 - 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。2026-07-20 本地复核已通过 typecheck、lint、161 项单测（1 项真实账号测试按环境跳过）、首次引导 Electron E2E 和 x64 NSIS 安装包构建。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、全新 Windows 安装和 GitHub Release/分发验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
+- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。2026-07-20 本地复核已通过 typecheck、lint、162 项单测（1 项真实账号测试按环境跳过）、首次引导 Electron E2E 和 x64 NSIS 安装包构建。现场 `verify:zju-auth` 已通过 `live-auth.env` 注入真实账号执行：公共登录页与公钥端点返回 200；Node HTTPS transport 已取代会超时的 Undici fetch，但表单提交阶段收到 ZJUAM 5xx，未建立登录态，因此真实账号验收仍未通过且未输出敏感数据。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、全新 Windows 安装和 GitHub Release/分发验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
 
 ---
 
