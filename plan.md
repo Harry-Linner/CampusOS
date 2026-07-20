@@ -29,7 +29,7 @@
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，原始分数显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
-- `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。当前阶段的数据源限定为 mock fixture，协议解析与刷新链路可在不接触真实账号的前提下验证；真实账号脱敏验收仍待执行。2026-07-20 已通过 `pnpm typecheck`、`pnpm test`（160 项通过，1 项真实账号现场测试按环境跳过）、`pnpm lint`、`pnpm build`。
+- `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。当前阶段的数据源限定为 mock fixture，协议解析与刷新链路可在不接触真实账号的前提下验证；真实账号脱敏验收仍待执行。2026-07-20 本地复核通过 `pnpm typecheck`、`pnpm lint`、`pnpm build` 和 Electron 首次引导 E2E；Vitest 的 4 个 SQLite 测试因本机 `better-sqlite3` 被 Electron ABI 重建、与 Node 22 ABI 不匹配而未通过，属于本地依赖状态，未作为测试全绿证据。
 - 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability 权限代理与签名。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
@@ -40,7 +40,7 @@
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
 - 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、可信课程节次/日期展开、真实来源 URL 的课件批量下载验收、其余 Playwright 端到端流程、第三方 headless capability/网络权限代理与签名、Windows 安装和发布验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
+- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、Windows 安装和发布验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
 
 ---
 
@@ -199,10 +199,10 @@ flowchart TD
 
 **Concrete deliverables:**
 - [ ] GitHub 仓库初始化 (MIT license + README + CONTRIBUTING)
-- [ ] Electron + React + Vite + TypeScript 项目骨架可运行
-- [ ] VS Code 式工作台 UI 可见
-- [ ] hello-world 插件加载并渲染
-- [ ] 插件安装/卸载/激活/停用生命周期通过测试
+- [x] Electron + React + Vite + TypeScript 项目骨架可运行
+- [x] VS Code 式工作台 UI 可见
+- [x] hello-world 插件加载并渲染
+- [x] 插件安装/卸载/激活/停用生命周期通过测试
 - [x] SQLite 初始化 + migration v1/v2 执行成功
 - [x] CI pipeline: typecheck + lint + test + build + Electron E2E
 
@@ -253,16 +253,16 @@ flowchart TD
 - **Signal to switch:** 如果 CC98 发帖 3 天后回复 < 5 人且报名 < 3 人 → 改为线下 1v1 邀请（实验室/社团熟人）
 
 **Concrete deliverables:**
-- [ ] 5 步引导向导完整可用
+- [x] 5 步引导向导完整可用
 - [x] ZJUAM 核心登录 + 本科教务网 Session + 素拓非匿名身份/getMyInfo 回执 + safeStorage 原子持久化
 - [ ] 在 5–10 台真实学生设备上完成统一认证成功/失败与网络异常验收
 - [x] Plugin Runtime v2 的 connector、能力解析、不透明 Session 请求和 provenance store 通过测试
 - [x] `.campusmod` 检查、权限确认、原子安装升级、崩溃恢复、持久注册和卸载通过测试；受限 renderer sandbox v1 可激活，其他第三方执行保持关闭
-- [ ] 教务课表自动同步（写入 SQLite courses 表）
-- [ ] 课件批量下载（含断点续传）
-- [ ] 日历周视图 + 冲突检测
-- [ ] 桌面通知 + 提醒调度
-- [ ] 抓取容错（缓存兜底 + 手动重试）
+- [x] 教务课表自动同步（以 capability provenance 和统一课程事件持久化；不再使用独立 `courses` 表）
+- [x] 课件批量下载（含断点续传）
+- [ ] 日历周视图 + 冲突检测（已实现月历、线性日程、单日时间线和冲突检测；周视图尚缺）
+- [x] 桌面通知 + 提醒调度
+- [x] 抓取容错（缓存兜底 + 手动重试）
 - [ ] Playwright E2E 测试通过
 
 ---
@@ -309,10 +309,10 @@ flowchart TD
 
 **Concrete deliverables:**
 - [ ] Windows NSIS 安装包构建成功
-- [ ] electron-updater 配置就绪
-- [ ] Sentry crash reporting 集成
-- [ ] 插件开发文档完整
-- [ ] 2 个示例插件源码 + README
+- [x] electron-updater 配置就绪
+- [x] Sentry crash reporting 集成
+- [x] 插件开发文档完整
+- [x] 2 个示例插件源码 + README
 - [ ] GitHub Release v0.1.0 发布
 - [ ] CC98 发布帖上线
 

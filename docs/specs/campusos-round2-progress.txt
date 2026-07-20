@@ -3,12 +3,12 @@ CampusOS Round 2 — Implementation Progress
 
 Spec: docs/specs/campusos-round2.md
 Base Spec: docs/specs/ideazjuermodapp.md
-Generated: 2026-06-18
+Updated: 2026-07-20
 Interview Rounds: 2
 
 PHASE STATUS:
 
-[IN PROGRESS] Phase 1: Foundation (weeks 0-2)
+[DONE] Phase 1: Foundation (weeks 0-2)
   - [DONE] pnpm monorepo initialization
   - [DONE] Electron + React + Vite + TypeScript skeleton
   - [DONE] Campus workspace UI (navigation + main area; current design intentionally has no status bar)
@@ -22,7 +22,7 @@ PHASE STATUS:
   - Vitest unit tests (>70% coverage)
   Verification: npm run typecheck && npm run lint && npm run test
 
-[PENDING] Phase 2: Core (weeks 2-6)
+[IN PROGRESS] Phase 2: Core (weeks 2-6)
   - 5-step onboarding wizard (with error handling + skip)
   - AES-256-GCM + OS Keychain credential encryption
   - Academic scraper plugin (course sync + material listing)
@@ -37,7 +37,7 @@ PHASE STATUS:
   - Playwright E2E tests
   Verification: npm run test:e2e
 
-[PENDING] Phase 3: Delivery (weeks 6-8)
+[IN PROGRESS] Phase 3: Delivery (weeks 6-8)
   - electron-builder + NSIS installer
   - electron-updater (GitHub Releases)
   - Sentry crash reporting
@@ -47,7 +47,7 @@ PHASE STATUS:
   - GitHub Release v0.1.0
   Verification: npm run build
 
-[PENDING] Phase 4: V1 (weeks 8-20)
+[IN PROGRESS] Phase 4: V1 (weeks 8-20; selected vertical slices only)
   - Theme system (day/night/high-contrast)
   - Official GPA tracker plugin
   - Official exam countdown plugin
