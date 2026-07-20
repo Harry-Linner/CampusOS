@@ -1,0 +1,34 @@
+appId: io.github.harry-linner.campusos
+productName: CampusOS
+copyright: Copyright © 2026 Harry-Linner
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: "${productName}-${version}-win-x64.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CampusOS
+
+asar: true
+compression: maximum
+
+publish:
+  provider: github
+  owner: Harry-Linner
+  repo: campus-os

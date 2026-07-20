@@ -1,0 +1,161 @@
+{
+  "name": "ZJU CampusOS",
+  "slug": "ideazjuermodapp",
+  "version": "1.0",
+  "date": "2026-06-17",
+  "status": "superseded",
+  "supersededBy": "docs/specs/campusos-interface-v3.md",
+  "platform": {
+    "primary": "Windows (Electron)",
+    "future": ["macOS", "Linux", "Mobile"]
+  },
+  "techStack": {
+    "frontend": "Electron + React 18 + TypeScript 5",
+    "build": "Vite + electron-builder",
+    "state": "Zustand",
+    "database": "SQLite (better-sqlite3)",
+    "encryption": "OS Keychain (keytar) + AES-256-GCM",
+    "testing": "Vitest + Playwright",
+    "monitoring": "Sentry",
+    "updates": "electron-updater (GitHub Releases)"
+  },
+  "decisions": [
+    { "id": 1, "topic": "平台路线", "choice": "PC 桌面端 (Electron) → 后期移动端" },
+    { "id": 2, "topic": "操作系统", "choice": "Windows 优先，后期 macOS/Linux" },
+    { "id": 3, "topic": "桌面框架", "choice": "Electron + React + TypeScript + Vite" },
+    { "id": 4, "topic": "UI 布局", "choice": "VS Code 式工作台" },
+    { "id": 5, "topic": "MVP 策略", "choice": "插件框架 + UI 骨架并行" },
+    { "id": 6, "topic": "凭据管理", "choice": "本地加密存储 (OS Keychain + AES)" },
+    { "id": 7, "topic": "抓取范围", "choice": "全量校内网站 + 各学院院网" },
+    { "id": 8, "topic": "日历数据", "choice": "自动抓取 + 手动编辑 + 自定义活动" },
+    { "id": 9, "topic": "提醒方式", "choice": "桌面系统通知 (V1)" },
+    { "id": 10, "topic": "数据同步", "choice": "V1 纯本地 SQLite，V2 可选云同步" },
+    { "id": 11, "topic": "插件安全", "choice": "权限声明 + 安装时逐项确认" },
+    { "id": 12, "topic": "插件 UI", "choice": "React 组件动态加载" },
+    { "id": 13, "topic": "插件分发 V1", "choice": "手动安装 .campusmod 文件" },
+    { "id": 14, "topic": "Mod 市场", "choice": "V1 不做后端，V2 自建市场 (闭源)" },
+    { "id": 15, "topic": "容错策略", "choice": "缓存兜底 + 时间戳 + 手动重试" },
+    { "id": 16, "topic": "课件存储", "choice": "学期/课程名/ 目录结构" },
+    { "id": 17, "topic": "开源策略", "choice": "核心 MIT 开源，市场闭源" },
+    { "id": 18, "topic": "首次引导", "choice": "5 步向导式流程" },
+    { "id": 19, "topic": "MVP 完成标准", "choice": "完整可用 + 文档 + 安装包 + 自动更新 + 崩溃上报" },
+    { "id": 20, "topic": "首个里程碑", "choice": "Electron 骨架 + 插件框架 + hello-world 插件" }
+  ],
+  "userStories": [
+    { "id": "US-1", "title": "Electron 工作台骨架 + 插件框架", "phase": 1 },
+    { "id": "US-2", "title": "首次引导 + 账号管理", "phase": 2 },
+    { "id": "US-3", "title": "教务抓取插件 (官方)", "phase": 2 },
+    { "id": "US-4", "title": "日历 + 提醒系统", "phase": 2 },
+    { "id": "US-5", "title": "打包发布 + 自动更新", "phase": 3 },
+    { "id": "US-6", "title": "插件开发文档 + 示例", "phase": 3 }
+  ],
+  "phases": [
+    {
+      "id": 1,
+      "name": "地基 — 工作台 + 插件框架",
+      "goal": "Electron 窗口能运行，hello-world 插件能在工作台中渲染",
+      "tasks": [
+        "Electron + React + Vite + TypeScript 项目初始化",
+        "VS Code 式 UI 骨架",
+        "插件加载器 (.campusmod 解析, manifest 校验)",
+        "React 组件动态加载 + JS 沙箱集成",
+        "权限系统 (声明解析 + UI 确认 + 运行时检查)",
+        "SQLite 初始化 + migration 框架",
+        "单元测试 + 插件生命周期集成测试"
+      ],
+      "verification": "npm run test && npm run typecheck"
+    },
+    {
+      "id": 2,
+      "name": "核心 — 账号 + 教务 + 日历",
+      "goal": "完整链路：配置账号 → 同步课表 → 日历展示 → 课件下载",
+      "tasks": [
+        "首次引导向导 (5 步流程 UI)",
+        "本地加密存储 (keytar + AES-256-GCM)",
+        "官方教务抓取插件",
+        "课件下载引擎 (队列、断点续传)",
+        "日历组件 (周视图、日视图、冲突检测)",
+        "桌面通知系统 + 提醒调度",
+        "抓取容错 (缓存展示、手动重试)"
+      ],
+      "verification": "npm run test:e2e"
+    },
+    {
+      "id": 3,
+      "name": "交付 — 打包 + 文档 + 发布",
+      "goal": "Windows 安装包可分发，插件开发者可上手",
+      "tasks": [
+        "electron-builder + NSIS 安装包",
+        "自动更新 (electron-updater)",
+        "崩溃上报 (Sentry)",
+        "插件开发文档",
+        "2 个官方示例插件",
+        "插件调试工具"
+      ],
+      "verification": "npm run build"
+    },
+    {
+      "id": 4,
+      "name": "二期 — Mod 市场 + 移动端",
+      "goal": "社区生态 + 多平台覆盖",
+      "tasks": [
+        "后端服务 (插件上传/审核/下载/评分)",
+        "市场 UI",
+        "插件数字签名验证",
+        "用户账户系统",
+        "移动端技术方案评估"
+      ],
+      "verification": null
+    }
+  ],
+  "functionalRequirements": [
+    "FR-1: VS Code 式工作台界面",
+    "FR-2: .campusmod 插件加载/卸载/生命周期管理",
+    "FR-3: manifest.json 权限声明",
+    "FR-4: 安装时权限逐项确认",
+    "FR-5: 插件 JS 沙箱隔离",
+    "FR-6: 安全 IPC API",
+    "FR-7: AES-256-GCM 凭据加密",
+    "FR-8: 教务课表自动同步",
+    "FR-9: 课件批量下载",
+    "FR-10: 学期/课程名 目录组织",
+    "FR-11: 日历周视图 + 日视图",
+    "FR-12: 时间冲突警告",
+    "FR-13: 桌面系统通知提醒",
+    "FR-14: 抓取失败缓存兜底",
+    "FR-15: 5 步向导式引导",
+    "FR-16: GitHub Releases 自动更新",
+    "FR-17: Sentry 崩溃上报",
+    "FR-18: 插件开发文档 + 示例"
+  ],
+  "nonFunctionalRequirements": [
+    "NFR-1: 冷启动 < 3s",
+    "NFR-2: 后台内存 < 200MB",
+    "NFR-3: 断点续传",
+    "NFR-4: 并发下载 ≤ 5",
+    "NFR-5: SQLite migration 支持",
+    "NFR-6: 插件数据隔离",
+    "NFR-7: 安装包 < 200MB",
+    "NFR-8: IPC 超时 30s",
+    "NFR-9: TypeScript strict + ESLint 零 warning",
+    "NFR-10: 单元测试覆盖率 > 70%"
+  ],
+  "risks": [
+    { "risk": "ZJU 教务系统验证码", "probability": "high", "impact": "high" },
+    { "risk": "反爬策略变化", "probability": "high", "impact": "medium" },
+    { "risk": "社区插件安全风险", "probability": "medium", "impact": "high" },
+    { "risk": "Electron 体积大", "probability": "certain", "impact": "medium" },
+    { "risk": "React 动态加载性能", "probability": "low", "impact": "medium" }
+  ],
+  "dataModel": {
+    "tables": ["courses", "events", "materials", "plugins", "settings"],
+    "engine": "SQLite (better-sqlite3)"
+  },
+  "openResearch": [
+    "Electron + Vite + React 最新模板方案",
+    "JS 沙箱方案对比 (Compartment/SES/isolated-vm/quickjs-emscripten)",
+    "ZJU 统一认证模拟登录可行性",
+    "SQLite migration 最佳实践",
+    "electron-builder Windows 签名/杀软误报处理"
+  ]
+}

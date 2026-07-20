@@ -1,0 +1,109 @@
+/* CampusOS Theme System
+ *
+ * Three modes: light (default), dark, high-contrast.
+ * All colors defined as CSS custom properties on :root[data-theme].
+ * Components reference tokens — never hardcode colors.
+ */
+
+:root[data-theme="light"] {
+  --ink: #17212b;
+  --ink-soft: #56616b;
+  --ink-faint: #7c8790;
+  --paper: #f8f9f7;
+  --paper-muted: #f0f2ef;
+  --paper-deep: #e9ece8;
+  --line: #d9ded9;
+  --line-strong: #c8cfca;
+  --accent: #315f8e;
+  --accent-deep: #234a72;
+  --accent-wash: #e7eef5;
+  --danger: #b54542;
+  --danger-wash: #f9eeee;
+  --warning: #a56d22;
+  --warning-wash: #fdf6ed;
+  --success: #356b57;
+  --success-wash: #e5f0ea;
+  --brand-gradient: radial-gradient(circle at 88% -8%, rgba(49, 95, 142, 0.08), transparent 30rem),
+    linear-gradient(150deg, #fbfcfa 0%, var(--paper-muted) 100%);
+  --dot-opacity: 0.16;
+  --card-bg: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme="dark"] {
+  --ink: #e8edf2;
+  --ink-soft: #9ba8b5;
+  --ink-faint: #667380;
+  --paper: #1a1f26;
+  --paper-muted: #13171c;
+  --paper-deep: #222831;
+  --line: #2d353f;
+  --line-strong: #3d4752;
+  --accent: #5b8fc7;
+  --accent-deep: #7aa8d9;
+  --accent-wash: #1e2a38;
+  --danger: #d4726e;
+  --danger-wash: #2c1818;
+  --warning: #d49b4e;
+  --warning-wash: #2c2218;
+  --success: #5e9c7c;
+  --success-wash: #1a2c22;
+  --brand-gradient: radial-gradient(circle at 88% -8%, rgba(91, 143, 199, 0.12), transparent 30rem),
+    linear-gradient(150deg, #1e242c 0%, var(--paper-muted) 100%);
+  --dot-opacity: 0.08;
+  --card-bg: rgba(30, 36, 44, 0.92);
+}
+
+:root[data-theme="high-contrast"] {
+  --ink: #ffffff;
+  --ink-soft: #d0d0d0;
+  --ink-faint: #a0a0a0;
+  --paper: #000000;
+  --paper-muted: #0a0a0a;
+  --paper-deep: #111111;
+  --line: #444444;
+  --line-strong: #666666;
+  --accent: #66a8ff;
+  --accent-deep: #99ccff;
+  --accent-wash: #001a33;
+  --danger: #ff5555;
+  --danger-wash: #220000;
+  --warning: #ffaa33;
+  --warning-wash: #221100;
+  --success: #55cc55;
+  --success-wash: #002200;
+  --brand-gradient: linear-gradient(150deg, #0a0a0a 0%, #000000 100%);
+  --dot-opacity: 0;
+  --card-bg: rgba(10, 10, 10, 0.95);
+}
+
+/* Override body background to use theme token */
+body {
+  background: var(--brand-gradient);
+}
+
+body::before {
+  opacity: var(--dot-opacity);
+}
+
+/* Navigation rail, settings form backgrounds */
+.navigation-rail {
+  background: rgba(248, 249, 247, 0.8);
+}
+
+[data-theme="dark"] .navigation-rail,
+[data-theme="high-contrast"] .navigation-rail {
+  background: rgba(26, 31, 38, 0.9);
+}
+
+[data-theme="high-contrast"] .nav-item.is-active {
+  outline: 1px solid var(--accent);
+}
+
+[data-theme="high-contrast"] .primary-button {
+  outline: 1px solid var(--accent-deep);
+}
+
+[data-theme="high-contrast"] :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}

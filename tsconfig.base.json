@@ -1,0 +1,113 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2022"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@campusos/shared": [
+        "packages/shared/src/index.ts"
+      ],
+      "@campusos/plugin-academic-grades": [
+        "plugins/official/academic-grades/src/index.tsx"
+      ],
+      "@campusos/plugin-academic-grades/manifest": [
+        "plugins/official/academic-grades/src/manifest.ts"
+      ],
+      "@campusos/plugin-academic-grades/model": [
+        "plugins/official/academic-grades/src/model.ts"
+      ],
+      "@campusos/plugin-academic-scraper": [
+        "plugins/official/academic-scraper/src/index.tsx"
+      ],
+      "@campusos/plugin-academic-scraper/manifest": [
+        "plugins/official/academic-scraper/src/manifest.ts"
+      ],
+      "@campusos/plugin-calendar": [
+        "plugins/official/calendar/src/index.tsx"
+      ],
+      "@campusos/plugin-calendar/manifest": [
+        "plugins/official/calendar/src/manifest.ts"
+      ],
+      "@campusos/plugin-materials": [
+        "plugins/official/materials/src/index.tsx"
+      ],
+      "@campusos/plugin-materials/manifest": [
+        "plugins/official/materials/src/manifest.ts"
+      ],
+      "@campusos/plugin-dingtalk-entry": [
+        "plugins/official/dingtalk-entry/src/index.tsx"
+      ],
+      "@campusos/plugin-dingtalk-entry/manifest": [
+        "plugins/official/dingtalk-entry/src/manifest.ts"
+      ],
+      "@campusos/plugin-zju-undergraduate/manifest": [
+        "plugins/official/zju-undergraduate/src/manifest.ts"
+      ],
+      "@campusos/plugin-zju-undergraduate/main": [
+        "plugins/official/zju-undergraduate/src/main.ts"
+      ],
+      "@campusos/plugin-zju-calendar-config/manifest": [
+        "plugins/official/zju-calendar-config/src/manifest.ts"
+      ],
+      "@campusos/plugin-zju-calendar-config/main": [
+        "plugins/official/zju-calendar-config/src/main.ts"
+      ],
+      "@campusos/plugin-zju-graduate/manifest": [
+        "plugins/official/zju-graduate/src/manifest.ts"
+      ],
+      "@campusos/plugin-zju-graduate/main": [
+        "plugins/official/zju-graduate/src/main.ts"
+      ],
+      "@campusos/plugin-zju-learning/manifest": [
+        "plugins/official/zju-learning/src/manifest.ts"
+      ],
+      "@campusos/plugin-zju-learning/main": [
+        "plugins/official/zju-learning/src/main.ts"
+      ],
+      "@campusos/plugin-academic-exams/manifest": [
+        "plugins/official/academic-exams/src/manifest.ts"
+      ],
+      "@campusos/plugin-academic-exams/main": [
+        "plugins/official/academic-exams/src/main.ts"
+      ],
+      "@campusos/plugin-deadline-assistant/manifest": [
+        "plugins/official/deadline-assistant/src/manifest.ts"
+      ],
+      "@campusos/plugin-deadline-assistant/main": [
+        "plugins/official/deadline-assistant/src/main.ts"
+      ],
+      "@campusos/plugin-academic-timetable-events/manifest": [
+        "plugins/official/academic-timetable-events/src/manifest.ts"
+      ],
+      "@campusos/plugin-academic-timetable-events/main": [
+        "plugins/official/academic-timetable-events/src/main.ts"
+      ],
+      "@campusos/plugin-exam-countdown/manifest": [
+        "plugins/official/exam-countdown/src/manifest.ts"
+      ],
+      "@campusos/plugin-exam-countdown/main": [
+        "plugins/official/exam-countdown/src/main.ts"
+      ],
+      "@campusos/plugin-exam-countdown": [
+        "plugins/official/exam-countdown/src/index.tsx"
+      ]
+    }
+  }
+}

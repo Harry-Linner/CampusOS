@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+out/
+coverage/
+.tmp/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+live-auth.env
+!.env.example

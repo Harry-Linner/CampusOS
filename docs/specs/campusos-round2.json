@@ -1,0 +1,86 @@
+{
+  "version": "2.0",
+  "date": "2026-06-18",
+  "status": "superseded",
+  "supersededBy": "docs/specs/campusos-interface-v3.md",
+  "feature": {
+    "name": "CampusOS Round 2 — 合规、UX、工程化、架构",
+    "slug": "campusos-round2",
+    "based_on": "docs/specs/ideazjuermodapp.md"
+  },
+  "interview": {
+    "round": 2,
+    "covered_dimensions": ["compliance", "ux", "engineering", "architecture"],
+    "key_decisions": 12,
+    "ux_decisions": 10,
+    "engineering_decisions": 4,
+    "architecture_decisions": 5
+  },
+  "decisions": [
+    { "id": "D-1", "category": "compliance", "decision": "先免费验证再决定收费路线", "trigger": "WAU ≥ 500" },
+    { "id": "D-2", "category": "ux", "decision": "视觉风格改为现代校园风（圆角卡片、温暖色调）" },
+    { "id": "D-3", "category": "ux", "decision": "布局简化：无侧栏，纯活动栏导航" },
+    { "id": "D-4", "category": "ux", "decision": "默认首页改为今日仪表盘（3卡片）" },
+    { "id": "D-5", "category": "ux", "decision": "日历改为独立桌面伴侣插件（多窗口）" },
+    { "id": "D-6", "category": "ux", "decision": "插件安装改为VS Code式扩展面板" },
+    { "id": "D-7", "category": "ux", "decision": "通知策略按事项类型分类" },
+    { "id": "D-8", "category": "engineering", "decision": "项目结构采用pnpm monorepo" },
+    { "id": "D-9", "category": "engineering", "decision": "CI/CD完整流水线从Phase 1开始" },
+    { "id": "D-10", "category": "architecture", "decision": "插件加载：renderer独立custom-protocol沙箱 + headless worker/isolate" },
+    { "id": "D-11", "category": "architecture", "decision": "主进程模块化服务层（7个service）" },
+    { "id": "D-12", "category": "assumption", "decision": "ZJU教务无验证码已确认", "status": "load-bearing-passed" }
+  ],
+  "user_stories": [
+    { "id": "US-1", "name": "工作台骨架 + 插件框架", "source": "round1", "status": "revised" },
+    { "id": "US-2", "name": "首次引导 + 账号管理", "source": "round1", "status": "kept" },
+    { "id": "US-3", "name": "教务抓取插件", "source": "round1", "status": "kept" },
+    { "id": "US-4", "name": "日历 + 提醒系统", "source": "round1", "status": "revised" },
+    { "id": "US-5", "name": "打包发布 + 自动更新", "source": "round1", "status": "kept" },
+    { "id": "US-6", "name": "插件开发文档 + 示例", "source": "round1", "status": "kept" },
+    { "id": "US-7", "name": "合规架构预留", "source": "round2", "status": "new" }
+  ],
+  "ux_specs": {
+    "UX-1": { "name": "首页今日仪表盘", "cards": ["今日课表", "待办截止", "学期进度"] },
+    "UX-2": { "name": "日历桌面伴侣", "modes": ["只读迷你浮窗", "月历快速查看"], "ddl_sync": "auto_add_with_pending_state" },
+    "UX-3": { "name": "引导失败处理", "errors": ["账号密码错误", "网络超时", "系统维护"], "can_skip": true },
+    "UX-4": { "name": "通知策略", "by_type": true },
+    "UX-5": { "name": "回访体验", "default": "今日仪表盘", "customizable": true },
+    "UX-6": { "name": "插件面板", "tabs": ["已安装管理", "官方推荐"], "manual_install": ["拖入", "文件选择器", "URL"] },
+    "UX-7": { "name": "纯活动栏导航", "icons": ["仪表盘", "日历", "课件", "扩展", "设置"] },
+    "UX-8": { "name": "现代校园风视觉", "day_theme": "暖灰+毛玻璃+渐变", "night_theme": "求是蓝#0A4C8A+暗色" },
+    "UX-9": { "name": "课件文件夹树", "layout": "左侧树+右侧列表" },
+    "UX-10": { "name": "设置页面", "location": "活动栏图标" }
+  },
+  "architecture": {
+    "plugin_loading": "trusted_builtin_import + sandboxed_custom_origin_iframe + headless_worker_isolate",
+    "multi_window": "independent_zustand_stores + shared_sqlite",
+    "ipc": "contextBridge + standard_electron_ipc",
+    "main_process": "modular_service_layer (7 services)",
+    "plugin_lifecycle": "VS_Code_standard (install→confirm→activate→deactivate→uninstall)",
+    "orm": "Drizzle + better-sqlite3"
+  },
+  "engineering": {
+    "structure": "pnpm_monorepo",
+    "packages": ["core", "shared", "plugins/official/academic-scraper", "plugins/official/calendar", "plugins/official/materials"],
+    "ci": "typecheck+lint+test+E2E+build (GitHub Actions)",
+    "code_standards": ["ESLint_strict", "Prettier", "Conventional_Commits", "branch_protection"],
+    "testing": { "unit": "Vitest", "component": "React_Testing_Library", "e2e": "Playwright" }
+  },
+  "phases": [
+    { "id": 1, "name": "Foundation", "weeks": "0-2", "verification": "typecheck+lint+test" },
+    { "id": 2, "name": "Core", "weeks": "2-6", "verification": "test:e2e" },
+    { "id": 3, "name": "Delivery", "weeks": "6-8", "verification": "build" },
+    { "id": 4, "name": "V1", "weeks": "8-20", "verification": "WAU≥500" }
+  ],
+  "open_questions": [
+    "桌面迷你日历浮窗技术方案（BrowserWindow/透明置顶/托盘面板）",
+    "仪表盘待办卡片数据来源（手动输入/教务解析）",
+    "第三方headless worker/isolate资源限制与权限代理POC",
+    "Windows NSIS安装包签名方案"
+  ],
+  "load_bearing_assumptions": {
+    "zju_no_captcha": { "status": "confirmed", "date": "2026-06-18" },
+    "desktop_primary_device": { "status": "assumed" },
+    "vscode_mental_model": { "status": "assumed" }
+  }
+}

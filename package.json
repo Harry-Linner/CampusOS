@@ -1,0 +1,25 @@
+{
+  "name": "campus-os",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.29.2",
+  "scripts": {
+    "dev": "pnpm --filter @campusos/core dev",
+    "build": "pnpm --filter @campusos/core build",
+    "dist": "pnpm build && cd packages/core && electron-builder --win",
+    "typecheck": "pnpm --filter @campusos/shared typecheck && pnpm --filter @campusos/core typecheck",
+    "test": "pnpm --filter @campusos/core test",
+    "verify:zju-auth": "node scripts/run-zju-auth-live.mjs",
+    "lint": "pnpm --filter @campusos/core lint"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "4.62.2"
+  }
+}

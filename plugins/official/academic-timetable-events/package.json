@@ -1,0 +1,10 @@
+{
+  "name": "@campusos/plugin-academic-timetable-events",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main.ts"
+  }
+}
