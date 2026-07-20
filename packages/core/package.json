@@ -2,6 +2,8 @@
   "name": "@campusos/core",
   "private": true,
   "version": "0.1.0",
+  "description": "A local-first desktop workspace for ZJU students.",
+  "author": "Harry-Linner",
   "type": "module",
   "main": "out/main/main.js",
   "scripts": {

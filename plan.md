@@ -40,7 +40,7 @@
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
 - 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、Windows 安装和发布验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
+- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。2026-07-20 本地复核已通过 typecheck、lint、161 项单测（1 项真实账号测试按环境跳过）、首次引导 Electron E2E 和 x64 NSIS 安装包构建。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、全新 Windows 安装和 GitHub Release/分发验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
 
 ---
 
@@ -198,7 +198,7 @@ flowchart TD
 - 本阶段不对外分发。仅开发者自测。
 
 **Concrete deliverables:**
-- [ ] GitHub 仓库初始化 (MIT license + README + CONTRIBUTING)
+- [x] GitHub 仓库初始化 (MIT license + README + CONTRIBUTING)
 - [x] Electron + React + Vite + TypeScript 项目骨架可运行
 - [x] VS Code 式工作台 UI 可见
 - [x] hello-world 插件加载并渲染
@@ -260,7 +260,7 @@ flowchart TD
 - [x] `.campusmod` 检查、权限确认、原子安装升级、崩溃恢复、持久注册和卸载通过测试；受限 renderer sandbox v1 可激活，其他第三方执行保持关闭
 - [x] 教务课表自动同步（以 capability provenance 和统一课程事件持久化；不再使用独立 `courses` 表）
 - [x] 课件批量下载（含断点续传）
-- [ ] 日历周视图 + 冲突检测（已实现月历、线性日程、单日时间线和冲突检测；周视图尚缺）
+- [x] 日历周视图 + 冲突检测
 - [x] 桌面通知 + 提醒调度
 - [x] 抓取容错（缓存兜底 + 手动重试）
 - [ ] Playwright E2E 测试通过
@@ -308,7 +308,7 @@ flowchart TD
 - **Signal to switch:** 如果 GitHub Release 发布 1 周后下载量 < 30，则评估是否需要额外推广渠道
 
 **Concrete deliverables:**
-- [ ] Windows NSIS 安装包构建成功
+- [x] Windows NSIS 安装包构建成功
 - [x] electron-updater 配置就绪
 - [x] Sentry crash reporting 集成
 - [x] 插件开发文档完整

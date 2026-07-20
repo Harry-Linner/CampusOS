@@ -13,7 +13,7 @@ interface CalendarViewProps {
   snapshot: CampusWorkspaceSnapshot | null;
 }
 
-type CalendarViewMode = "month" | "agenda" | "day";
+type CalendarViewMode = "month" | "week" | "agenda" | "day";
 
 type CalendarTask =
   | {
@@ -40,7 +40,7 @@ type CalendarTask =
       note?: string;
     };
 
-type CalendarTaskVariant = "month" | "agenda" | "day";
+type CalendarTaskVariant = "month" | "week" | "agenda" | "day";
 
 interface CalendarTaskButtonProps {
   task: CalendarTask;
@@ -118,6 +118,17 @@ const getWeekdayLabel = (value: Date): string => weekdayLabels[(value.getDay() +
 
 const formatDateHeading = (value: Date): string =>
   `${value.getMonth() + 1}月${value.getDate()}日 ${getWeekdayLabel(value)}`;
+
+const formatWeekRange = (weekDays: Date[]): string => {
+  const firstDay = weekDays[0];
+  const lastDay = weekDays[weekDays.length - 1];
+
+  if (firstDay.getFullYear() === lastDay.getFullYear()) {
+    return `${firstDay.getMonth() + 1}月${firstDay.getDate()}日 - ${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
+  }
+
+  return `${firstDay.getFullYear()}年${firstDay.getMonth() + 1}月${firstDay.getDate()}日 - ${lastDay.getFullYear()}年${lastDay.getMonth() + 1}月${lastDay.getDate()}日`;
+};
 
 const buildMonthGrid = (month: Date): Date[] => {
   const firstVisibleDay = startOfWeek(startOfMonth(month));
@@ -323,6 +334,10 @@ export const CalendarView = ({
       })),
     [selectedDayTasks]
   );
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(selectedDate), index)),
+    [selectedDate]
+  );
 
   if (!snapshot) {
     return loading ? (
@@ -342,8 +357,13 @@ export const CalendarView = ({
   const today = new Date();
   const todayKey = toDayKey(today);
   const isDayView = viewMode === "day";
-  const periodLabel = isDayView ? formatDateHeading(selectedDate) : monthLabelFormatter.format(visibleMonth);
-  const periodName = isDayView ? "日期" : "月份";
+  const isWeekView = viewMode === "week";
+  const periodLabel = isDayView
+    ? formatDateHeading(selectedDate)
+    : isWeekView
+      ? formatWeekRange(weekDays)
+      : monthLabelFormatter.format(visibleMonth);
+  const periodName = isDayView ? "日期" : isWeekView ? "周" : "月份";
 
   const toggleTask = (id: string): void => {
     setSelectedTaskId((current) => (current === id ? null : id));
@@ -352,7 +372,7 @@ export const CalendarView = ({
   const changeView = (nextView: CalendarViewMode): void => {
     setSelectedTaskId(null);
 
-    if (nextView === "day" && !isSameMonth(selectedDate, visibleMonth)) {
+    if ((nextView === "day" || nextView === "week") && !isSameMonth(selectedDate, visibleMonth)) {
       setSelectedDate((current) => alignDateToMonth(current, visibleMonth));
     }
 
@@ -364,6 +384,13 @@ export const CalendarView = ({
 
     if (isDayView) {
       const next = addDays(selectedDate, direction);
+      setSelectedDate(next);
+      setVisibleMonth(startOfMonth(next));
+      return;
+    }
+
+    if (isWeekView) {
+      const next = addDays(selectedDate, direction * 7);
       setSelectedDate(next);
       setVisibleMonth(startOfMonth(next));
       return;
@@ -394,6 +421,7 @@ export const CalendarView = ({
             {(
               [
                 ["month", "月历"],
+                ["week", "周视图"],
                 ["agenda", "日程"],
                 ["day", "日视图"]
               ] as const
@@ -429,7 +457,7 @@ export const CalendarView = ({
               <AppIcon name="chevron-right" size={18} />
             </button>
             <button className="text-button" type="button" onClick={returnToCurrentPeriod}>
-              {isDayView ? "本日" : "本月"}
+              {isDayView ? "本日" : isWeekView ? "本周" : "本月"}
             </button>
           </div>
         </div>
@@ -518,6 +546,44 @@ export const CalendarView = ({
           })}
 
           {agendaGroups.size === 0 ? <div className="quiet-empty-state">本月没有安排</div> : null}
+        </div>
+      ) : null}
+
+      {viewMode === "week" ? (
+        <div className="calendar-scroll">
+          <section className="week-view" aria-label={`${formatWeekRange(weekDays)}周视图`}>
+            {weekDays.map((day) => {
+              const dayKey = toDayKey(day);
+              const tasks = taskGroups.get(dayKey) ?? [];
+              const isToday = dayKey === todayKey;
+
+              return (
+                <section
+                  className={isToday ? "week-day is-today" : "week-day"}
+                  key={dayKey}
+                  aria-label={formatDateHeading(day)}
+                >
+                  <header className="week-day-heading">
+                    <span>{getWeekdayLabel(day)}</span>
+                    <h2>
+                      <time dateTime={day.toISOString()}>{day.getDate()}</time>
+                    </h2>
+                  </header>
+                  <div className="week-day-events">
+                    {tasks.map((task) => (
+                      <CalendarTaskButton
+                        key={task.id}
+                        task={task}
+                        variant="week"
+                        selected={selectedTaskId === task.id}
+                        onToggle={toggleTask}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </section>
         </div>
       ) : null}
 

@@ -3,8 +3,8 @@ productName: CampusOS
 copyright: Copyright © 2026 Harry-Linner
 
 directories:
-  output: dist
-  buildResources: build
+  output: ../../dist
+  buildResources: ../../build
 
 files:
   - out/**/*

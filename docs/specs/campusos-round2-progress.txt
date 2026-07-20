@@ -23,26 +23,27 @@ PHASE STATUS:
   Verification: npm run typecheck && npm run lint && npm run test
 
 [IN PROGRESS] Phase 2: Core (weeks 2-6)
-  - 5-step onboarding wizard (with error handling + skip)
+  - [DONE] 5-step onboarding wizard (with error handling + skip)
   - AES-256-GCM + OS Keychain credential encryption
   - Academic scraper plugin (course sync + material listing)
   - Today dashboard (3 cards)
+  - [DONE] Calendar workspace (month/week/agenda/day + conflict detection)
   - Calendar companion plugin (multi-window + mini float)
   - Materials panel (folder tree + file list)
-  - Download engine (queue + resume)
-  - Notification system (by event type)
-  - Desktop system notifications + scheduling
-  - Scraping fault tolerance (cache + retry)
+  - [DONE] Download engine (queue + resume)
+  - [DONE] Notification system (by event type)
+  - [DONE] Desktop system notifications + scheduling
+  - [DONE] Scraping fault tolerance (cache + retry)
   - Extension panel (installed + recommendations)
   - Playwright E2E tests
   Verification: npm run test:e2e
 
 [IN PROGRESS] Phase 3: Delivery (weeks 6-8)
-  - electron-builder + NSIS installer
-  - electron-updater (GitHub Releases)
-  - Sentry crash reporting
-  - Plugin developer documentation
-  - 2 example plugins (hello-world + web scraper)
+  - [DONE] electron-builder + NSIS installer build
+  - [DONE] electron-updater (GitHub Releases)
+  - [DONE] Sentry crash reporting integration
+  - [DONE] Plugin developer documentation
+  - [DONE] 2 example plugins (hello-world + web scraper)
   - Windows 10/11 VM verification
   - GitHub Release v0.1.0
   Verification: npm run build
