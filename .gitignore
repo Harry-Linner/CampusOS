@@ -12,3 +12,5 @@ test-results/
 .env.*
 live-auth.env
 !.env.example
+.agents/
+.claude/
