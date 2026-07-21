@@ -95,6 +95,51 @@ describe("plugin runtime repository", () => {
     );
   });
 
+  it("activates bundled plugins with their declared default grants", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "campusos-plugin-runtime-"));
+    temporaryDirectories.push(directory);
+    const repository = createPluginRuntimeRepository({
+      storagePath: join(directory, "runtime-state.json"),
+      manifests: [provider, calendar],
+      coreCapabilities: [],
+      defaultGrantedPermissions: (manifest) => [...manifest.permissions]
+    });
+
+    const calendarRecord = (await repository.load()).plugins.find(
+      (plugin) => plugin.id === calendar.id
+    );
+
+    expect(calendarRecord).toMatchObject({
+      id: calendar.id,
+      enabled: true,
+      grantedPermissions: ["storage:domain:calendar"],
+      status: "active"
+    });
+
+    await writeFile(
+      join(directory, "runtime-state.json"),
+      JSON.stringify({
+        dataVersion: 1,
+        plugins: {
+          [calendar.id]: {
+            enabled: true,
+            grantedPermissions: [],
+            updatedAt: "2026-07-19T00:00:00.000Z"
+          }
+        }
+      }),
+      "utf8"
+    );
+    const migratedCalendar = (await repository.load()).plugins.find(
+      (plugin) => plugin.id === calendar.id
+    );
+
+    expect(migratedCalendar).toMatchObject({
+      grantedPermissions: ["storage:domain:calendar"],
+      status: "active"
+    });
+  });
+
   it("discovers installed manifests dynamically and fails closed before sandbox execution", async () => {
     const directory = await mkdtemp(join(tmpdir(), "campusos-plugin-runtime-"));
     temporaryDirectories.push(directory);

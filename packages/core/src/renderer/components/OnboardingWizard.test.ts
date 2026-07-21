@@ -408,6 +408,11 @@ describe("OnboardingWizard", () => {
       screen.getByRole("button", { name: "安装选中插件" })
     );
     expect(await screen.findByText("一切就绪")).toBeDefined();
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
+      pluginId: stubPlugin.id,
+      enabled: true,
+      grantedPermissions: stubPlugin.manifest.permissions
+    });
 
     // Step 4: done → complete
     fireEvent.click(screen.getByRole("button", { name: "进入 CampusOS" }));

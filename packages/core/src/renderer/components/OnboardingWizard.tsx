@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
 import type { AcademicProgram } from "../../shared/credentialBridge";
+import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
+import { manifest as academicGradesManifest } from "@campusos/plugin-academic-grades/manifest";
+import { manifest as calendarManifest } from "@campusos/plugin-calendar/manifest";
+import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useCampusWorkspace } from "../hooks/useCampusWorkspace";
 import { usePluginHost } from "../hooks/usePluginHost";
@@ -40,6 +44,13 @@ const RECOMMENDED_PLUGIN_IDS = [
   "org.campusos.plugin-deadline-assistant",
   "org.campusos.plugin-academic-exams"
 ];
+
+const recommendedPluginPermissions = new Map([
+  calendarManifest,
+  academicGradesManifest,
+  deadlineAssistantManifest,
+  academicExamsManifest
+].map((manifest) => [manifest.id, manifest.permissions] as const));
 
 const RECOMMENDED_PLUGIN_DETAILS: Record<
   string,
@@ -183,10 +194,16 @@ export const OnboardingWizard = ({
     const errors: string[] = [];
     for (const pluginId of RECOMMENDED_PLUGIN_IDS) {
       try {
+        const plugin = pluginHost.plugins.find(
+          (candidate) => candidate.manifest.id === pluginId
+        );
         await pluginHost.configure({
           pluginId,
           enabled: true,
-          grantedPermissions: []
+          grantedPermissions: [
+            ...(plugin?.manifest.permissions ??
+              recommendedPluginPermissions.get(pluginId) ?? [])
+          ]
         });
       } catch (error) {
         errors.push(

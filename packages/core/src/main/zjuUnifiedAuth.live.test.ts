@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   ZjuUnifiedAuthError,
+  createNodeHttpsZjuAuthTransport,
   createZjuUnifiedAuthClient,
+  type ZjuAuthTransport,
   type ZjuUndergraduateSeason
 } from "./zjuUnifiedAuth";
 
@@ -27,9 +29,21 @@ describe("ZJU unified authentication live verification", () => {
         );
       }
 
+      const requestTrace: string[] = [];
+      const transport = createNodeHttpsZjuAuthTransport();
+      const tracedTransport: ZjuAuthTransport = async (request) => {
+        const response = await transport(request);
+        const target = new URL(request.url);
+        requestTrace.push(
+          `${request.method} ${target.hostname}${target.pathname} -> ${response.status}`
+        );
+        return response;
+      };
+
       try {
         const client = createZjuUnifiedAuthClient({
-          timeoutMs: 12_000
+          timeoutMs: 12_000,
+          transport: tracedTransport
         });
         const result = await client.authenticate({
           username,
@@ -172,6 +186,9 @@ describe("ZJU unified authentication live verification", () => {
           ].join("\n") + "\n"
         );
       } catch (error) {
+        process.stdout.write(
+          `[AUTH-TRACE] ${requestTrace.join(" | ") || "请求未获得响应"}\n`
+        );
         const code =
           error instanceof ZjuUnifiedAuthError ? error.code : "verification-error";
         const message =

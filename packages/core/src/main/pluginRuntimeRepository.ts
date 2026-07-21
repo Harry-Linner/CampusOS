@@ -37,15 +37,19 @@ export interface CreatePluginRuntimeRepositoryOptions {
   loadManifests?: () => Promise<PluginManifestV2[]>;
   coreCapabilities: PluginCapability[];
   isEnabledByDefault?: (manifest: PluginManifestV2) => boolean;
+  defaultGrantedPermissions?: (
+    manifest: PluginManifestV2
+  ) => CampusPermission[];
   canEnable?: (manifest: PluginManifestV2) => string | null;
 }
 
 const createDefaultConfiguration = (
   manifest: PluginManifestV2,
-  isEnabledByDefault: (manifest: PluginManifestV2) => boolean
+  isEnabledByDefault: (manifest: PluginManifestV2) => boolean,
+  defaultGrantedPermissions: (manifest: PluginManifestV2) => CampusPermission[]
 ): StoredPluginConfiguration => ({
   enabled: manifest.releaseStage === "ready" && isEnabledByDefault(manifest),
-  grantedPermissions: [],
+  grantedPermissions: defaultGrantedPermissions(manifest),
   updatedAt: new Date(0).toISOString()
 });
 
@@ -61,6 +65,7 @@ export const createPluginRuntimeRepository = ({
   loadManifests,
   coreCapabilities,
   isEnabledByDefault = (manifest) => manifest.releaseStage === "ready",
+  defaultGrantedPermissions = () => [],
   canEnable = () => null
 }: CreatePluginRuntimeRepositoryOptions): PluginRuntimeRepository => {
   if (!manifests && !loadManifests) {
@@ -90,9 +95,10 @@ export const createPluginRuntimeRepository = ({
         const stored = payload.plugins[manifest.id];
         const defaults = createDefaultConfiguration(
           manifest,
-          isEnabledByDefault
+          isEnabledByDefault,
+          defaultGrantedPermissions
         );
-        const grantedPermissions = Array.isArray(stored?.grantedPermissions)
+        const storedPermissions = Array.isArray(stored?.grantedPermissions)
           ? stored.grantedPermissions.filter((permission) =>
               manifest.permissions.includes(permission)
             )
@@ -101,6 +107,15 @@ export const createPluginRuntimeRepository = ({
           typeof stored?.enabled === "boolean"
             ? stored.enabled
             : defaults.enabled;
+        const grantedPermissions =
+          requestedEnabled && defaultGrantedPermissions(manifest).length > 0
+            ? [
+                ...new Set([
+                  ...storedPermissions,
+                  ...defaultGrantedPermissions(manifest)
+                ])
+              ]
+            : storedPermissions;
 
         plugins[manifest.id] = {
           enabled:
@@ -127,7 +142,11 @@ export const createPluginRuntimeRepository = ({
         plugins: Object.fromEntries(
           currentManifests.map((manifest) => [
             manifest.id,
-            createDefaultConfiguration(manifest, isEnabledByDefault)
+            createDefaultConfiguration(
+              manifest,
+              isEnabledByDefault,
+              defaultGrantedPermissions
+            )
           ])
         )
       };
@@ -142,7 +161,8 @@ export const createPluginRuntimeRepository = ({
       const configuration =
         payload.plugins[manifest.id] ?? createDefaultConfiguration(
           manifest,
-          isEnabledByDefault
+          isEnabledByDefault,
+          defaultGrantedPermissions
         );
 
       return {

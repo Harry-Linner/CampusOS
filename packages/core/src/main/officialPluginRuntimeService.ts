@@ -66,6 +66,8 @@ export const getOfficialPluginRuntimeService =
       ],
       coreCapabilities: corePluginCapabilities,
       isEnabledByDefault: (manifest) => officialPluginIds.has(manifest.id),
+      defaultGrantedPermissions: (manifest) =>
+        officialPluginIds.has(manifest.id) ? [...manifest.permissions] : [],
       canEnable: (manifest) => officialPluginIds.has(manifest.id)
         ? null
         : getSandboxedRendererExecutionIssue(manifest)
