@@ -21,7 +21,7 @@ export interface AcademicProfileProof {
 }
 
 interface ConnectorRefreshResult {
-  sourceId: "zju-undergraduate";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "fallback" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -524,7 +524,7 @@ export const createZjuUndergraduateConnector = ({
         message: "尚未配置并验证浙大统一身份认证账号。"
       });
       return {
-        sourceId: "zju-undergraduate",
+        sourceId: manifest.id,
         status: "unavailable",
         updatedAt,
         message: "需要先连接浙大统一身份认证账号。"
@@ -642,7 +642,7 @@ export const createZjuUndergraduateConnector = ({
       ? "本科教务部分模块已实时刷新，其余模块使用缓存或当前不可用。"
       : timetableMessage;
     return {
-      sourceId: "zju-undergraduate",
+      sourceId: manifest.id,
       status,
       updatedAt,
       message

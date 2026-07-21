@@ -17,7 +17,7 @@ export type LearningAssignmentsFetchResult =
   | { ok: false; message: string };
 
 interface ConnectorRefreshResult {
-  sourceId: "zju-learning";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -156,7 +156,7 @@ export const createZjuLearningConnector = ({
         data: null,
         message
       });
-      return { sourceId: "zju-learning", status: "unavailable", updatedAt, message };
+      return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
     }
 
     const result = await fetchAssignments().catch(
@@ -175,7 +175,7 @@ export const createZjuLearningConnector = ({
           updatedAt,
           data
         });
-        return { sourceId: "zju-learning", status: "live", updatedAt };
+        return { sourceId: manifest.id, status: "live", updatedAt };
       } catch {
         // Malformed live data must not overwrite the last valid publication.
       }
@@ -192,7 +192,7 @@ export const createZjuLearningConnector = ({
         data: cached,
         message
       });
-      return { sourceId: "zju-learning", status: "cache", updatedAt, message };
+      return { sourceId: manifest.id, status: "cache", updatedAt, message };
     }
 
     const message = result.ok ? "学在浙大作业响应无法解析。" : result.message;
@@ -204,7 +204,7 @@ export const createZjuLearningConnector = ({
       data: null,
       message
     });
-    return { sourceId: "zju-learning", status: "unavailable", updatedAt, message };
+    return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
   };
 
   return {

@@ -35,7 +35,7 @@ export const ZJU_STANDARD_PERIOD_TIMES: PeriodTimeRecord[] = [
 ];
 
 interface ConnectorRefreshResult {
-  sourceId: "zju-calendar-config";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -244,7 +244,7 @@ export const createZjuCalendarConfigConnector = ({
         updatedAt,
         data
       });
-      return { sourceId: "zju-calendar-config", status: "live", updatedAt };
+      return { sourceId: manifest.id, status: "live", updatedAt };
     } catch (error) {
       const cached = await loadCachedCalendar();
       if (cached) {
@@ -257,7 +257,7 @@ export const createZjuCalendarConfigConnector = ({
           message: "官网校历暂时不可用，继续使用上次成功数据。"
         });
         return {
-          sourceId: "zju-calendar-config",
+          sourceId: manifest.id,
           status: "cache",
           updatedAt,
           message: "官网校历暂时不可用，已使用缓存。"
@@ -274,7 +274,7 @@ export const createZjuCalendarConfigConnector = ({
         message
       });
       return {
-        sourceId: "zju-calendar-config",
+        sourceId: manifest.id,
         status: "unavailable",
         updatedAt,
         message

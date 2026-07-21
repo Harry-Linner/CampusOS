@@ -12,7 +12,7 @@ import type {
 import { manifest } from "./manifest";
 
 interface FeatureRefreshResult {
-  sourceId: "deadline-events";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "fallback" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -106,7 +106,7 @@ export const createDeadlineAssistant = ({
       message
     });
     return {
-      sourceId: "deadline-events",
+      sourceId: manifest.id,
       status: state,
       updatedAt,
       message

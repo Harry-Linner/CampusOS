@@ -8,6 +8,7 @@ import {
 describe("zju undergraduate connector", () => {
   it("publishes verified profile, timetable, exams and grades through one refresh job", async () => {
     let refreshJob: (() => Promise<unknown>) | undefined;
+    let registeredSourceId: string | null = null;
     const unregister = vi.fn();
     const publish = vi.fn(async () => undefined);
     const connector = createZjuUndergraduateConnector({
@@ -80,7 +81,8 @@ describe("zju undergraduate connector", () => {
       })),
       loadCachedGrades: vi.fn(async () => null),
       publish,
-      registerRefreshJob: (_sourceId, job) => {
+      registerRefreshJob: (sourceId, job) => {
+        registeredSourceId = sourceId;
         refreshJob = job;
         return unregister;
       },
@@ -179,10 +181,11 @@ describe("zju undergraduate connector", () => {
     );
     await expect(refreshJob?.()).resolves.toEqual(
       expect.objectContaining({
-        sourceId: "zju-undergraduate",
+        sourceId: "org.campusos.zju-undergraduate",
         status: "live"
       })
     );
+    expect(registeredSourceId).toBe("org.campusos.zju-undergraduate");
 
     await activation.deactivate();
     expect(unregister).toHaveBeenCalledTimes(1);

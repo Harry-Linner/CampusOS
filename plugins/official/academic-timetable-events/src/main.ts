@@ -16,7 +16,7 @@ import type {
 import { manifest } from "./manifest";
 
 interface FeatureRefreshResult {
-  sourceId: "timetable-events";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "fallback" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -333,7 +333,7 @@ export const createAcademicTimetableEventsFeature = ({
     });
 
     return {
-      sourceId: "timetable-events",
+      sourceId: manifest.id,
       status: state,
       updatedAt,
       message

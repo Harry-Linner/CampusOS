@@ -2,9 +2,12 @@ import { app, ipcMain } from "electron";
 import { join } from "node:path";
 import type {
   AcademicCalendarConfigData,
-  CalendarEventsData
+  CalendarEventsData,
+  PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
+import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/manifest";
+import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
 import type { CampusWorkspaceRecord } from "../shared/campusBridge";
 import {
   createDefaultCampusAdapterContext,
@@ -29,6 +32,7 @@ import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService"
 import { getWorkspaceDownloads } from "./downloadIpc";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
+import { appendDiagnosticEntry } from "./diagnosticLogStore";
 
 const WORKSPACE_STORE_FILE = "campus-workspace.json";
 
@@ -43,17 +47,32 @@ const getWorkspaceSnapshotStore = () =>
 
 const getAcademicConnectorSourceId = (
   program: "undergraduate" | "graduate"
-): "zju-undergraduate" | "zju-graduate" =>
-  program === "undergraduate" ? "zju-undergraduate" : "zju-graduate";
+): string =>
+  program === "undergraduate" ? zjuUndergraduateManifest.id : zjuGraduateManifest.id;
 
-const assertAcademicRefreshAvailable = (
+const assertAcademicRefreshAvailable = async (
   refreshResults: readonly RefreshSourceResult[],
-  program: "undergraduate" | "graduate"
-): void => {
+  program: "undergraduate" | "graduate",
+  pluginRuntime: PluginRuntimeSnapshot
+): Promise<void> => {
   const sourceId = getAcademicConnectorSourceId(program);
   const result = refreshResults.find((candidate) => candidate.sourceId === sourceId);
 
   if (result && result.status !== "unavailable") return;
+
+  const connector = pluginRuntime.plugins.find((plugin) => plugin.id === sourceId);
+  const registeredSources = refreshResults.map((candidate) => candidate.sourceId);
+  await appendDiagnosticEntry({
+    module: sourceId,
+    operation: "academic-sync-availability",
+    state: "unavailable",
+    durationMs: 0,
+    message: [
+      `培养层次: ${program}`,
+      `连接器状态: ${connector?.status ?? "未加载"}`,
+      `刷新源: ${registeredSources.length > 0 ? registeredSources.join("、") : "无"}`
+    ].join("；")
+  }).catch(() => {});
 
   throw new Error(
     `教务数据同步失败：${result?.message ?? "真实教务连接器未启动。"}`
@@ -72,7 +91,11 @@ const buildGeneratedRecord = async (
       ? academicCredential.authenticatedProfile.studentId
       : null;
   if (verifiedAcademicAccountId && academicCredential.program) {
-    assertAcademicRefreshAvailable(refreshResults, academicCredential.program);
+    await assertAcademicRefreshAvailable(
+      refreshResults,
+      academicCredential.program,
+      pluginRuntime
+    );
   }
   const reminderSettings = await readReminderSettingsRecord();
   const now = new Date();

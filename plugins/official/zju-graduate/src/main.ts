@@ -49,7 +49,7 @@ type ExamFetchResult = FetchResult & {
 };
 
 interface ConnectorRefreshResult {
-  sourceId: "zju-graduate";
+  sourceId: typeof manifest.id;
   status: "live" | "cache" | "fallback" | "unavailable";
   updatedAt: string;
   message?: string;
@@ -394,7 +394,7 @@ export const createZjuGraduateConnector = ({
     if (!proof) {
       const message = "尚未配置并验证浙大统一身份认证账号。";
       await publishUnavailable(updatedAt, message);
-      return { sourceId: "zju-graduate", status: "unavailable", updatedAt, message };
+      return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
     }
 
     const timetableQueries = createGraduateTimetableQueries(refreshedAt);
@@ -535,7 +535,7 @@ export const createZjuGraduateConnector = ({
 
     const status = aggregateStatus([timetableState, examsState, gradesState]);
     return {
-      sourceId: "zju-graduate",
+      sourceId: manifest.id,
       status,
       updatedAt,
       ...(status === "fallback" ? { message: "研究生教务部分模块已实时刷新，其余模块使用缓存或当前不可用。" } : {})
