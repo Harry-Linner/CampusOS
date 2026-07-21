@@ -12,7 +12,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node ../../scripts/repair-expect-type.mjs && vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "electron-vite build --mode e2e && playwright test",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "verify:zju-auth": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/zjuUnifiedAuth.live.test.ts --reporter=verbose",
     "verify:headless-sandbox": "electron-vite build && electron ../../scripts/headless-sandbox-smoke",

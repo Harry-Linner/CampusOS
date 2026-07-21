@@ -30,7 +30,11 @@ import {
 import type { CapabilityRepository } from "./capabilityRepository";
 import type { HeadlessPluginLoader } from "./pluginLifecycle";
 import { pluginRefreshCoordinator } from "./refreshCoordinator";
-import { requestOfficialAcademicCalendar } from "./officialAcademicCalendarRequest";
+import {
+  requestE2eOfficialCalendar,
+  requestOfficialAcademicCalendar,
+  useE2eFixtureSources
+} from "./officialAcademicCalendarRequest";
 
 const readVerifiedStudentId = async (): Promise<string | null> => {
   const record = await readAcademicCredentialRecord();
@@ -191,7 +195,9 @@ export const createOfficialHeadlessPluginLoaders = ({
     }),
   [zjuCalendarConfigManifest.id]: async () =>
     createZjuCalendarConfigConnector({
-      fetchCalendarPage: requestOfficialAcademicCalendar,
+      fetchCalendarPage: useE2eFixtureSources()
+        ? requestE2eOfficialCalendar
+        : requestOfficialAcademicCalendar,
       loadCachedCalendar: async () => {
         const records =
           await capabilityRepository.read<AcademicCalendarConfigData>(

@@ -27,8 +27,12 @@ const STEP_ORDER: OnboardingStep[] = [
   "done"
 ];
 
-const isDevelopmentBuild =
-  (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
+const rendererEnvironment = (import.meta as ImportMeta & {
+  env?: { DEV?: boolean; MODE?: string };
+}).env;
+
+const allowsFixtureOnboarding =
+  rendererEnvironment?.DEV === true || rendererEnvironment?.MODE === "e2e";
 
 const RECOMMENDED_PLUGIN_IDS = [
   "org.campusos.calendar-workspace",
@@ -113,7 +117,7 @@ const ProgressIndicator = ({
 
 export const OnboardingWizard = ({
   onComplete,
-  allowDevelopmentAuthSkip = isDevelopmentBuild
+  allowDevelopmentAuthSkip = allowsFixtureOnboarding
 }: OnboardingWizardProps): JSX.Element => {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
   const academicCredential = useAcademicCredential();

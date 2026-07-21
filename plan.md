@@ -415,23 +415,15 @@ flowchart TD
 
 ---
 
-## 6. Immediate next steps (next 1–2 weeks)
+## 6. Immediate next steps (private alpha)
 
-Ranked, concrete, small.
+1. **保持本地完整流程 E2E 为发布门禁** — 已完成。`pnpm --filter @campusos/core test:e2e` 构建专用 `e2e` renderer，并在外部校历 HTTP adapter 边界使用 fixture；测试经过 Electron IPC、插件运行时、SQLite 工作区和日历渲染，不能用 renderer 假成功替代。
 
-1. **复核并记录教务系统登录机制** — Harry — 本周五前。既然当前已确认无交互式验证码，就把登录流程、Cookie 生命周期、失败场景和降级预案系统写清楚，沉淀为 `docs/教务登录调研.md`。
+2. **结案真实本科认证故障** — 下一步。以脱敏 `verify:zju-auth` 证据在至少两个时段或网络复测，区分 ZJUAM 服务异常、协议变化、网络限制和实现缺陷。认证成功前不新增连接器或插件功能。
 
-2. **初始化项目仓库** — Harry — 本周内。GitHub 创建 `campus-os` 仓库，Electron + React + Vite + TypeScript 最小可运行骨架（`npm create electron-vite` 或等效方案），push 初始 commit。README 写清楚项目定位 + 技术栈 + 本地开发步骤。MIT LICENSE。
+3. **执行 3 人 / 3 设备私有 Alpha** — 依赖步骤 2。每名本科生在真实 Windows 设备上完成安装、认证、同步、日历查看和一次提醒；记录步骤、结果和脱敏诊断，而不是仅记录是否安装。
 
-3. **搭建 CI pipeline** — Harry — 随步骤 2 同步。GitHub Actions: typecheck + lint + test 在每次 push 时自动运行。目标：Phase 1 结束时 CI 绿灯是常态。
-
-4. **CC98 账号活跃** — Harry — 本周开始。如果还没有 CC98 账号，注册并在技术版 / 软件版潜伏，了解社区讨论风格、常用工具帖、已有的学生自建项目。为 Phase 2 内测招募做准备。
-
-5. **扩展沙箱到 headless。** renderer sandbox v1 已完成并通过真实冷启动；下一步选 worker/isolate，验证 CPU/内存/超时、崩溃回收、受控 capability/网络代理，且不能访问 `process`/`fs`/凭据。
-
-6. **列出首批信息源优先级并完成接入基线设计** — Harry — 下周内。把 MVP 首批抓取范围明确收敛为：教务处网站、计算机学院院网、云峰学院院网、ETA 三全育人平台，并为每个源写清楚"抓什么、为什么先做、技术难度、依赖登录与否"；实现前按 [Celechron 1.3.0 参考基线](docs/references/celechron-1.3.0-ingestion-baseline.md)设计认证、缓存、错误隔离、刷新协调、诊断和测试矩阵。
-
-7. **预留钉钉登录/消息导入入口** — Harry — 下周内。先把入口、设置位和架构挂点留出来；具体实现后续再参考你提供的现成软件方案，不在当前阶段展开。
+4. **作出发布 Go/No-Go 决策** — 依赖步骤 3。只有[私有 Alpha 验收门槛](docs/alpha-acceptance.md)全部通过，才进入 GitHub Release 与 CC98 招募；否则只修复验收暴露的问题。
 
 ---
 

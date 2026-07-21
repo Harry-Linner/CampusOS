@@ -4,6 +4,25 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_ATTEMPTS = 2;
 
+const E2E_OFFICIAL_CALENDAR_PAGE = `
+  <div class="title">Autumn Quarter 2026</div>
+  <table>
+    <tr><th>September 1, 2026 - January 10, 2027</th></tr>
+    <tr><td>September 14, 2026</td><td>Classes begin</td></tr>
+  </table>
+`;
+
+export const useE2eFixtureSources = (): boolean =>
+  process.env.CAMPUSOS_E2E_FIXTURE === "1";
+
+export const requestE2eOfficialCalendar = async (): Promise<{
+  body: string;
+  sourceUrl: string;
+}> => ({
+  body: E2E_OFFICIAL_CALENDAR_PAGE,
+  sourceUrl: "https://www.zju.edu.cn/english/19600/list.htm"
+});
+
 const isRetryableStatus = (status: number): boolean =>
   status === 408 || status === 429 || status >= 500;
 

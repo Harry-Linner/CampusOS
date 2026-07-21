@@ -1,6 +1,6 @@
 # CampusOS
 
-CampusOS 是一个面向浙江大学学生的桌面校园工作台。当前处于 **MVP Phase 2（核心链路实现与验收）**：Phase 1 插件工作台地基已完成，Phase 2 的认证、日历、下载、提醒和引导代码已接通，但真实账号/设备、完整端到端流程和 Windows 安装验收尚未完成，因此尚不可作为可发布 MVP。
+CampusOS 是一个面向浙江大学学生的桌面校园工作台。当前处于 **MVP Phase 2（核心链路实现与验收）**：Phase 1 插件工作台地基已完成，Phase 2 的认证、日历、下载、提醒和引导代码已接通，但真实账号/设备和 Windows 安装验收尚未完成，因此尚不可作为可发布 MVP。当前唯一的发布前门槛见[私有 Alpha 验收清单](docs/alpha-acceptance.md)。
 
 项目采用 [MIT License](LICENSE)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
