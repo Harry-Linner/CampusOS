@@ -895,7 +895,7 @@ class ZjuUnifiedAuthClient {
   readonly #pendingGraduateSessions = new Map<string, Promise<string>>();
 
   constructor(options: ZjuUnifiedAuthClientOptions = {}) {
-    this.#transport = options.transport ?? createNodeHttpsZjuAuthTransport();
+    this.#transport = options.transport ?? createFetchZjuAuthTransport();
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => new Date());
   }

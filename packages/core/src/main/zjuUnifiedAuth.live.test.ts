@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ZjuUnifiedAuthError,
-  createNodeHttpsZjuAuthTransport,
+  createFetchZjuAuthTransport,
   createZjuUnifiedAuthClient,
   type ZjuAuthTransport
 } from "./zjuUnifiedAuth";
@@ -30,7 +30,7 @@ describe("ZJU unified authentication live verification", () => {
       }
 
       const requestTrace: string[] = [];
-      const transport = createNodeHttpsZjuAuthTransport();
+      const transport = createFetchZjuAuthTransport();
       const tracedTransport: ZjuAuthTransport = async (request) => {
         const response = await transport(request);
         const target = new URL(request.url);

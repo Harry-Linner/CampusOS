@@ -8,7 +8,7 @@
 
 CampusOS 的“连接并保存”不是本地表单保存。用户先明确选择本科或研究生，避免某个业务站点临时异常时被自动误判培养层次。两条路径都必须先完成 ZJUAM 登录，再验证对应的认证后业务数据，只有整条所选链路通过后才加密落盘并展示回执；任一步失败都不会覆盖已有凭据，也不会向前端报告成功。
 
-**真实验收状态（2026-07-22）：未通过。** 使用本机已忽略的 `live-auth.env` 本科账号运行 `pnpm verify:zju-auth`，请求依次得到 `GET /cas/login -> 200`、`GET /cas/v2/getPubKey -> 200`、`POST /cas/login -> 500`。因此当前不能声称已通过真实 ZJUAM、本科教务、考试、成绩或学习平台验收；该状态必须以同一真实输入的后续成功反馈更新，不能用 fixture、构建或 UI 测试替代。
+**真实验收状态（2026-07-22）：部分通过，完整链路未通过。** 使用本机已忽略的 `live-auth.env` 本科账号运行 `pnpm verify:zju-auth`：Node `https` transport 在 `POST /cas/login` 收到 500；切换到 `fetch` transport 后，ZJUAM 登录、教务网 Session、运行时全部课表学期、考试和成绩请求均返回 200。核心默认 transport 已改为 `fetch`。同一输入随后在学在浙大 `GET /user/index` 收到 401，因此当前不能声称完整 ZJUAM、本科教务与学习平台链路已通过；该状态必须以同一真实输入的后续成功反馈更新，不能用 fixture、构建或 UI 测试替代。
 
 本科路径必须建立本科教务网 Session、素拓正式 `SESSION` 和非匿名 `ctx`，并从 `getMyInfo` 取得与输入账号一致的二/三/四课堂汇总。研究生路径必须消费研究生院 CAS ticket、取得短期 token，并用该 token 访问固定成绩接口且确认 `result.xxjhnList` 是数组。研究生回执只包含认证账号、数据集类型、实际记录数和获取时间，不包含 token 或成绩正文。新连接写入 `dataVersion: 4` 和培养层次；已有合法 v3 本科回执继续按本科已验证记录加载。
 
