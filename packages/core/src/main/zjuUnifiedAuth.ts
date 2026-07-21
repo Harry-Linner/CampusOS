@@ -11,6 +11,8 @@ const UNDERGRADUATE_EXAMS_URL =
   "https://zdbk.zju.edu.cn/jwglxt/xskscx/kscx_cxXsgrksIndex.html?doType=query&queryModel.showCount=5000";
 const UNDERGRADUATE_GRADES_URL =
   "https://zdbk.zju.edu.cn/jwglxt/cxdy/xscjcx_cxXscjIndex.html?doType=query&queryModel.showCount=5000";
+const ZJU_UNDERGRADUATE_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 const GRADUATE_ACADEMIC_SERVICE_URL = "https://yjsy.zju.edu.cn/";
 const GRADUATE_VALIDATE_LOGIN_URL =
   "https://yjsy.zju.edu.cn/dataapi/sys/cas/client/validateLogin";
@@ -917,6 +919,9 @@ class ZjuUnifiedAuthClient {
     if (method === "POST") {
       headers["Content-Type"] =
         "application/x-www-form-urlencoded; charset=UTF-8";
+      headers["Content-Length"] = String(
+        Buffer.byteLength(options.body ?? "", "utf8")
+      );
     }
     Object.assign(headers, options.headers);
 
@@ -1493,7 +1498,7 @@ class ZjuUnifiedAuthClient {
         ? new URLSearchParams({
             xnm: String(request.academicYearStart),
             xqm: request.season,
-            captcha_value: ""
+            captcha_value: "null"
           }).toString()
         : "";
     const requestContext = request.operation === "timetable"
@@ -1508,8 +1513,10 @@ class ZjuUnifiedAuthClient {
         cookie: session.header(requestUrl),
         headers: {
           Accept: "application/json, text/javascript, */*; q=0.01",
+          Connection: "close",
           Referer:
             "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html",
+          "User-Agent": ZJU_UNDERGRADUATE_USER_AGENT,
           "X-Requested-With": "XMLHttpRequest"
         }
       });

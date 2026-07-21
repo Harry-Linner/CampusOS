@@ -255,4 +255,40 @@ describe("zju undergraduate connector", () => {
       })
     );
   });
+
+  it("retains per-term failure reasons when no timetable cache exists", async () => {
+    const publish = vi.fn(async () => undefined);
+    const connector = createZjuUndergraduateConnector({
+      loadAcademicProfileProof: async () => ({
+        studentId: "3240100001",
+        verifiedAt: "2026-07-18T08:00:00.000Z",
+        verifiedService: "undergraduate-academic-affairs"
+      }),
+      fetchTimetableTerms: async (queries) => queries.map((query) => ({
+        query,
+        ok: false as const,
+        message: "本科教务请求失败（service-unavailable，HTTP 500）：统一认证服务暂时不可用。"
+      })),
+      loadCachedTimetable: async () => null,
+      fetchExams: async () => ({ ok: true, body: JSON.stringify({ items: [] }) }),
+      loadCachedExams: async () => null,
+      fetchGrades: async () => ({ ok: true, body: JSON.stringify({ items: [] }) }),
+      loadCachedGrades: async () => null,
+      publish,
+      registerRefreshJob: () => () => undefined,
+      now: () => new Date("2026-07-19T04:00:00.000Z")
+    });
+
+    await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      capability: "academic.timetable@1",
+      state: "unavailable",
+      message: expect.stringContaining("2025 1|秋")
+    }));
+  });
 });

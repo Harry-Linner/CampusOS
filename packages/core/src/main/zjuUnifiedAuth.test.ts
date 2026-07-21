@@ -149,7 +149,12 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(requests[5].headers.Cookie).toContain("JSESSIONID=academic-session");
     expect(requests[5].headers.Cookie).toContain("route=route-value");
     expect(new URLSearchParams(requests[5].body)).toEqual(
-      new URLSearchParams({ xnm: "2025", xqm: "2|夏", captcha_value: "" })
+      new URLSearchParams({ xnm: "2025", xqm: "2|夏", captcha_value: "null" })
+    );
+    expect(requests[5].headers.Connection).toBe("close");
+    expect(requests[5].headers["User-Agent"]).toContain("Chrome/122.0.0.0");
+    expect(requests[2].headers["Content-Length"]).toBe(
+      String(Buffer.byteLength(requests[2].body ?? "", "utf8"))
     );
     expect(requests[6].headers.Cookie).toContain("JSESSIONID=academic-session");
     expect(requests[7].url).toContain("/xskscx/kscx_cxXsgrksIndex.html");

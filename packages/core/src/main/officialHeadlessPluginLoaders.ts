@@ -27,6 +27,7 @@ import {
   requestUndergraduateAcademicService,
   requestZjuLearningService
 } from "./academicCredentialStore";
+import { ZjuUnifiedAuthError } from "./zjuUnifiedAuth";
 import type { CapabilityRepository } from "./capabilityRepository";
 import type { HeadlessPluginLoader } from "./pluginLifecycle";
 import { pluginRefreshCoordinator } from "./refreshCoordinator";
@@ -42,6 +43,24 @@ const readVerifiedStudentId = async (): Promise<string | null> => {
     ? record.authenticatedProfile.studentId
     : null;
 };
+
+const formatUndergraduateRequestFailure = (error: unknown): string => {
+  if (error instanceof ZjuUnifiedAuthError) {
+    const status = error.statusCode === undefined ? "" : `，HTTP ${error.statusCode}`;
+    return `本科教务请求失败（${error.code}${status}）：${error.message}`;
+  }
+  return error instanceof Error ? error.message : "教务网课表请求失败。";
+};
+
+const isSharedUndergraduateFailure = (error: unknown): boolean =>
+  error instanceof ZjuUnifiedAuthError && [
+    "interactive-verification-required",
+    "network-error",
+    "protocol-error",
+    "service-unavailable",
+    "service-verification-failed",
+    "timeout"
+  ].includes(error.code);
 
 const selectAccountRecord = <T>(
   records: CapabilityRecord<T>[],
@@ -355,7 +374,12 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       fetchTimetableTerms: async (queries) => {
         const results = [];
+        let sharedFailure: string | null = null;
         for (const query of queries) {
+          if (sharedFailure) {
+            results.push({ query, ok: false as const, message: sharedFailure });
+            continue;
+          }
           try {
             const response = await requestUndergraduateAcademicService({
               operation: "timetable",
@@ -364,11 +388,13 @@ export const createOfficialHeadlessPluginLoaders = ({
             });
             results.push({ query, ok: true as const, body: response.body });
           } catch (error) {
+            const message = formatUndergraduateRequestFailure(error);
             results.push({
               query,
               ok: false as const,
-              message: error instanceof Error ? error.message : "教务网课表请求失败。"
+              message
             });
+            if (isSharedUndergraduateFailure(error)) sharedFailure = message;
           }
         }
         return results;

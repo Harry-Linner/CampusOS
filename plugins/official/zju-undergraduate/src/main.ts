@@ -605,6 +605,11 @@ export const createZjuUndergraduateConnector = ({
       timetableStatus = "live";
     } else {
       const cached = await loadCachedTimetable(proof.studentId);
+      const failures = terms.flatMap((term) =>
+        term.state === "unavailable" && term.message
+          ? [`${term.academicYearStart} ${term.season}: ${term.message}`]
+          : []
+      ).join("；");
       if (cached) {
         await publish({
           capability: "academic.timetable@1",
@@ -617,16 +622,19 @@ export const createZjuUndergraduateConnector = ({
         timetableStatus = "cache";
         timetableMessage = "实时课表不可用，已使用缓存。";
       } else {
+        const message = failures
+          ? `教务网课表当前不可用，且没有可用缓存。${failures}`
+          : "教务网课表当前不可用，且没有可用缓存。";
         await publish({
           capability: "academic.timetable@1",
           accountId: proof.studentId,
           state: "unavailable",
           updatedAt,
           data: null,
-          message: "教务网课表当前不可用，且没有可用缓存。"
+          message
         });
         timetableStatus = "unavailable";
-        timetableMessage = "教务网课表当前不可用。";
+        timetableMessage = message;
       }
     }
 

@@ -204,7 +204,7 @@ describe("academic calendar event plugins", () => {
     });
 
     expect(registerRefreshJob).toHaveBeenCalledWith(
-      "deadline-events",
+      deadlineAssistantManifest.id,
       expect.any(Function),
       { after: ["org.campusos.zju-learning"] }
     );

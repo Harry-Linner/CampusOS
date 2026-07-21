@@ -138,7 +138,7 @@ export const createDeadlineAssistant = ({
         : typeof binding === "string"
           ? [binding]
           : [...binding];
-      const unregister = registerRefreshJob("deadline-events", refresh, {
+      const unregister = registerRefreshJob(manifest.id, refresh, {
         after: providers.filter((providerId) => providerId !== "core")
       });
       try {

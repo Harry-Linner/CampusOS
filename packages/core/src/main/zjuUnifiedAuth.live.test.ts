@@ -3,9 +3,9 @@ import {
   ZjuUnifiedAuthError,
   createNodeHttpsZjuAuthTransport,
   createZjuUnifiedAuthClient,
-  type ZjuAuthTransport,
-  type ZjuUndergraduateSeason
+  type ZjuAuthTransport
 } from "./zjuUnifiedAuth";
+import { createTimetableQueries } from "@campusos/plugin-zju-undergraduate/main";
 
 const liveVerificationRequested =
   process.env.npm_lifecycle_event === "verify:zju-auth";
@@ -104,37 +104,28 @@ describe("ZJU unified authentication live verification", () => {
           ].every(Number.isFinite);
 
         expect(valid).toBe(true);
-        const now = new Date();
-        const currentAcademicYearStart =
-          now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
-        const currentSeason: ZjuUndergraduateSeason =
-          now.getMonth() >= 8 && now.getMonth() <= 9
-            ? "1|秋"
-            : now.getMonth() >= 10 || now.getMonth() === 0
-              ? "1|冬"
-              : now.getMonth() <= 3
-                ? "2|春"
-                : "2|夏";
-        const timetableResponse = await client.requestUndergraduateService(
-          { username, password },
-          {
-            operation: "timetable",
-            academicYearStart: currentAcademicYearStart,
-            season: currentSeason
-          }
-        );
-        const timetablePayload =
-          timetableResponse.body.trim() === "null"
-            ? null
-            : (JSON.parse(timetableResponse.body) as unknown);
-        const timetableStructureValid =
-          timetablePayload === null ||
-          (typeof timetablePayload === "object" &&
-            timetablePayload !== null &&
-            "kbList" in timetablePayload &&
-            Array.isArray(timetablePayload.kbList));
-
-        expect(timetableStructureValid).toBe(true);
+        const timetableQueries = createTimetableQueries(new Date());
+        for (const query of timetableQueries) {
+          const timetableResponse = await client.requestUndergraduateService(
+            { username, password },
+            {
+              operation: "timetable",
+              academicYearStart: query.academicYearStart,
+              season: query.season
+            }
+          );
+          const timetablePayload =
+            timetableResponse.body.trim() === "null"
+              ? null
+              : (JSON.parse(timetableResponse.body) as unknown);
+          const timetableStructureValid =
+            timetablePayload === null ||
+            (typeof timetablePayload === "object" &&
+              timetablePayload !== null &&
+              "kbList" in timetablePayload &&
+              Array.isArray(timetablePayload.kbList));
+          expect(timetableStructureValid).toBe(true);
+        }
         const examsResponse = await client.requestUndergraduateService(
           { username, password },
           { operation: "exams" }
@@ -178,7 +169,7 @@ describe("ZJU unified authentication live verification", () => {
             "[PASS] 素拓 CAS ticket 已消费并取得正式 SESSION",
             "[PASS] 素拓 ctx 已确认非匿名身份",
             "[PASS] getMyInfo 返回账号匹配且汇总结构有效",
-            "[PASS] 教务网当前学季课表端点返回可解析业务结构",
+            "[PASS] 教务网运行时请求的全部课表学期均返回可解析业务结构",
             "[PASS] 教务网考试端点返回可解析业务结构",
             "[PASS] 教务网成绩端点返回可解析业务结构",
             "[PASS] 学在浙大业务 Session 已建立且作业端点返回可解析结构",
