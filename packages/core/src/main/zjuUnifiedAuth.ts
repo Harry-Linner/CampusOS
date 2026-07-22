@@ -1,4 +1,4 @@
-import { request as httpsRequest } from "node:https";
+import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
 
 const ZJU_AUTH_LOGIN_URL = "https://zjuam.zju.edu.cn/cas/login";
 const ZJU_AUTH_PUBLIC_KEY_URL =
@@ -11,8 +11,8 @@ const UNDERGRADUATE_EXAMS_URL =
   "https://zdbk.zju.edu.cn/jwglxt/xskscx/kscx_cxXsgrksIndex.html?doType=query&queryModel.showCount=5000";
 const UNDERGRADUATE_GRADES_URL =
   "https://zdbk.zju.edu.cn/jwglxt/cxdy/xscjcx_cxXscjIndex.html?doType=query&queryModel.showCount=5000";
-const ZJU_UNDERGRADUATE_USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+const ZJU_BROWSER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.63";
 const GRADUATE_ACADEMIC_SERVICE_URL = "https://yjsy.zju.edu.cn/";
 const GRADUATE_VALIDATE_LOGIN_URL =
   "https://yjsy.zju.edu.cn/dataapi/sys/cas/client/validateLogin";
@@ -31,6 +31,7 @@ const QUALITY_DEVELOPMENT_PROFILE_URL =
   "https://sztz.zju.edu.cn/dekt/student/home/getMyInfo";
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_LENGTH = 1_048_576;
+const SSO_PROCESS_COOKIE_LIFETIME_MS = 2 * 60 * 1_000;
 
 export type ZjuAuthErrorCode =
   | "invalid-input"
@@ -148,11 +149,18 @@ interface ZjuUnifiedAuthClientOptions {
 interface StoredCookie {
   name: string;
   value: string;
+  sourceHost: string;
   domain: string;
   hostOnly: boolean;
   path: string;
   secure: boolean;
   expiresAt: number | null;
+}
+
+interface ActiveCasSession {
+  username: string;
+  cookies: CookieJar;
+  expiresAt: number;
 }
 
 const getHeaderValues = (
@@ -264,6 +272,7 @@ class CookieJar {
       this.#cookies.set(key, {
         name,
         value,
+        sourceHost: url.hostname.toLowerCase(),
         domain,
         hostOnly,
         path,
@@ -315,6 +324,64 @@ class CookieJar {
         (cookie.expiresAt === null || cookie.expiresAt > now) &&
         cookie.value.length > 0
     );
+  }
+
+  createLearningServiceSessionJar(): CookieJar {
+    const now = Date.now();
+    const trustedSsoCookie = [...this.#cookies.values()].find(
+      (cookie) =>
+        cookie.name === "iPlanetDirectoryPro" &&
+        cookie.value.length > 0 &&
+        (cookie.expiresAt === null || cookie.expiresAt > now)
+    );
+    const learningCookies = new CookieJar();
+
+    if (!trustedSsoCookie) {
+      return learningCookies;
+    }
+
+    // Celechron scopes the CAS-issued SSO credential to zju.edu.cn before
+    // starting the courses redirect chain. The server may omit Domain, which
+    // otherwise makes this cookie host-only for zjuam.zju.edu.cn.
+    learningCookies.#cookies.set(
+      `zju.edu.cn\n/\n${trustedSsoCookie.name}`,
+      {
+        ...trustedSsoCookie,
+        domain: "zju.edu.cn",
+        hostOnly: false,
+        path: "/"
+      }
+    );
+
+    return learningCookies;
+  }
+
+  createLearningTodoSessionJar(): CookieJar {
+    const target = new URL(LEARNING_TODOS_URL);
+    const hostname = target.hostname.toLowerCase();
+    const now = Date.now();
+    const session = [...this.#cookies.values()].find((cookie) => {
+      const matchesDomain = cookie.hostOnly
+        ? hostname === cookie.domain
+        : domainMatches(hostname, cookie.domain);
+      return (
+        cookie.name === "session" &&
+        cookie.sourceHost === "courses.zju.edu.cn" &&
+        cookie.value.length > 0 &&
+        (cookie.expiresAt === null || cookie.expiresAt > now) &&
+        matchesDomain &&
+        pathMatches(target.pathname, cookie.path) &&
+        (!cookie.secure || target.protocol === "https:")
+      );
+    });
+    const todoSession = new CookieJar();
+    if (session) {
+      todoSession.#cookies.set(
+        `${session.domain}\n${session.path}\n${session.name}`,
+        { ...session }
+      );
+    }
+    return todoSession;
   }
 }
 
@@ -394,8 +461,9 @@ export const createFetchZjuAuthTransport = (
   };
 };
 
-export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport =>
-  async (request) =>
+export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport => {
+  const agent = new HttpsAgent({ keepAlive: true });
+  return async (request) =>
     new Promise<ZjuAuthHttpResponse>((resolve, reject) => {
       const target = new URL(request.url);
       if (target.protocol !== "https:") {
@@ -413,6 +481,7 @@ export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport =>
         {
           method: request.method,
           headers: request.headers,
+          agent,
           signal: request.signal
         },
         (response) => {
@@ -469,6 +538,7 @@ export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport =>
       if (request.body) nativeRequest.write(request.body, "utf8");
       nativeRequest.end();
     });
+};
 
 const decodeHtmlAttribute = (value: string): string =>
   value
@@ -893,9 +963,14 @@ class ZjuUnifiedAuthClient {
   readonly #pendingLearningSessions = new Map<string, Promise<CookieJar>>();
   readonly #graduateSessions = new Map<string, string>();
   readonly #pendingGraduateSessions = new Map<string, Promise<string>>();
+  readonly #activeCasSessions = new Map<string, ActiveCasSession>();
+  readonly #pendingCasLogins = new Map<
+    string,
+    Promise<{ username: string; cookies: CookieJar }>
+  >();
 
   constructor(options: ZjuUnifiedAuthClientOptions = {}) {
-    this.#transport = options.transport ?? createFetchZjuAuthTransport();
+    this.#transport = options.transport ?? createNodeHttpsZjuAuthTransport();
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => new Date());
   }
@@ -907,14 +982,18 @@ class ZjuUnifiedAuthClient {
       body?: string;
       cookie?: string | null;
       headers?: Record<string, string>;
+      minimalHeaders?: boolean;
     } = {}
   ): Promise<ZjuAuthHttpResponse> {
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const headers: Record<string, string> = {
-      Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
-      "Cache-Control": "no-store"
-    };
+    const headers: Record<string, string> = options.minimalHeaders
+      ? { "User-Agent": ZJU_BROWSER_USER_AGENT }
+      : {
+          "User-Agent": ZJU_BROWSER_USER_AGENT,
+          Accept: "text/html,application/json;q=0.9,*/*;q=0.8",
+          "Cache-Control": "no-store"
+        };
     if (options.cookie) headers.Cookie = options.cookie;
     if (method === "POST") {
       headers["Content-Type"] =
@@ -975,7 +1054,7 @@ class ZjuUnifiedAuthClient {
     }
   }
 
-  async #authenticateCas(
+  async #createFreshCasSession(
     credentials: ZjuAuthCredentials
   ): Promise<{ username: string; cookies: CookieJar }> {
     const username = credentials.username.trim();
@@ -1093,6 +1172,35 @@ class ZjuUnifiedAuthClient {
     return { username, cookies };
   }
 
+  async #authenticateCas(
+    credentials: ZjuAuthCredentials
+  ): Promise<{ username: string; cookies: CookieJar }> {
+    const username = credentials.username.trim();
+    const active = this.#activeCasSessions.get(username);
+    if (active && active.expiresAt > Date.now()) {
+      return { username: active.username, cookies: active.cookies };
+    }
+    if (active) this.#activeCasSessions.delete(username);
+
+    const pending = this.#pendingCasLogins.get(username);
+    if (pending) return pending;
+
+    const login = this.#createFreshCasSession(credentials);
+    this.#pendingCasLogins.set(username, login);
+    try {
+      const session = await login;
+      this.#activeCasSessions.set(username, {
+        ...session,
+        expiresAt: Date.now() + SSO_PROCESS_COOKIE_LIFETIME_MS
+      });
+      return session;
+    } finally {
+      if (this.#pendingCasLogins.get(username) === login) {
+        this.#pendingCasLogins.delete(username);
+      }
+    }
+  }
+
   async #connectUndergraduateSession(
     casCookies: CookieJar
   ): Promise<CookieJar> {
@@ -1164,15 +1272,33 @@ class ZjuUnifiedAuthClient {
     }
   }
 
+  async #requestLearningTodos(
+    session: CookieJar
+  ): Promise<ZjuAuthHttpResponse> {
+    const response = await this.#request("GET", LEARNING_TODOS_URL, {
+      cookie: session.header(LEARNING_TODOS_URL),
+      minimalHeaders: true,
+      headers: {}
+    });
+    session.store(
+      LEARNING_TODOS_URL,
+      getHeaderValues(response.headers, "set-cookie")
+    );
+    return response;
+  }
+
   async #connectLearningSession(casCookies: CookieJar): Promise<CookieJar> {
+    const learningCookies = casCookies.createLearningServiceSessionJar();
     let current = new URL(LEARNING_SERVICE_HOME_URL);
 
     for (let hop = 0; hop < 15; hop += 1) {
       validateLearningRedirect(current);
       const response = await this.#request("GET", current.href, {
-        cookie: casCookies.header(current.href)
+        cookie: learningCookies.header(current.href),
+        minimalHeaders: true,
+        headers: {}
       });
-      casCookies.store(
+      learningCookies.store(
         current.href,
         getHeaderValues(response.headers, "set-cookie")
       );
@@ -1199,12 +1325,13 @@ class ZjuUnifiedAuthClient {
         continue;
       }
 
+      const todoSession = learningCookies.createLearningTodoSessionJar();
       if (
         success &&
         current.hostname === "courses.zju.edu.cn" &&
-        cookieHeaderHasName(casCookies.header(LEARNING_TODOS_URL), "session")
+        cookieHeaderHasName(todoSession.header(LEARNING_TODOS_URL), "session")
       ) {
-        return casCookies;
+        return todoSession;
       }
 
       if (
@@ -1346,18 +1473,7 @@ class ZjuUnifiedAuthClient {
     const username = credentials.username.trim();
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const session = await this.#getLearningSession(credentials);
-      const response = await this.#request("GET", LEARNING_TODOS_URL, {
-        cookie: session.header(LEARNING_TODOS_URL),
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          Referer: LEARNING_SERVICE_HOME_URL,
-          "X-Requested-With": "XMLHttpRequest"
-        }
-      });
-      session.store(
-        LEARNING_TODOS_URL,
-        getHeaderValues(response.headers, "set-cookie")
-      );
+      const response = await this.#requestLearningTodos(session);
 
       const redirected = isRedirect(response.status);
       const expired =
@@ -1516,7 +1632,7 @@ class ZjuUnifiedAuthClient {
           Connection: "close",
           Referer:
             "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html",
-          "User-Agent": ZJU_UNDERGRADUATE_USER_AGENT,
+          "User-Agent": ZJU_BROWSER_USER_AGENT,
           "X-Requested-With": "XMLHttpRequest"
         }
       });
@@ -1564,100 +1680,35 @@ class ZjuUnifiedAuthClient {
     );
   }
 
-  clearServiceSessions(): void {
-    this.#undergraduateSessions.clear();
-    this.#pendingUndergraduateSessions.clear();
-    this.#learningSessions.clear();
-    this.#pendingLearningSessions.clear();
-    this.#graduateSessions.clear();
-    this.#pendingGraduateSessions.clear();
-  }
-
-  async authenticate(
-    credentials: ZjuAuthCredentials & { program: AcademicProgram }
-  ): Promise<ZjuAuthenticationResult> {
-    const { username, cookies: casCookies } =
-      await this.#authenticateCas(credentials);
-
-    if (credentials.program === "graduate") {
-      const token = await this.#connectGraduateSession(casCookies);
-      const gradesResponse = await this.#request("POST", GRADUATE_GRADES_URL, {
-        body: "",
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "X-Access-Token": token
-        }
-      });
-      if (
-        gradesResponse.status === 401 ||
-        gradesResponse.status === 403 ||
-        serviceBodyIndicatesExpiredSession(gradesResponse.body)
-      ) {
-        throw new ZjuUnifiedAuthError(
-          "service-verification-failed",
-          "研究生院业务令牌未能访问认证后成绩数据。",
-          { statusCode: gradesResponse.status }
-        );
-      }
-      validateStatus(gradesResponse, "研究生院认证后成绩接口");
-      const authenticatedAt = this.#now().toISOString();
-      const authenticatedProfile = parseGraduateAuthenticatedProfile(
-        gradesResponse.body,
-        username,
-        authenticatedAt
-      );
-      this.#graduateSessions.set(username, token);
-      return {
-        provider: "zju-unified-auth",
-        username,
-        authenticatedAt,
-        program: "graduate",
-        verifiedService: "graduate-academic-affairs",
-        authenticatedProfile
-      };
-    }
-
-    const serviceCookies = await this.#connectUndergraduateSession(casCookies);
-    this.#undergraduateSessions.set(username, serviceCookies);
-
-    const qualityServiceLoginUrl = new URL(ZJU_AUTH_LOGIN_URL);
-    qualityServiceLoginUrl.searchParams.set(
-      "service",
-      QUALITY_DEVELOPMENT_SERVICE_URL
-    );
-    const qualityServiceResponse = await this.#request(
-      "GET",
-      qualityServiceLoginUrl.href,
-      { cookie: casCookies.header(qualityServiceLoginUrl.href) }
-    );
-    const qualityLocation = getHeader(
-      qualityServiceResponse.headers,
-      "location"
-    );
-    if (!isRedirect(qualityServiceResponse.status) || !qualityLocation) {
+  async #connectQualityDevelopmentProfile(
+    casCookies: CookieJar,
+    username: string,
+    authenticatedAt: string
+  ): Promise<ZjuAuthenticatedProfile> {
+    const serviceLoginUrl = new URL(ZJU_AUTH_LOGIN_URL);
+    serviceLoginUrl.searchParams.set("service", QUALITY_DEVELOPMENT_SERVICE_URL);
+    const serviceResponse = await this.#request("GET", serviceLoginUrl.href, {
+      cookie: casCookies.header(serviceLoginUrl.href)
+    });
+    const location = getHeader(serviceResponse.headers, "location");
+    if (!isRedirect(serviceResponse.status) || !location) {
       throw new ZjuUnifiedAuthError(
         "service-verification-failed",
         "统一认证登录态未能通过素质拓展平台连接验证。",
-        { statusCode: qualityServiceResponse.status }
+        { statusCode: serviceResponse.status }
       );
     }
 
-    const qualityCallback = new URL(
-      qualityLocation,
-      QUALITY_DEVELOPMENT_SERVICE_URL
-    );
-    validateQualityDevelopmentCallback(qualityCallback);
-    const qualityCallbackResponse = await this.#request(
-      "GET",
-      qualityCallback.href
-    );
+    const callback = new URL(location, QUALITY_DEVELOPMENT_SERVICE_URL);
+    validateQualityDevelopmentCallback(callback);
+    const callbackResponse = await this.#request("GET", callback.href);
     const qualityCookies = new CookieJar();
     qualityCookies.store(
-      qualityCallback.href,
-      getHeaderValues(qualityCallbackResponse.headers, "set-cookie")
+      callback.href,
+      getHeaderValues(callbackResponse.headers, "set-cookie")
     );
     if (
-      qualityCallbackResponse.status !== 200 ||
+      callbackResponse.status !== 200 ||
       !cookieHeaderHasName(
         qualityCookies.header(QUALITY_DEVELOPMENT_CONTEXT_URL),
         "SESSION"
@@ -1666,7 +1717,7 @@ class ZjuUnifiedAuthClient {
       throw new ZjuUnifiedAuthError(
         "service-verification-failed",
         "素质拓展平台没有建立正式的已认证会话。",
-        { statusCode: qualityCallbackResponse.status }
+        { statusCode: callbackResponse.status }
       );
     }
 
@@ -1716,21 +1767,124 @@ class ZjuUnifiedAuthClient {
       }
     );
     validateStatus(profileResponse, "素质拓展个人汇总接口");
-    const authenticatedAt = this.#now().toISOString();
-    const authenticatedProfile = parseAuthenticatedProfile(
+    return parseAuthenticatedProfile(
       profileResponse.body,
       username,
       authenticatedAt
     );
+  }
 
-    return {
-      provider: "zju-unified-auth",
-      username,
-      authenticatedAt,
-      program: "undergraduate",
-      verifiedService: "undergraduate-academic-affairs",
-      authenticatedProfile
-    };
+  clearServiceSessions(): void {
+    this.#undergraduateSessions.clear();
+    this.#pendingUndergraduateSessions.clear();
+    this.#learningSessions.clear();
+    this.#pendingLearningSessions.clear();
+    this.#graduateSessions.clear();
+    this.#pendingGraduateSessions.clear();
+    this.#activeCasSessions.clear();
+    this.#pendingCasLogins.clear();
+  }
+
+  async authenticate(
+    credentials: ZjuAuthCredentials & { program: AcademicProgram }
+  ): Promise<ZjuAuthenticationResult> {
+    const initialCasSession = await this.#authenticateCas(credentials);
+    const { username } = initialCasSession;
+
+    if (credentials.program === "graduate") {
+      const token = await this.#connectGraduateSession(
+        initialCasSession.cookies
+      );
+      const gradesResponse = await this.#request("POST", GRADUATE_GRADES_URL, {
+        body: "",
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "X-Access-Token": token
+        }
+      });
+      if (
+        gradesResponse.status === 401 ||
+        gradesResponse.status === 403 ||
+        serviceBodyIndicatesExpiredSession(gradesResponse.body)
+      ) {
+        throw new ZjuUnifiedAuthError(
+          "service-verification-failed",
+          "研究生院业务令牌未能访问认证后成绩数据。",
+          { statusCode: gradesResponse.status }
+        );
+      }
+      validateStatus(gradesResponse, "研究生院认证后成绩接口");
+      const authenticatedAt = this.#now().toISOString();
+      const authenticatedProfile = parseGraduateAuthenticatedProfile(
+        gradesResponse.body,
+        username,
+        authenticatedAt
+      );
+      this.#graduateSessions.set(username, token);
+      return {
+        provider: "zju-unified-auth",
+        username,
+        authenticatedAt,
+        program: "graduate",
+        verifiedService: "graduate-academic-affairs",
+        authenticatedProfile
+      };
+    }
+
+    let casCookies = initialCasSession.cookies;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const authenticatedAt = this.#now().toISOString();
+      const serviceResults = await Promise.allSettled([
+        this.#connectLearningSession(casCookies),
+        this.#connectUndergraduateSession(casCookies),
+        this.#connectQualityDevelopmentProfile(
+          casCookies,
+          username,
+          authenticatedAt
+        )
+      ] as const);
+      const rejected = serviceResults.find(
+        (result): result is PromiseRejectedResult => result.status === "rejected"
+      );
+      if (rejected) {
+        const ssoRejected =
+          rejected.reason instanceof ZjuUnifiedAuthError &&
+          rejected.reason.code === "service-verification-failed" &&
+          /统一认证登录态|登录态失效|统一身份认证凭据无效/.test(
+            rejected.reason.message
+          );
+        if (attempt === 0 && ssoRejected) {
+          this.#activeCasSessions.delete(username);
+          casCookies = (await this.#authenticateCas(credentials)).cookies;
+          continue;
+        }
+        throw rejected.reason;
+      }
+      const fulfilled = serviceResults as [
+        PromiseFulfilledResult<CookieJar>,
+        PromiseFulfilledResult<CookieJar>,
+        PromiseFulfilledResult<ZjuAuthenticatedProfile>
+      ];
+      const learningCookies = fulfilled[0].value;
+      const serviceCookies = fulfilled[1].value;
+      const authenticatedProfile = fulfilled[2].value;
+      this.#undergraduateSessions.set(username, serviceCookies);
+      this.#learningSessions.set(username, learningCookies);
+
+      return {
+        provider: "zju-unified-auth",
+        username,
+        authenticatedAt,
+        program: "undergraduate",
+        verifiedService: "undergraduate-academic-affairs",
+        authenticatedProfile
+      };
+    }
+
+    throw new ZjuUnifiedAuthError(
+      "service-verification-failed",
+      "本科业务会话建立失败。"
+    );
   }
 }
 

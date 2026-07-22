@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ZjuUnifiedAuthError,
-  createFetchZjuAuthTransport,
+  createNodeHttpsZjuAuthTransport,
   createZjuUnifiedAuthClient,
   type ZjuAuthTransport
 } from "./zjuUnifiedAuth";
@@ -30,12 +30,29 @@ describe("ZJU unified authentication live verification", () => {
       }
 
       const requestTrace: string[] = [];
-      const transport = createFetchZjuAuthTransport();
+      const transport = createNodeHttpsZjuAuthTransport();
       const tracedTransport: ZjuAuthTransport = async (request) => {
-        const response = await transport(request);
         const target = new URL(request.url);
+        const response = await transport(request);
+        const sentCookieNames = (request.headers.Cookie ?? "")
+          .split(";")
+          .map((entry) => entry.trim().split("=", 1)[0])
+          .filter(Boolean)
+          .sort()
+          .join(",");
+        const receivedSetCookie = response.headers["set-cookie"];
+        const receivedCookieNames = (
+          typeof receivedSetCookie === "string"
+            ? [receivedSetCookie]
+            : (receivedSetCookie ?? [])
+        )
+          .map((header) => header.split("=", 1)[0]?.trim())
+          .filter((name): name is string => Boolean(name))
+          .sort()
+          .join(",");
         requestTrace.push(
-          `${request.method} ${target.hostname}${target.pathname} -> ${response.status}`
+          `${request.method} ${target.hostname}${target.pathname} -> ${response.status}` +
+            ` [sent=${sentCookieNames || "<none>"}; received=${receivedCookieNames || "<none>"}]`
         );
         return response;
       };

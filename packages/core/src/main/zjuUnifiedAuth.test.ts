@@ -46,29 +46,82 @@ const createSequenceTransport = (
   return { requests, transport };
 };
 
-const authenticatedServicePrelude = (): ZjuAuthHttpResponse[] => [
-  response(200, '<input name="execution" value="e1s1">'),
-  response(200, JSON.stringify({ modulus, exponent: "10001" })),
-  response(302, "", {
-    "set-cookie": ["iPlanetDirectoryPro=sso-value; Path=/; Secure"]
-  }),
-  response(302, "", {
-    location:
-      "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html?ticket=ST-academic"
-  }),
-  response(302, "", {
-    "set-cookie": [
-      "JSESSIONID=academic-session; Path=/jwglxt; HttpOnly",
-      "route=route-value; Path=/jwglxt; HttpOnly"
-    ]
-  }),
-  response(302, "", {
-    location: "https://sztz.zju.edu.cn/dekt/?ticket=ST-quality"
-  }),
-  response(200, "quality development home", {
-    "set-cookie": ["SESSION=quality-session; Path=/dekt; Secure; HttpOnly"]
-  })
-];
+const createRoutingTransport = (
+  route: (request: ZjuAuthHttpRequest) => ZjuAuthHttpResponse
+): {
+  requests: ZjuAuthHttpRequest[];
+  transport: ZjuAuthTransport;
+} => {
+  const requests: ZjuAuthHttpRequest[] = [];
+  const transport = vi.fn(async (request: ZjuAuthHttpRequest) => {
+    requests.push(request);
+    return route(request);
+  });
+
+  return { requests, transport };
+};
+
+const createAuthenticatedUndergraduateTransport = (options: {
+  includeRoute?: boolean;
+  context?: string;
+  studentId?: string;
+  points?: { second: string | number | null; third: string | number | null; fourth: string | number | null };
+} = {}) => createRoutingTransport((request) => {
+  const target = new URL(request.url);
+  const service = target.searchParams.get("service");
+  if (request.method === "GET" && target.pathname === "/cas/login" && !service) {
+    return response(200, '<form><input value="e1s1" type="hidden" name="execution"></form>', {
+      "set-cookie": ["_csrf=csrf-value; Path=/cas; Secure; HttpOnly", "_pv0=visitor-value; Path=/; Secure"]
+    });
+  }
+  if (target.pathname === "/cas/v2/getPubKey") {
+    return response(200, JSON.stringify({ modulus, exponent: "10001" }));
+  }
+  if (request.method === "POST" && target.pathname === "/cas/login") {
+    return response(302, "", {
+      "set-cookie": ["iPlanetDirectoryPro=sso-value; Domain=.zju.edu.cn; Path=/; Secure; HttpOnly"]
+    });
+  }
+  if (target.pathname === "/cas/login" && service === UNDERGRADUATE_ACADEMIC_SERVICE_URL_FOR_TEST) {
+    return response(302, "", { location: `${UNDERGRADUATE_ACADEMIC_SERVICE_URL_FOR_TEST}?ticket=ST-sensitive` });
+  }
+  if (target.hostname === "zdbk.zju.edu.cn" && target.searchParams.get("ticket") === "ST-sensitive") {
+    const cookies = ["JSESSIONID=academic-session; Path=/jwglxt; HttpOnly"];
+    if (options.includeRoute !== false) cookies.push("route=route-value; Path=/jwglxt; HttpOnly");
+    return response(302, "", { "set-cookie": cookies });
+  }
+  if (target.hostname === "courses.zju.edu.cn" && target.pathname === "/user/index" && !target.searchParams.has("authenticated")) {
+    return response(302, "", { location: "https://identity.zju.edu.cn/auth/continue" });
+  }
+  if (target.hostname === "identity.zju.edu.cn") {
+    return response(200, '<meta http-equiv="refresh" content="0;url=https://courses.zju.edu.cn/user/index?authenticated=1">');
+  }
+  if (target.hostname === "courses.zju.edu.cn" && target.pathname === "/user/index") {
+    return response(200, "learning home", { "set-cookie": ["session=learning-session; Path=/; Secure; HttpOnly"] });
+  }
+  if (target.pathname === "/cas/login" && service === "https://sztz.zju.edu.cn/dekt/") {
+    return response(302, "", { location: "https://sztz.zju.edu.cn/dekt/?ticket=ST-quality-sensitive" });
+  }
+  if (target.hostname === "sztz.zju.edu.cn" && target.pathname === "/dekt/" && target.searchParams.get("ticket") === "ST-quality-sensitive") {
+    return response(200, "quality development home", {
+      "set-cookie": ["SESSION=quality-session; Path=/dekt; Secure; HttpOnly; SameSite=Lax"]
+    });
+  }
+  if (target.pathname === "/dekt/ctx") {
+    return response(200, JSON.stringify({ success: true, code: 0, data: options.context ?? authenticatedContext }));
+  }
+  if (target.pathname === "/dekt/student/home/getMyInfo") {
+    const points = options.points ?? { second: 3.45, third: 1, fourth: 0 };
+    return response(200, JSON.stringify({
+      code: 0,
+      extend: { myInfo: { xh: options.studentId ?? "3240100001", dektJf: points.second, dsktJf: points.third, dsiktJf: points.fourth } }
+    }));
+  }
+  throw new Error(`Unexpected request: ${request.method} ${request.url}`);
+});
+
+const UNDERGRADUATE_ACADEMIC_SERVICE_URL_FOR_TEST =
+  "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html";
 
 describe("ZjuUnifiedAuthClient", () => {
   it("rejects non-HTTPS requests in the native transport", async () => {
@@ -152,7 +205,7 @@ describe("ZjuUnifiedAuthClient", () => {
       new URLSearchParams({ xnm: "2025", xqm: "2|夏", captcha_value: "null" })
     );
     expect(requests[5].headers.Connection).toBe("close");
-    expect(requests[5].headers["User-Agent"]).toContain("Chrome/122.0.0.0");
+    expect(requests[5].headers["User-Agent"]).toContain("Edg/110.0.1587.63");
     expect(requests[2].headers["Content-Length"]).toBe(
       String(Buffer.byteLength(requests[2].body ?? "", "utf8"))
     );
@@ -308,7 +361,7 @@ describe("ZjuUnifiedAuthClient", () => {
       response(200, JSON.stringify({ modulus, exponent: "10001" })),
       response(302, "", {
         "set-cookie": [
-          "iPlanetDirectoryPro=sso-value; Domain=.zju.edu.cn; Path=/; Secure"
+          "iPlanetDirectoryPro=sso-value; Path=/; Secure"
         ]
       }),
       response(302, "", {
@@ -334,10 +387,129 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(JSON.stringify(result)).not.toContain("learning-session");
     expect(requests).toHaveLength(7);
     expect(requests[3].url).toBe("https://courses.zju.edu.cn/user/index");
+    expect(requests[3].headers.Cookie).toContain(
+      "iPlanetDirectoryPro=sso-value"
+    );
+    expect(requests[3].headers["User-Agent"]).toContain("Edg/110.0.1587.63");
+    expect(requests[3].headers.Accept).toBeUndefined();
+    expect(requests[3].headers["Cache-Control"]).toBeUndefined();
     expect(requests[4].url).toBe("https://identity.zju.edu.cn/auth/continue");
     expect(requests[5].url).toContain("authenticated=1");
     expect(requests[6].url).toBe("https://courses.zju.edu.cn/api/todos");
     expect(requests[6].headers.Cookie).toContain("session=learning-session");
+    expect(requests[6].headers.Cookie).not.toContain("iPlanetDirectoryPro");
+    expect(requests[6].headers["User-Agent"]).toContain("Edg/110.0.1587.63");
+    expect(requests[6].headers.Referer).toBeUndefined();
+    expect(requests[6].headers["X-Requested-With"]).toBeUndefined();
+  });
+
+  it("establishes undergraduate service sessions atomically from one CAS login", async () => {
+    const todosBody = JSON.stringify({ todo_list: [] });
+    const { requests, transport } = createRoutingTransport((request) => {
+      const target = new URL(request.url);
+      if (request.method === "GET" && target.pathname === "/cas/login" && !target.searchParams.has("service")) {
+        return response(200, '<input name="execution" value="e1s1">');
+      }
+      if (target.pathname === "/cas/v2/getPubKey") {
+        return response(200, JSON.stringify({ modulus, exponent: "10001" }));
+      }
+      if (request.method === "POST" && target.pathname === "/cas/login") {
+        return response(302, "", {
+          "set-cookie": ["iPlanetDirectoryPro=sso-value; Path=/; Secure"]
+        });
+      }
+      const service = target.searchParams.get("service");
+      if (target.pathname === "/cas/login" && service === "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html") {
+        return response(302, "", {
+          location: "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html?ticket=ST-academic"
+        });
+      }
+      if (target.hostname === "zdbk.zju.edu.cn" && target.searchParams.get("ticket") === "ST-academic") {
+        return response(302, "", {
+          "set-cookie": [
+            "JSESSIONID=academic-session; Path=/jwglxt; HttpOnly",
+            "route=route-value; Path=/jwglxt; HttpOnly"
+          ]
+        });
+      }
+      if (target.hostname === "courses.zju.edu.cn" && target.pathname === "/user/index" && !target.searchParams.has("authenticated")) {
+        return response(302, "", {
+          location: "https://identity.zju.edu.cn/auth/continue"
+        });
+      }
+      if (target.hostname === "identity.zju.edu.cn") {
+        return response(200, '<meta http-equiv="refresh" content="0;url=https://courses.zju.edu.cn/user/index?authenticated=1">');
+      }
+      if (target.hostname === "courses.zju.edu.cn" && target.pathname === "/user/index") {
+        return response(200, "learning home", {
+          "set-cookie": ["session=learning-session; Path=/; Secure; HttpOnly"]
+        });
+      }
+      if (target.pathname === "/cas/login" && service === "https://sztz.zju.edu.cn/dekt/") {
+        return response(302, "", {
+          location: "https://sztz.zju.edu.cn/dekt/?ticket=ST-quality"
+        });
+      }
+      if (target.hostname === "sztz.zju.edu.cn" && target.pathname === "/dekt/" && target.searchParams.get("ticket") === "ST-quality") {
+        return response(200, "quality home", {
+          "set-cookie": ["SESSION=quality-session; Path=/dekt; Secure; HttpOnly"]
+        });
+      }
+      if (target.pathname === "/dekt/ctx") {
+        return response(200, JSON.stringify({ success: true, code: 0, data: authenticatedContext }));
+      }
+      if (target.pathname === "/dekt/student/home/getMyInfo") {
+        return response(200, JSON.stringify({
+          code: 0,
+          extend: { myInfo: { xh: "3240100001", dektJf: 1, dsktJf: 2, dsiktJf: 3 } }
+        }));
+      }
+      if (target.pathname === "/api/todos") {
+        return response(200, todosBody);
+      }
+      throw new Error(`Unexpected request: ${request.method} ${request.url}`);
+    });
+    const client = createZjuUnifiedAuthClient({ transport });
+    const credentials = { username: "3240100001", password: "real password" };
+
+    await client.authenticate({ ...credentials, program: "undergraduate" });
+    const todos = await client.requestLearningService(credentials, { operation: "todos" });
+
+    expect(todos).toEqual({ status: 200, body: todosBody });
+    expect(requests.filter((request) => request.method === "POST" && new URL(request.url).pathname === "/cas/login")).toHaveLength(1);
+    const todoRequest = requests.find((request) => new URL(request.url).pathname === "/api/todos");
+    expect(todoRequest?.headers.Cookie).toContain("session=learning-session");
+    expect(todoRequest?.headers.Cookie).not.toContain("iPlanetDirectoryPro");
+  });
+
+  it("retries the complete undergraduate login once with a fresh SSO session", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    let passwordSubmissions = 0;
+    const transport: ZjuAuthTransport = async (request) => {
+      const target = new URL(request.url);
+      if (request.method === "POST" && target.pathname === "/cas/login") {
+        passwordSubmissions += 1;
+      }
+      if (
+        passwordSubmissions === 1 &&
+        target.hostname === "courses.zju.edu.cn" &&
+        target.pathname === "/user/index" &&
+        !target.searchParams.has("authenticated")
+      ) {
+        routed.requests.push(request);
+        return response(401, "expired SSO");
+      }
+      return routed.transport(request);
+    };
+    const client = createZjuUnifiedAuthClient({ transport });
+
+    await client.authenticate({
+      username: "3240100001",
+      password: "real password",
+      program: "undergraduate"
+    });
+
+    expect(passwordSubmissions).toBe(2);
   });
 
   it("rejects learning-service redirects outside the explicit ZJU host set", async () => {
@@ -365,63 +537,9 @@ describe("ZjuUnifiedAuthClient", () => {
   });
 
   it("returns authenticated practice-point data only after both service sessions are verified", async () => {
-    const { requests, transport } = createSequenceTransport([
-      response(
-        200,
-        '<form><input value="e1s1" type="hidden" name="execution"></form>',
-        {
-          "set-cookie": [
-            "_csrf=csrf-value; Path=/cas; Secure; HttpOnly",
-            "_pv0=visitor-value; Path=/; Secure"
-          ]
-        }
-      ),
-      response(200, JSON.stringify({ modulus, exponent: "10001" })),
-      response(302, "", {
-        location: "https://zjuam.zju.edu.cn/cas/login",
-        "set-cookie": [
-          "iPlanetDirectoryPro=sso-value; Domain=.zju.edu.cn; Path=/; Secure; HttpOnly"
-        ]
-      }),
-      response(302, "", {
-        location:
-          "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html?ticket=ST-sensitive"
-      }),
-      response(302, "", {
-        location: "https://zdbk.zju.edu.cn/jwglxt/xtgl/index_initMenu.html",
-        "set-cookie": [
-          "JSESSIONID=academic-session; Path=/jwglxt; HttpOnly",
-          "route=route-value; Path=/jwglxt; HttpOnly"
-        ]
-      }),
-      response(302, "", {
-        location:
-          "https://sztz.zju.edu.cn/dekt/?ticket=ST-quality-sensitive"
-      }),
-      response(200, "quality development home", {
-        "set-cookie": [
-          "SESSION=quality-session; Path=/dekt; Secure; HttpOnly; SameSite=Lax"
-        ]
-      }),
-      response(
-        200,
-        JSON.stringify({ success: true, code: 0, data: authenticatedContext })
-      ),
-      response(
-        200,
-        JSON.stringify({
-          code: 0,
-          extend: {
-            myInfo: {
-              xh: "3240100001",
-              dektJf: "3.45",
-              dsktJf: 1,
-              dsiktJf: null
-            }
-          }
-        })
-      )
-    ]);
+    const { requests, transport } = createAuthenticatedUndergraduateTransport({
+      points: { second: "3.45", third: 1, fourth: null }
+    });
     const client = createZjuUnifiedAuthClient({
       transport,
       now: () => new Date("2026-07-18T08:00:00.000Z")
@@ -451,50 +569,24 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(JSON.stringify(result)).not.toContain("ST-sensitive");
     expect(JSON.stringify(result)).not.toContain("ST-quality-sensitive");
     expect(JSON.stringify(result)).not.toContain("quality-session");
-    expect(requests.map(({ method, url }) => [method, url])).toEqual([
-      ["GET", "https://zjuam.zju.edu.cn/cas/login"],
-      ["GET", "https://zjuam.zju.edu.cn/cas/v2/getPubKey"],
-      ["POST", "https://zjuam.zju.edu.cn/cas/login"],
-      [
-        "GET",
-        "https://zjuam.zju.edu.cn/cas/login?service=https%3A%2F%2Fzdbk.zju.edu.cn%2Fjwglxt%2Fxtgl%2Flogin_ssologin.html"
-      ],
-      [
-        "GET",
-        "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html?ticket=ST-sensitive"
-      ],
-      [
-        "GET",
-        "https://zjuam.zju.edu.cn/cas/login?service=https%3A%2F%2Fsztz.zju.edu.cn%2Fdekt%2F"
-      ],
-      [
-        "GET",
-        "https://sztz.zju.edu.cn/dekt/?ticket=ST-quality-sensitive"
-      ],
-      ["POST", "https://sztz.zju.edu.cn/dekt/ctx"],
-      [
-        "GET",
-        "https://sztz.zju.edu.cn/dekt/student/home/getMyInfo"
-      ]
-    ]);
-
-    const loginForm = new URLSearchParams(requests[2].body);
+    const loginRequest = requests.find((request) =>
+      request.method === "POST" && new URL(request.url).pathname === "/cas/login"
+    );
+    expect(loginRequest).toBeDefined();
+    const loginForm = new URLSearchParams(loginRequest?.body);
     expect(loginForm.get("username")).toBe("3240100001");
     expect(loginForm.get("password")).toMatch(/^[0-9a-f]{128}$/);
     expect(loginForm.get("password")).not.toContain("real password");
     expect(loginForm.get("execution")).toBe("e1s1");
     expect(loginForm.get("_eventId")).toBe("submit");
     expect(loginForm.get("rememberMe")).toBe("true");
-    expect(requests[1].headers.Cookie).toContain("_csrf=csrf-value");
-    expect(requests[2].headers.Cookie).toContain("_pv0=visitor-value");
-    expect(requests[3].headers.Cookie).toContain(
-      "iPlanetDirectoryPro=sso-value"
-    );
-    expect(requests[5].headers.Cookie).toContain(
-      "iPlanetDirectoryPro=sso-value"
-    );
-    expect(requests[7].headers.Cookie).toContain("SESSION=quality-session");
-    expect(requests[8].headers.Cookie).toContain("SESSION=quality-session");
+    expect(requests.find((request) => new URL(request.url).pathname === "/cas/v2/getPubKey")?.headers.Cookie).toContain("_csrf=csrf-value");
+    expect(loginRequest?.headers.Cookie).toContain("_pv0=visitor-value");
+    const serviceRequests = requests.filter((request) => new URL(request.url).searchParams.has("service"));
+    expect(serviceRequests).toHaveLength(2);
+    expect(serviceRequests.every((request) => request.headers.Cookie?.includes("iPlanetDirectoryPro=sso-value"))).toBe(true);
+    const qualityRequests = requests.filter((request) => new URL(request.url).hostname === "sztz.zju.edu.cn");
+    expect(qualityRequests.filter((request) => new URL(request.url).pathname !== "/dekt/").every((request) => request.headers.Cookie?.includes("SESSION=quality-session"))).toBe(true);
   });
 
   it("classifies a rejected login without attempting a service callback", async () => {
@@ -534,20 +626,9 @@ describe("ZjuUnifiedAuthClient", () => {
   });
 
   it("does not mark login successful when the academic service omits its route cookie", async () => {
-    const { transport } = createSequenceTransport([
-      response(200, '<input name="execution" value="e1s1">'),
-      response(200, JSON.stringify({ modulus, exponent: "10001" })),
-      response(302, "", {
-        "set-cookie": ["iPlanetDirectoryPro=sso-value; Path=/; Secure"]
-      }),
-      response(302, "", {
-        location:
-          "https://zdbk.zju.edu.cn/jwglxt/xtgl/login_ssologin.html?ticket=ST-sensitive"
-      }),
-      response(302, "", {
-        "set-cookie": ["JSESSIONID=academic-session; Path=/jwglxt; HttpOnly"]
-      })
-    ]);
+    const { transport } = createAuthenticatedUndergraduateTransport({
+      includeRoute: false
+    });
     const client = createZjuUnifiedAuthClient({ transport });
 
     await expect(
@@ -568,13 +649,9 @@ describe("ZjuUnifiedAuthClient", () => {
       }),
       "utf8"
     ).toString("base64");
-    const { requests, transport } = createSequenceTransport([
-      ...authenticatedServicePrelude(),
-      response(
-        200,
-        JSON.stringify({ success: true, code: 0, data: anonymousContext })
-      )
-    ]);
+    const { requests, transport } = createAuthenticatedUndergraduateTransport({
+      context: anonymousContext
+    });
     const client = createZjuUnifiedAuthClient({ transport });
 
     await expect(
@@ -584,31 +661,13 @@ describe("ZjuUnifiedAuthClient", () => {
         program: "undergraduate"
       })
     ).rejects.toMatchObject({ code: "service-verification-failed" });
-    expect(requests).toHaveLength(8);
+    expect(requests.some((request) => new URL(request.url).pathname === "/dekt/ctx")).toBe(true);
   });
 
   it("rejects getMyInfo data returned for a different account", async () => {
-    const { transport } = createSequenceTransport([
-      ...authenticatedServicePrelude(),
-      response(
-        200,
-        JSON.stringify({ success: true, code: 0, data: authenticatedContext })
-      ),
-      response(
-        200,
-        JSON.stringify({
-          code: 0,
-          extend: {
-            myInfo: {
-              xh: "3240100002",
-              dektJf: 3.45,
-              dsktJf: 1,
-              dsiktJf: 0
-            }
-          }
-        })
-      )
-    ]);
+    const { transport } = createAuthenticatedUndergraduateTransport({
+      studentId: "3240100002"
+    });
     const client = createZjuUnifiedAuthClient({ transport });
 
     await expect(
