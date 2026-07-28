@@ -403,6 +403,38 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(requests[6].headers["X-Requested-With"]).toBeUndefined();
   });
 
+  it("retries one transient learning-session timeout before returning data", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    let learningLoginAttempts = 0;
+    const transport: ZjuAuthTransport = async (request) => {
+      const target = new URL(request.url);
+      if (
+        target.hostname === "courses.zju.edu.cn" &&
+        target.pathname === "/user/index" &&
+        !target.searchParams.has("authenticated")
+      ) {
+        learningLoginAttempts += 1;
+        if (learningLoginAttempts === 1) {
+          throw new ZjuUnifiedAuthError(
+            "timeout",
+            "连接统一认证服务超时，请检查网络后重试。"
+          );
+        }
+      }
+      if (target.pathname === "/api/todos") {
+        return response(200, '{"todo_list":[]}');
+      }
+      return routed.transport(request);
+    };
+    const client = createZjuUnifiedAuthClient({ transport });
+
+    await expect(client.requestLearningService(
+      { username: "3240100001", password: "real password" },
+      { operation: "todos" }
+    )).resolves.toEqual({ status: 200, body: '{"todo_list":[]}' });
+    expect(learningLoginAttempts).toBe(2);
+  });
+
   it("downloads a learning upload through the authenticated reference endpoint", async () => {
     const routed = createAuthenticatedUndergraduateTransport();
     const downloadRequests: Array<{

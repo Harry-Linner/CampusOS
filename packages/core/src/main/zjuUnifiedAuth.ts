@@ -1397,6 +1397,29 @@ class ZjuUnifiedAuthClient {
     );
   }
 
+  async #connectLearningSessionWithRetry(
+    casCookies: CookieJar
+  ): Promise<CookieJar> {
+    // Celechron 1.3.0 lib/http/ugrs_spider.dart:_fetchWithRetry retries
+    // transient timeout/network failures once after 300 ms.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.#connectLearningSession(casCookies);
+      } catch (error) {
+        const transient =
+          error instanceof ZjuUnifiedAuthError &&
+          (error.code === "timeout" || error.code === "network-error");
+        if (!transient || attempt === 1) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, 300));
+      }
+    }
+
+    throw new ZjuUnifiedAuthError(
+      "service-verification-failed",
+      "学在浙大业务会话建立失败。"
+    );
+  }
+
   async #getLearningSession(
     credentials: ZjuAuthCredentials
   ): Promise<CookieJar> {
@@ -1409,7 +1432,7 @@ class ZjuUnifiedAuthClient {
 
     const operation = this.#authenticateCas(credentials).then(
       async ({ username: authenticatedUsername, cookies }) => {
-        const session = await this.#connectLearningSession(cookies);
+        const session = await this.#connectLearningSessionWithRetry(cookies);
         this.#learningSessions.set(authenticatedUsername, session);
         return session;
       }
@@ -1955,7 +1978,7 @@ class ZjuUnifiedAuthClient {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const authenticatedAt = this.#now().toISOString();
       const serviceResults = await Promise.allSettled([
-        this.#connectLearningSession(casCookies),
+        this.#connectLearningSessionWithRetry(casCookies),
         this.#connectUndergraduateSession(casCookies),
         this.#connectQualityDevelopmentProfile(
           casCookies,

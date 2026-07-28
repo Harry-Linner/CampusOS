@@ -30,7 +30,11 @@ describe("ZJU unified authentication live verification", () => {
       }
 
       const requestTrace: string[] = [];
+      let currentStage = "authenticate";
       const transport = createNodeHttpsZjuAuthTransport();
+      const safePath = (pathname: string): string => pathname
+        .replace(/;jsessionid=[^/;]+/gi, ";jsessionid=<redacted>")
+        .replace(/\/(courses|uploads)\/\d+(?=\/|$)/g, "/$1/<redacted>");
       const tracedTransport: ZjuAuthTransport = async (request) => {
         const target = new URL(request.url);
         const response = await transport(request);
@@ -50,8 +54,13 @@ describe("ZJU unified authentication live verification", () => {
           .filter((name): name is string => Boolean(name))
           .sort()
           .join(",");
+        const locationValue = response.headers.location;
+        const location = typeof locationValue === "string"
+          ? new URL(locationValue, target)
+          : null;
         requestTrace.push(
-          `${request.method} ${target.hostname}${target.pathname} -> ${response.status}` +
+          `${request.method} ${target.hostname}${safePath(target.pathname)} -> ${response.status}` +
+            `${location ? ` -> ${location.hostname}${safePath(location.pathname)}` : ""}` +
             ` [sent=${sentCookieNames || "<none>"}; received=${receivedCookieNames || "<none>"}]`
         );
         return response;
@@ -122,7 +131,8 @@ describe("ZJU unified authentication live verification", () => {
 
         expect(valid).toBe(true);
         const timetableQueries = createTimetableQueries(new Date());
-        for (const query of timetableQueries) {
+        for (const [index, query] of timetableQueries.entries()) {
+          currentStage = `undergraduate-timetable-${index + 1}`;
           const timetableResponse = await client.requestUndergraduateService(
             { username, password },
             {
@@ -143,6 +153,7 @@ describe("ZJU unified authentication live verification", () => {
               Array.isArray(timetablePayload.kbList));
           expect(timetableStructureValid).toBe(true);
         }
+        currentStage = "undergraduate-exams";
         const examsResponse = await client.requestUndergraduateService(
           { username, password },
           { operation: "exams" }
@@ -155,6 +166,7 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(examsPayload.items);
 
         expect(examsStructureValid).toBe(true);
+        currentStage = "undergraduate-grades";
         const gradesResponse = await client.requestUndergraduateService(
           { username, password },
           { operation: "grades" }
@@ -167,6 +179,7 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(gradesPayload.items);
 
         expect(gradesStructureValid).toBe(true);
+        currentStage = "learning-todos";
         const learningResponse = await client.requestLearningService(
           { username, password },
           { operation: "todos" }
@@ -179,6 +192,7 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(learningPayload.todo_list);
 
         expect(learningStructureValid).toBe(true);
+        currentStage = "learning-semesters";
         const semestersResponse = await client.requestLearningService(
           { username, password },
           { operation: "semesters" }
@@ -192,6 +206,7 @@ describe("ZJU unified authentication live verification", () => {
         expect(semestersStructureValid).toBe(true);
 
         const readCoursesPage = async (page: number) => {
+          currentStage = `learning-courses-page-${page}`;
           const response = await client.requestLearningService(
             { username, password },
             { operation: "courses", page }
@@ -233,11 +248,15 @@ describe("ZJU unified authentication live verification", () => {
           ).toBe(true);
           return String(id);
         });
-        await Promise.all(courseIds.map(async (courseId) => {
+        await Promise.all(courseIds.map(async (courseId, index) => {
+          const operation = `learning-course-activities-${index + 1}`;
           const response = await client.requestLearningService(
             { username, password },
             { operation: "course-activities", courseId }
-          );
+          ).catch((error: unknown) => {
+            currentStage = operation;
+            throw error;
+          });
           const payload = JSON.parse(response.body) as unknown;
           const record = typeof payload === "object" &&
             payload !== null &&
@@ -288,6 +307,7 @@ describe("ZJU unified authentication live verification", () => {
         );
       } catch (error) {
         process.stdout.write(
+          `[AUTH-STAGE] ${currentStage}\n` +
           `[AUTH-TRACE] ${requestTrace.join(" | ") || "请求未获得响应"}\n`
         );
         const code =
