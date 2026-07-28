@@ -24,6 +24,8 @@ const GRADUATE_GRADES_URL =
   "https://yjsy.zju.edu.cn/dataapi/py/pyXsxk/queryXsxkByXnxqXs";
 const LEARNING_SERVICE_HOME_URL = "https://courses.zju.edu.cn/user/index";
 const LEARNING_TODOS_URL = "https://courses.zju.edu.cn/api/todos";
+const LEARNING_SEMESTERS_URL = "https://courses.zju.edu.cn/api/my-semesters?";
+const LEARNING_COURSES_URL = "https://courses.zju.edu.cn/api/my-courses";
 const QUALITY_DEVELOPMENT_SERVICE_URL = "https://sztz.zju.edu.cn/dekt/";
 const QUALITY_DEVELOPMENT_CONTEXT_URL =
   "https://sztz.zju.edu.cn/dekt/ctx";
@@ -111,12 +113,34 @@ export interface ZjuGraduateServiceResponse {
   body: string;
 }
 
-export type ZjuLearningServiceRequest = { operation: "todos" };
+export type ZjuLearningServiceRequest =
+  | { operation: "todos" }
+  | { operation: "semesters" }
+  | { operation: "courses"; page: number }
+  | { operation: "course-activities"; courseId: string };
 
 export interface ZjuLearningServiceResponse {
   status: number;
   body: string;
 }
+
+export interface ZjuLearningDownloadRequest {
+  uploadId: string;
+  referenceId: string;
+  signal: AbortSignal;
+  range?: string;
+}
+
+export interface ZjuLearningDownloadTransportRequest {
+  method: "GET";
+  url: string;
+  headers: Record<string, string>;
+  signal: AbortSignal;
+}
+
+export type ZjuLearningDownloadTransport = (
+  request: ZjuLearningDownloadTransportRequest
+) => Promise<Response>;
 
 export type ZjuAuthenticatedProfile = AcademicAuthenticatedProfile;
 
@@ -142,6 +166,7 @@ export type ZjuAuthTransport = (
 
 interface ZjuUnifiedAuthClientOptions {
   transport?: ZjuAuthTransport;
+  learningDownloadTransport?: ZjuLearningDownloadTransport;
   timeoutMs?: number;
   now?: () => Date;
 }
@@ -356,8 +381,8 @@ class CookieJar {
     return learningCookies;
   }
 
-  createLearningTodoSessionJar(): CookieJar {
-    const target = new URL(LEARNING_TODOS_URL);
+  createLearningApiSessionJar(targetUrl = LEARNING_TODOS_URL): CookieJar {
+    const target = new URL(targetUrl);
     const hostname = target.hostname.toLowerCase();
     const now = Date.now();
     const session = [...this.#cookies.values()].find((cookie) => {
@@ -374,14 +399,14 @@ class CookieJar {
         (!cookie.secure || target.protocol === "https:")
       );
     });
-    const todoSession = new CookieJar();
+    const apiSession = new CookieJar();
     if (session) {
-      todoSession.#cookies.set(
+      apiSession.#cookies.set(
         `${session.domain}\n${session.path}\n${session.name}`,
         { ...session }
       );
     }
-    return todoSession;
+    return apiSession;
   }
 }
 
@@ -952,6 +977,7 @@ const serviceBodyIndicatesExpiredSession = (body: string): boolean => {
 
 class ZjuUnifiedAuthClient {
   readonly #transport: ZjuAuthTransport;
+  readonly #learningDownloadTransport: ZjuLearningDownloadTransport;
   readonly #timeoutMs: number;
   readonly #now: () => Date;
   readonly #undergraduateSessions = new Map<string, CookieJar>();
@@ -971,6 +997,13 @@ class ZjuUnifiedAuthClient {
 
   constructor(options: ZjuUnifiedAuthClientOptions = {}) {
     this.#transport = options.transport ?? createNodeHttpsZjuAuthTransport();
+    this.#learningDownloadTransport = options.learningDownloadTransport ?? (async (request) =>
+      fetch(request.url, {
+        method: request.method,
+        headers: request.headers,
+        signal: request.signal,
+        redirect: "manual"
+      }));
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => new Date());
   }
@@ -1272,16 +1305,17 @@ class ZjuUnifiedAuthClient {
     }
   }
 
-  async #requestLearningTodos(
-    session: CookieJar
+  async #requestLearningEndpoint(
+    session: CookieJar,
+    url: string
   ): Promise<ZjuAuthHttpResponse> {
-    const response = await this.#request("GET", LEARNING_TODOS_URL, {
-      cookie: session.header(LEARNING_TODOS_URL),
+    const response = await this.#request("GET", url, {
+      cookie: session.header(url),
       minimalHeaders: true,
       headers: {}
     });
     session.store(
-      LEARNING_TODOS_URL,
+      url,
       getHeaderValues(response.headers, "set-cookie")
     );
     return response;
@@ -1325,13 +1359,13 @@ class ZjuUnifiedAuthClient {
         continue;
       }
 
-      const todoSession = learningCookies.createLearningTodoSessionJar();
+      const apiSession = learningCookies.createLearningApiSessionJar();
       if (
         success &&
         current.hostname === "courses.zju.edu.cn" &&
-        cookieHeaderHasName(todoSession.header(LEARNING_TODOS_URL), "session")
+        cookieHeaderHasName(apiSession.header(LEARNING_TODOS_URL), "session")
       ) {
-        return todoSession;
+        return apiSession;
       }
 
       if (
@@ -1463,17 +1497,39 @@ class ZjuUnifiedAuthClient {
     credentials: ZjuAuthCredentials,
     request: ZjuLearningServiceRequest
   ): Promise<ZjuLearningServiceResponse> {
-    if (request.operation !== "todos") {
-      throw new ZjuUnifiedAuthError(
-        "invalid-input",
-        "学在浙大业务请求参数无效。"
-      );
-    }
+    const endpoint = (() => {
+      if (request.operation === "todos") return LEARNING_TODOS_URL;
+      if (request.operation === "semesters") return LEARNING_SEMESTERS_URL;
+      if (request.operation === "courses") {
+        if (!Number.isSafeInteger(request.page) || request.page < 1) {
+          throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程页码无效。");
+        }
+        const url = new URL(LEARNING_COURSES_URL);
+        url.searchParams.set("conditions", JSON.stringify({
+          status: ["ongoing", "notStarted"],
+          keyword: "",
+          classify_type: "recently_started",
+          display_studio_list: false
+        }));
+        url.searchParams.set(
+          "fields",
+          "id,name,course_code,department(id,name),grade(id,name),klass(id,name),course_type,cover,small_cover,start_date,end_date,is_started,is_closed,academic_year_id,semester_id,credit,compulsory,second_name,display_name,created_user(id,name),org(is_enterprise_or_organization),org_id,public_scope,audit_status,audit_remark,can_withdraw_course,imported_from,allow_clone,is_instructor,is_team_teaching,is_default_course_cover,instructors(id,name,email,avatar_small_url),course_attributes(teaching_class_name,is_during_publish_period,copy_status,tip,data),user_stick_course_record(id),classroom_schedule"
+        );
+        url.searchParams.set("page", String(request.page));
+        url.searchParams.set("page_size", "100");
+        url.searchParams.set("showScorePassedStatus", "false");
+        return url.href;
+      }
+      if (!/^[1-9]\d*$/.test(request.courseId)) {
+        throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程标识无效。");
+      }
+      return `https://courses.zju.edu.cn/api/courses/${request.courseId}/activities`;
+    })();
 
     const username = credentials.username.trim();
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const session = await this.#getLearningSession(credentials);
-      const response = await this.#requestLearningTodos(session);
+      const response = await this.#requestLearningEndpoint(session, endpoint);
 
       const redirected = isRedirect(response.status);
       const expired =
@@ -1493,13 +1549,77 @@ class ZjuUnifiedAuthClient {
         );
       }
 
-      validateStatus(response, "学在浙大作业接口");
+      validateStatus(response, "学在浙大业务接口");
       return { status: response.status, body: response.body };
     }
 
     throw new ZjuUnifiedAuthError(
       "service-verification-failed",
       "学在浙大业务会话建立失败。"
+    );
+  }
+
+  async requestLearningDownload(
+    credentials: ZjuAuthCredentials,
+    request: ZjuLearningDownloadRequest
+  ): Promise<Response> {
+    if (!/^[1-9]\d*$/.test(request.uploadId) ||
+      !/^[1-9]\d*$/.test(request.referenceId)) {
+      throw new ZjuUnifiedAuthError(
+        "invalid-input",
+        "学在浙大课件标识无效。"
+      );
+    }
+
+    const referenceUrl =
+      `https://courses.zju.edu.cn/api/uploads/reference/${request.referenceId}/blob`;
+    const fallbackUrl =
+      `https://courses.zju.edu.cn/api/uploads/${request.uploadId}/blob`;
+    const username = credentials.username.trim();
+    let reauthenticated = false;
+    let delayMs = 100;
+
+    // zju-learning-assistant src-tauri/src/zju_assist.rs:452-479 requests the
+    // reference blob first, then the upload blob, with five exponential retries.
+    // CampusOS returns the stream to its download engine instead of writing here.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const session = await this.#getLearningSession(credentials);
+      const requestEndpoint = (url: string) => this.#learningDownloadTransport({
+        method: "GET",
+        url,
+        signal: request.signal,
+        headers: {
+          "User-Agent": ZJU_BROWSER_USER_AGENT,
+          ...(session.header(url) ? { Cookie: session.header(url)! } : {}),
+          ...(request.range ? { Range: request.range } : {})
+        }
+      });
+
+      let response = await requestEndpoint(referenceUrl);
+      if (!response.ok) {
+        await response.body?.cancel();
+        response = await requestEndpoint(fallbackUrl);
+      }
+
+      const expired = response.status === 401 ||
+        response.status === 403 ||
+        isRedirect(response.status);
+      if (expired && !reauthenticated) {
+        await response.body?.cancel();
+        this.#learningSessions.delete(username);
+        reauthenticated = true;
+        continue;
+      }
+      if (response.ok || attempt === 4 || expired) return response;
+
+      await response.body?.cancel();
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      delayMs *= 2;
+    }
+
+    throw new ZjuUnifiedAuthError(
+      "service-verification-failed",
+      "学在浙大课件下载请求失败。"
     );
   }
 

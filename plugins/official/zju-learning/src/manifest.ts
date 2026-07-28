@@ -3,11 +3,11 @@ import type { PluginManifestV2 } from "@campusos/shared";
 export const manifest: PluginManifestV2 = {
   id: "org.campusos.zju-learning",
   name: "zju-learning",
-  displayName: "学在浙大作业",
+  displayName: "学在浙大",
   version: "0.1.0",
   apiVersion: 2,
   kind: "connector",
-  description: "通过核心托管的学在浙大会话读取作业和截止时间，不接触账号密码或 Cookie。",
+  description: "通过核心托管的学在浙大会话读取作业、截止时间和课件目录，不接触账号密码或 Cookie。",
   icon: "DDL",
   permissions: [
     "data:account:academic-profile",
@@ -17,7 +17,7 @@ export const manifest: PluginManifestV2 = {
   ],
   sourceScope: ["浙大统一身份认证", "学在浙大"],
   releaseStage: "ready",
-  provides: ["learning.assignments@1"],
+  provides: ["learning.assignments@1", "learning.materials@1"],
   requires: [
     "core.auth.zju-verification@1",
     "core.auth.zju-service-session@1",

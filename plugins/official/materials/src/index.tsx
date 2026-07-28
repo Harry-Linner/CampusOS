@@ -68,6 +68,8 @@ export const Component = ({
           disabled={busyId === material.id}
           onClick={() => void runAction(material.id, () => downloads.enqueue({
             url: material.downloadUrl!,
+            fallbackUrl: material.downloadFallbackUrl,
+            expectedBytes: material.sizeBytes,
             title: material.title,
             courseName: material.courseName,
             sourceId: material.sourceId,

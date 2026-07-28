@@ -15,17 +15,19 @@ Celechron 的功能值得迁移，但不能把 Flutter 页面或 `Spider` 直接
 
 这允许本科与研究生连接器提供同一组学业能力，也允许未来其他学校替换连接器而不重写功能插件。
 
-### 1.1 实现检查点（2026-07-19）
+### 1.1 实现检查点（2026-07-28）
 
 首个可运行纵向切片已经完成：Manifest v2 校验、能力依赖解析、provider 冲突与循环依赖 fail closed、逐项权限授权、主进程持久化、headless 生命周期、刷新 single-flight、来源状态存储，以及内置 `org.campusos.zju-undergraduate` 与 `org.campusos.zju-graduate` 连接器。连接器通过核心托管的 service-session broker 发布同版本 profile、课表、考试和成绩能力，不能读取密码、Cookie、Session、token 或 ticket；核心复用内存业务会话、失效后受控重认证，只向连接器开放固定操作。
 
-本科连接器按运行时日期探测当前和下一学年；研究生连接器使用独立 CAS service 与内存 token，按当前/下一学年查询四个授课学季和考试学季。两者都隔离坏记录并使用账号/provider 隔离的 provenance 缓存；研究生精确周次原样保留，缺少明确钟点的考试不伪造时间。原始 profile、课表、考试和成绩能力已经注册为 collection，可同时绑定本科与研究生 provider。`org.campusos.zju-learning` 已通过独立业务 `session` 和固定 `/api/todos` 发布 `learning.assignments@1`。考试与 DDL 无头功能插件通过显式刷新依赖向多 provider `calendar.events@1` 发布带来源、原始 ID、时区和上游 provider 的统一事件；工作区不再直接依赖具体连接器。`org.campusos.academic-grades` 通过主进程校验 manifest dependency、runtime binding 和当前验证账号的只读 capability IPC 展示多来源成绩，激活的 activity view 自动生成入口。设置页首次连接已按显式培养层次分别验证本科教务/素拓和研究生 token/成绩结构，新凭据保存 v4 培养层次，旧 v3 本科回执保持兼容。`.campusmod` 已完成检查、权限确认、原子安装升级、完整性复核、动态注册与卸载；严格本地单视图 profile 可经 Electron 43 Chromium sandbox + 独立 origin iframe 激活，其他包不执行。第三方 headless QuickJS/WASM 内层资源 POC 已通过，但 utility process 外层、权限代理和 lifecycle 尚未开放。研究生真实账号验收、可信节次时间和课程事件、完整成绩口径/隐私遮罩、第三方进程级资源回收和 schema migration 仍待实现，Phase 0 和最小学业闭环都不能据此标记为全部完成。
+本科连接器按运行时日期探测当前和下一学年；研究生连接器使用独立 CAS service 与内存 token，按当前/下一学年查询四个授课学季和考试学季。两者都隔离坏记录并使用账号/provider 隔离的 provenance 缓存。`org.campusos.zju-learning` 通过独立业务 `session` 发布 `learning.assignments@1` 和 `learning.materials@1`：每轮完整读取学期、全部课程分页和逐课 activities/uploads，按 60–120 秒间隔持续刷新，作业与资料独立回退；下载由核心按 reference → preview、5 次退避和一次受控重认证处理。考试、DDL 与课表事件插件通过显式刷新依赖发布统一事件；工作区和 renderer 不读取 Cookie 或通用网络句柄。2026-07-28 本科真实账号已脱敏通过教务、作业和课件目录；研究生、多设备、私有课件实体下载及第三方 headless capability/网络权限代理仍待验收，不能据此将整个 Runtime v2 标记为完成。
 
 ## 2. 参考与许可证边界
 
 本设计通过只读检查 Celechron 1.3.0 的页面、模型、HTTP 服务、刷新协调、缓存、诊断和测试目录得到。重点参考路径见 [Celechron 1.3.0 校内数据接入参考基线](../references/celechron-1.3.0-ingestion-baseline.md)，架构决策见 [ADR-0001：能力驱动的插件运行时](../adr/0001-capability-driven-plugin-runtime.md)。
 
 Celechron 使用 GPL-3.0，CampusOS 当前核心与官方插件计划使用 MIT。以下工作只允许提取产品行为、协议状态机、失败场景和领域概念，不得复制、逐行翻译、机械改写或移植 Celechron 源码。任何代码级复用必须先单独通过许可证 ADR。
+
+课程资料业务另以 MIT 许可的 [ZJU Learning Assistant](../references/zju-learning-assistant-courseware-baseline.md) 为唯一对照来源；其课程分页、逐课 uploads、reference/preview 下载、重试、大小判断和刷新间隔允许在保留版权与许可声明的前提下作 Electron/TypeScript 机械适配。
 
 ## 3. Celechron 功能盘点
 

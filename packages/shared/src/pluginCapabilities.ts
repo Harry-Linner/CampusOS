@@ -128,6 +128,33 @@ export interface LearningAssignmentsData {
   assignments: LearningAssignmentRecord[];
 }
 
+export interface LearningCourseRecord {
+  sourceId: string;
+  name: string;
+  academicYearId: string | null;
+  semesterId: string | null;
+  semesterName: string | null;
+}
+
+export interface LearningMaterialRecord {
+  sourceId: string;
+  uploadId: string;
+  referenceId: string;
+  fileName: string;
+  courseId: string;
+  courseName: string;
+  semesterName: string;
+  size: number | null;
+  updatedAt: string | null;
+  downloadUrl: string;
+  downloadFallbackUrl: string;
+}
+
+export interface LearningMaterialsData {
+  courses: LearningCourseRecord[];
+  materials: LearningMaterialRecord[];
+}
+
 export type CalendarEventKind = "course" | "exam" | "assignment" | "task";
 
 export interface CalendarEventRecord {

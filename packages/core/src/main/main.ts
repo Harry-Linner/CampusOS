@@ -2,7 +2,10 @@ import { app, BrowserWindow } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAcademicCredentialHandlers } from "./academicCredentialStore";
-import { registerCampusWorkspaceHandlers } from "./campusWorkspaceStore";
+import {
+  registerCampusWorkspaceHandlers,
+  syncCampusWorkspace
+} from "./campusWorkspaceStore";
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
@@ -17,9 +20,13 @@ import { initSentryMain } from "./sentryInit";
 import { registerUpdateHandlers } from "./autoUpdater";
 import { registerPluginHotReloadHandlers } from "./pluginHotReload";
 import { registerDownloadHandlers } from "./downloadIpc";
+import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
+const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
+  refresh: syncCampusWorkspace
+});
 
 const createMainWindow = async (): Promise<void> => {
   const window = new BrowserWindow({
@@ -75,6 +82,7 @@ app.whenReady().then(async () => {
   registerPluginHotReloadHandlers();
   registerUpdateHandlers();
   await createMainWindow();
+  workspaceRefreshScheduler.start();
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -87,4 +95,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  workspaceRefreshScheduler.stop();
 });

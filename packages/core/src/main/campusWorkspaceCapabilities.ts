@@ -9,7 +9,8 @@ import type {
   CampusDeadline,
   CampusSourceId,
   CampusSourceSyncState,
-  CampusWorkspaceSnapshot
+  CampusWorkspaceSnapshot,
+  LearningMaterialsData
 } from "@campusos/shared";
 import { firstWaveSourceCatalog } from "@campusos/shared";
 import { buildReminderQueue } from "../shared/campusWorkspace";
@@ -80,6 +81,42 @@ export const findAcademicCalendarRecord = (
   records.find(
     (record) => record.providerId === providerId && record.accountId === null
   ) ?? null;
+
+export const findLearningMaterialsRecord = (
+  records: CapabilityRecord<LearningMaterialsData>[],
+  providerId: string,
+  accountId: string | null
+): CapabilityRecord<LearningMaterialsData> | null =>
+  records.find(
+    (record) =>
+      record.providerId === providerId &&
+      record.accountId === accountId
+  ) ?? null;
+
+export const mergeLearningMaterialsIntoWorkspace = (
+  snapshot: CampusWorkspaceSnapshot,
+  record: CapabilityRecord<LearningMaterialsData> | null
+): CampusWorkspaceSnapshot => {
+  const materials = record?.data?.materials.map((material) => ({
+    id: material.sourceId,
+    title: material.fileName,
+    courseName: material.courseName,
+    semester: material.semesterName,
+    sourceId: "learning-platform" as const,
+    updatedAt: material.updatedAt ?? record.updatedAt,
+    sizeBytes: material.size ?? undefined,
+    downloadUrl: material.downloadUrl,
+    downloadFallbackUrl: material.downloadFallbackUrl
+  })) ?? [];
+  return {
+    ...snapshot,
+    materials,
+    summary: {
+      ...snapshot.summary,
+      materialsReady: materials.length
+    }
+  };
+};
 
 export const findCalendarEventRecords = (
   records: CapabilityRecord<CalendarEventsData>[],

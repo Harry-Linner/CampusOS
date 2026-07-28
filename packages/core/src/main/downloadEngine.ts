@@ -11,6 +11,8 @@ import type {
 export interface DownloadQueueItem {
   id: string;
   url: string;
+  fallbackUrl?: string;
+  expectedBytes?: number;
   title: string;
   courseName: string;
   sourceId: CampusSourceId;
@@ -37,7 +39,18 @@ export interface DownloadEngineOptions {
   requestTimeoutMs?: number;
   onChanged?: () => void;
   queuePersistence?: DownloadQueuePersistence;
+  resolveResponse?: DownloadResponseResolver;
 }
+
+export interface DownloadResponseRequest {
+  item: Readonly<DownloadQueueItem>;
+  headers: Record<string, string>;
+  signal: AbortSignal;
+}
+
+export type DownloadResponseResolver = (
+  request: DownloadResponseRequest
+) => Promise<Response>;
 
 interface ActiveDownload {
   item: DownloadQueueItem;
@@ -81,6 +94,7 @@ export class DownloadEngine {
   private persistencePath: string;
   private onChanged: (() => void) | null;
   private queuePersistence: DownloadQueuePersistence | null;
+  private resolveResponse: DownloadResponseResolver;
 
   constructor(options: DownloadEngineOptions = {}) {
     if (!Number.isInteger(options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT) ||
@@ -101,6 +115,11 @@ export class DownloadEngine {
     );
     this.onChanged = options.onChanged ?? null;
     this.queuePersistence = options.queuePersistence ?? null;
+    this.resolveResponse = options.resolveResponse ?? ((request) =>
+      fetch(request.item.url, {
+        signal: request.signal,
+        headers: request.headers
+      }));
   }
 
   get pendingCount(): number {
@@ -117,6 +136,8 @@ export class DownloadEngine {
 
   async enqueue(task: {
     url: string;
+    fallbackUrl?: string;
+    expectedBytes?: number;
     title: string;
     courseName: string;
     sourceId: CampusSourceId;
@@ -131,12 +152,46 @@ export class DownloadEngine {
     const existing = this.queue.find(
       (item) => item.url === task.url && item.targetPath === targetPath
     );
-    if (existing) return existing;
+    if (existing) {
+      const expectedBytes = task.expectedBytes;
+      let targetSize: number | null = null;
+      try {
+        targetSize = (await stat(existing.targetPath)).size;
+      } catch (error) {
+        if (
+          typeof error !== "object" ||
+          error === null ||
+          !("code" in error) ||
+          error.code !== "ENOENT"
+        ) {
+          throw error;
+        }
+      }
+      const targetMatches = targetSize !== null &&
+        (expectedBytes === undefined || targetSize === expectedBytes);
+      if (existing.status === "ready" && targetMatches) return existing;
+      if (existing.status === "syncing" || existing.status === "queued") return existing;
+
+      existing.fallbackUrl = task.fallbackUrl;
+      existing.expectedBytes = expectedBytes;
+      existing.status = "queued";
+      existing.totalBytes = expectedBytes ?? 0;
+      existing.downloadedBytes = 0;
+      existing.failureMessage = undefined;
+      existing.updatedAt = new Date().toISOString();
+      await rm(existing.temporaryPath, { force: true });
+      await this.persist();
+      this.onChanged?.();
+      this.drain();
+      return existing;
+    }
 
     const now = new Date().toISOString();
     const item: DownloadQueueItem = {
       id: randomUUID(),
       url: task.url,
+      fallbackUrl: task.fallbackUrl,
+      expectedBytes: task.expectedBytes,
       title: fileName,
       courseName,
       sourceId: task.sourceId,
@@ -323,7 +378,8 @@ export class DownloadEngine {
     const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
     let response: Response;
     try {
-      response = await fetch(item.url, {
+      response = await this.resolveResponse({
+        item,
         signal: controller.signal,
         headers: resumeOffset > 0 ? { Range: `bytes=${resumeOffset}-` } : {}
       });
@@ -339,7 +395,39 @@ export class DownloadEngine {
       item.downloadedBytes = 0;
     }
     const contentLength = response.headers.get("content-length");
-    item.totalBytes = resumeOffset + (contentLength ? Number.parseInt(contentLength, 10) : 0);
+    const responseBytes = contentLength ? Number.parseInt(contentLength, 10) : null;
+    const responseTotalBytes = responseBytes !== null &&
+      Number.isSafeInteger(responseBytes) &&
+      responseBytes >= 0
+      ? resumeOffset + responseBytes
+      : item.expectedBytes;
+    item.totalBytes = responseTotalBytes ?? 0;
+
+    // zju-learning-assistant src-tauri/src/controller.rs:779-816 uses the
+    // selected reference/preview response length for its final skip decision.
+    // Preview files can legitimately differ from the upload metadata size.
+    if (resumeOffset === 0 && responseTotalBytes !== undefined) {
+      try {
+        const targetSize = (await stat(item.targetPath)).size;
+        if (targetSize === responseTotalBytes) {
+          await response.body?.cancel();
+          item.downloadedBytes = targetSize;
+          item.status = "ready";
+          item.failureMessage = undefined;
+          item.updatedAt = new Date().toISOString();
+          return;
+        }
+      } catch (error) {
+        if (
+          typeof error !== "object" ||
+          error === null ||
+          !("code" in error) ||
+          error.code !== "ENOENT"
+        ) {
+          throw error;
+        }
+      }
+    }
     const reader = response.body?.getReader();
     if (!reader) throw new Error("无法读取下载响应流。");
     const file = await open(item.temporaryPath, resumeOffset > 0 ? "a" : "w");
@@ -357,6 +445,12 @@ export class DownloadEngine {
     } finally {
       await file.close();
       reader.releaseLock();
+    }
+
+    if (responseTotalBytes !== undefined && item.downloadedBytes !== responseTotalBytes) {
+      throw new Error(
+        `下载文件大小不匹配：预期 ${responseTotalBytes} 字节，实际 ${item.downloadedBytes} 字节。`
+      );
     }
 
     await rename(item.temporaryPath, item.targetPath);

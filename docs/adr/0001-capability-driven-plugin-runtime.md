@@ -23,7 +23,7 @@ Celechron 1.3.0 的功能盘点表明，同一课表、考试、成绩等用户�
 
 ## 实现状态
 
-2026-07-19 已落地内置官方插件纵向切片：Manifest v2、能力解析、持久化授权、connector/feature 共用的 headless 生命周期、带依赖拓扑的刷新协调、provenance repository、本科教务、研究生教务和学在浙大 service-session broker、真实课表/考试/成绩/作业端点、官方学季边界 capability、多 provider 原始学业 capability 与 `calendar.events@1`，以及由真实刷新结果驱动的脱敏诊断中心。考试与 DDL 已经由独立功能插件转换为统一事件，工作区不依赖具体连接器 ID；renderer feature 通过主进程校验 manifest 依赖、runtime binding 和当前验证账号的只读 capability 通道获取数据，激活的 activity view 自动生成入口。本科/研究生首次连接按显式培养层次验证对应业务数据，研究生 CAS/token、私有成绩结构回执、v4 持久化、解析和缓存链路已通过自动化 fixture，真实研究生账号尚未验收。第三方 `.campusmod` 已完成真实 ZIP/manifest 校验、安装审查、原子升级与崩溃恢复、完整性复核、动态注册和卸载。Electron 43 + CJS preload + Chromium OS sandbox 已通过真实冷启动；严格本地单视图 profile 可经独立 origin iframe 激活，其他包 fail closed。第三方 headless 内层确定采用 QuickJS/WASM，同步 ESM/JSON 合同、Node/网络隔离、deadline 和普通 JS 堆上限已通过 POC；在 utility process 外层、外部内存与崩溃回收、capability/网络权限代理完成前仍禁止接入 lifecycle。schema migration、可信节次钟点与课程事件和完整成绩分析也仍属于后续工作，不能据此将整个 Runtime v2 标记为完成。
+截至 2026-07-28，内置官方插件纵向切片已覆盖 Manifest v2、能力解析、持久化授权、connector/feature 共用的 headless 生命周期、依赖拓扑刷新、provenance repository、本科/研究生教务及学在浙大 service-session broker。`org.campusos.zju-learning` 现在分别发布作业和课件目录 capability；主进程按 60–120 秒间隔刷新，任一课程失败不发布残缺资料快照，下载响应流由核心认证 broker 提供。考试、DDL 与课程由独立功能插件转换为统一事件，工作区不依赖具体连接器 ID。2026-07-28 本科真实账号已脱敏通过认证、教务、素拓、作业及完整课件目录；研究生、多设备和私有课件实体下载仍待验收。第三方 headless 的 capability/网络权限代理完成前仍禁止接入 lifecycle，不能据此将整个 Runtime v2 标记为完成。
 
 ## 结果
 

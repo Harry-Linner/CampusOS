@@ -17,7 +17,7 @@
 - **Timeline to MVP:** ~8 周（Phase 1 地基 2 周 + Phase 2 核心 4 周 + Phase 3 交付 2 周）
 - **First milestone:** hello-world 插件在工作台 UI 中渲染 + `npm run test` 全绿
 
-### Current implementation checkpoint (2026-07-20)
+### Current implementation checkpoint (2026-07-28)
 
 - 已完成内置官方插件路径的 Manifest v2、能力依赖解析、API/权限 fail closed、逐项授权 UI、主进程状态持久化、headless activate/deactivate、刷新 single-flight、分源错误隔离和 provenance repository。
 - `zju-undergraduate` 已通过核心不透明业务 Session 发布脱敏身份、真实课表和真实考试 capability；明确日期时间的考试进入工作台，相对考试周记录只保留原始语义，不强制换算日期。密码、Cookie、Session 和 ticket 不进入插件。
@@ -29,19 +29,19 @@
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，原始分数显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
-- `zju-learning` 已实现专用业务 Session、固定 `/api/todos` 操作、`learning.assignments@1` 和缓存回退；无截止时间的作业只保留在 capability。2026-07-21 起，引导中已验证账号的 workspace 只从当前账号的正式 capability 记录生成，固定 mock 课程、考试和 DDL 不可进入该路径；核心教务 connector 失败会让同步如实失败。未认证开发路径继续在 fixture 边界内测试。真实账号脱敏验收仍待通过。
+- `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。DDL 更新/移除会替换旧事件；课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
 - 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability/网络权限代理。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不开放第三方 headless 生命周期。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
 - 桌面壳层已调整为固定左侧导航与右侧主内容滚动；周视图在桌面直接填充主内容宽度，窄屏才使用横向滚动。
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。
 - 日历冲突检测：`detectCalendarConflicts` 扫描课程与待办时间轴重叠，标记 overlapping/double-booked 两种严重度。
-- 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消和状态广播已用本地 HTTP fixture 覆盖。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移；资料 fixture 不再伪造下载进度，未返回 URL 时如实显示为无下载入口。
+- 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消、状态广播、预期大小校验和按大小变化重下已用协议边界测试覆盖。学在浙大 URL 仅接受固定 HTTPS host/path/正整数 ID，并由主进程注入业务 Session；renderer 和下载队列不能取得 Cookie。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移。
 - 自动更新：electron-updater 集成，GitHub Releases 源，检查/下载/安装 IPC。
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
 - 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- 已新增 Windows CI（install、typecheck、lint、test、build、Electron native rebuild、Playwright）。2026-07-20 本地复核已通过 typecheck、lint、162 项单测（1 项真实账号测试按环境跳过）、首次引导 Electron E2E 和 x64 NSIS 安装包构建。现场 `verify:zju-auth` 已通过 `live-auth.env` 注入真实账号执行：公共登录页与公钥端点返回 200；Node HTTPS transport 已取代会超时的 Undici fetch，但表单提交阶段收到 ZJUAM 5xx，未建立登录态，因此真实账号验收仍未通过且未输出敏感数据。剩余未完成：其他持久化模块迁入 SQLite、真实账号验收、真实来源 URL 的课件批量下载验收、完整 Playwright 用户链路、第三方 headless capability/网络权限代理与签名、全新 Windows 安装和 GitHub Release/分发验收。`verify:headless-sandbox` 在当前受限环境中启动 Electron 后 124 秒超时且留下子进程，尚未通过；因未获 `Stop-Process` 预授权，未清理残留进程。
+- Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-28 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，敏感输出为 0。该证据证明真实课件目录链，不证明私有课件实体已下载。剩余未完成：私有文件点击下载、多设备与完整 Playwright 用户链路、第三方 headless capability/网络权限代理、全新 Windows 安装和 GitHub Release/分发验收。
 
 ---
 
@@ -261,6 +261,8 @@ flowchart TD
 - [x] `.campusmod` 检查、权限确认、原子安装升级、崩溃恢复、持久注册和卸载通过测试；受限 renderer sandbox v1 可激活，其他第三方执行保持关闭
 - [x] 教务课表自动同步（以 capability provenance 和统一课程事件持久化；不再使用独立 `courses` 表）
 - [x] 课件批量下载（含断点续传）
+- [x] 真实账号课件目录发现（学期、全部课程分页、逐课 activities/uploads）
+- [ ] 至少一个私有课件实体下载并按文件大小验收
 - [x] 日历周视图 + 冲突检测
 - [x] 桌面通知 + 提醒调度
 - [x] 抓取容错（缓存兜底 + 手动重试）

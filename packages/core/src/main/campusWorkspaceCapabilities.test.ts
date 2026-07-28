@@ -8,7 +8,8 @@ import {
   createLiveWorkspaceSnapshot,
   findCalendarEventRecords,
   mergeAcademicCalendarIntoWorkspace,
-  mergeCalendarEventsIntoWorkspace
+  mergeCalendarEventsIntoWorkspace,
+  mergeLearningMaterialsIntoWorkspace
 } from "./campusWorkspaceCapabilities";
 
 const createSnapshot = (): CampusWorkspaceSnapshot => ({
@@ -343,6 +344,78 @@ describe("workspace capability integration", () => {
     );
   });
 
+  it("replaces a changed assignment deadline and rebuilds its reminder", () => {
+    const initial = mergeCalendarEventsIntoWorkspace(
+      createLiveWorkspaceSnapshot({
+        generatedAt: "2026-07-19T04:00:00.000Z",
+        accountId: "3240100001"
+      }),
+      [learningEventsRecord],
+      [60]
+    );
+    const changedRecord: CapabilityRecord<CalendarEventsData> = {
+      ...learningEventsRecord,
+      updatedAt: "2026-07-19T05:00:00.000Z",
+      data: {
+        ...learningEventsData,
+        sourceUpdatedAt: "2026-07-19T05:00:00.000Z",
+        events: learningEventsData.events.map((event) => ({
+          ...event,
+          startAt: "2026-07-22T14:00:00.000Z"
+        }))
+      }
+    };
+    const refreshed = mergeCalendarEventsIntoWorkspace(
+      initial,
+      [changedRecord],
+      [60]
+    );
+
+    expect(refreshed.deadlines).toEqual([
+      expect.objectContaining({
+        id: "org.campusos.deadline-assistant:assignment-1",
+        dueAt: "2026-07-22T14:00:00.000Z"
+      })
+    ]);
+    expect(refreshed.reminders).toEqual([
+      expect.objectContaining({
+        id: "org.campusos.deadline-assistant:assignment-1-lead-60",
+        fireAt: "2026-07-22T13:00:00.000Z",
+        eventStartAt: "2026-07-22T14:00:00.000Z"
+      })
+    ]);
+  });
+
+  it("removes an assignment and its reminders when the live source removes it", () => {
+    const initial = mergeCalendarEventsIntoWorkspace(
+      createLiveWorkspaceSnapshot({
+        generatedAt: "2026-07-19T04:00:00.000Z",
+        accountId: "3240100001"
+      }),
+      [learningEventsRecord],
+      [60]
+    );
+    const emptyRecord: CapabilityRecord<CalendarEventsData> = {
+      ...learningEventsRecord,
+      updatedAt: "2026-07-19T05:00:00.000Z",
+      data: {
+        ...learningEventsData,
+        sourceUpdatedAt: "2026-07-19T05:00:00.000Z",
+        totalItems: 0,
+        omittedItems: 0,
+        events: []
+      }
+    };
+    const refreshed = mergeCalendarEventsIntoWorkspace(
+      initial,
+      [emptyRecord],
+      [60]
+    );
+
+    expect(refreshed.deadlines).toEqual([]);
+    expect(refreshed.reminders).toEqual([]);
+  });
+
   it("rejects event times without an explicit timezone", () => {
     const unsafeRecord: CapabilityRecord<CalendarEventsData> = {
       ...learningEventsRecord,
@@ -372,5 +445,50 @@ describe("workspace capability integration", () => {
         (source) => source.sourceId === "learning-platform"
       )?.summary
     ).toContain("另有 1 项没有可信绝对时间");
+  });
+
+  it("replaces the material list from a complete learning snapshot", () => {
+    const base = createSnapshot();
+    base.materials = [{
+      id: "old",
+      title: "旧课件.pdf",
+      courseName: "旧课程",
+      semester: "旧学期",
+      sourceId: "learning-platform",
+      updatedAt: "2026-07-18T00:00:00.000Z"
+    }];
+    const refreshed = mergeLearningMaterialsIntoWorkspace(base, {
+      capability: "learning.materials@1",
+      providerId: "org.campusos.zju-learning",
+      accountId: "3240100001",
+      state: "live",
+      updatedAt: "2026-07-20T09:00:00.000Z",
+      data: {
+        courses: [],
+        materials: [{
+          sourceId: "1:100",
+          uploadId: "10",
+          referenceId: "100",
+          fileName: "新课件.pdf",
+          courseId: "1",
+          courseName: "课程一",
+          semesterName: "秋冬学期",
+          size: 1024,
+          updatedAt: "2026-07-20T08:00:00.000Z",
+          downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
+          downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/10/blob"
+        }]
+      }
+    });
+
+    expect(refreshed.materials).toEqual([
+      expect.objectContaining({
+        id: "1:100",
+        title: "新课件.pdf",
+        downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
+        downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/10/blob"
+      })
+    ]);
+    expect(refreshed.summary.materialsReady).toBe(1);
   });
 });

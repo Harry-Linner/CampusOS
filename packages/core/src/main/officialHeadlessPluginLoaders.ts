@@ -19,7 +19,8 @@ import type {
   AcademicTimetableData,
   CalendarEventsData,
   CapabilityRecord,
-  LearningAssignmentsData
+  LearningAssignmentsData,
+  LearningMaterialsData
 } from "@campusos/shared";
 import {
   readAcademicCredentialRecord,
@@ -189,10 +190,70 @@ export const createOfficialHeadlessPluginLoaders = ({
           };
         }
       },
+      fetchSemesters: async () => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "semesters"
+          });
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大学期请求失败。"
+          };
+        }
+      },
+      fetchCoursesPage: async (page) => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "courses",
+            page
+          });
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大课程请求失败。"
+          };
+        }
+      },
+      fetchCourseActivities: async (courseId) => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "course-activities",
+            courseId
+          });
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大课件请求失败。"
+          };
+        }
+      },
       loadCachedAssignments: async (accountId) => {
         const records =
           await capabilityRepository.read<LearningAssignmentsData>(
             "learning.assignments@1"
+          );
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuLearningManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      loadCachedMaterials: async (accountId) => {
+        const records =
+          await capabilityRepository.read<LearningMaterialsData>(
+            "learning.materials@1"
           );
         const record = records.find(
           (candidate) =>

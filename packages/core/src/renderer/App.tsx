@@ -21,7 +21,6 @@ import {
   subscribeToDownloadChanges
 } from "./lib/downloadBridge";
 
-const WORKSPACE_AUTO_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 const isDevelopmentBuild =
   (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
 
@@ -62,16 +61,6 @@ export const App = (): JSX.Element => {
       setActiveView("dashboard");
     }
   }, [activeView, activityItems]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void workspace.sync().catch(() => undefined);
-    }, WORKSPACE_AUTO_SYNC_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const activityPlugins = useMemo(
     () =>

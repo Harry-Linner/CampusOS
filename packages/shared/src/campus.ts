@@ -80,7 +80,9 @@ export interface CampusMaterialRecord {
   semester: string;
   sourceId: CampusSourceId;
   updatedAt: string;
+  sizeBytes?: number;
   downloadUrl?: string;
+  downloadFallbackUrl?: string;
 }
 
 export interface CampusDownloadTask {
@@ -95,6 +97,8 @@ export interface CampusDownloadTask {
 
 export interface CampusDownloadRequest {
   url: string;
+  fallbackUrl?: string;
+  expectedBytes?: number;
   title: string;
   courseName: string;
   sourceId: CampusSourceId;

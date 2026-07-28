@@ -32,7 +32,7 @@ This research was generated in autonomous mode based on the dense spec at `docs/
 
 ## Interface direction (2026-07-17)
 
-当前界面不把 CampusOS 定义为数据仪表盘，而定义为学生每天打开一次的学术日历。总览只回答“今天有什么课、有什么待办”；日历在月历、线性日程与单日时间线之间切换，课程、作业与考试使用稳定课程颜色进入同一套日程；扩展与设置均采用按需展开的管理界面。测试版在设置页提供显式“刷新数据”操作，用于替换本地缓存并验证最新 mock 数据；同步状态、下载队列、学期进度和资料归档不占用一级页面或首页注意力。
+当前界面不把 CampusOS 定义为数据仪表盘，而定义为学生每天打开一次的学术日历。总览只回答“今天有什么课、有什么待办”；日历在月历、线性日程与单日时间线之间切换，课程、作业与考试使用稳定课程颜色进入同一套日程；扩展与设置均采用按需展开的管理界面。设置页提供显式“刷新数据”操作，走与后台调度相同的正式主进程刷新链；未认证开发场景只在 adapter/fixture 边界注入数据。同步状态、下载队列、学期进度和资料归档不占用一级页面或首页注意力。
 
 这一方向参考学生日程产品对课程/作业/考试对象的区分、学习管理系统对跨课程月历的聚合，以及桌面扩展产品的列表—详情管理方式。相关的当前实现定义见 [interface v3](docs/specs/campusos-interface-v3.md)。
 
@@ -42,15 +42,15 @@ Plugin Runtime v2 纵向切片已经验证“核心基础设施 + 无头连接�
 
 `.campusmod` 纵向切片已经验证本地 ZIP 可完成主进程检查、权限确认、确认后重读、SHA-256 防换包、受限解压、原子目录换位、崩溃恢复、逐文件完整性复核、动态注册和卸载。清单与代码正文不进入 IPC。renderer sandbox v1 只接受唯一 namespaced activity view、恰好 `storage:local` 且无 capability/后台贡献的 profile；宿主通过 `campusmod://<plugin-id>` 独立 secure origin 和 host-owned iframe 加载，不把入口导入 CampusOS renderer。Electron 43 主 renderer 已启用 Chromium OS sandbox、CJS preload 和严格 CSP；协议禁止网络/eval、逐请求复核 active 状态与安装完整性，所有网页权限、新窗口和跨 origin frame 导航由主进程拒绝。真实 ZIP 已通过“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”自动化纵向测试；Electron 窗口内跨 origin 进程隔离 E2E 仍未完成。headless 内层 QuickJS/WASM POC 已验证插件看不到 Node/网络全局，模块导入、异步与非 JSON 返回被拒绝，死循环和普通 JS 堆增长受限；TypedArray 等外部内存、WASM 宿主崩溃仍必须由 utility process 外层处理。102 项测试、生产构建和 8 秒真实冷启动通过。当前摘要不是数字签名，headless lifecycle 接入、权限代理、进程级资源回收、真实恶意包 E2E 和 schema migration 仍是扩大执行面的硬门槛。格式和限制见 [`.campusmod` 本地插件包格式与安装边界](docs/architecture/campusmod-package-format.md)。
 
-本科成绩纵向切片已打通固定教务请求、单条容错解析、账号隔离缓存、`academic.grades@1`、成绩 feature view 和真实工作区刷新。当前 GPA 只按接口明确返回的 `gradePoint × credit` 加权，缺少绩点的课程不做文字等级换算；计入 GPA 标记、主修标记、多算法对照、隐私遮罩和真实账号验收仍是后续边界，不能把首个看板视为完整成绩分析。
+本科成绩纵向切片已打通固定教务请求、单条容错解析、账号隔离缓存、`academic.grades@1`、成绩 feature view 和真实工作区刷新；2026-07-28 真实账号脱敏探针已验证成绩端点结构。当前 GPA 只按接口明确返回的 `gradePoint × credit` 加权，缺少绩点的课程不做文字等级换算；计入 GPA 标记、主修标记和多算法对照仍是后续边界，不能把首个看板视为完整成绩分析。
 
 研究生纵向切片已按 Celechron 1.3.0 的协议证据实现独立 CAS service、ticket 回调校验、`validateLogin` token 交换和固定课表/考试/成绩操作。token 只在主进程内存中作为 `X-Access-Token` 使用，连接器拿不到凭据或请求头；精确周次、单双周和不完整记录按字段容错，考试只有在日期与起止钟点都有效时才生成绝对时间。设置页由用户明确选择本科或研究生，避免服务临时故障造成自动误判；研究生路径必须验证认证后成绩结构才保存凭据，IPC 只返回记录数而不返回正文。自动化 fixture、v3 到 v4 兼容、UI 和缓存局部回退已经通过，真实研究生账号验收尚未完成。
 
 课表已可通过日期日历展示。`zju-calendar-config` 从浙江大学官方 HTTPS 校历页 `https://www.zju.edu.cn/english/19600/list.htm` 提取学季边界和开课日，并以 capability 驱动当前周或下一学季状态；`academic-timetable-events` 使用官方插件内置、可配置的紫金港标准 14 节节次表，按学季、周次、单双周和节次生成课程事件。节假日调补尚无稳定机器源，真实账号与校历交叉验收前不得把该配置宣称为校方完整日历事实。
 
-### Verification update (2026-07-21)
+### Verification update (2026-07-28)
 
-已验证账号的正式 workspace 不再使用 mock fixture：主进程刷新官方 connector，按当前认证账号读取 capability repository，再将课程、考试和有可信绝对时间的作业投影为日历项。若选定培养层次的核心教务 connector 返回 `unavailable`，同步 IPC 以失败返回，引导保留重试而不显示伪造成功；同账号的真实缓存可作为缓存状态使用。密码、Cookie、Session、ticket、token 与原始业务正文继续被限制在主进程。未认证开发场景仍可在明确 fixture 边界验证协议解析。2026-07-21 使用 `live-auth.env` 的脱敏现场验证再次在 ZJUAM 阶段得到 `service-unavailable`，没有建立登录态，也没有输出敏感信息；所以连接器的真实数据验收仍未通过。完整端到端流程与全新 Windows 安装验收仍未完成。
+已验证账号的正式 workspace 不再使用 mock fixture：主进程刷新官方 connector，按当前认证账号读取 capability repository，再将课程、考试、有可信绝对时间的作业和课件目录投影到工作区。作业与资料目录每轮独立获取和降级；资料发布前必须完成学期、全部课程分页及每门课程 activities/uploads，禁止用部分成功覆盖上次完整快照。2026-07-28 使用 `live-auth.env` 的本科真实账号脱敏验证通过 ZJUAM、教务、素拓、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页与逐课 activities 结构，且没有输出敏感内容。认证下载 transport、reference → preview 回退、一次重认证、5 次指数退避、Range 和文件大小变化均由自动化协议测试覆盖；为避免读取或输出私人课程内容，本轮未抓取文件实体，所以该项仍需用户手动验收。完整多设备流程与全新 Windows 安装验收仍未完成。
 
 本地验证现已增加完整 Electron 引导 E2E：测试构建只在外部校历 HTTP adapter 边界提供 fixture，仍经过主进程 IPC、插件运行时、SQLite 工作区持久化和日历渲染。未认证 fixture 路径不会伪造已认证教务数据，因此该测试只证明本地完整调用链，不能替代真实账号或设备验收。发布前的唯一门槛见[私有 Alpha 验收清单](docs/alpha-acceptance.md)。
 
@@ -60,7 +60,7 @@ Plugin Runtime v2 纵向切片已经验证“核心基础设施 + 无头连接�
 
 CampusOS 需要吸收的不是 Flutter/Dart 代码，而是统一认证后业务身份确认、服务级 Session、局部成功、重试与重登分类、账号/学期隔离缓存、前后台刷新互斥、下一学年主动探测、单条数据解析隔离、数据来源标记和脱敏诊断等工程原则。Celechron 为 GPL-3.0，未经许可证评审不得复制源码。完整约束、源码对照、素拓 CAS 链路和作者描述归档见 [Celechron 1.3.0 校内数据接入参考基线](docs/references/celechron-1.3.0-ingestion-baseline.md)。
 
-2026-07-19 已完成 CampusOS 的统一认证核心纵向链路：动态 RSA 登录、有效 SSO Cookie、本科教务网 `JSESSIONID`/`route`、研究生院内存 token、学在浙大独立业务 `session`、素拓 CAS/正式 `SESSION`、非匿名 `ctx`、本科 `getMyInfo` 账号匹配回执，以及研究生认证后成绩结构回执，并通过结构化 IPC 和 `safeStorage` 原子持久化。设置页只有收到所选培养层次的真实业务回执才显示成功；研究生 IPC 仅包含认证账号、数据集类型、记录数和时间，不包含 token 或成绩正文。环境变量现场测试支持本科/研究生分支，且不输出学号、密码、汇总、Cookie、Session、ticket、课程/考试/成绩/作业正文或数量。课表、考试、成绩和学在浙大作业通过正式 capability 与缓存链路进入已验证账号的空 workspace 基线，不能再由 mock 项替代；真实账号路径仍需内测设备验收。实现边界见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)。
+CampusOS 的统一认证核心纵向链路已覆盖动态 RSA 登录、有效 SSO Cookie、本科教务网 `JSESSIONID`/`route`、研究生院内存 token、学在浙大独立业务 `session`、素拓 CAS/正式 `SESSION`、非匿名 `ctx`、本科 `getMyInfo` 账号匹配回执，以及研究生认证后成绩结构回执，并通过结构化 IPC 和 `safeStorage` 原子持久化。设置页只有收到所选培养层次的真实业务回执才显示成功；研究生 IPC 仅包含认证账号、数据集类型、记录数和时间，不包含 token 或成绩正文。环境变量现场测试支持本科/研究生分支，且不输出学号、密码、汇总、Cookie、Session、ticket、课程/考试/成绩/作业/课件正文或数量。本科真实账号路径已在 2026-07-28 通过脱敏验证；研究生、多设备和私有文件实体下载仍待验收。实现边界见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)，课程资料对照见 [ZJU Learning Assistant 基线](docs/references/zju-learning-assistant-courseware-baseline.md)。
 
 ## Celechron 功能插件化结论（2026-07-19）
 

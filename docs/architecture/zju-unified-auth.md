@@ -1,14 +1,16 @@
 # ZJU 统一身份认证核心登录
 
-**状态：** 已实现核心登录、不可导出本科教务/研究生教务/学在浙大业务会话、素拓认证后数据回执与真实课表/考试/成绩/作业请求链  
-**实现日期：** 2026-07-19  
-**范围：** 本科/研究生账号连接、CAS 登录、按培养层次验证业务数据、本科教务与素拓 Session、研究生 token、学在浙大独立 Session、最小业务回执、安全存储、课表/考试/成绩/作业请求与解析、插件刷新协调、provenance、受控 renderer capability 读取、官方学季边界和脱敏诊断；可信节次钟点、课程日期展开和完整成绩口径仍未接入
+**状态：** 已实现核心登录、不可导出本科教务/研究生教务/学在浙大业务会话、素拓认证后数据回执与真实课表/考试/成绩/作业/课件目录请求链
+
+**更新日期：** 2026-07-28
+
+**范围：** 本科/研究生账号连接、CAS 登录、按培养层次验证业务数据、本科教务与素拓 Session、研究生 token、学在浙大独立 Session、最小业务回执、安全存储、课表/考试/成绩/作业/课件目录请求与解析、认证下载、插件刷新协调、provenance、受控 renderer capability 读取、官方学季边界和脱敏诊断；私有课件实体下载、多设备和完整成绩口径仍待验收
 
 ## 当前结论
 
 CampusOS 的“连接并保存”不是本地表单保存。用户先明确选择本科或研究生，避免某个业务站点临时异常时被自动误判培养层次。两条路径都必须先完成 ZJUAM 登录，再验证对应的认证后业务数据，只有整条所选链路通过后才加密落盘并展示回执；任一步失败都不会覆盖已有凭据，也不会向前端报告成功。
 
-**真实验收状态（2026-07-22）：完整通过。** 使用本机已忽略的 `live-auth.env` 本科账号运行 `pnpm verify:zju-auth`：ZJUAM、教务网、素拓、全部运行时课表学期、考试、成绩，以及学在浙大 `Courses.login` 和 `/api/todos` 均返回可验证成功反馈，现场输出 10 个 `[PASS]` 且敏感字段输出为 0。验收使用单一持久 Node HTTPS transport、Celechron 固定 Chrome/Edge UA、手动 CookieJar 和同一 SSO 下的并发子站登录；未用 fixture、构建或 UI 测试替代真实上游验收。
+**本科真实目录链验收状态（2026-07-28）：通过。** 使用本机已忽略的 `live-auth.env` 本科账号运行 `pnpm verify:zju-auth`：ZJUAM、教务网、素拓、全部运行时课表学期、考试、成绩，以及学在浙大 `Courses.login`、`/api/todos`、学期、全部课程分页和每门课程 activities 均返回可验证成功反馈，敏感字段输出为 0。验收使用单一持久 Node HTTPS transport、Celechron 固定 UA、手动 CookieJar 和同一 SSO 下的并发子站登录；未用 fixture、构建或 UI 测试替代真实上游验收。该结论不包含私有课件响应体下载。
 
 本科路径必须建立本科教务网 Session、素拓正式 `SESSION` 和非匿名 `ctx`，并从 `getMyInfo` 取得与输入账号一致的二/三/四课堂汇总。研究生路径必须消费研究生院 CAS ticket、取得短期 token，并用该 token 访问固定成绩接口且确认 `result.xxjhnList` 是数组。研究生回执只包含认证账号、数据集类型、实际记录数和获取时间，不包含 token 或成绩正文。新连接写入 `dataVersion: 4` 和培养层次；已有合法 v3 本科回执继续按本科已验证记录加载。
 
@@ -55,7 +57,9 @@ CampusOS 的“连接并保存”不是本地表单保存。用户先明确选�
 
 整体迁入 `.tmp/celechron-1.3.0/lib/http/zjuServices/zjuam.dart`、`courses.dart` 和 `ugrs_spider.dart` 的业务顺序：同一候选客户端先取得一次短时内存 SSO，再按 `Courses → Zdbk → Sztz` 启动三个子站登录；候选会话全部成功后才原子替换旧会话。子站明确拒绝 SSO 时丢弃候选会话、清除短时 SSO 并使用全新密码会话重试一次；业务请求 401/403 时只允许一次受控重建。
 
-`Courses` 的逐跳行为保持一致：关闭自动重定向，先保存当前响应 Cookie，再解析相对或绝对 Location，接受受信任 ZJU host 的 200 meta-refresh，最多 15 跳，并只把 `courses.zju.edu.cn` 签发的 `session` 导出给 `/api/todos`。认证客户端使用持久 HTTPS agent 和 Celechron 固定 UA；学习平台请求不注入教务网的 Accept、Referer 或 XHR 头。
+`Courses` 的逐跳行为保持一致：关闭自动重定向，先保存当前响应 Cookie，再解析相对或绝对 Location，接受受信任 ZJU host 的 200 meta-refresh，最多 15 跳，并只把 `courses.zju.edu.cn` 签发的 `session` 导出给固定学习平台 API。认证客户端使用持久 HTTPS agent 和 Celechron 固定 UA；学习平台请求不注入教务网的 Accept、Referer 或 XHR 头。
+
+课件目录与下载严格对照 [ZJU Learning Assistant 课程资料基线](../references/zju-learning-assistant-courseware-baseline.md)：每轮先取学期与全部课程分页，再逐课读取 activities/uploads；reference blob 失败后才请求 preview blob，最多 5 次指数退避。CampusOS 仅作 Electron 主进程会话、流式下载、Range 断点续传和类型契约的机械适配，renderer 不取得 Cookie 或通用网络能力。
 
 CampusOS 的差异仅是 TypeScript transport、Electron 内存会话、结构化错误和 IPC 类型适配；未复制 Celechron GPL-3.0 源码文本，也未改变上述请求顺序、Cookie 范围、重试次数、缓存边界或成功条件。真实对照探针在本轮返回 `Courses.login=true`、`/api/todos HTTP 200`，CampusOS 同一账号的 `pnpm verify:zju-auth` 也已逐项通过。
 
@@ -95,7 +99,7 @@ Electron 官方说明 `safeStorage` 使用操作系统提供的加密系统，Wi
 - IPC 调用方校验：`packages/core/src/main/ipcSecurity.ts`
 - 共享契约：`packages/core/src/shared/credentialBridge.ts`
 - 设置页入口：`packages/core/src/renderer/views/SettingsView.tsx`
-- 脱敏现场测试：`packages/core/src/main/zjuUnifiedAuth.live.test.ts`，运行 `pnpm verify:zju-auth`；本科模式请求运行时会刷新的全部课表学期、考试、成绩和学在浙大作业，研究生模式验证研究生院 token 与成绩结构。两种模式都不输出课程、考试、成绩、作业内容或数量
+- 脱敏现场测试：`packages/core/src/main/zjuUnifiedAuth.live.test.ts`，运行 `pnpm verify:zju-auth`；本科模式请求全部课表学期、考试、成绩、学在浙大作业、学期、全部课程分页及逐课 activities 结构，研究生模式验证研究生院 token 与成绩结构。两种模式都不输出课程、考试、成绩、作业、课件内容或数量
 
 自动化测试只替换外部 HTTP 或 IPC 边界，覆盖成功链路、RSA 密文、Cookie 连续性、凭据拒绝、验证码、协议变化、业务 Session 不完整、匿名 ctx、账号串号、超时中止、旧格式降级、安全存储不可用、写盘失败和设置页真实回执/失败行为。
 
@@ -103,10 +107,11 @@ Electron 官方说明 `safeStorage` 使用操作系统提供的加密系统，Wi
 
 - 本科课表与考试真实协议链已经实现：核心从安全存储读取凭据、建立并复用 `JSESSIONID`/`route`、会话失效时重新认证，连接器查询当前与下一学年并逐条解析课表和考试。自动化测试使用外部 HTTP fixture；真实账号端点验收需运行 `pnpm verify:zju-auth`。
 - 学在浙大作业真实协议链已经实现：核心使用 SSO 登录态完整跟随 `courses.zju.edu.cn`、`identity.zju.edu.cn` 和 `zjuam.zju.edu.cn` 的受信任跳转及 200 meta-refresh，只有目标业务域签发可访问 `/api/todos` 的 `session` 才成功；连接器只收到固定操作正文并发布 `learning.assignments@1`。无截止时间或无法可靠解析时间的作业不进入日历。
-- 课表当前保存为抽象学年、学季、周几、节次和单双周 capability。官方 HTTPS 校历 capability 已提供学季边界和开课日，但公开机器源未提供可信本科节次钟点，节假日调补也未完整结构化，因此日历不把课表强制转换为具体日期，课程页面继续消费明确的 mock fixture。
+- 学在浙大课件目录真实协议链已经实现：连接器发布 `learning.materials@1`，且只有学期、全部课程分页和逐课 activities/uploads 全部成功时才替换实时快照；目录分支失败不回滚本轮作业成功，反之亦然。下载使用主进程业务 Session、reference → preview、一次受控重认证、5 次指数退避、固定 URL 校验、Range 和最终大小校验。自动化协议通过，私有课件实体下载待手动验收。
+- 课表当前保存为抽象学年、学季、周几、节次和单双周 capability。官方 HTTPS 校历 capability 已提供学季边界和开课日，并由内置紫金港节次配置展开课程事件；节假日调补尚未完整结构化，因此不能把它宣称为完整校方日历事实。
 - `org.campusos.zju-undergraduate` 通过主进程生命周期发布 `academic.profile@1`、`academic.timetable@1`、`academic.exams@1` 和 `academic.grades@1`；它不会访问密钥存储中的密码。成绩解析保留接口原始成绩和明确返回的绩点，不自行转换文字等级。`academic-grades` 只读取自身 runtime binding 对应 provider、当前已验证账号的 capability record，不能命中其他账号缓存。
 - `org.campusos.zju-graduate` 通过主进程生命周期发布同版本的 profile、课表、考试和成绩能力；这些原始学业能力注册为 collection，可与本科 provider 同时存在。解析器保留精确周次与原始成绩，考试缺少有效日期或完整起止钟点时保持时间为空，不用 08:00、22:00 或全天事件伪造。部分研究生端点失败时只回退对应缓存，不覆盖其他实时成功数据。
-- SSO Cookie 不持久化；本科教务、研究生教务与学在浙大业务会话只在主进程内存复用，用户重新连接或清除凭据时立即销毁。插件只收到固定课表/考试/成绩/作业操作的 `{status, body}`，不会收到 Cookie、token、请求头或通用网络句柄。
+- SSO Cookie 不持久化；本科教务、研究生教务与学在浙大业务会话只在主进程内存复用，用户重新连接或清除凭据时立即销毁。插件只收到固定课表/考试/成绩/作业/课件目录操作的 `{status, body}`；下载引擎只收到经固定 host/path/ID 校验后的响应流，不会收到 Cookie、token、请求头或通用网络句柄。
 - 核心已经具备刷新作业注册、同来源 single-flight、分源错误隔离、带账号哈希的 provenance 存储和脱敏诊断页；多 provider `calendar.events@1` 已承载跨来源考试与 DDL，诊断记录来自真实刷新协调器并持久化，支持清空和脱敏 TXT 导出。完整多级回退和更细的重试/重登阶段记录仍按 [Celechron 1.3.0 接入基线](../references/celechron-1.3.0-ingestion-baseline.md)推进。
 - 成绩首个纵向切片已完成，但接口尚未提供或当前解析尚未覆盖“是否计入 GPA”、主修课程标记和多套绩点算法；页面也尚未加入隐私遮罩。因此当前看板只展示原始成绩和基于明确 `gradePoint × credit` 的单一加权结果，不能替代学校正式成绩单或完整学业分析。
 - 脱敏现场测试代码已覆盖本科和研究生分支，但本轮没有注入真实研究生账号执行；真实账号成功、错误密码、账号锁定、校外网络和服务维护场景仍需在自有账号和 5–10 台内测设备上验收。测试材料不得进入仓库或日志。

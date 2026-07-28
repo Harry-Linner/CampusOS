@@ -403,6 +403,107 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(requests[6].headers["X-Requested-With"]).toBeUndefined();
   });
 
+  it("downloads a learning upload through the authenticated reference endpoint", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    const downloadRequests: Array<{
+      url: string;
+      headers: Record<string, string>;
+    }> = [];
+    const client = createZjuUnifiedAuthClient({
+      transport: routed.transport,
+      learningDownloadTransport: async (request) => {
+        downloadRequests.push({ url: request.url, headers: request.headers });
+        return new Response("authenticated-courseware", {
+          status: 200,
+          headers: { "content-length": "24" }
+        });
+      }
+    });
+
+    const result = await client.requestLearningDownload(
+      { username: "3240100001", password: "real password" },
+      {
+        uploadId: "908844",
+        referenceId: "929150",
+        signal: new AbortController().signal
+      }
+    );
+
+    await expect(result.text()).resolves.toBe("authenticated-courseware");
+    expect(downloadRequests).toEqual([{
+      url: "https://courses.zju.edu.cn/api/uploads/reference/929150/blob",
+      headers: expect.objectContaining({
+        Cookie: expect.stringContaining("session=learning-session")
+      })
+    }]);
+    expect(downloadRequests[0]?.headers.Cookie).not.toContain("iPlanetDirectoryPro");
+  });
+
+  it("falls back to the upload blob only after the reference blob fails", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    const downloadUrls: string[] = [];
+    const client = createZjuUnifiedAuthClient({
+      transport: routed.transport,
+      learningDownloadTransport: async (request) => {
+        downloadUrls.push(request.url);
+        return request.url.includes("/reference/")
+          ? new Response("reference unavailable", { status: 404 })
+          : new Response("preview-courseware", { status: 200 });
+      }
+    });
+
+    const result = await client.requestLearningDownload(
+      { username: "3240100001", password: "real password" },
+      {
+        uploadId: "908844",
+        referenceId: "929150",
+        signal: new AbortController().signal
+      }
+    );
+
+    await expect(result.text()).resolves.toBe("preview-courseware");
+    expect(downloadUrls).toEqual([
+      "https://courses.zju.edu.cn/api/uploads/reference/929150/blob",
+      "https://courses.zju.edu.cn/api/uploads/908844/blob"
+    ]);
+  });
+
+  it("reauthenticates the learning session once before retrying a download", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    const downloadUrls: string[] = [];
+    const client = createZjuUnifiedAuthClient({
+      transport: routed.transport,
+      learningDownloadTransport: async (request) => {
+        downloadUrls.push(request.url);
+        return downloadUrls.length <= 2
+          ? new Response("session expired", { status: 401 })
+          : new Response("fresh-session-courseware", { status: 200 });
+      }
+    });
+
+    const result = await client.requestLearningDownload(
+      { username: "3240100001", password: "real password" },
+      {
+        uploadId: "908844",
+        referenceId: "929150",
+        signal: new AbortController().signal
+      }
+    );
+
+    await expect(result.text()).resolves.toBe("fresh-session-courseware");
+    expect(downloadUrls).toEqual([
+      "https://courses.zju.edu.cn/api/uploads/reference/929150/blob",
+      "https://courses.zju.edu.cn/api/uploads/908844/blob",
+      "https://courses.zju.edu.cn/api/uploads/reference/929150/blob"
+    ]);
+    expect(routed.requests.filter((request) => {
+      const target = new URL(request.url);
+      return target.hostname === "courses.zju.edu.cn" &&
+        target.pathname === "/user/index" &&
+        !target.searchParams.has("authenticated");
+    })).toHaveLength(2);
+  });
+
   it("establishes undergraduate service sessions atomically from one CAS login", async () => {
     const todosBody = JSON.stringify({ todo_list: [] });
     const { requests, transport } = createRoutingTransport((request) => {
@@ -534,6 +635,19 @@ describe("ZjuUnifiedAuthClient", () => {
       code: "protocol-error",
       message: "学在浙大登录返回了不受信任的跳转地址。"
     });
+  });
+
+  it("rejects a non-positive learning course identifier before authentication", async () => {
+    const client = createZjuUnifiedAuthClient({
+      transport: vi.fn(async () => {
+        throw new Error("transport must not be called");
+      })
+    });
+
+    await expect(client.requestLearningService(
+      { username: "3240100001", password: "real password" },
+      { operation: "course-activities", courseId: "0" }
+    )).rejects.toMatchObject({ code: "invalid-input" });
   });
 
   it("returns authenticated practice-point data only after both service sessions are verified", async () => {

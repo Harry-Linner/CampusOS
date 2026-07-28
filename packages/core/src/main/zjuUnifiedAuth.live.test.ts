@@ -179,6 +179,97 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(learningPayload.todo_list);
 
         expect(learningStructureValid).toBe(true);
+        const semestersResponse = await client.requestLearningService(
+          { username, password },
+          { operation: "semesters" }
+        );
+        const semestersPayload = JSON.parse(semestersResponse.body) as unknown;
+        const semestersStructureValid =
+          typeof semestersPayload === "object" &&
+          semestersPayload !== null &&
+          "semesters" in semestersPayload &&
+          Array.isArray(semestersPayload.semesters);
+        expect(semestersStructureValid).toBe(true);
+
+        const readCoursesPage = async (page: number) => {
+          const response = await client.requestLearningService(
+            { username, password },
+            { operation: "courses", page }
+          );
+          const payload = JSON.parse(response.body) as unknown;
+          const record = typeof payload === "object" &&
+            payload !== null &&
+            !Array.isArray(payload)
+              ? payload as Record<string, unknown>
+              : null;
+          expect(Array.isArray(record?.courses)).toBe(true);
+          expect(Number.isSafeInteger(record?.pages) && Number(record?.pages) >= 0).toBe(true);
+          return {
+            courses: record?.courses as unknown[],
+            pages: Number(record?.pages)
+          };
+        };
+        const firstCoursesPage = await readCoursesPage(1);
+        const remainingCoursePages = await Promise.all(
+          Array.from(
+            { length: Math.max(0, firstCoursesPage.pages - 1) },
+            (_, index) => readCoursesPage(index + 2)
+          )
+        );
+        const courses = [
+          firstCoursesPage.courses,
+          ...remainingCoursePages.map((page) => page.courses)
+        ].flat();
+        const courseIds = courses.map((course) => {
+          const record = typeof course === "object" &&
+            course !== null &&
+            !Array.isArray(course)
+              ? course as Record<string, unknown>
+              : null;
+          const id = record?.id;
+          expect(
+            (typeof id === "number" && Number.isSafeInteger(id) && id > 0) ||
+            (typeof id === "string" && /^[1-9]\d*$/.test(id))
+          ).toBe(true);
+          return String(id);
+        });
+        await Promise.all(courseIds.map(async (courseId) => {
+          const response = await client.requestLearningService(
+            { username, password },
+            { operation: "course-activities", courseId }
+          );
+          const payload = JSON.parse(response.body) as unknown;
+          const record = typeof payload === "object" &&
+            payload !== null &&
+            !Array.isArray(payload)
+              ? payload as Record<string, unknown>
+              : null;
+          expect(Array.isArray(record?.activities)).toBe(true);
+          for (const activity of record?.activities as unknown[]) {
+            const activityRecord = typeof activity === "object" &&
+              activity !== null &&
+              !Array.isArray(activity)
+                ? activity as Record<string, unknown>
+                : null;
+            if (!Array.isArray(activityRecord?.uploads)) continue;
+            for (const upload of activityRecord.uploads) {
+              const uploadRecord = typeof upload === "object" &&
+                upload !== null &&
+                !Array.isArray(upload)
+                  ? upload as Record<string, unknown>
+                  : null;
+              expect(uploadRecord).not.toBeNull();
+              expect(["string", "number"]).toContain(typeof uploadRecord?.id);
+              expect(["string", "number"]).toContain(typeof uploadRecord?.reference_id);
+              expect(typeof uploadRecord?.name).toBe("string");
+              expect(
+                uploadRecord?.size === undefined ||
+                uploadRecord?.size === null ||
+                (typeof uploadRecord.size === "number" && uploadRecord.size >= 0)
+              ).toBe(true);
+            }
+          }
+        }));
         process.stdout.write(
           [
             "[PASS] ZJUAM SSO 登录态已建立",
@@ -190,6 +281,8 @@ describe("ZJU unified authentication live verification", () => {
             "[PASS] 教务网考试端点返回可解析业务结构",
             "[PASS] 教务网成绩端点返回可解析业务结构",
             "[PASS] 学在浙大业务 Session 已建立且作业端点返回可解析结构",
+            "[PASS] 学在浙大学期与全部课程分页返回可解析业务结构",
+            "[PASS] 学在浙大每门课程课件列表均返回可解析业务结构",
             "[PASS] 敏感字段输出：0"
           ].join("\n") + "\n"
         );
@@ -210,6 +303,6 @@ describe("ZJU unified authentication live verification", () => {
         delete process.env.CAMPUSOS_ZJU_PROGRAM;
       }
     },
-    90_000
+    180_000
   );
 });

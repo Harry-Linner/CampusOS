@@ -232,8 +232,9 @@
 - 核心框架的插件 API 保持"进程边界"，确保法律上的独立性
 - 市场前端展示插件的开源协议标签
 - Celechron 1.3.0 仅作为校内数据接入的行为与架构参考；被 Git 忽略的本地参考副本不得参与 CampusOS 构建、打包或发布，也不得直接复制、改写或移植到 MIT 核心
+- 学在浙大课程资料逻辑参考 MIT 许可的 `PeiPei233/zju-learning-assistant`（Copyright 2023 PeiPei233）；本地忽略快照的关键文件已与上游提交 `73aecb6a81a55fc6f5055d2fb309cf1b809d36ab` 做 Git blob 哈希核对。课程分页、逐课 uploads、reference/preview 下载、重试和文件大小判断的适配位置与 MIT 署名见 [课程资料对照基线](references/zju-learning-assistant-courseware-baseline.md)
 - Celechron 启发的官方插件集必须保持 clean-room 实现证据：需求与协议说明可引用行为结论，代码评审不得以 Celechron 源文件为补丁来源；构建和许可证扫描需覆盖每个官方连接器与功能插件
-- 2026-07-19 的本科教务与学在浙大连接器为独立 TypeScript 实现；核心只向已授权官方连接器返回固定课表/考试/作业操作的业务正文，不暴露密码、Cookie、Session、ticket、请求头或通用网络句柄。课表、考试和作业正文属于本地个人学业数据，必须继续受权限、provenance、删除入口和诊断脱敏约束；官方校历连接器只读取浙江大学公开 HTTPS 页面，不携带个人会话。当前未移植 Celechron 源文件
+- 本科教务与学在浙大连接器为 TypeScript/Electron 适配；核心只向已授权官方连接器返回固定课表/考试/作业/课件目录操作的业务正文，不暴露密码、Cookie、Session、ticket、请求头或通用网络句柄。课表、考试、作业、课程名、文件名和课件正文属于本地个人学业数据，必须继续受权限、provenance、删除入口和诊断脱敏约束；真实验收只输出阶段结果，不输出课程内容、数量或私有下载 URL
 - 如需复用任何 Celechron GPL-3.0 源码，必须先通过 ADR 明确派生作品边界、开源发布义务和第三方声明，再决定是否采用
 
 ---

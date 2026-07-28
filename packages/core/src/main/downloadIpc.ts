@@ -3,6 +3,8 @@ import type { CampusDownloadRequest, CampusDownloadTask } from "@campusos/shared
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { DownloadEngine } from "./downloadEngine";
 import { getOfficialDownloadQueuePersistence } from "./sqliteDownloadQueuePersistence";
+import { requestZjuLearningDownload } from "./academicCredentialStore";
+import { classifyCampusDownloadRequest } from "./downloadRequestPolicy";
 
 let downloadEngine: DownloadEngine | null = null;
 let initialization: Promise<DownloadEngine> | null = null;
@@ -17,7 +19,19 @@ const getInitializedDownloadEngine = async (): Promise<DownloadEngine> => {
   if (initialization) return initialization;
   const engine = downloadEngine ?? new DownloadEngine({
     onChanged: notifyDownloadChange,
-    queuePersistence: getOfficialDownloadQueuePersistence()
+    queuePersistence: getOfficialDownloadQueuePersistence(),
+    resolveResponse: async ({ item, headers, signal }) => {
+      const classification = classifyCampusDownloadRequest(item);
+      if (classification.kind === "public") {
+        return fetch(item.url, { headers, signal });
+      }
+      return requestZjuLearningDownload({
+        uploadId: classification.uploadId,
+        referenceId: classification.referenceId,
+        range: headers.Range,
+        signal
+      });
+    }
   });
   downloadEngine = engine;
   initialization = engine.loadPersisted().then(() => engine);
@@ -42,6 +56,7 @@ export const registerDownloadHandlers = (): void => {
     "campusos:downloads:enqueue",
     async (event, input: CampusDownloadRequest) => {
       assertTrustedRenderer(event);
+      classifyCampusDownloadRequest(input);
       const engine = await getInitializedDownloadEngine();
       const task = await engine.enqueue(input);
       return toTask(engine, task.id);

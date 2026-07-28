@@ -3,11 +3,13 @@ import { join } from "node:path";
 import type {
   AcademicCalendarConfigData,
   CalendarEventsData,
+  LearningMaterialsData,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
 import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/manifest";
 import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
+import { manifest as zjuLearningManifest } from "@campusos/plugin-zju-learning/manifest";
 import type { CampusWorkspaceRecord } from "../shared/campusBridge";
 import {
   createDefaultCampusAdapterContext,
@@ -24,8 +26,10 @@ import {
   createLiveWorkspaceSnapshot,
   findAcademicCalendarRecord,
   findCalendarEventRecords,
+  findLearningMaterialsRecord,
   mergeAcademicCalendarIntoWorkspace,
-  mergeCalendarEventsIntoWorkspace
+  mergeCalendarEventsIntoWorkspace,
+  mergeLearningMaterialsIntoWorkspace
 } from "./campusWorkspaceCapabilities";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
@@ -121,6 +125,10 @@ const buildGeneratedRecord = async (
     await getOfficialCapabilityRepository().read<AcademicCalendarConfigData>(
       "academic.calendar-config@1"
     );
+  const learningMaterialRecords =
+    await getOfficialCapabilityRepository().read<LearningMaterialsData>(
+      "learning.materials@1"
+    );
   const calendarPluginActive = pluginRuntime.plugins.some(
     (plugin) =>
       plugin.id === zjuCalendarConfigManifest.id && plugin.status === "active"
@@ -141,7 +149,7 @@ const buildGeneratedRecord = async (
         )
       : null
   );
-  const mergedSnapshot = mergeCalendarEventsIntoWorkspace(
+  const eventSnapshot = mergeCalendarEventsIntoWorkspace(
     calendarSnapshot,
     findCalendarEventRecords(
       eventRecords,
@@ -149,6 +157,14 @@ const buildGeneratedRecord = async (
       verifiedAcademicAccountId
     ),
     reminderSettings.leadMinutes
+  );
+  const mergedSnapshot = mergeLearningMaterialsIntoWorkspace(
+    eventSnapshot,
+    findLearningMaterialsRecord(
+      learningMaterialRecords,
+      zjuLearningManifest.id,
+      verifiedAcademicAccountId
+    )
   );
   const downloads = await getWorkspaceDownloads();
   const snapshot = {

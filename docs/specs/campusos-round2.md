@@ -2,7 +2,7 @@
 
 > **历史规格：** 本文中有关活动栏、状态栏、三卡首页、独立日历浮窗与课件一级页面的 UX 决策，已由 [CampusOS Interface v3](campusos-interface-v3.md) 取代。合规、工程化与插件架构决策仍有效。
 
-> **实现检查点（2026-07-19）：** 本科、研究生和学在浙大连接器均通过核心托管的不可导出业务会话与固定操作发布 capability；原始 profile/课表/考试/成绩和统一事件支持多 provider。设置页首次连接已按显式培养层次验证本科业务回执或研究生 token/成绩结构，研究生考试缺少完整钟点时不补假值。成绩 feature 使用主进程鉴权和当前账号隔离的只读通道，并由运行时生成可达入口。`.campusmod` 已支持检查、权限确认、原子安装升级、动态注册与卸载；受限本地单视图可在 Electron 43 OS sandbox + 独立 origin iframe 中激活，其他第三方包不执行。真实 ZIP 的安装、授权、协议读取和 mount/dispose 纵向测试已通过，Electron 窗口内 iframe 打包 E2E 仍待完成。第三方 headless QuickJS/WASM 内核的 Node/网络隔离、deadline 和普通 JS 堆上限 POC 已通过，但 lifecycle 与 utility process 外层仍未开放。类型检查、102 项单测、lint、生产构建和真实冷启动已通过；所有真实账号脱敏验收仍待执行。
+> **实现检查点（2026-07-28）：** 本科、研究生和学在浙大连接器均通过核心托管的不可导出业务会话与固定操作发布 capability；原始 profile/课表/考试/成绩、作业、课件目录和统一事件支持账号/provider 隔离。学在浙大每轮重取学期、全部课程分页及逐课 activities/uploads，作业与资料分支独立降级；认证下载固定 reference → preview、5 次指数退避、一次受控重认证并保留 Range/大小校验。2026-07-28 本科真实账号已脱敏通过统一认证、教务、素拓、作业与完整课件目录；私有课件实体、多设备和研究生真实账号仍待验收。第三方 headless 的 capability/网络权限代理仍未开放，不能据此标记 Runtime v2 完成。
 
 > **版本：** 2.0 | **日期：** 2026-06-18 | **状态：** MVP Phase 2 实现与验收中
 > **基于：** [第一轮技术规格](ideazjuermodapp.md)（14 轮访谈，2026-06-17）
