@@ -71,7 +71,7 @@
 
 **Not a design spec — this is the shape, not the details.**
 
-**实现状态（2026-07-28）：** 项目处于 MVP Phase 2。内置官方 connector 已通过主进程的受控业务会话发布课表、考试、作业、课件目录与 `calendar.events@1`；已验证账号的工作区从空的正式快照开始，只接受当前账号的 capability 记录，绝不回退为固定课程、DDL 或课件。作业和课件由主进程在启动后立即刷新，并在每次完成后等待 60–120 秒再次刷新；作业的截止时间变化和移除会替换对应日历事件，课件则在每轮发布前重取全部课程分页和逐课 activities/uploads。核心教务 connector 不可用时，引导同步明确失败；作业和课件目录可独立回退到同账号的上次有效数据。密码、Cookie、Session、ticket、token 与原始响应均不进入 renderer、日志或版本库。2026-07-28 本科真实账号脱敏验证已通过 ZJUAM、教务、素拓、课表/考试/成绩、作业及完整课件目录链；认证下载协议的自动化测试已通过，私有课件实体下载、多设备和全新 Windows 安装仍待现场验收。
+**实现状态（2026-07-29）：** 项目处于 MVP Phase 2。内置官方 connector 已通过主进程的受控业务会话发布课表、考试、作业、课件目录与 `calendar.events@1`；已验证账号的工作区从空的正式快照开始，只接受当前账号的 capability 记录，绝不回退为固定课程、DDL 或课件。作业和课件由主进程在启动后立即刷新，并在每次完成后等待 60–120 秒再次刷新；作业的截止时间变化和移除会替换对应日历事件，课件则在每轮发布前重取全部课程分页和逐课 activities/uploads。核心教务 connector 不可用时，引导同步明确失败；作业和课件目录可独立回退到同账号的上次有效数据。密码、Cookie、Session、ticket、token 与原始响应均不进入 renderer、日志或版本库。2026-07-29 本科真实账号脱敏验证已通过 ZJUAM、教务、素拓、课表/考试/成绩、作业、完整课件目录及一份授权私有课件的认证下载和字节校验；多设备和全新 Windows 安装仍待现场验收。
 
 **开发数据范围（2026-07-28 用户授权）：** 课表抓取与日历投影以真实 `2026-2027 秋冬` 为正确性基线；资料视图和新建下载任务暂时只接受真实 `2025-2026 春/夏/春夏` 课程。私有基线只能位于 Git ignored 的本地目录，不进入 Git、CI、构建、日志或截图；完整约束见 [开发数据基线](docs/development-data-baselines.md)。
 
@@ -89,7 +89,7 @@
 - **Celechron 启发的官方插件集** — 不再使用一个大而全的“教务抓取插件”。本科教务、研究生教务、学在浙大、素拓、在线校历和校园卡作为数据连接器；课表、考试、成绩/GPA、DDL、实践、任务规划、日历桥接和搜索作为能力消费者。完整清单与依赖图见 [官方插件集设计](docs/design/celechron-inspired-plugin-suite.md)。
 - **校内数据接入稳定性基线** — 教务网、学在浙大、素质拓展平台及后续校内 adapter 必须严格参考 Celechron 1.3.0 已验证的认证状态机、局部成功、重试分类、缓存回退、刷新互斥、下一学年探测、解析隔离和脱敏诊断设计。详细基线见 [Celechron 1.3.0 校内数据接入参考](docs/references/celechron-1.3.0-ingestion-baseline.md)。
 - **统一身份认证核心登录** — 设置页“连接并保存”已接通 ZJUAM 动态公钥登录、本科教务网 Session、素拓 CAS/正式 `SESSION`、非匿名 `ctx` 与 `getMyInfo` 账号匹配汇总；只有取得真实认证后业务数据才写入凭据并展示回执。本科课表、考试、成绩和学在浙大作业通过正式 capability 链路进入当前账号的正式 workspace；关键 connector 不可用时同步失败，不能伪造成功或以 mock 项替代。完整状态机见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)。
-- **学在浙大课程资料** — 严格对照 [ZJU Learning Assistant 课程资料基线](docs/references/zju-learning-assistant-courseware-baseline.md)：刷新前重新读取学期、全部课程分页和每门课程的 activities/uploads；reference blob 失败后才使用 preview blob，最多重试 5 次；本地文件不存在或大小改变时允许重新下载。目录发现已通过真实账号脱敏验证，私有文件实体下载保留为现场验收项。
+- **学在浙大课程资料** — 严格对照 [ZJU Learning Assistant 课程资料基线](docs/references/zju-learning-assistant-courseware-baseline.md)：刷新前重新读取学期、全部课程分页和每门课程的 activities/uploads；reference blob 失败后才使用 preview blob，最多重试 5 次；本地文件不存在或大小改变时允许重新下载。目录发现及一份授权私有文件的认证下载和字节校验已通过真实账号脱敏验证；多设备现场验收仍是发布门槛。
 - **日历 + 提醒系统** — 月历、线性日程、单日时间线、桌面系统通知、课程/作业/考试统一展示与悬停详情。课表事件只投影校历确定的当前完整学期；休课期投影下一完整学期并在总览预览下一学期首次出现的同星期课程，真实课程日期不被改写。DDL 在上海自然日早于今天时不再进入待办或提醒。MVP 先把桌面场景下的"尽量不漏事"做到可用，再由 post-MVP 安卓端补齐离开电脑后的最后一公里提醒。
 - **首次引导向导** — 5 步流程降低首次使用门槛；教务账号认证 + 连接测试用于快速进入可用状态。
 - **安全存储** — Electron `safeStorage` + 操作系统加密系统；Windows 由 DPAPI 保护密钥。密码明文不落盘，凭据安全是所有自动化抓取的前提和产品底线。

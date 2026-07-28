@@ -41,7 +41,7 @@
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
 - 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-28 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，敏感输出为 0。该证据证明真实课件目录链，不证明私有课件实体已下载。剩余未完成：私有文件点击下载、多设备与完整 Playwright 用户链路、第三方 headless capability/网络权限代理、全新 Windows 安装和 GitHub Release/分发验收。
+- Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-29 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，以及一份授权私有课件的认证下载和实际字节校验，敏感输出为 0。剩余未完成：多设备现场流程、第三方 headless capability/网络权限代理、全新 Windows 安装和 GitHub Release/分发验收。
 
 ---
 
@@ -263,7 +263,7 @@ flowchart TD
 - [x] 课件批量下载（含断点续传）
 - [x] 真实账号课件目录发现（学期、全部课程分页、逐课 activities/uploads）
 - [x] 开发期私有基线已捕获到 Git ignored 本地边界（2026-2027 秋冬课表；2025-2026 春夏课程/资料元数据）
-- [ ] 至少一个私有课件实体下载并按文件大小验收
+- [x] 至少一个私有课件实体下载并按文件大小验收（2026-07-29 本科真实账号脱敏验证）
 - [x] 日历周视图 + 冲突检测
 - [x] 桌面通知 + 提醒调度
 - [x] 抓取容错（缓存兜底 + 手动重试）
@@ -422,7 +422,7 @@ flowchart TD
 
 1. **保持本地完整流程 E2E 为发布门禁** — 已完成。`pnpm --filter @campusos/core test:e2e` 构建专用 `e2e` renderer，并在外部校历 HTTP adapter 边界使用 fixture；测试经过 Electron IPC、插件运行时、SQLite 工作区和日历渲染，不能用 renderer 假成功替代。
 
-2. **结案真实本科认证故障** — 下一步。以脱敏 `verify:zju-auth` 证据在至少两个时段或网络复测，区分 ZJUAM 服务异常、协议变化、网络限制和实现缺陷。认证成功前不新增连接器或插件功能。
+2. **积累真实本科认证稳定性证据** — 下一步。已完成一次包含授权私有课件下载的脱敏 `verify:zju-auth`；仍需在至少两个时段或网络复测，区分 ZJUAM 服务异常、协议变化、网络限制和实现缺陷。证据不足前不新增连接器或插件功能。
 
 3. **执行 3 人 / 3 设备私有 Alpha** — 依赖步骤 2。每名本科生在真实 Windows 设备上完成安装、认证、同步、日历查看和一次提醒；记录步骤、结果和脱敏诊断，而不是仅记录是否安装。
 
