@@ -19,7 +19,7 @@ Celechron 的功能值得迁移，但不能把 Flutter 页面或 `Spider` 直接
 
 首个可运行纵向切片已经完成：Manifest v2 校验、能力依赖解析、provider 冲突与循环依赖 fail closed、逐项权限授权、主进程持久化、headless 生命周期、刷新 single-flight、来源状态存储，以及内置 `org.campusos.zju-undergraduate` 与 `org.campusos.zju-graduate` 连接器。连接器通过核心托管的 service-session broker 发布同版本 profile、课表、考试和成绩能力，不能读取密码、Cookie、Session、token 或 ticket；核心复用内存业务会话、失效后受控重认证，只向连接器开放固定操作。
 
-本科连接器按运行时日期探测当前和下一学年；研究生连接器使用独立 CAS service 与内存 token，按当前/下一学年查询四个授课学季和考试学季。两者都隔离坏记录并使用账号/provider 隔离的 provenance 缓存。`org.campusos.zju-learning` 通过独立业务 `session` 发布 `learning.assignments@1` 和 `learning.materials@1`：每轮完整读取学期、全部课程分页和逐课 activities/uploads，按 60–120 秒间隔持续刷新，作业与资料独立回退；下载由核心按 reference → preview、5 次退避和一次受控重认证处理。考试、DDL 与课表事件插件通过显式刷新依赖发布统一事件；课表事件遵循 Celechron 单一 `Semester` 投影，按校历合并秋冬/春夏并在休课期选择下一完整学期，DDL 在上海自然日早于今天时不再进入待办。工作区和 renderer 不读取 Cookie 或通用网络句柄。2026-07-28 本科真实账号已脱敏通过教务、作业和课件目录；研究生、多设备、私有课件实体下载及第三方 headless capability/网络权限代理仍待验收，不能据此将整个 Runtime v2 标记为完成。
+本科连接器按运行时日期探测当前和下一学年；研究生连接器使用独立 CAS service 与内存 token，按当前/下一学年查询四个授课学季和考试学季。两者都隔离坏记录并使用账号/provider 隔离的 provenance 缓存。`org.campusos.zju-learning` 通过独立业务 `session` 发布 `learning.assignments@1` 和 `learning.materials@1`：每轮完整读取学期、全部课程分页和逐课 activities/uploads，按 60–120 秒间隔持续刷新，作业与资料独立回退；下载由核心按 reference → preview、5 次退避和一次受控重认证处理。考试、DDL 与课表事件插件通过显式刷新依赖发布统一事件；课表事件遵循 Celechron 单一 `Semester` 投影，先合并重复 session，再按上下半学期日期格展开。DDL 在上海自然日早于今天时不再进入待办。开发期课表以真实 `2026-2027 秋冬` 为基线，资料视图和新建下载只投影真实 `2025-2026 春/夏/春夏`，但这一投影筛选不改变学在浙大完整目录刷新顺序。工作区和 renderer 不读取 Cookie 或通用网络句柄。2026-07-28 本科真实账号已脱敏通过教务、作业和课件目录；研究生、多设备、私有课件实体下载及第三方 headless capability/网络权限代理仍待验收，不能据此将整个 Runtime v2 标记为完成。
 
 ## 2. 参考与许可证边界
 

@@ -77,10 +77,10 @@ describe("academic timetable events", () => {
     expect(result.upstreamProviderIds).toEqual([
       "org.campusos.zju-undergraduate"
     ]);
-    // 16 weeks × 1 session = 16 attempted, 16 produced
-    expect(result.totalItems).toBe(16);
+    // The first-half calendar window contains eight teaching Mondays.
+    expect(result.totalItems).toBe(8);
     expect(result.omittedItems).toBe(0);
-    expect(result.events).toHaveLength(16);
+    expect(result.events).toHaveLength(8);
 
     // Week 1 Monday: 2026-09-14 (classesBeginDate is a Monday)
     const week1Event = result.events[0];
@@ -161,6 +161,47 @@ describe("academic timetable events", () => {
     expect(titles).toEqual(new Set(["秋学期课程", "冬学期课程"]));
   });
 
+  it("deduplicates a full autumn-winter timetable and bounds each half by the calendar", () => {
+    const sharedSession = {
+      ...timetableRecord.data!.terms[0].sessions[0],
+      sourceId: "autumn-copy",
+      firstHalf: true,
+      secondHalf: true
+    };
+    const duplicatedRecord: CapabilityRecord<AcademicTimetableData> = {
+      ...timetableRecord,
+      data: {
+        terms: [
+          {
+            academicYearStart: 2026,
+            season: "1|秋",
+            state: "live",
+            sessions: [sharedSession]
+          },
+          {
+            academicYearStart: 2026,
+            season: "1|冬",
+            state: "live",
+            sessions: [{ ...sharedSession, sourceId: "winter-copy" }]
+          }
+        ]
+      }
+    };
+
+    const result = deriveTimetableCalendarEvents(
+      [duplicatedRecord],
+      calendarConfig,
+      "2026-07-28T04:00:00.000Z"
+    );
+    const dates = result.events.map((event) => event.startAt.slice(0, 10));
+
+    expect(dates).toHaveLength(18);
+    expect(new Set(result.events.map((event) => event.id)).size).toBe(18);
+    expect(dates.filter((date) => date === "2026-11-09")).toHaveLength(1);
+    expect(dates.at(-1)).toBe("2027-01-11");
+    expect(dates.every((date) => date <= "2027-01-15")).toBe(true);
+  });
+
   it("returns empty when no calendar config is available", () => {
     const result = deriveTimetableCalendarEvents(
       [timetableRecord],
@@ -199,8 +240,8 @@ describe("academic timetable events", () => {
       "2026-07-19T12:00:00.000Z"
     );
 
-    // Odd weeks only: 1, 3, 5, 7, 9, 11, 13, 15 = 8 events
-    expect(result.events).toHaveLength(8);
+    // Odd weeks within the eight-week first-half window.
+    expect(result.events).toHaveLength(4);
     // First event is week 1
     expect(result.events[0].startAt).toBe("2026-09-14T08:00:00+08:00");
     // Second event is week 3 (skipped week 2)
@@ -234,7 +275,7 @@ describe("academic timetable events", () => {
       "2026-07-19T12:00:00.000Z"
     );
 
-    expect(result.omittedItems).toBe(16);
+    expect(result.omittedItems).toBe(8);
     expect(result.events).toHaveLength(0);
   });
 });

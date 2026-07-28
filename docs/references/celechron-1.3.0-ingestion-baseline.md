@@ -107,6 +107,12 @@ Celechron 使用 GPL-3.0。CampusOS 在没有完成许可证兼容性评审和�
 
 本科与研究生课表、考试、成绩及学在浙大作业已经通过核心托管的业务会话、固定操作、单条解析隔离、账号/provider 隔离 capability 缓存、刷新协调和来源状态进入正式代码链路；考试、DDL 和成绩再由独立 feature 消费，renderer 不直接解析网站响应。研究生实现按 `GrsNew` 行为使用 `https://yjsy.zju.edu.cn/` CAS service、固定 `validateLogin` ticket 交换与主进程内存 `X-Access-Token`，缺失考试时间不会套用 Celechron 旧实现中的兜底钟点。首次连接已按用户明确选择的培养层次执行：研究生只有在固定成绩接口返回有效认证后结构时才原子保存，IPC 不返回 token 或成绩正文。诊断页面已连接真实刷新日志并支持脱敏导出。研究生当前仅通过外部 HTTP fixture，尚未执行真实账号现场测试；实践项目明细、完整多级重认证/重试阶段记录、可信节次与课程日期展开、成绩完整口径和多设备验收仍未完成，因此不能把整个数据接入面宣称为生产就绪。插件拆分与依赖关系见 [Celechron 启发的官方插件集设计](../design/celechron-inspired-plugin-suite.md)。
 
+### 课表 session 合并与开发基线
+
+CampusOS 课表投影对照 `lib/model/semester.dart:168-205,216-365,384-403,506-528` 与 `lib/model/course.dart:109-157`：本科 session 先以“学期 + 课程名”归组，同星期/单双周/地点且起始节次重合的重复接口记录只合并上下半学期标志，相邻节次合并为连续安排。完成去重后，上、下半学期分别使用各自校历开课日与结束日生成日期格，单双周在每个半学期内独立展开。不得将秋、冬响应各自无界生成 16 周。
+
+2026-07-28 用户授权以本机真实 `2026-2027 秋冬` 课表作为开发正确性基线。该私有数据只保存在 `.tmp/development-baselines/`，具体边界见 [开发数据基线](../development-data-baselines.md)。
+
 ## 素质拓展平台认证链
 
 此链路来自用户提供的维护者说明，并已与 Celechron 1.3.0 的 `lib/http/zjuServices/sztz.dart` 结构交叉核对：

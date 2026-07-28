@@ -566,7 +566,7 @@ describe("workspace capability integration", () => {
           fileName: "新课件.pdf",
           courseId: "1",
           courseName: "课程一",
-          semesterName: "秋冬学期",
+          semesterName: "2025-2026春夏",
           size: 1024,
           updatedAt: "2026-07-20T08:00:00.000Z",
           downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
@@ -584,5 +584,40 @@ describe("workspace capability integration", () => {
       })
     ]);
     expect(refreshed.summary.materialsReady).toBe(1);
+  });
+
+  it("uses only 2025-2026 spring-summer materials as the development download source", () => {
+    const material = {
+      sourceId: "1:100",
+      uploadId: "10",
+      referenceId: "100",
+      fileName: "fixture.pdf",
+      courseId: "1",
+      courseName: "fixture course",
+      semesterName: "2025-2026春夏",
+      size: 1024,
+      updatedAt: "2026-07-20T08:00:00.000Z",
+      downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
+      downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/10/blob"
+    };
+    const refreshed = mergeLearningMaterialsIntoWorkspace(createSnapshot(), {
+      capability: "learning.materials@1",
+      providerId: "org.campusos.zju-learning",
+      accountId: "account-fixture",
+      state: "live",
+      updatedAt: "2026-07-20T09:00:00.000Z",
+      data: {
+        courses: [],
+        materials: [
+          material,
+          { ...material, sourceId: "2:200", semesterName: "2025-2026春" },
+          { ...material, sourceId: "3:300", semesterName: "2025-2026短" },
+          { ...material, sourceId: "4:400", semesterName: "2024-2025春夏" }
+        ]
+      }
+    });
+
+    expect(refreshed.materials.map((item) => item.id)).toEqual(["1:100", "2:200"]);
+    expect(refreshed.summary.materialsReady).toBe(2);
   });
 });

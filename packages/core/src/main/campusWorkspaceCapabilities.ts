@@ -14,6 +14,7 @@ import type {
 } from "@campusos/shared";
 import { firstWaveSourceCatalog } from "@campusos/shared";
 import { buildReminderQueue } from "../shared/campusWorkspace";
+import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 const DAY_IN_MS = 24 * HOUR_IN_MS;
@@ -97,17 +98,19 @@ export const mergeLearningMaterialsIntoWorkspace = (
   snapshot: CampusWorkspaceSnapshot,
   record: CapabilityRecord<LearningMaterialsData> | null
 ): CampusWorkspaceSnapshot => {
-  const materials = record?.data?.materials.map((material) => ({
-    id: material.sourceId,
-    title: material.fileName,
-    courseName: material.courseName,
-    semester: material.semesterName,
-    sourceId: "learning-platform" as const,
-    updatedAt: material.updatedAt ?? record.updatedAt,
-    sizeBytes: material.size ?? undefined,
-    downloadUrl: material.downloadUrl,
-    downloadFallbackUrl: material.downloadFallbackUrl
-  })) ?? [];
+  const materials = record?.data?.materials
+    .filter((material) => isDevelopmentCoursewareSemester(material.semesterName))
+    .map((material) => ({
+      id: material.sourceId,
+      title: material.fileName,
+      courseName: material.courseName,
+      semester: material.semesterName,
+      sourceId: "learning-platform" as const,
+      updatedAt: material.updatedAt ?? record.updatedAt,
+      sizeBytes: material.size ?? undefined,
+      downloadUrl: material.downloadUrl,
+      downloadFallbackUrl: material.downloadFallbackUrl
+    })) ?? [];
   return {
     ...snapshot,
     materials,

@@ -48,17 +48,6 @@ interface FeatureActivationContext {
   bindings: Readonly<Partial<Record<PluginCapability, PluginCapabilityBinding>>>;
 }
 
-const findQuarterForSeason = (
-  quarters: readonly AcademicCalendarQuarter[],
-  academicYearStart: number,
-  season: string
-): AcademicCalendarQuarter | undefined =>
-  quarters.find(
-    (quarter) =>
-      quarter.academicYearStart === academicYearStart &&
-      quarter.season === season
-  );
-
 const semesterNumberForSeason = (season: string): 1 | 2 | null => {
   const seasonName = season.split("|").at(-1);
   if (seasonName === "秋" || seasonName === "冬") return 1;
@@ -132,40 +121,200 @@ const resolvePeriodTime = (
 
 const toDateOnly = (dateString: string): string => dateString.slice(0, 10);
 
-/**
- * Compute the calendar date for a given week and day-of-week relative to a
- * quarter's classes-begin Monday.
- *
- * week-1 Monday = classesBeginDate
- * target date = classesBeginDate + (week - 1) * 7 + (dayOfWeek - 1) days
- *
- * Uses local date arithmetic to avoid UTC offset issues with Asia/Shanghai.
- */
-const computeSessionDate = (
-  classesBeginDate: string,
-  week: number,
-  dayOfWeek: number
-): string | null => {
-  const parts = classesBeginDate.split("-");
+const parseDateOnly = (value: string): Date | null => {
+  const parts = value.split("-");
   const year = Number.parseInt(parts[0], 10);
   const month = Number.parseInt(parts[1], 10);
   const day = Number.parseInt(parts[2], 10);
   if (!year || !month || !day) return null;
 
-  const base = new Date(year, month - 1, day);
-  if (Number.isNaN(base.getTime())) return null;
-  base.setDate(base.getDate() + (week - 1) * 7 + (dayOfWeek - 1));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
-  return toDateOnly(
-    `${String(base.getFullYear()).padStart(4, "0")}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`
+const addDays = (value: string, days: number): string | null => {
+  const date = parseDateOnly(value);
+  if (!date) return null;
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateOnly(date.toISOString());
+};
+
+const dayOfWeekToNumber = (raw: number): number => {
+  const normalized = Math.round(raw);
+  if (normalized < 1 || normalized > 7) return 1;
+  return normalized;
+};
+
+interface HalfWindow {
+  kind: "first" | "second";
+  startDate: string;
+  endDate: string;
+}
+
+const buildHalfWindows = (
+  quarters: readonly AcademicCalendarQuarter[],
+  selectedSemester: SemesterWindow
+): HalfWindow[] => {
+  const seasons = selectedSemester.semesterNumber === 1
+    ? (["1|秋", "1|冬"] as const)
+    : (["2|春", "2|夏"] as const);
+  const first = quarters.find(
+    (quarter) =>
+      quarter.academicYearStart === selectedSemester.academicYearStart &&
+      quarter.season === seasons[0]
   );
+  const second = quarters.find(
+    (quarter) =>
+      quarter.academicYearStart === selectedSemester.academicYearStart &&
+      quarter.season === seasons[1]
+  );
+  if (!first || !second) return [];
+
+  const dayBeforeSecond = addDays(second.classesBeginDate, -1);
+  const firstEnd = dayBeforeSecond && dayBeforeSecond < first.endDate
+    ? dayBeforeSecond
+    : first.endDate;
+  return [
+    {
+      kind: "first",
+      startDate: first.classesBeginDate,
+      endDate: firstEnd
+    },
+    {
+      kind: "second",
+      startDate: second.classesBeginDate,
+      endDate: second.endDate
+    }
+  ];
+};
+
+const datesForHalf = (
+  window: HalfWindow,
+  dayOfWeek: number,
+  weekPattern: AcademicTimetableSession["weekPattern"]
+): string[] => {
+  const start = parseDateOnly(window.startDate);
+  const end = parseDateOnly(window.endDate);
+  if (!start || !end || start > end) return [];
+
+  const target = dayOfWeekToNumber(dayOfWeek);
+  const startDay = start.getUTCDay() === 0 ? 7 : start.getUTCDay();
+  const first = new Date(start);
+  first.setUTCDate(first.getUTCDate() + ((target - startDay + 7) % 7));
+
+  const dates: string[] = [];
+  for (let current = first, week = 1; current <= end; week += 1) {
+    if (weekPatternAllows(weekPattern, week)) {
+      dates.push(toDateOnly(current.toISOString()));
+    }
+    current = new Date(current);
+    current.setUTCDate(current.getUTCDate() + 7);
+  }
+  return dates;
+};
+
+const dateForExactWeek = (
+  windows: readonly HalfWindow[],
+  week: number,
+  dayOfWeek: number
+): string | null => {
+  if (!Number.isInteger(week) || week < 1) return null;
+  const halfIndex = week <= 8 ? 0 : 1;
+  const window = windows[halfIndex];
+  if (!window) return null;
+  const weekInHalf = week <= 8 ? week : week - 8;
+  const start = parseDateOnly(window.startDate);
+  if (!start) return null;
+  const startDay = start.getUTCDay() === 0 ? 7 : start.getUTCDay();
+  const date = new Date(start);
+  date.setUTCDate(
+    date.getUTCDate() +
+      ((dayOfWeekToNumber(dayOfWeek) - startDay + 7) % 7) +
+      (weekInHalf - 1) * 7
+  );
+  const result = toDateOnly(date.toISOString());
+  return result <= window.endDate ? result : null;
+};
+
+const sessionDates = (
+  session: AcademicTimetableSession,
+  windows: readonly HalfWindow[]
+): string[] => {
+  if (session.weeks && session.weeks.length > 0) {
+    return session.weeks.flatMap((week) => {
+      const date = dateForExactWeek(windows, week, session.dayOfWeek);
+      return date ? [date] : [];
+    });
+  }
+
+  return windows.flatMap((window) => {
+    if (window.kind === "first" && !session.firstHalf) return [];
+    if (window.kind === "second" && !session.secondHalf) return [];
+    return datesForHalf(window, session.dayOfWeek, session.weekPattern);
+  });
+};
+
+const sameRepeatPattern = (
+  left: AcademicTimetableSession,
+  right: AcademicTimetableSession
+): boolean =>
+  left.dayOfWeek === right.dayOfWeek &&
+  left.weekPattern === right.weekPattern &&
+  left.location === right.location;
+
+const mergeCourseSessions = (
+  entries: readonly ExpandedSession[]
+): ExpandedSession[] => {
+  // Celechron lib/model/semester.dart:384-403 and course.dart:109-157.
+  // CampusOS only adapts the mutable Dart model to immutable capability records.
+  const courses = new Map<string, ExpandedSession[]>();
+  for (const entry of entries) {
+    const courseKey = [
+      entry.providerId,
+      entry.academicYearStart,
+      entry.semesterNumber,
+      entry.session.courseName
+    ].join(":");
+    const sessions = courses.get(courseKey) ?? [];
+    const firstPeriod = entry.session.periods[0];
+    const duplicate = sessions.find(
+      (current) =>
+        sameRepeatPattern(current.session, entry.session) &&
+        current.session.periods.includes(firstPeriod)
+    );
+    if (duplicate) {
+      duplicate.session.firstHalf ||= entry.session.firstHalf;
+      duplicate.session.secondHalf ||= entry.session.secondHalf;
+      continue;
+    }
+
+    const adjacent = sessions.find(
+      (current) =>
+        sameRepeatPattern(current.session, entry.session) &&
+        current.session.periods.at(-1)! + 1 === firstPeriod
+    );
+    if (adjacent) {
+      adjacent.session.periods.push(...entry.session.periods);
+      continue;
+    }
+
+    sessions.push({
+      ...entry,
+      session: {
+        ...entry.session,
+        periods: [...entry.session.periods],
+        ...(entry.session.weeks ? { weeks: [...entry.session.weeks] } : {})
+      }
+    });
+    courses.set(courseKey, sessions);
+  }
+  return [...courses.values()].flat();
 };
 
 const sessionToEvent = (
   session: AcademicTimetableSession,
   providerId: string,
-  classesBeginDate: string,
-  week: number,
+  date: string,
   periodTimes: readonly PeriodTimeRecord[]
 ): CalendarEventRecord | null => {
   const sortedPeriods = [...session.periods].sort((a, b) => a - b);
@@ -178,11 +327,8 @@ const sessionToEvent = (
   );
   if (!firstPeriod || !lastPeriod) return null;
 
-  const date = computeSessionDate(classesBeginDate, week, dayOfWeekToNumber(session.dayOfWeek));
-  if (!date) return null;
-
   return {
-    id: `${manifest.id}:${providerId}:${session.sourceId}:w${week}`,
+    id: `${manifest.id}:${providerId}:${session.sourceId}:${date}`,
     originId: session.sourceId,
     originCapability: "academic.timetable@1",
     sourceId: "academic-affairs",
@@ -195,16 +341,6 @@ const sessionToEvent = (
     courseName: session.courseName,
     note: session.teacher ? `教师：${session.teacher}` : null
   };
-};
-
-/**
- * Normalize dayOfWeek: the timetable API may return 1=Monday or use a
- * different convention. This function expects 1=Monday through 7=Sunday.
- */
-const dayOfWeekToNumber = (raw: number): number => {
-  const normalized = Math.round(raw);
-  if (normalized < 1 || normalized > 7) return 1;
-  return normalized;
 };
 
 const weekPatternAllows = (
@@ -220,8 +356,8 @@ const weekPatternAllows = (
 interface ExpandedSession {
   session: AcademicTimetableSession;
   providerId: string;
-  season: string;
   academicYearStart: number;
+  semesterNumber: 1 | 2;
 }
 
 export const deriveTimetableCalendarEvents = (
@@ -272,12 +408,11 @@ export const deriveTimetableCalendarEvents = (
   for (const record of timetableRecords) {
     const terms = record.data?.terms ?? [];
     for (const term of terms) {
-      const seasonParts = term.season.split("|");
-      const season = seasonParts[1] ?? term.season;
+      const semesterNumber = semesterNumberForSeason(term.season);
       if (
         selectedSemester === null ||
         term.academicYearStart !== selectedSemester.academicYearStart ||
-        semesterNumberForSeason(term.season) !== selectedSemester.semesterNumber
+        semesterNumber !== selectedSemester.semesterNumber
       ) {
         continue;
       }
@@ -285,43 +420,27 @@ export const deriveTimetableCalendarEvents = (
         expanded.push({
           session,
           providerId: record.providerId,
-          season,
-          academicYearStart: term.academicYearStart
+          academicYearStart: term.academicYearStart,
+          semesterNumber
         });
       }
     }
   }
 
+  const halfWindows = selectedSemester
+    ? buildHalfWindows(calendarConfig.quarters, selectedSemester)
+    : [];
+  const merged = mergeCourseSessions(expanded);
   const events: CalendarEventRecord[] = [];
-  for (const { session, providerId, season, academicYearStart } of expanded) {
-    const seasonKey =
-      season === "秋" ? "1|秋" :
-      season === "冬" ? "1|冬" :
-      season === "春" ? "2|春" :
-      season === "夏" ? "2|夏" :
-      season;
-
-    const quarter = findQuarterForSeason(
-      calendarConfig.quarters,
-      academicYearStart,
-      seasonKey
-    );
-    if (!quarter) continue;
-
-    // Determine which weeks to expand
-    const weeks: number[] = session.weeks && session.weeks.length > 0
-      ? session.weeks
-      : Array.from(
-          { length: 16 },
-          (_, index) => index + 1
-        ).filter((week) => weekPatternAllows(session.weekPattern, week));
-
-    for (const week of weeks) {
+  let totalAttempted = 0;
+  for (const { session, providerId } of merged) {
+    const dates = sessionDates(session, halfWindows);
+    totalAttempted += dates.length;
+    for (const date of dates) {
       const event = sessionToEvent(
         session,
         providerId,
-        quarter.classesBeginDate,
-        week,
+        date,
         periodTimes
       );
       if (event) events.push(event);
@@ -337,16 +456,9 @@ export const deriveTimetableCalendarEvents = (
     .sort()
     .at(-1) ?? generatedAt;
 
-  // totalItems: count all session×week combinations that were attempted
-  let totalAttempted = 0;
-  for (const { session } of expanded) {
-    const weeks = session.weeks && session.weeks.length > 0
-      ? session.weeks.length
-      : [...Array(16).keys()].filter(
-          (w) => weekPatternAllows(session.weekPattern, w + 1)
-        ).length;
-    totalAttempted += weeks;
-  }
+  events.sort((left, right) =>
+    left.startAt.localeCompare(right.startAt) || left.id.localeCompare(right.id)
+  );
 
   return {
     feedId: "timetable-events",

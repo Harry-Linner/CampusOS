@@ -8,7 +8,7 @@ const validRequest = (): CampusDownloadRequest => ({
   title: "lecture.pdf",
   courseName: "Computer Networks",
   sourceId: "learning-platform",
-  semester: "2026-fall"
+  semester: "2025-2026春夏"
 });
 
 describe("campus download request policy", () => {
@@ -43,5 +43,12 @@ describe("campus download request policy", () => {
       url: "https://example.com/public.pdf",
       fallbackUrl: undefined
     })).toEqual({ kind: "public" });
+  });
+
+  it("rejects learning materials outside the development baseline semester", () => {
+    expect(() => classifyCampusDownloadRequest({
+      ...validRequest(),
+      semester: "2025-2026秋冬"
+    })).toThrow("开发阶段只允许下载 2025-2026 学年春夏学期课件");
   });
 });

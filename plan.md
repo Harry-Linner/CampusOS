@@ -23,13 +23,13 @@
 - `zju-undergraduate` 已通过核心不透明业务 Session 发布脱敏身份、真实课表和真实考试 capability；明确日期时间的考试进入工作台，相对考试周记录只保留原始语义，不强制换算日期。密码、Cookie、Session 和 ticket 不进入插件。
 - `zju-graduate` 已通过独立 CAS service、一次性 ticket 和主进程内存 token broker 发布研究生 profile、课表、考试和成绩 capability；固定业务操作、精确周次解析、单条容错和缓存局部回退已由外部 HTTP fixture 覆盖，缺少明确钟点的考试不会被补成全天或任意时段。
 - `zju-calendar-config` 已从浙江大学官方 HTTPS 页面读取学季边界和开课日，并动态驱动当前/下一学季状态；已内置 ZJU 紫金港标准节次时间表（14 节）作为默认配置数据，供课程日历事件展开使用。
-- `academic-timetable-events` 新增为官方无头功能插件，读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期，再按学季边界、周次、单双周和节次钟点展开为 `calendar.events@1` 课程事件；总览在休课期预览下一学期首次出现的同星期课程，且不改写真实课程日期。
+- `academic-timetable-events` 作为官方无头功能插件，读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
 - 设置页”诊断与测试”已连接真实刷新协调器和主进程持久化日志，支持查看、清空与自动脱敏 TXT 导出。
 - `calendar.events@1` 已实现多 provider collection contract；`academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 作为无头功能插件，按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。工作区只消费事件 feed，不再 import 具体连接器；未验证账号不能命中旧账号事件缓存。
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
-- `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
+- `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。开发期仍完整刷新上游目录，但工作区资料投影和新建下载任务只接受真实 `2025-2026 春/夏/春夏` 课程基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
 - 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability/网络权限代理。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不开放第三方 headless 生命周期。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
@@ -262,6 +262,7 @@ flowchart TD
 - [x] 教务课表自动同步（以 capability provenance 和统一课程事件持久化；不再使用独立 `courses` 表）
 - [x] 课件批量下载（含断点续传）
 - [x] 真实账号课件目录发现（学期、全部课程分页、逐课 activities/uploads）
+- [x] 开发期私有基线已捕获到 Git ignored 本地边界（2026-2027 秋冬课表；2025-2026 春夏课程/资料元数据）
 - [ ] 至少一个私有课件实体下载并按文件大小验收
 - [x] 日历周视图 + 冲突检测
 - [x] 桌面通知 + 提醒调度

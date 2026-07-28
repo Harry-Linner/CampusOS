@@ -325,6 +325,8 @@ Functional, emotional, social layers. Top jobs ranked.
 
 Things we couldn't resolve in this pass but that would change the plan.
 
+2026-07-28 开发证据：用户已授权以真实 `2026-2027 秋冬` 课表和 `2025-2026 春夏` 课程/资料作为本地正确性基线。此证据用于验证秋冬重复响应合并、半学期日期边界和资料学期投影，不能推广为其他账号、研究生或其他学年的验收结论。数据保留和脱敏范围见 [开发数据基线](docs/development-data-baselines.md)。
+
 - ZJU 教务系统当前的登录流程细节是什么？Cookie 生命周期、失败场景和降级方案如何记录清楚？— 如何解决：直接测试登录流程；查看 Celechron 源码了解现有方案；沉淀成调研文档
 - ZJU 学生日均在 PC 端 vs 手机端处理学术事务的时间占比？— 如何解决：CC98 发问卷（20 题）；内测用户的屏幕时间数据
 - CC98 Windows 客户端的技术选型和开发团队规模？— 如何解决：查看 GitHub 仓库；联系开发团队
