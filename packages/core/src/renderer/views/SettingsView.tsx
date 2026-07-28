@@ -19,7 +19,10 @@ interface SettingsViewProps {
 const reminderLeadOptions = [15, 60, 120];
 
 const formatVerificationTime = (value: string): string =>
-  new Date(value).toLocaleString("zh-CN", { hour12: false });
+  new Date(value).toLocaleString("zh-CN", {
+    hour12: false,
+    timeZone: "Asia/Shanghai"
+  });
 
 const formatPoints = (value: number): string =>
   new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
