@@ -59,6 +59,71 @@ const findQuarterForSeason = (
       quarter.season === season
   );
 
+const semesterNumberForSeason = (season: string): 1 | 2 | null => {
+  const seasonName = season.split("|").at(-1);
+  if (seasonName === "秋" || seasonName === "冬") return 1;
+  if (seasonName === "春" || seasonName === "夏") return 2;
+  return null;
+};
+
+const formatShanghaiDate = (dateTime: string): string => {
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(new Date(dateTime))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+interface SemesterWindow {
+  academicYearStart: number;
+  semesterNumber: 1 | 2;
+  startDate: string;
+  endDate: string;
+}
+
+const selectSemesterWindow = (
+  quarters: readonly AcademicCalendarQuarter[],
+  generatedAt: string
+): SemesterWindow | null => {
+  const bySemester = new Map<string, SemesterWindow>();
+  for (const quarter of quarters) {
+    const semesterNumber = semesterNumberForSeason(quarter.season);
+    if (semesterNumber === null) continue;
+    const key = `${quarter.academicYearStart}:${semesterNumber}`;
+    const existing = bySemester.get(key);
+    bySemester.set(key, {
+      academicYearStart: quarter.academicYearStart,
+      semesterNumber,
+      startDate: existing && existing.startDate < quarter.startDate
+        ? existing.startDate
+        : quarter.startDate,
+      endDate: existing && existing.endDate > quarter.endDate
+        ? existing.endDate
+        : quarter.endDate
+    });
+  }
+
+  const windows = [...bySemester.values()].sort((left, right) =>
+    left.startDate.localeCompare(right.startDate)
+  );
+  if (windows.length === 0) return null;
+  const today = formatShanghaiDate(generatedAt);
+
+  // Celechron lib/model/scholar.dart:97-110 and scholar_controller.dart:96-110
+  // expose one Semester. CampusOS mechanically groups ZJU's two quarter
+  // records into that Semester because the capability stores 秋/冬 and 春/夏 separately.
+  return windows.find(
+    (window) => window.startDate <= today && today <= window.endDate
+  ) ?? windows.find((window) => window.startDate > today) ?? windows.at(-1) ?? null;
+};
+
 const resolvePeriodTime = (
   period: number,
   periodTimes: readonly PeriodTimeRecord[]
@@ -197,13 +262,25 @@ export const deriveTimetableCalendarEvents = (
     events: []
   };
 
-  // Flatten all sessions with their provider context
+  const selectedSemester = selectSemesterWindow(
+    calendarConfig.quarters,
+    generatedAt
+  );
+
+  // Flatten the selected semester's sessions with their provider context.
   const expanded: ExpandedSession[] = [];
   for (const record of timetableRecords) {
     const terms = record.data?.terms ?? [];
     for (const term of terms) {
       const seasonParts = term.season.split("|");
       const season = seasonParts[1] ?? term.season;
+      if (
+        selectedSemester === null ||
+        term.academicYearStart !== selectedSemester.academicYearStart ||
+        semesterNumberForSeason(term.season) !== selectedSemester.semesterNumber
+      ) {
+        continue;
+      }
       for (const session of term.sessions) {
         expanded.push({
           session,

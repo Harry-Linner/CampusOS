@@ -9,7 +9,8 @@ import {
   findCalendarEventRecords,
   mergeAcademicCalendarIntoWorkspace,
   mergeCalendarEventsIntoWorkspace,
-  mergeLearningMaterialsIntoWorkspace
+  mergeLearningMaterialsIntoWorkspace,
+  pruneWorkspaceDeadlinesBeforeToday
 } from "./campusWorkspaceCapabilities";
 
 const createSnapshot = (): CampusWorkspaceSnapshot => ({
@@ -342,6 +343,99 @@ describe("workspace capability integration", () => {
         )
       })
     );
+  });
+
+  it("excludes deadlines before today while retaining deadlines from today", () => {
+    const boundaryRecord: CapabilityRecord<CalendarEventsData> = {
+      ...learningEventsRecord,
+      data: {
+        ...learningEventsData,
+        totalItems: 2,
+        omittedItems: 0,
+        events: [
+          {
+            ...learningEventsData.events[0],
+            id: "assignment-yesterday",
+            originId: "assignment-yesterday",
+            startAt: "2026-07-18T23:00:00+08:00"
+          },
+          {
+            ...learningEventsData.events[0],
+            id: "assignment-today",
+            originId: "assignment-today",
+            startAt: "2026-07-19T08:00:00+08:00"
+          }
+        ]
+      }
+    };
+
+    const snapshot = mergeCalendarEventsIntoWorkspace(
+      createSnapshot(),
+      [boundaryRecord],
+      [15]
+    );
+
+    expect(
+      snapshot.deadlines
+        .filter((deadline) => deadline.sourceId === "learning-platform")
+        .map((deadline) => deadline.id)
+    ).toEqual(["assignment-today"]);
+  });
+
+  it("prunes expired deadlines and reminders from a hydrated snapshot", () => {
+    const staleSnapshot = createSnapshot();
+    staleSnapshot.deadlines = [
+      {
+        id: "expired",
+        title: "已过期",
+        dueAt: "2026-07-27T23:59:00+08:00",
+        sourceId: "learning-platform",
+        kind: "assignment",
+        priority: "important"
+      },
+      {
+        id: "today",
+        title: "今天截止",
+        dueAt: "2026-07-28T08:00:00+08:00",
+        sourceId: "learning-platform",
+        kind: "assignment",
+        priority: "important"
+      },
+      {
+        id: "future",
+        title: "未来截止",
+        dueAt: "2026-07-29T08:00:00+08:00",
+        sourceId: "learning-platform",
+        kind: "assignment",
+        priority: "important"
+      }
+    ];
+    staleSnapshot.reminders = [
+      {
+        id: "expired-lead-15",
+        title: "旧提醒",
+        kind: "deadline",
+        sourceId: "learning-platform",
+        fireAt: "2026-07-27T15:44:00.000Z",
+        eventStartAt: "2026-07-27T15:59:00.000Z",
+        leadMinutes: 15
+      }
+    ];
+
+    const snapshot = pruneWorkspaceDeadlinesBeforeToday(
+      staleSnapshot,
+      "2026-07-28T04:00:00.000Z",
+      [15]
+    );
+
+    expect(snapshot.deadlines.map((deadline) => deadline.id)).toEqual([
+      "today",
+      "future"
+    ]);
+    expect(snapshot.reminders.map((reminder) => reminder.id)).toEqual([
+      "future-lead-15"
+    ]);
+    expect(snapshot.summary.remindersQueued).toBe(1);
   });
 
   it("replaces a changed assignment deadline and rebuilds its reminder", () => {

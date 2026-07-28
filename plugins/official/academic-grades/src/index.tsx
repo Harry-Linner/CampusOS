@@ -117,7 +117,7 @@ export const Component = ({
           <h1>学业成绩</h1>
         </div>
         <div className="grade-header-actions">
-          <label className="setting-switch" title={privacyMask ? "点击显示原始成绩" : "点击隐藏原始成绩"}>
+          <label className="setting-switch" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>
             <input
               type="checkbox"
               checked={privacyMask}
@@ -177,7 +177,9 @@ export const Component = ({
             <article className="grade-summary-card">
               <span>加权绩点 · {gpaScale} 制</span>
               <strong>
-                {summary.weightedGradePoint === null
+                {privacyMask
+                  ? "***"
+                  : summary.weightedGradePoint === null
                   ? "暂无"
                   : numberFormatter.format(summary.weightedGradePoint)}
               </strong>
@@ -185,7 +187,9 @@ export const Component = ({
             <article className="grade-summary-card">
               <span>主修加权绩点</span>
               <strong>
-                {summary.majorWeightedGradePoint === null
+                {privacyMask
+                  ? "***"
+                  : summary.majorWeightedGradePoint === null
                   ? "暂无"
                   : numberFormatter.format(summary.majorWeightedGradePoint)}
               </strong>
@@ -246,7 +250,9 @@ export const Component = ({
                           : (grade.originalScore || "未返回成绩")}
                       </strong>
                       <span className="meta-line">
-                        {grade.gradePoint === null
+                        {privacyMask
+                          ? "***"
+                          : grade.gradePoint === null
                           ? "绩点未返回"
                           : `绩点 ${numberFormatter.format(grade.gradePoint)}`}
                       </span>

@@ -68,7 +68,7 @@ describe("AcademicGradesView", () => {
     }));
 
     expect(await screen.findByText("程序设计")).toBeDefined();
-    expect(screen.getAllByText("3.89")).toHaveLength(2);
+    expect(screen.getByText("加权绩点 · 5.0 制")).toBeDefined();
     expect(screen.getByText("实时获取")).toBeDefined();
     expect(readCalls).toEqual(["academic.grades@1"]);
 
@@ -80,7 +80,7 @@ describe("AcademicGradesView", () => {
     });
   });
 
-  it("masks original scores when privacy toggle is on by default", async () => {
+  it("masks scores and grade points when privacy toggle is on by default", async () => {
     const capabilities: PluginCapabilityClient = {
       read: async <T>() =>
         [liveRecord] as unknown as CapabilityRecord<T>[]
@@ -95,19 +95,19 @@ describe("AcademicGradesView", () => {
     }));
 
     await screen.findByText("程序设计");
-    // Privacy mask is on by default — scores hidden
-    expect(screen.getAllByText("***")).toHaveLength(2);
-    // Grade points still visible
-    expect(screen.getByText("绩点 4.2")).toBeDefined();
-    expect(screen.getByText("绩点 3.7")).toBeDefined();
-    // Original scores hidden
+    expect(screen.getAllByText("***")).toHaveLength(6);
     expect(screen.queryByText("92")).toBeNull();
     expect(screen.queryByText("85")).toBeNull();
+    expect(screen.queryByText("绩点 4.2")).toBeNull();
+    expect(screen.queryByText("绩点 3.7")).toBeNull();
+    expect(screen.queryByText("3.89")).toBeNull();
 
-    // Toggle privacy off
     fireEvent.click(screen.getByLabelText("隐私遮罩"));
     expect(screen.getByText("92")).toBeDefined();
     expect(screen.getByText("85")).toBeDefined();
+    expect(screen.getByText("绩点 4.2")).toBeDefined();
+    expect(screen.getByText("绩点 3.7")).toBeDefined();
+    expect(screen.getAllByText("3.89")).toHaveLength(2);
     expect(screen.queryByText("***")).toBeNull();
   });
 });

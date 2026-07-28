@@ -276,10 +276,14 @@ const toCourse = (event: CalendarEventRecord): CampusCourseSession | null => {
 
 const toDeadline = (
   event: CalendarEventRecord,
-  now: number
+  now: number,
+  today: string
 ): CampusDeadline | null => {
   const kind = deadlineKindForEvent(event.kind);
   if (!kind || !isAbsoluteDateTime(event.startAt)) return null;
+  // Celechron scholar_controller.dart:130-143 removes expired todos before
+  // projection. CampusOS applies the requested Shanghai calendar-day boundary.
+  if (formatShanghaiDate(event.startAt) < today) return null;
   const remaining = Date.parse(event.startAt) - now;
   return {
     id: event.id,
@@ -336,6 +340,50 @@ const sortDeadlines = (deadlines: CampusDeadline[]): CampusDeadline[] =>
     (left, right) => Date.parse(left.dueAt) - Date.parse(right.dueAt)
   );
 
+export const pruneWorkspaceDeadlinesBeforeToday = (
+  snapshot: CampusWorkspaceSnapshot,
+  nowIso: string,
+  reminderLeadMinutes: number[]
+): CampusWorkspaceSnapshot => {
+  const today = formatShanghaiDate(nowIso);
+  const now = Date.parse(nowIso);
+  const deadlines = snapshot.deadlines.filter(
+    (deadline) =>
+      isAbsoluteDateTime(deadline.dueAt) &&
+      formatShanghaiDate(deadline.dueAt) >= today
+  );
+  const reminders = buildReminderQueue(
+    snapshot.courses,
+    deadlines,
+    reminderLeadMinutes,
+    nowIso
+  );
+  const deadlinesDueSoon = deadlines.filter((deadline) => {
+    const remaining = Date.parse(deadline.dueAt) - now;
+    return remaining >= 0 && remaining <= 36 * HOUR_IN_MS;
+  }).length;
+
+  if (
+    deadlines.length === snapshot.deadlines.length &&
+    JSON.stringify(reminders) === JSON.stringify(snapshot.reminders) &&
+    snapshot.summary.remindersQueued === reminders.length &&
+    snapshot.summary.deadlinesDueSoon === deadlinesDueSoon
+  ) {
+    return snapshot;
+  }
+
+  return {
+    ...snapshot,
+    deadlines,
+    reminders,
+    summary: {
+      ...snapshot.summary,
+      remindersQueued: reminders.length,
+      deadlinesDueSoon
+    }
+  };
+};
+
 export const mergeCalendarEventsIntoWorkspace = (
   snapshot: CampusWorkspaceSnapshot,
   records: CapabilityRecord<CalendarEventsData>[],
@@ -362,6 +410,7 @@ export const mergeCalendarEventsIntoWorkspace = (
   let deadlines = [...snapshot.deadlines];
   const sourceStates = [...snapshot.sourceStates];
   const now = Date.parse(snapshot.generatedAt);
+  const today = formatShanghaiDate(snapshot.generatedAt);
 
   for (const [sourceId, sourceRecords] of recordsBySource) {
     const supportedKinds = new Set(
@@ -401,7 +450,7 @@ export const mergeCalendarEventsIntoWorkspace = (
       .map(toCourse)
       .filter((course): course is CampusCourseSession => course !== null);
     const newDeadlines = events
-      .map((event) => toDeadline(event, now))
+      .map((event) => toDeadline(event, now, today))
       .filter((deadline): deadline is CampusDeadline => deadline !== null);
     const acceptedEventCount = newCourses.length + newDeadlines.length;
     const invalidEventCount = events.length - acceptedEventCount;
@@ -479,7 +528,6 @@ export const mergeCalendarEventsIntoWorkspace = (
     reminderLeadMinutes,
     snapshot.generatedAt
   );
-  const today = formatShanghaiDate(snapshot.generatedAt);
   const todayCourses = courses.filter(
     (course) => formatShanghaiDate(course.startAt) === today
   );

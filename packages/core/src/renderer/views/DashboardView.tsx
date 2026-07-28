@@ -23,6 +23,18 @@ const pageDateFormatter = new Intl.DateTimeFormat("zh-CN", {
   weekday: "long"
 });
 
+const weekdayFormatter = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: "Asia/Shanghai",
+  weekday: "long"
+});
+
+const shanghaiDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+});
+
 const priorityLabelMap: Record<CampusPriority, string> = {
   routine: "常规",
   important: "重要",
@@ -65,6 +77,43 @@ const sortCourses = (courses: CampusCourseSession[]): CampusCourseSession[] =>
   [...courses].sort(
     (left, right) => Date.parse(left.startAt) - Date.parse(right.startAt)
   );
+
+const toShanghaiDateKey = (dateTime: string): string => {
+  const values = Object.fromEntries(
+    shanghaiDateFormatter
+      .formatToParts(new Date(dateTime))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const weekdayIndex = (dateKey: string): number =>
+  new Date(`${dateKey}T00:00:00Z`).getUTCDay();
+
+const selectUpcomingWeekdayPreview = (
+  courses: CampusCourseSession[],
+  generatedAt: string
+): CampusCourseSession[] => {
+  const now = Date.parse(generatedAt);
+  const futureCourses = sortCourses(courses).filter(
+    (course) => Date.parse(course.startAt) > now
+  );
+  const currentWeekday = weekdayIndex(toShanghaiDateKey(generatedAt));
+  const matchingCourses = futureCourses.filter(
+    (course) => weekdayIndex(toShanghaiDateKey(course.startAt)) === currentWeekday
+  );
+  const previewDate = matchingCourses[0]
+    ? toShanghaiDateKey(matchingCourses[0].startAt)
+    : null;
+  if (previewDate === null) return [];
+
+  // Use the first real occurrence of today's weekday in the upcoming term;
+  // late-week term starts therefore cannot point the preview before classes begin.
+  return matchingCourses.filter(
+    (course) => toShanghaiDateKey(course.startAt) === previewDate
+  );
+};
 
 const sortDeadlines = (deadlines: CampusDeadline[]): CampusDeadline[] =>
   [...deadlines].sort(
@@ -112,9 +161,22 @@ export const DashboardView = ({
   }
 
   const now = Date.parse(snapshot.generatedAt);
-  const courses = sortCourses(snapshot.todayCourses);
-  const courseStates = getCourseStates(courses, now);
+  const isUpcomingPreview = snapshot.term.phase === "upcoming";
+  const courses = sortCourses(
+    isUpcomingPreview
+      ? selectUpcomingWeekdayPreview(snapshot.courses, snapshot.generatedAt)
+      : snapshot.todayCourses
+  );
+  const courseStates = isUpcomingPreview
+    ? new Map<string, CourseState>()
+    : getCourseStates(courses, now);
   const deadlines = sortDeadlines(snapshot.deadlines);
+  const weekdayLabel = weekdayFormatter
+    .format(new Date(snapshot.generatedAt))
+    .replace("星期", "周");
+  const courseHeading = isUpcomingPreview
+    ? `下学期${weekdayLabel}预览`
+    : "今日课程";
 
   return (
     <section className="page-shell">
@@ -142,12 +204,14 @@ export const DashboardView = ({
       <div className="dashboard-layout">
         <section className="content-section schedule-section" aria-labelledby="today-heading">
           <header className="section-heading">
-            <h2 id="today-heading">今日课程</h2>
+            <h2 id="today-heading">{courseHeading}</h2>
             <span>{courses.length} 节课</span>
           </header>
 
           {courses.length === 0 ? (
-            <div className="quiet-empty-state quiet-empty-compact">今日没有课程</div>
+            <div className="quiet-empty-state quiet-empty-compact">
+              {isUpcomingPreview ? `${courseHeading}没有课程` : "今日没有课程"}
+            </div>
           ) : (
             <ol className="course-timeline">
               {courses.map((course) => {

@@ -96,6 +96,71 @@ describe("academic timetable events", () => {
     expect(week2Event.startAt).toBe("2026-09-21T08:00:00+08:00");
   });
 
+  it("projects only the next autumn-winter semester outside teaching periods", () => {
+    const historicalSession = {
+      ...timetableRecord.data!.terms[0].sessions[0],
+      sourceId: "historical-session",
+      courseName: "历史学期课程"
+    };
+    const autumnSession = {
+      ...timetableRecord.data!.terms[0].sessions[0],
+      sourceId: "autumn-session",
+      courseName: "秋学期课程"
+    };
+    const winterSession = {
+      ...timetableRecord.data!.terms[0].sessions[0],
+      sourceId: "winter-session",
+      courseName: "冬学期课程"
+    };
+    const multiSemesterRecord: CapabilityRecord<AcademicTimetableData> = {
+      ...timetableRecord,
+      data: {
+        terms: [
+          {
+            academicYearStart: 2025,
+            season: "2|夏",
+            state: "live",
+            sessions: [historicalSession]
+          },
+          {
+            academicYearStart: 2026,
+            season: "1|秋",
+            state: "live",
+            sessions: [autumnSession]
+          },
+          {
+            academicYearStart: 2026,
+            season: "1|冬",
+            state: "live",
+            sessions: [winterSession]
+          }
+        ]
+      }
+    };
+    const multiSemesterCalendar: AcademicCalendarConfigData = {
+      ...calendarConfig,
+      quarters: [
+        {
+          academicYearStart: 2025,
+          season: "2|夏",
+          startDate: "2026-04-27",
+          classesBeginDate: "2026-04-27",
+          endDate: "2026-07-05"
+        },
+        ...calendarConfig.quarters
+      ]
+    };
+
+    const result = deriveTimetableCalendarEvents(
+      [multiSemesterRecord],
+      multiSemesterCalendar,
+      "2026-07-28T04:00:00.000Z"
+    );
+    const titles = new Set(result.events.map((event) => event.title));
+
+    expect(titles).toEqual(new Set(["秋学期课程", "冬学期课程"]));
+  });
+
   it("returns empty when no calendar config is available", () => {
     const result = deriveTimetableCalendarEvents(
       [timetableRecord],

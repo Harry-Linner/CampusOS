@@ -29,7 +29,8 @@ import {
   findLearningMaterialsRecord,
   mergeAcademicCalendarIntoWorkspace,
   mergeCalendarEventsIntoWorkspace,
-  mergeLearningMaterialsIntoWorkspace
+  mergeLearningMaterialsIntoWorkspace,
+  pruneWorkspaceDeadlinesBeforeToday
 } from "./campusWorkspaceCapabilities";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
@@ -189,16 +190,25 @@ const buildGeneratedRecord = async (
 
 export const hydrateCampusWorkspace =
   async (): Promise<CampusWorkspaceRecord> => {
-    const stored = await getWorkspaceSnapshotStore().load();
+    const snapshotStore = getWorkspaceSnapshotStore();
+    const stored = await snapshotStore.load();
 
     if (stored) {
       const reminderSettings = await readReminderSettingsRecord();
-      scheduleWorkspaceReminders(stored.snapshot, reminderSettings);
+      const snapshot = pruneWorkspaceDeadlinesBeforeToday(
+        stored.snapshot,
+        new Date().toISOString(),
+        reminderSettings.leadMinutes
+      );
+      const hydrated = snapshot === stored.snapshot
+        ? stored
+        : await snapshotStore.save(snapshot);
+      scheduleWorkspaceReminders(hydrated.snapshot, reminderSettings);
 
       return {
-        snapshot: stored.snapshot,
-        savedAt: stored.savedAt,
-        storagePath: stored.storagePath,
+        snapshot: hydrated.snapshot,
+        savedAt: hydrated.savedAt,
+        storagePath: hydrated.storagePath,
         hydratedFrom: "disk"
       };
     }

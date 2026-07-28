@@ -28,9 +28,14 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 ### 总览
 
 - Show the date and term context without KPI cards, sync metrics, or descriptive copy.
-- Show every current-day course in chronological order. The current or next course receives a visual timeline emphasis, not an additional summary card.
-- Show deadlines only in the to-do list. Reminder scheduler entries never duplicate a deadline as a second to-do.
+- Show every current-day course in chronological order. When the official calendar marks the next semester as upcoming, show its first real occurrence of the matching weekday as an explicitly labeled preview without changing the stored course dates. The current or next real course receives a visual timeline emphasis, not an additional summary card.
+- Show deadlines only in the to-do list, excluding any deadline whose Asia/Shanghai calendar date is before today. Reminder scheduler entries never duplicate a deadline as a second to-do.
 - Use composed loading skeletons and concise empty states.
+
+### 学业成绩
+
+- Privacy masking is on by default and hides original course scores, per-course grade points, weighted GPA, and major weighted GPA together.
+- Turning privacy masking off reveals all four value groups in the existing layout; credit totals and data-source state remain visible in either mode.
 
 ### 日历
 
