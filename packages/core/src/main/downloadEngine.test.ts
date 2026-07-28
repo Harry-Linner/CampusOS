@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -190,5 +190,164 @@ describe("DownloadEngine", () => {
     expect(engine.allTasks[0]?.status).toBe("ready");
     await expect(readFile(targetPath!, "utf8")).resolves.toBe(preview);
     expect(resolveResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it("restarts an active download when it is resumed before abort cleanup finishes", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-pause-resume-test-"));
+    temporaryDirectories.push(storageRoot);
+    let releaseFirstRequest: (() => void) | null = null;
+    const firstRequestStarted = new Promise<void>((resolve) => {
+      releaseFirstRequest = resolve;
+    });
+    let confirmAbortObserved: (() => void) | null = null;
+    const abortObserved = new Promise<void>((resolve) => {
+      confirmAbortObserved = resolve;
+    });
+    let releaseAbortCleanup!: () => void;
+    const abortCleanupReleased = new Promise<void>((resolve) => {
+      releaseAbortCleanup = resolve;
+    });
+    let attempt = 0;
+    const resolveResponse = vi.fn(async ({ signal }: { signal: AbortSignal }) => {
+      attempt += 1;
+      if (attempt === 1) {
+        releaseFirstRequest?.();
+        await new Promise<void>((resolve) => {
+          signal.addEventListener("abort", () => {
+            confirmAbortObserved?.();
+            resolve();
+          }, { once: true });
+        });
+        await abortCleanupReleased;
+        throw new DOMException("Aborted", "AbortError");
+      }
+      return new Response("resumed", {
+        status: 200,
+        headers: { "content-length": "7" }
+      });
+    });
+    const engine = new DownloadEngine({
+      downloadRoot: join(storageRoot, "materials"),
+      persistencePath: join(storageRoot, "queue.json"),
+      maxConcurrent: 1,
+      queuePersistence: {
+        load: async () => [],
+        save: async () => undefined
+      },
+      resolveResponse
+    });
+
+    const item = await engine.enqueue({
+      url: "https://example.com/resumable.bin",
+      title: "resumable.bin",
+      courseName: "Systems",
+      sourceId: "academic-affairs",
+      semester: "2026-fall"
+    });
+    await firstRequestStarted;
+    await expect(engine.pause(item.id)).resolves.toBe(true);
+    await abortObserved;
+    await expect(engine.resume(item.id)).resolves.toBe(true);
+    releaseAbortCleanup();
+    await engine.waitForIdle();
+
+    expect(resolveResponse).toHaveBeenCalledTimes(2);
+    expect(engine.allTasks[0]?.status).toBe("ready");
+    await expect(readFile(engine.allTasks[0]!.targetPath, "utf8")).resolves.toBe("resumed");
+  });
+
+  it("resumes an interrupted persisted download from its partial file after restart", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-restart-resume-test-"));
+    temporaryDirectories.push(storageRoot);
+    const targetPath = join(storageRoot, "materials", "2026-fall", "Systems", "restart.bin");
+    const temporaryPath = `${targetPath}.part`;
+    await mkdir(join(targetPath, ".."), { recursive: true });
+    await writeFile(temporaryPath, "partial", "utf8");
+    const persistedItem = {
+      id: "restart-task",
+      url: "https://example.com/restart.bin",
+      expectedBytes: 11,
+      title: "restart.bin",
+      courseName: "Systems",
+      sourceId: "academic-affairs" as const,
+      semester: "2026-fall",
+      targetPath,
+      temporaryPath,
+      totalBytes: 11,
+      downloadedBytes: 4,
+      status: "syncing" as const,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:01:00.000Z"
+    };
+    const save = vi.fn(async () => undefined);
+    const resolveResponse = vi.fn(async ({ headers }: { headers: Record<string, string> }) => {
+      expect(headers.Range).toBe("bytes=7-");
+      return new Response("-end", {
+        status: 206,
+        headers: { "content-length": "4" }
+      });
+    });
+    const engine = new DownloadEngine({
+      downloadRoot: join(storageRoot, "materials"),
+      persistencePath: join(storageRoot, "queue.json"),
+      maxConcurrent: 1,
+      queuePersistence: {
+        load: async () => [persistedItem],
+        save
+      },
+      resolveResponse
+    });
+
+    await engine.loadPersisted();
+    await engine.waitForIdle();
+
+    expect(resolveResponse).toHaveBeenCalledTimes(1);
+    expect(engine.allTasks[0]?.status).toBe("ready");
+    await expect(readFile(targetPath, "utf8")).resolves.toBe("partial-end");
+    expect(save).toHaveBeenCalled();
+  });
+
+  it("exposes a failed download reason in the renderer task summary", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-download-error-test-"));
+    temporaryDirectories.push(storageRoot);
+    let attempt = 0;
+    const engine = new DownloadEngine({
+      downloadRoot: join(storageRoot, "materials"),
+      persistencePath: join(storageRoot, "queue.json"),
+      maxConcurrent: 1,
+      resolveResponse: async () => {
+        attempt += 1;
+        return attempt === 1
+          ? new Response(null, { status: 503 })
+          : new Response("retried", {
+              status: 200,
+              headers: { "content-length": "7" }
+            });
+      }
+    });
+
+    await engine.enqueue({
+      url: "https://example.com/unavailable.bin",
+      title: "unavailable.bin",
+      courseName: "Systems",
+      sourceId: "academic-affairs",
+      semester: "2026-fall"
+    });
+    await engine.waitForIdle();
+
+    expect(engine.getSummary()).toEqual([
+      expect.objectContaining({
+        status: "failed",
+        failureMessage: "下载失败：HTTP 503"
+      })
+    ]);
+    const taskId = engine.allTasks[0]!.id;
+    await expect(engine.resume(taskId)).resolves.toBe(true);
+    await engine.waitForIdle();
+    expect(engine.getSummary()[0]).toEqual(expect.objectContaining({
+      status: "ready",
+      progress: 100,
+      failureMessage: undefined
+    }));
   });
 });

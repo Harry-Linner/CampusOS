@@ -32,6 +32,7 @@ const QUALITY_DEVELOPMENT_CONTEXT_URL =
 const QUALITY_DEVELOPMENT_PROFILE_URL =
   "https://sztz.zju.edu.cn/dekt/student/home/getMyInfo";
 const DEFAULT_TIMEOUT_MS = 8_000;
+const LEARNING_API_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_LENGTH = 1_048_576;
 const SSO_PROCESS_COOKIE_LIFETIME_MS = 2 * 60 * 1_000;
 
@@ -485,6 +486,18 @@ export const createFetchZjuAuthTransport = (
     };
   };
 };
+
+export const createFetchZjuLearningDownloadTransport = (
+  fetchImplementation: typeof fetch = globalThis.fetch
+): ZjuLearningDownloadTransport => async (request) =>
+  fetchImplementation(request.url, {
+    method: request.method,
+    headers: request.headers,
+    signal: request.signal,
+    // zju-learning-assistant src-tauri/src/zju_assist.rs:430-479 uses
+    // reqwest's redirect-following client for the authenticated blob request.
+    redirect: "follow"
+  });
 
 export const createNodeHttpsZjuAuthTransport = (): ZjuAuthTransport => {
   const agent = new HttpsAgent({ keepAlive: true });
@@ -997,13 +1010,8 @@ class ZjuUnifiedAuthClient {
 
   constructor(options: ZjuUnifiedAuthClientOptions = {}) {
     this.#transport = options.transport ?? createNodeHttpsZjuAuthTransport();
-    this.#learningDownloadTransport = options.learningDownloadTransport ?? (async (request) =>
-      fetch(request.url, {
-        method: request.method,
-        headers: request.headers,
-        signal: request.signal,
-        redirect: "manual"
-      }));
+    this.#learningDownloadTransport = options.learningDownloadTransport ??
+      createFetchZjuLearningDownloadTransport();
     this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.#now = options.now ?? (() => new Date());
   }
@@ -1016,6 +1024,7 @@ class ZjuUnifiedAuthClient {
       cookie?: string | null;
       headers?: Record<string, string>;
       minimalHeaders?: boolean;
+      timeoutMs?: number;
     } = {}
   ): Promise<ZjuAuthHttpResponse> {
     const controller = new AbortController();
@@ -1046,7 +1055,7 @@ class ZjuUnifiedAuthClient {
             "连接统一认证服务超时，请检查网络后重试。"
           )
         );
-      }, this.#timeoutMs);
+      }, options.timeoutMs ?? this.#timeoutMs);
     });
     timeout?.unref?.();
 
@@ -1312,7 +1321,10 @@ class ZjuUnifiedAuthClient {
     const response = await this.#request("GET", url, {
       cookie: session.header(url),
       minimalHeaders: true,
-      headers: {}
+      headers: {},
+      // zju-learning-assistant uses reqwest's 30 second default timeout for
+      // course, activity and todo data requests.
+      timeoutMs: LEARNING_API_TIMEOUT_MS
     });
     session.store(
       url,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ZjuUnifiedAuthError,
+  createFetchZjuLearningDownloadTransport,
   createNodeHttpsZjuAuthTransport,
   createZjuUnifiedAuthClient,
   type ZjuAuthHttpRequest,
@@ -435,6 +436,38 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(learningLoginAttempts).toBe(2);
   });
 
+  it("uses the zju-learning-assistant 30 second timeout for learning API data", async () => {
+    vi.useFakeTimers();
+    try {
+      const routed = createAuthenticatedUndergraduateTransport();
+      let apiSignal: AbortSignal | null = null;
+      const transport: ZjuAuthTransport = async (request) => {
+        if (new URL(request.url).pathname === "/api/todos") {
+          apiSignal = request.signal;
+          return new Promise<ZjuAuthHttpResponse>(() => undefined);
+        }
+        return routed.transport(request);
+      };
+      const client = createZjuUnifiedAuthClient({ transport, timeoutMs: 10 });
+      const operation = client.requestLearningService(
+        { username: "3240100001", password: "real password" },
+        { operation: "todos" }
+      ).then(
+        () => null,
+        (error: unknown) => error
+      );
+
+      await vi.advanceTimersByTimeAsync(10);
+      expect(apiSignal).not.toBeNull();
+      expect(apiSignal!.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(29_990);
+      await expect(operation).resolves.toMatchObject({ code: "timeout" });
+      expect(apiSignal!.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("downloads a learning upload through the authenticated reference endpoint", async () => {
     const routed = createAuthenticatedUndergraduateTransport();
     const downloadRequests: Array<{
@@ -469,6 +502,27 @@ describe("ZjuUnifiedAuthClient", () => {
       })
     }]);
     expect(downloadRequests[0]?.headers.Cookie).not.toContain("iPlanetDirectoryPro");
+  });
+
+  it("follows the authenticated file endpoint redirect like zju-learning-assistant", async () => {
+    const fetchImplementation = vi.fn(async () => new Response("courseware", {
+      status: 200
+    }));
+    const transport = createFetchZjuLearningDownloadTransport(
+      fetchImplementation as unknown as typeof fetch
+    );
+
+    await transport({
+      method: "GET",
+      url: "https://courses.zju.edu.cn/api/uploads/reference/929150/blob",
+      headers: { Cookie: "session=learning-session" },
+      signal: new AbortController().signal
+    });
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "https://courses.zju.edu.cn/api/uploads/reference/929150/blob",
+      expect.objectContaining({ redirect: "follow" })
+    );
   });
 
   it("falls back to the upload blob only after the reference blob fails", async () => {

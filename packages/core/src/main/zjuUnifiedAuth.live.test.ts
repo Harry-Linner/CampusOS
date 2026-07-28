@@ -1,3 +1,5 @@
+import { stat } from "node:fs/promises";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ZjuUnifiedAuthError,
@@ -6,6 +8,8 @@ import {
   type ZjuAuthTransport
 } from "./zjuUnifiedAuth";
 import { createTimetableQueries } from "@campusos/plugin-zju-undergraduate/main";
+import { DownloadEngine } from "./downloadEngine";
+import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
 const liveVerificationRequested =
   process.env.npm_lifecycle_event === "verify:zju-auth";
@@ -34,6 +38,7 @@ describe("ZJU unified authentication live verification", () => {
       const transport = createNodeHttpsZjuAuthTransport();
       const safePath = (pathname: string): string => pathname
         .replace(/;jsessionid=[^/;]+/gi, ";jsessionid=<redacted>")
+        .replace(/\/uploads\/reference\/\d+(?=\/|$)/g, "/uploads/reference/<redacted>")
         .replace(/\/(courses|uploads)\/\d+(?=\/|$)/g, "/$1/<redacted>");
       const tracedTransport: ZjuAuthTransport = async (request) => {
         const target = new URL(request.url);
@@ -198,12 +203,29 @@ describe("ZJU unified authentication live verification", () => {
           { operation: "semesters" }
         );
         const semestersPayload = JSON.parse(semestersResponse.body) as unknown;
-        const semestersStructureValid =
-          typeof semestersPayload === "object" &&
+        const semestersRecord = typeof semestersPayload === "object" &&
           semestersPayload !== null &&
-          "semesters" in semestersPayload &&
-          Array.isArray(semestersPayload.semesters);
-        expect(semestersStructureValid).toBe(true);
+          !Array.isArray(semestersPayload)
+            ? semestersPayload as Record<string, unknown>
+            : null;
+        const semesters = Array.isArray(semestersRecord?.semesters)
+          ? semestersRecord.semesters
+          : null;
+        expect(semesters).not.toBeNull();
+        const semesterNameById = new Map<string, string>();
+        for (const semester of semesters!) {
+          const record = typeof semester === "object" &&
+            semester !== null &&
+            !Array.isArray(semester)
+              ? semester as Record<string, unknown>
+              : null;
+          const id = record?.id;
+          const name = record?.name;
+          if ((typeof id === "string" || typeof id === "number") &&
+            typeof name === "string") {
+            semesterNameById.set(String(id), name);
+          }
+        }
 
         const readCoursesPage = async (page: number) => {
           currentStage = `learning-courses-page-${page}`;
@@ -235,7 +257,7 @@ describe("ZJU unified authentication live verification", () => {
           firstCoursesPage.courses,
           ...remainingCoursePages.map((page) => page.courses)
         ].flat();
-        const courseIds = courses.map((course) => {
+        const courseDescriptors = courses.map((course) => {
           const record = typeof course === "object" &&
             course !== null &&
             !Array.isArray(course)
@@ -246,13 +268,29 @@ describe("ZJU unified authentication live verification", () => {
             (typeof id === "number" && Number.isSafeInteger(id) && id > 0) ||
             (typeof id === "string" && /^[1-9]\d*$/.test(id))
           ).toBe(true);
-          return String(id);
+          const name = record?.name;
+          const semesterId = record?.semester_id;
+          expect(typeof name).toBe("string");
+          expect(typeof semesterId === "string" || typeof semesterId === "number").toBe(true);
+          return {
+            id: String(id),
+            name: String(name),
+            semesterName: semesterNameById.get(String(semesterId)) ?? ""
+          };
         });
-        await Promise.all(courseIds.map(async (courseId, index) => {
+        let downloadCandidate: {
+          uploadId: string;
+          referenceId: string;
+          fileName: string;
+          courseName: string;
+          semesterName: string;
+          expectedBytes?: number;
+        } | null = null;
+        await Promise.all(courseDescriptors.map(async (course, index) => {
           const operation = `learning-course-activities-${index + 1}`;
           const response = await client.requestLearningService(
             { username, password },
-            { operation: "course-activities", courseId }
+            { operation: "course-activities", courseId: course.id }
           ).catch((error: unknown) => {
             currentStage = operation;
             throw error;
@@ -286,9 +324,110 @@ describe("ZJU unified authentication live verification", () => {
                 uploadRecord?.size === null ||
                 (typeof uploadRecord.size === "number" && uploadRecord.size >= 0)
               ).toBe(true);
+              if (!downloadCandidate &&
+                isDevelopmentCoursewareSemester(course.semesterName) &&
+                uploadRecord &&
+                (typeof uploadRecord.id === "string" || typeof uploadRecord.id === "number") &&
+                (typeof uploadRecord.reference_id === "string" ||
+                  typeof uploadRecord.reference_id === "number") &&
+                typeof uploadRecord.name === "string") {
+                downloadCandidate = {
+                  uploadId: String(uploadRecord.id),
+                  referenceId: String(uploadRecord.reference_id),
+                  fileName: uploadRecord.name,
+                  courseName: course.name,
+                  semesterName: course.semesterName,
+                  ...(typeof uploadRecord.size === "number" && uploadRecord.size >= 0
+                    ? { expectedBytes: uploadRecord.size }
+                    : {})
+                };
+              }
             }
           }
         }));
+        expect(downloadCandidate).not.toBeNull();
+        currentStage = "learning-private-download";
+        const candidate = downloadCandidate!;
+        const baselineRoot = resolve(
+          process.cwd(),
+          "..",
+          "..",
+          ".tmp",
+          "development-baselines",
+          "downloads"
+        );
+        let authenticatedResponseBytes: number | null = null;
+        let downloadResponseStatus: number | null = null;
+        const downloadEngine = new DownloadEngine({
+          downloadRoot: resolve(baselineRoot, "files"),
+          persistencePath: resolve(baselineRoot, "queue-state.json"),
+          maxConcurrent: 1,
+          requestTimeoutMs: 120_000,
+          resolveResponse: async ({ headers, signal }) => {
+            currentStage = "learning-private-download-request";
+            const response = await client.requestLearningDownload(
+              { username, password },
+              {
+                uploadId: candidate.uploadId,
+                referenceId: candidate.referenceId,
+                range: headers.Range,
+                signal
+              }
+            );
+            downloadResponseStatus = response.status;
+            currentStage = `learning-private-download-http-${response.status}`;
+            const responseLength = Number.parseInt(
+              response.headers.get("content-length") ?? "",
+              10
+            );
+            if (!Number.isSafeInteger(responseLength) || responseLength < 0) {
+              currentStage = "learning-private-download-invalid-length";
+              await response.body?.cancel();
+              throw new Error("真实课件响应缺少有效文件大小。");
+            }
+            const rangeOffset = response.status === 206
+              ? Number.parseInt(headers.Range?.match(/^bytes=(\d+)-$/)?.[1] ?? "0", 10)
+              : 0;
+            authenticatedResponseBytes = rangeOffset + responseLength;
+            return response;
+          }
+        });
+        await downloadEngine.enqueue({
+          url: `https://courses.zju.edu.cn/api/uploads/reference/${candidate.referenceId}/blob`,
+          fallbackUrl: `https://courses.zju.edu.cn/api/uploads/${candidate.uploadId}/blob`,
+          expectedBytes: candidate.expectedBytes,
+          title: candidate.fileName,
+          courseName: candidate.courseName,
+          sourceId: "learning-platform",
+          semester: candidate.semesterName
+        });
+        await downloadEngine.waitForIdle();
+        const downloadedTask = downloadEngine.allTasks[0];
+        const failureMessage = downloadedTask?.failureMessage ?? "";
+        const failureCategory = !downloadedTask
+          ? "missing"
+          : downloadedTask.status !== "failed"
+            ? downloadedTask.status
+            : downloadResponseStatus === null
+              ? "request"
+              : /大小不匹配/.test(failureMessage)
+                ? "size-mismatch"
+                : /无法读取下载响应流/.test(failureMessage)
+                  ? "missing-body"
+                  : /EPERM|ENOENT|EEXIST|rename|open/i.test(failureMessage)
+                    ? "filesystem"
+                    : /HTTP \d+/.test(failureMessage)
+                      ? "http"
+                      : "stream";
+        currentStage = `learning-private-download-task-${failureCategory}` +
+          (downloadResponseStatus === null ? "" : `-http-${downloadResponseStatus}`);
+        expect(downloadedTask?.status).toBe("ready");
+        expect(authenticatedResponseBytes).not.toBeNull();
+        const downloadedFile = await stat(downloadedTask!.targetPath);
+        currentStage = "learning-private-download-size-check";
+        expect(downloadedFile.isFile()).toBe(true);
+        expect(downloadedFile.size).toBe(authenticatedResponseBytes);
+        expect(downloadedTask?.totalBytes).toBe(authenticatedResponseBytes);
         process.stdout.write(
           [
             "[PASS] ZJUAM SSO 登录态已建立",
@@ -302,6 +441,7 @@ describe("ZJU unified authentication live verification", () => {
             "[PASS] 学在浙大业务 Session 已建立且作业端点返回可解析结构",
             "[PASS] 学在浙大学期与全部课程分页返回可解析业务结构",
             "[PASS] 学在浙大每门课程课件列表均返回可解析业务结构",
+            "[PASS] 一份授权学期私有课件经认证下载并通过实际字节校验",
             "[PASS] 敏感字段输出：0"
           ].join("\n") + "\n"
         );

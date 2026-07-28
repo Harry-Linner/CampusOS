@@ -269,23 +269,35 @@ export const createZjuLearningConnector = ({
     accountId: string,
     updatedAt: string,
     message: string
-  ): Promise<"cache" | "unavailable"> => {
+  ): Promise<{
+    status: "cache" | "unavailable";
+    message: string;
+  }> => {
     const cached = await loadCachedMaterials(accountId);
+    const publishedMessage = cached
+      ? `实时课件目录不可用，继续使用上次成功数据。${message}`
+      : message;
     await publish({
       capability: "learning.materials@1",
       accountId,
       state: cached ? "cache" : "unavailable",
       updatedAt,
       data: cached,
-      message: cached ? "实时课件目录不可用，继续使用上次成功数据。" : message
+      message: publishedMessage
     });
-    return cached ? "cache" : "unavailable";
+    return {
+      status: cached ? "cache" : "unavailable",
+      message: publishedMessage
+    };
   };
 
   const refreshMaterials = async (
     accountId: string,
     updatedAt: string
-  ): Promise<"live" | "cache" | "unavailable"> => {
+  ): Promise<{
+    status: "live" | "cache" | "unavailable";
+    message?: string;
+  }> => {
     try {
       const semestersResult = await fetchSemesters();
       if (!semestersResult.ok) throw new Error(semestersResult.message);
@@ -307,10 +319,17 @@ export const createZjuLearningConnector = ({
       ).values()];
       // zju-learning-assistant refreshes every selected course's activities before
       // publishing a new list; a partial directory must not replace the last snapshot.
-      const materials = (await Promise.all(courses.map(async (course) => {
-        const result = await fetchCourseActivities(course.sourceId);
-        if (!result.ok) throw new Error(result.message);
-        return parseLearningActivitiesResponse(result.body, course, updatedAt);
+      const materials = (await Promise.all(courses.map(async (course, index) => {
+        try {
+          const result = await fetchCourseActivities(course.sourceId);
+          if (!result.ok) throw new Error(result.message);
+          return parseLearningActivitiesResponse(result.body, course, updatedAt);
+        } catch (error) {
+          const message = error instanceof Error
+            ? error.message
+            : "学在浙大课件请求失败。";
+          throw new Error(`第 ${index + 1} 个课程课件请求失败：${message}`);
+        }
       }))).flat();
       await publish({
         capability: "learning.materials@1",
@@ -322,7 +341,7 @@ export const createZjuLearningConnector = ({
           materials: [...new Map(materials.map((item) => [item.sourceId, item])).values()]
         }
       });
-      return "live";
+      return { status: "live" };
     } catch (error) {
       return publishMaterialsFallback(
         accountId,
@@ -408,11 +427,11 @@ export const createZjuLearningConnector = ({
       return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
     }
 
-    const [assignments, materialsStatus] = await Promise.all([
+    const [assignments, materials] = await Promise.all([
       refreshAssignments(proof.studentId, updatedAt),
       refreshMaterials(proof.studentId, updatedAt)
     ]);
-    const statuses = [assignments.status, materialsStatus];
+    const statuses = [assignments.status, materials.status];
     const status = statuses.every((value) => value === "live")
       ? "live"
       : statuses.every((value) => value === "unavailable")
@@ -420,7 +439,10 @@ export const createZjuLearningConnector = ({
         : "cache";
     const message = status === "live"
       ? undefined
-      : `作业状态：${assignments.status}；课件状态：${materialsStatus}。`;
+      : [
+          `作业状态：${assignments.status}；课件状态：${materials.status}。`,
+          materials.message ? `课件详情：${materials.message}` : null
+        ].filter((value): value is string => value !== null).join(" ");
     return { sourceId: manifest.id, status, updatedAt, message };
   };
 

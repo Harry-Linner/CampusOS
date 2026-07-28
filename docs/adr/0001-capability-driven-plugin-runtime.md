@@ -23,7 +23,7 @@ Celechron 1.3.0 的功能盘点表明，同一课表、考试、成绩等用户�
 
 ## 实现状态
 
-截至 2026-07-28，内置官方插件纵向切片已覆盖 Manifest v2、能力解析、持久化授权、connector/feature 共用的 headless 生命周期、依赖拓扑刷新、provenance repository、本科/研究生教务及学在浙大 service-session broker。`org.campusos.zju-learning` 现在分别发布作业和课件目录 capability；主进程按 60–120 秒间隔刷新，任一课程失败不发布残缺资料快照，下载响应流由核心认证 broker 提供。考试、DDL 与课程由独立功能插件转换为统一事件，工作区不依赖具体连接器 ID。2026-07-28 本科真实账号已脱敏通过认证、教务、素拓、作业及完整课件目录；研究生、多设备和私有课件实体下载仍待验收。第三方 headless 的 capability/网络权限代理完成前仍禁止接入 lifecycle，不能据此将整个 Runtime v2 标记为完成。
+截至 2026-07-28，内置官方插件纵向切片已覆盖 Manifest v2、能力解析、持久化授权、connector/feature 共用的 headless 生命周期、依赖拓扑刷新、provenance repository、本科/研究生教务及学在浙大 service-session broker。`org.campusos.zju-learning` 现在分别发布作业和课件目录 capability；主进程按 60–120 秒间隔刷新，任一课程失败不发布残缺资料快照，下载响应流由核心认证 broker 提供。考试、DDL 与课程由独立功能插件转换为统一事件，工作区不依赖具体连接器 ID。2026-07-28 本科真实账号已脱敏通过认证、教务、素拓、作业及完整课件目录，并通过正式 Electron IPC 将一份授权学期私有课件下载落盘且完成实际字节校验；研究生和多设备仍待验收。第三方 headless 的 capability/网络权限代理完成前仍禁止接入 lifecycle，不能据此将整个 Runtime v2 标记为完成。
 
 ## 结果
 

@@ -225,7 +225,7 @@ export class DownloadEngine {
 
   async resume(id: string): Promise<boolean> {
     const item = this.queue.find((candidate) => candidate.id === id);
-    if (!item || item.status !== "paused") return false;
+    if (!item || (item.status !== "paused" && item.status !== "failed")) return false;
     item.status = "queued";
     item.failureMessage = undefined;
     item.updatedAt = new Date().toISOString();
@@ -256,7 +256,8 @@ export class DownloadEngine {
         ? Math.min(100, Math.round((item.downloadedBytes / item.totalBytes) * 100))
         : 0,
       status: item.status,
-      targetPath: item.targetPath
+      targetPath: item.targetPath,
+      failureMessage: item.failureMessage
     }));
   }
 
@@ -342,7 +343,9 @@ export class DownloadEngine {
     try {
       await this.doDownload(item, controller);
     } catch (error) {
-      if (item.status !== "paused") {
+      const queuedForRestart =
+        controller.signal.aborted && item.status === "queued";
+      if (item.status !== "paused" && !queuedForRestart) {
         item.status = "failed";
         item.failureMessage = error instanceof Error ? error.message : "下载失败。";
         item.updatedAt = new Date().toISOString();

@@ -89,19 +89,24 @@ export const Component = ({
       <div>
         <strong>{download.title}</strong>
         <span className="meta-line">{download.targetPath}</span>
+        {download.failureMessage ? (
+          <span className="error-copy" role="alert">
+            {download.failureMessage}
+          </span>
+        ) : null}
       </div>
       <div className="row-side">
         <strong>{download.progress}% · {statusLabel[download.status]}</strong>
         {downloads && download.status !== "ready" ? (
           <span className="inline-actions">
-            {download.status === "paused" ? (
+            {download.status === "paused" || download.status === "failed" ? (
               <button
                 className="text-button"
                 type="button"
                 disabled={busyId === download.id}
                 onClick={() => void runAction(download.id, () => downloads.resume(download.id))}
               >
-                继续
+                {download.status === "failed" ? "重试" : "继续"}
               </button>
             ) : (
               <button

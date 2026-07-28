@@ -93,6 +93,7 @@ export interface CampusDownloadTask {
   progress: number;
   status: CampusDownloadStatus;
   targetPath: string;
+  failureMessage?: string;
 }
 
 export interface CampusDownloadRequest {

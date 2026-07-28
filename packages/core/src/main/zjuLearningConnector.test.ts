@@ -226,4 +226,60 @@ describe("zju learning connector", () => {
       state: "live"
     }));
   });
+
+  it("keeps the sanitized failing activity index when materials fall back to cache", async () => {
+    const publish = vi.fn(async () => undefined);
+    let refreshJob: (() => Promise<{
+      status: string;
+      message?: string;
+    }>) | null = null;
+    const connector = createZjuLearningConnector({
+      loadAcademicProfileProof: async () => ({ studentId: "3240100001" }),
+      fetchAssignments: async () => ({ ok: true, body: '{"todo_list":[]}' }),
+      fetchSemesters: async () => ({
+        ok: true,
+        body: '{"semesters":[{"id":34,"name":"春夏学期"}]}'
+      }),
+      fetchCoursesPage: async () => ({
+        ok: true,
+        body: '{"courses":[{"id":71,"name":"私有课程甲","semester_id":34},{"id":72,"name":"私有课程乙","semester_id":34}],"pages":1}'
+      }),
+      fetchCourseActivities: async (courseId) => courseId === "71"
+        ? { ok: true, body: '{"activities":[]}' }
+        : { ok: false, message: "连接学习平台超时。" },
+      loadCachedAssignments: async () => null,
+      loadCachedMaterials: async () => ({ courses: [], materials: [] }),
+      publish,
+      registerRefreshJob: (_sourceId, job) => {
+        refreshJob = job;
+        return () => undefined;
+      },
+      now: () => new Date("2026-07-20T09:00:00.000Z")
+    });
+
+    await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+
+    const materialPublication = (publish.mock.calls as unknown as Array<[{
+      capability: string;
+      state: string;
+      message?: string;
+    }]>)
+      .map(([publication]) => publication)
+      .find((publication) => publication.capability === "learning.materials@1");
+    expect(materialPublication).toEqual(expect.objectContaining({
+      state: "cache",
+      message: expect.stringContaining("第 2 个课程课件请求失败：连接学习平台超时。")
+    }));
+    expect(materialPublication?.message).not.toContain("私有课程");
+    expect(materialPublication?.message).not.toMatch(/\b7[12]\b/);
+    expect(refreshJob).not.toBeNull();
+    await expect(refreshJob!()).resolves.toEqual(expect.objectContaining({
+      status: "cache",
+      message: expect.stringContaining("第 2 个课程课件请求失败：连接学习平台超时。")
+    }));
+  });
 });
