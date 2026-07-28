@@ -80,3 +80,13 @@ Issues 存放在 GitHub Issues，使用 `gh` CLI 操作。详见 `docs/agents/is
 4. 推送到已配置的 GitHub 远程分支。
 
 除非用户明确要求，禁止 force push、改写远程历史或跳过验证直接推送。
+
+### CI/CD feedback closure
+
+每次提交并推送后，必须使用 `gh` CLI 检查该次提交对应的 GitHub Actions/CI/CD 反馈，不得只以本地检查或 `git push` 成功作为完成依据。
+
+- 使用当前 HEAD SHA 定位对应 workflow run，并等待其进入 completed；不得在 run 仍为 queued、in_progress 或找不到对应 run 时宣称该轮完成。
+- workflow 失败时必须运行 `gh run view <run-id> --log-failed` 获取实际失败步骤和日志，建立“失败日志 -> 本地复现/原因 -> 修复 -> 验证 -> 新提交 -> 新 run”闭环。
+- 修复推送后必须继续检查新的 run，直到当前 HEAD 的必需 workflow 全部成功；不得忽略旧失败、反复触发失败邮件或把 GitHub 失败留给用户自行发现。
+- 若 `gh` 不可用、未登录、Actions 未触发或 GitHub 服务异常，必须明确报告尚未完成远端验收及具体阻塞，不得声称 CI/CD 通过。
+- 查看和汇报 CI/CD 时不得输出凭据、环境变量值、私有业务响应或其他敏感日志内容。
