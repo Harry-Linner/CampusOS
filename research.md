@@ -48,7 +48,7 @@ Plugin Runtime v2 纵向切片已经验证“核心基础设施 + 无头连接�
 
 `.campusmod` 纵向切片已经验证本地 ZIP 可完成主进程检查、权限确认、确认后重读、SHA-256 防换包、受限解压、原子目录换位、崩溃恢复、逐文件完整性复核、动态注册和卸载。清单与代码正文不进入 IPC。renderer sandbox v1 只接受唯一 namespaced activity view、恰好 `storage:local` 且无 capability/后台贡献的 profile；宿主通过 `campusmod://<plugin-id>` 独立 secure origin 和 host-owned iframe 加载，不把入口导入 CampusOS renderer。Electron 43 主 renderer 已启用 Chromium OS sandbox、CJS preload 和严格 CSP；协议禁止网络/eval、逐请求复核 active 状态与安装完整性，所有网页权限、新窗口和跨 origin frame 导航由主进程拒绝。真实 ZIP 已通过“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”自动化纵向测试；Electron 窗口内跨 origin 进程隔离 E2E 仍未完成。headless 内层 QuickJS/WASM POC 已验证插件看不到 Node/网络全局，模块导入、异步与非 JSON 返回被拒绝，死循环和普通 JS 堆增长受限；TypedArray 等外部内存、WASM 宿主崩溃仍必须由 utility process 外层处理。102 项测试、生产构建和 8 秒真实冷启动通过。当前摘要不是数字签名，headless lifecycle 接入、权限代理、进程级资源回收、真实恶意包 E2E 和 schema migration 仍是扩大执行面的硬门槛。格式和限制见 [`.campusmod` 本地插件包格式与安装边界](docs/architecture/campusmod-package-format.md)。
 
-本科成绩纵向切片已打通固定教务请求、单条容错解析、账号隔离缓存、`academic.grades@1`、成绩 feature view 和真实工作区刷新；2026-07-28 真实账号脱敏探针已验证成绩端点结构。当前 GPA 只按接口明确返回的 `gradePoint × credit` 加权，缺少绩点的课程不做文字等级换算；隐私遮罩同时覆盖课程分数、单课绩点和两项加权绩点汇总。2026-08-03 已按 Celechron 1.3.0 完成计入 GPA、主修标记、缓考/不及格边界和真实账号双成绩端点验收。
+本科成绩纵向切片已打通固定教务请求、单条容错解析、账号隔离缓存、`academic.grades@1`、成绩 feature view 和真实工作区刷新；2026-07-28 真实账号脱敏探针已验证成绩端点结构。当前 GPA 按 Celechron 1.3.0 的 `gradePoint × credit` 加权，缺失 `jd` 按 0 分处理；隐私遮罩同时覆盖课程分数、单课绩点和两项加权绩点汇总。2026-08-03 已按 Celechron 1.3.0 完成计入 GPA、主修标记、缓考/不及格边界和真实账号双成绩端点验收。
 
 研究生纵向切片已按 Celechron 1.3.0 的协议证据实现独立 CAS service、ticket 回调校验、`validateLogin` token 交换和固定课表/考试/成绩操作。token 只在主进程内存中作为 `X-Access-Token` 使用，连接器拿不到凭据或请求头；精确周次、单双周和不完整记录按字段容错，考试只有在日期与起止钟点都有效时才生成绝对时间。设置页由用户明确选择本科或研究生，避免服务临时故障造成自动误判；研究生路径必须验证认证后成绩结构才保存凭据，IPC 只返回记录数而不返回正文。自动化 fixture、v3 到 v4 兼容、UI 和缓存局部回退已经通过，真实研究生账号验收尚未完成。
 

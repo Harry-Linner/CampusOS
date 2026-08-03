@@ -351,7 +351,8 @@ const parseGradeRecord = (
       .replaceAll(")", "）"),
     credit: credit !== null && credit >= 0 ? credit : 0,
     originalScore: asString(item.cj)?.trim() ?? "",
-    gradePoint: gradePoint !== null && gradePoint >= 0 ? gradePoint : null,
+    // Celechron lib/model/grade.dart:80-87 defaults a missing jd to 0.0.
+    gradePoint: gradePoint !== null && gradePoint >= 0 ? gradePoint : 0,
     academicYearStart,
     termNumber,
     isMajorCourse: majorCourseIds.has(sourceId),

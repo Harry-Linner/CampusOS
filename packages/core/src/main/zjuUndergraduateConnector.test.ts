@@ -317,4 +317,12 @@ describe("undergraduate major-grade projection", () => {
 
     expect(result.grades.map((grade) => grade.isMajorCourse)).toEqual([true, false]);
   });
+
+  it("uses Celechron's zero point when the transcript omits jd", () => {
+    const result = parseGradesResponse(JSON.stringify({
+      items: [{ xkkh: "(2025-2026-1)-MISSING-001-1", kcmc: "missing", xf: 2, cj: "不及格" }]
+    }));
+
+    expect(result.grades[0]?.gradePoint).toBe(0);
+  });
 });
