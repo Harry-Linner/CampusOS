@@ -353,7 +353,7 @@ export const ExtensionsView = ({
                         </div>
                         <div>
                           <dt>类型</dt>
-                          <dd>{plugin.manifest.kind === "connector" ? "数据连接器" : "功能插件"}</dd>
+                          <dd>侧栏模块</dd>
                         </div>
                         <div>
                           <dt>依赖</dt>

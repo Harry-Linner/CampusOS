@@ -55,7 +55,7 @@ test("renders the first-run onboarding with its stylesheet in Electron", async (
   }
 });
 
-test("takes a fixture-backed onboarding through the calendar using real Electron IPC", async ({ browserName: _browserName }) => {
+test("takes a fixture-backed onboarding through the schedule module using real Electron IPC", async ({ browserName: _browserName }) => {
   void _browserName;
   const userDataPath = await mkdtemp(join(tmpdir(), "campusos-e2e-"));
   const app = await electron.launch({
@@ -82,7 +82,7 @@ test("takes a fixture-backed onboarding through the calendar using real Electron
     await expect(page.getByRole("heading", { name: "一切就绪" })).toBeVisible();
 
     await page.getByRole("button", { name: "进入 CampusOS" }).click();
-    await page.getByRole("button", { name: "日历" }).click();
+    await page.getByRole("button", { name: "日程" }).click();
     await expect(
       page.getByRole("button", { name: /软件工程课程设计/ })
     ).toBeVisible();

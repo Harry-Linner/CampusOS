@@ -11,7 +11,6 @@ import { usePluginHost } from "./hooks/usePluginHost";
 import { buildActivityItems } from "./lib/pluginNavigation";
 import { DashboardView } from "./views/DashboardView";
 import { ExtensionsView } from "./views/ExtensionsView";
-import { CalendarView } from "./views/CalendarView";
 import { SettingsView } from "./views/SettingsView";
 import {
   cancelDownload,
@@ -104,13 +103,6 @@ export const App = (): JSX.Element => {
   if (activeView === "dashboard") {
     content = (
       <DashboardView
-        loading={workspace.loading}
-        snapshot={workspace.snapshot}
-      />
-    );
-  } else if (activeView === "calendar") {
-    content = (
-      <CalendarView
         loading={workspace.loading}
         snapshot={workspace.snapshot}
       />

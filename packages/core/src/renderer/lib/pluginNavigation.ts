@@ -9,8 +9,7 @@ export interface ActivityNavigationItem {
 }
 
 const leadingItems: ActivityNavigationItem[] = [
-  { id: "dashboard", label: "总览", icon: "overview" },
-  { id: "calendar", label: "日历", icon: "calendar" }
+  { id: "dashboard", label: "总览", icon: "overview" }
 ];
 
 const trailingItems: ActivityNavigationItem[] = [

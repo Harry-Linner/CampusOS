@@ -1,8 +1,10 @@
-import type { PluginCapability, PluginManifestV2 } from "@campusos/shared";
-import { manifest as academicGradesManifest } from "@campusos/plugin-academic-grades/manifest";
-import { manifest as academicScraperManifest } from "@campusos/plugin-academic-scraper/manifest";
-import { manifest as calendarManifest } from "@campusos/plugin-calendar/manifest";
-import { manifest as dingtalkEntryManifest } from "@campusos/plugin-dingtalk-entry/manifest";
+import type {
+  PluginCapability,
+  PluginManifestV2,
+  PluginRuntimeSnapshot
+} from "@campusos/shared";
+import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
 import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
 import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
 import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
@@ -11,23 +13,48 @@ import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/m
 import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
 import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
-import { manifest as examCountdownManifest } from "@campusos/plugin-exam-countdown/manifest";
 
-export const officialPluginManifests: PluginManifestV2[] = [
-  academicGradesManifest,
-  academicScraperManifest,
-  calendarManifest,
-  materialsManifest,
-  dingtalkEntryManifest,
+/** User-selectable Modules. Each contributes exactly one activity entry. */
+export const officialUserPluginManifests: PluginManifestV2[] = [
+  academicManifest,
+  scheduleManifest,
+  materialsManifest
+];
+
+/**
+ * Core-owned Adapters and event projections.
+ *
+ * Their stable IDs remain unchanged because capability provenance and cached
+ * records use those IDs. They participate in the internal dependency graph,
+ * but are never exposed through the user plugin Interface.
+ */
+export const officialCoreModuleManifests: PluginManifestV2[] = [
   zjuCalendarConfigManifest,
   zjuUndergraduateManifest,
   zjuGraduateManifest,
   zjuLearningManifest,
   academicExamsManifest,
   deadlineAssistantManifest,
-  academicTimetableEventsManifest,
-  examCountdownManifest
+  academicTimetableEventsManifest
 ];
+
+export const officialRuntimeManifests: PluginManifestV2[] = [
+  ...officialUserPluginManifests,
+  ...officialCoreModuleManifests
+];
+
+const officialCoreModuleIds = new Set(
+  officialCoreModuleManifests.map((manifest) => manifest.id)
+);
+
+export const toUserPluginSnapshot = (
+  snapshot: PluginRuntimeSnapshot
+): PluginRuntimeSnapshot => ({
+  ...snapshot,
+  plugins: snapshot.plugins.filter(
+    (plugin) => !officialCoreModuleIds.has(plugin.id)
+  )
+});
 
 export const corePluginCapabilities: PluginCapability[] = [
   "core.workspace-snapshot@1",

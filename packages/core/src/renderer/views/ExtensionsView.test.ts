@@ -3,7 +3,8 @@
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { manifest as calendarManifest } from "@campusos/plugin-calendar/manifest";
+import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
 import type {
   PluginPackageInspection,
   PluginPackageRegistrySnapshot
@@ -13,20 +14,20 @@ import { ExtensionsView } from "./ExtensionsView";
 
 afterEach(cleanup);
 
-const blockedCalendar: LoadedPlugin = {
-  manifest: calendarManifest,
+const blockedMaterials: LoadedPlugin = {
+  manifest: materialsManifest,
   Component: () => createElement("div"),
   capabilities: {
     read: async () => []
   },
   runtime: {
-    id: calendarManifest.id,
-    manifest: calendarManifest,
+    id: materialsManifest.id,
+    manifest: materialsManifest,
     enabled: true,
     grantedPermissions: [],
     status: "blocked",
     bindings: {},
-    issues: calendarManifest.permissions.map(
+    issues: materialsManifest.permissions.map(
       (permission) => `权限未授权：${permission}`
     )
   }
@@ -38,7 +39,7 @@ const emptyPackageRegistry: PluginPackageRegistrySnapshot = {
 };
 
 const createProps = () => ({
-  plugins: [blockedCalendar],
+  plugins: [blockedMaterials],
   loading: false,
   error: null,
   packageRegistry: emptyPackageRegistry,
@@ -60,14 +61,14 @@ describe("ExtensionsView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "详情" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "日历领域数据" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "资料领域数据" }));
     fireEvent.click(screen.getByRole("button", { name: "保存并启用" }));
 
     await waitFor(() => {
       expect(configure).toHaveBeenCalledWith({
-        pluginId: calendarManifest.id,
+        pluginId: materialsManifest.id,
         enabled: true,
-        grantedPermissions: ["storage:domain:calendar"]
+        grantedPermissions: ["storage:domain:materials"]
       });
     });
   });
@@ -76,7 +77,7 @@ describe("ExtensionsView", () => {
     const inspection: PluginPackageInspection = {
       token: "58ac2bea-45ab-497e-85e5-1856063b674d",
       manifest: {
-        ...calendarManifest,
+        ...scheduleManifest,
         id: "dev.example.countdown",
         name: "countdown",
         displayName: "考试倒计时",
@@ -117,7 +118,7 @@ describe("ExtensionsView", () => {
     const inspection: PluginPackageInspection = {
       token: "58ac2bea-45ab-497e-85e5-1856063b674d",
       manifest: {
-        ...calendarManifest,
+        ...scheduleManifest,
         id: "dev.example.signed-countdown",
         name: "signed-countdown",
         displayName: "已签名倒计时",
@@ -144,7 +145,7 @@ describe("ExtensionsView", () => {
 
   it("grants and enables only an eligible installed sandbox view", async () => {
     const manifest = {
-      ...calendarManifest,
+      ...scheduleManifest,
       id: "dev.example.countdown",
       name: "countdown",
       displayName: "考试倒计时",

@@ -6,14 +6,13 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRuntimeDependencies = [
   "@campusos/shared",
+  "@campusos/plugin-academic",
   "@campusos/plugin-academic-exams",
   "@campusos/plugin-academic-grades",
-  "@campusos/plugin-academic-scraper",
   "@campusos/plugin-academic-timetable-events",
-  "@campusos/plugin-calendar",
   "@campusos/plugin-deadline-assistant",
-  "@campusos/plugin-dingtalk-entry",
   "@campusos/plugin-materials",
+  "@campusos/plugin-schedule",
   "@campusos/plugin-zju-calendar-config",
   "@campusos/plugin-zju-graduate",
   "@campusos/plugin-zju-learning",
@@ -42,25 +41,21 @@ export default defineConfig({
     resolve: {
       alias: {
         "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
+        "@campusos/plugin-academic/manifest": resolve(
+          rootDir,
+          "../../plugins/official/academic/src/manifest.ts"
+        ),
         "@campusos/plugin-academic-grades/manifest": resolve(
           rootDir,
           "../../plugins/official/academic-grades/src/manifest.ts"
         ),
-        "@campusos/plugin-academic-scraper/manifest": resolve(
+        "@campusos/plugin-schedule/manifest": resolve(
           rootDir,
-          "../../plugins/official/academic-scraper/src/manifest.ts"
-        ),
-        "@campusos/plugin-calendar/manifest": resolve(
-          rootDir,
-          "../../plugins/official/calendar/src/manifest.ts"
+          "../../plugins/official/schedule/src/manifest.ts"
         ),
         "@campusos/plugin-materials/manifest": resolve(
           rootDir,
           "../../plugins/official/materials/src/manifest.ts"
-        ),
-        "@campusos/plugin-dingtalk-entry/manifest": resolve(
-          rootDir,
-          "../../plugins/official/dingtalk-entry/src/manifest.ts"
         ),
         "@campusos/plugin-zju-undergraduate/manifest": resolve(
           rootDir,
@@ -162,6 +157,10 @@ export default defineConfig({
       alias: {
         "@renderer": resolve(rootDir, "src/renderer"),
         "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
+        "@campusos/plugin-academic/manifest": resolve(
+          rootDir,
+          "../../plugins/official/academic/src/manifest.ts"
+        ),
         "@campusos/plugin-academic-grades/manifest": resolve(
           rootDir,
           "../../plugins/official/academic-grades/src/manifest.ts"
@@ -170,21 +169,9 @@ export default defineConfig({
           rootDir,
           "../../plugins/official/academic-grades/src/index.tsx"
         ),
-        "@campusos/plugin-academic-scraper/manifest": resolve(
+        "@campusos/plugin-schedule/manifest": resolve(
           rootDir,
-          "../../plugins/official/academic-scraper/src/manifest.ts"
-        ),
-        "@campusos/plugin-academic-scraper": resolve(
-          rootDir,
-          "../../plugins/official/academic-scraper/src/index.tsx"
-        ),
-        "@campusos/plugin-calendar/manifest": resolve(
-          rootDir,
-          "../../plugins/official/calendar/src/manifest.ts"
-        ),
-        "@campusos/plugin-calendar": resolve(
-          rootDir,
-          "../../plugins/official/calendar/src/index.tsx"
+          "../../plugins/official/schedule/src/manifest.ts"
         ),
         "@campusos/plugin-materials/manifest": resolve(
           rootDir,
@@ -193,14 +180,6 @@ export default defineConfig({
         "@campusos/plugin-materials": resolve(
           rootDir,
           "../../plugins/official/materials/src/index.tsx"
-        ),
-        "@campusos/plugin-dingtalk-entry/manifest": resolve(
-          rootDir,
-          "../../plugins/official/dingtalk-entry/src/manifest.ts"
-        ),
-        "@campusos/plugin-dingtalk-entry": resolve(
-          rootDir,
-          "../../plugins/official/dingtalk-entry/src/index.tsx"
         ),
         "@campusos/plugin-academic-exams/manifest": resolve(
           rootDir,

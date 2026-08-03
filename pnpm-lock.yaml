@@ -33,33 +33,30 @@ importers:
 
   packages/core:
     dependencies:
+      '@campusos/plugin-academic':
+        specifier: workspace:*
+        version: link:../../plugins/official/academic
       '@campusos/plugin-academic-exams':
         specifier: workspace:*
         version: link:../../plugins/official/academic-exams
       '@campusos/plugin-academic-grades':
         specifier: workspace:*
         version: link:../../plugins/official/academic-grades
-      '@campusos/plugin-academic-scraper':
-        specifier: workspace:*
-        version: link:../../plugins/official/academic-scraper
       '@campusos/plugin-academic-timetable-events':
         specifier: workspace:*
         version: link:../../plugins/official/academic-timetable-events
-      '@campusos/plugin-calendar':
-        specifier: workspace:*
-        version: link:../../plugins/official/calendar
       '@campusos/plugin-deadline-assistant':
         specifier: workspace:*
         version: link:../../plugins/official/deadline-assistant
-      '@campusos/plugin-dingtalk-entry':
-        specifier: workspace:*
-        version: link:../../plugins/official/dingtalk-entry
       '@campusos/plugin-exam-countdown':
         specifier: workspace:*
         version: link:../../plugins/official/exam-countdown
       '@campusos/plugin-materials':
         specifier: workspace:*
         version: link:../../plugins/official/materials
+      '@campusos/plugin-schedule':
+        specifier: workspace:*
+        version: link:../../plugins/official/schedule
       '@campusos/plugin-zju-calendar-config':
         specifier: workspace:*
         version: link:../../plugins/official/zju-calendar-config
@@ -159,6 +156,16 @@ importers:
         version: 2.1.9(@types/node@22.20.1)(jsdom@26.1.0)
 
   packages/shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  plugins/official/academic:
+    dependencies:
+      '@campusos/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
     devDependencies:
       typescript:
         specifier: ^5.7.3
@@ -278,6 +285,16 @@ importers:
       '@types/react':
         specifier: ^18.3.18
         version: 18.3.31
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  plugins/official/schedule:
+    dependencies:
+      '@campusos/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+    devDependencies:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

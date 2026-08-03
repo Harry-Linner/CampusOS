@@ -99,8 +99,6 @@ export interface PluginRuntimeSnapshot {
 
 export type CoreActivityItemId =
   | "dashboard"
-  | "calendar"
-  | "materials"
   | "extensions"
   | "settings";
 
@@ -388,6 +386,41 @@ export const validateManifestV2 = (
     ok: issues.length === 0,
     issues
   };
+};
+
+/** Validate the only user-installable campusmod shape. */
+export const validateUserPluginManifestV2 = (
+  manifest: unknown
+): PluginValidationResult => {
+  const base = validateManifestV2(manifest);
+  if (!base.ok) return base;
+
+  const candidate = manifest as PluginManifestV2;
+  const issues = [...base.issues];
+  const views = candidate.contributes.views ?? [];
+  if (candidate.kind !== "feature") {
+    issues.push("User campusmod must be a feature module.");
+  }
+  if (
+    views.length !== 1 ||
+    views[0]?.location !== "activity" ||
+    typeof views[0].activityTarget !== "string"
+  ) {
+    issues.push("User campusmod must contribute exactly one activity view.");
+  }
+  if (
+    (candidate.contributes.syncJobs?.length ?? 0) > 0 ||
+    (candidate.contributes.settings?.length ?? 0) > 0 ||
+    (candidate.contributes.searchProviders?.length ?? 0) > 0 ||
+    (candidate.contributes.commands?.length ?? 0) > 0
+  ) {
+    issues.push("User campusmod cannot contribute headless jobs or Core commands.");
+  }
+  const sandboxIssue = getSandboxedRendererExecutionIssue(candidate);
+  if (sandboxIssue) {
+    issues.push(`User campusmod is not executable in the renderer sandbox: ${sandboxIssue}`);
+  }
+  return { ok: issues.length === 0, issues };
 };
 
 export const validateManifest = (

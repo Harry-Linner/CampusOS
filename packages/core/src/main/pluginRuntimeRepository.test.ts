@@ -197,4 +197,95 @@ describe("plugin runtime repository", () => {
       grantedPermissions: []
     })).rejects.toThrow("第三方插件沙箱尚未就绪");
   });
+
+  it("carries legacy user module settings into consolidated module IDs", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "campusos-plugin-runtime-"));
+    temporaryDirectories.push(directory);
+    const consolidated: PluginManifestV2 = {
+      ...calendar,
+      id: "org.campusos.schedule",
+      name: "schedule",
+      displayName: "日程"
+    };
+    const storagePath = join(directory, "runtime-state.json");
+    await writeFile(
+      storagePath,
+      JSON.stringify({
+        dataVersion: 1,
+        plugins: {
+          [calendar.id]: {
+            enabled: false,
+            grantedPermissions: [],
+            updatedAt: "2026-07-19T00:00:00.000Z"
+          }
+        }
+      }),
+      "utf8"
+    );
+
+    const repository = createPluginRuntimeRepository({
+      storagePath,
+      manifests: [consolidated],
+      coreCapabilities: [],
+      legacyPluginIds: { [consolidated.id]: [calendar.id] }
+    });
+
+    expect(await repository.load()).toMatchObject({
+      plugins: [{ id: consolidated.id, enabled: false, status: "disabled" }]
+    });
+  });
+
+  it("enables a consolidated module when any legacy module was enabled", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "campusos-plugin-runtime-"));
+    temporaryDirectories.push(directory);
+    const consolidated: PluginManifestV2 = {
+      ...calendar,
+      id: "org.campusos.academic",
+      name: "academic",
+      displayName: "å­¦ä¸š",
+      permissions: [],
+      requires: [],
+      optionalRequires: []
+    };
+    const storagePath = join(directory, "runtime-state.json");
+    await writeFile(
+      storagePath,
+      JSON.stringify({
+        dataVersion: 1,
+        plugins: {
+          "org.campusos.academic-grades": {
+            enabled: false,
+            grantedPermissions: [],
+            updatedAt: "2026-07-19T00:00:00.000Z"
+          },
+          "org.campusos.exam-countdown": {
+            enabled: true,
+            grantedPermissions: [],
+            updatedAt: "2026-07-20T00:00:00.000Z"
+          }
+        }
+      }),
+      "utf8"
+    );
+
+    const repository = createPluginRuntimeRepository({
+      storagePath,
+      manifests: [consolidated],
+      coreCapabilities: [],
+      legacyPluginIds: {
+        [consolidated.id]: [
+          "org.campusos.academic-grades",
+          "org.campusos.exam-countdown"
+        ]
+      }
+    });
+
+    expect(await repository.load()).toMatchObject({
+      plugins: [{
+        id: consolidated.id,
+        enabled: true,
+        status: "active"
+      }]
+    });
+  });
 });

@@ -1,59 +1,64 @@
 import { describe, expect, it } from "vitest";
-import {
-  firstWaveSources,
-  type PluginManifestV2,
-  type PluginRuntimeSnapshot
+import type {
+  PluginManifestV2,
+  PluginRuntimeSnapshot
 } from "@campusos/shared";
-import { officialPluginManifests, corePluginCapabilities } from "../../main/officialPluginCatalog";
+import {
+  corePluginCapabilities,
+  officialRuntimeManifests,
+  officialUserPluginManifests,
+  toUserPluginSnapshot
+} from "../../main/officialPluginCatalog";
 import { resolvePluginRuntime } from "../../main/pluginRuntime";
 import { loadPlugins } from "./pluginHost";
 import { buildActivityItems } from "./pluginNavigation";
 
+const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
+  toUserPluginSnapshot(resolvePluginRuntime({
+    registrations: officialRuntimeManifests.map((manifest) => ({
+      manifest,
+      enabled: manifest.releaseStage === "ready",
+      grantedPermissions: [...manifest.permissions]
+    })),
+    coreCapabilities: corePluginCapabilities
+  }));
+
 describe("loadPlugins", () => {
-  it("loads official modules only with their main-process runtime records", async () => {
-    const runtime = resolvePluginRuntime({
-      registrations: officialPluginManifests.map((manifest) => ({
-        manifest,
-        enabled: manifest.releaseStage === "ready",
-        grantedPermissions: [...manifest.permissions]
-      })),
-      coreCapabilities: corePluginCapabilities
-    });
-    const plugins = await loadPlugins(runtime);
+  it("loads exactly the three official user Modules", async () => {
+    const plugins = await loadPlugins(createOfficialUserRuntime());
 
     expect(plugins.map((plugin) => plugin.manifest.id).sort()).toEqual(
-      officialPluginManifests.map((manifest) => manifest.id).sort()
+      officialUserPluginManifests.map((manifest) => manifest.id).sort()
     );
-
-    const academicPlugin = plugins.find(
-      (plugin) => plugin.manifest.id === "org.campusos.academic-scraper"
-    );
-    const dingtalkPlugin = plugins.find(
-      (plugin) => plugin.manifest.id === "org.campusos.dingtalk-entry"
-    );
-    const calendarPlugin = plugins.find(
-      (plugin) => plugin.manifest.id === "org.campusos.calendar-workspace"
-    );
-    const headlessPlugins = plugins.filter(
-      (plugin) => (plugin.manifest.contributes.syncJobs?.length ?? 0) > 0
-    );
-
-    expect(academicPlugin?.manifest.sourceScope).toEqual([...firstWaveSources]);
-    expect(dingtalkPlugin?.runtime.status).toBe("placeholder");
-    expect(dingtalkPlugin?.manifest.permissions).toEqual([]);
-    expect(calendarPlugin?.runtime.status).toBe("active");
-    expect(headlessPlugins).toHaveLength(7);
-    expect(headlessPlugins.every((plugin) => plugin.Component === undefined)).toBe(
-      true
-    );
-    expect(headlessPlugins.every((plugin) => plugin.runtime.status === "active"))
-      .toBe(true);
+    expect(plugins.every((plugin) => plugin.Component !== undefined)).toBe(true);
+    expect(plugins.every(
+      (plugin) => (plugin.manifest.contributes.views?.length ?? 0) === 1
+    )).toBe(true);
     expect(buildActivityItems(plugins).map((item) => item.id)).toEqual([
       "dashboard",
-      "calendar",
+      "academic",
+      "schedule",
       "materials",
-      "grades",
-      "exam-countdown",
+      "extensions",
+      "settings"
+    ]);
+  });
+
+  it("removes exactly one sidebar entry when an official Module is disabled", async () => {
+    const runtime = createOfficialUserRuntime();
+    const plugins = await loadPlugins({
+      ...runtime,
+      plugins: runtime.plugins.map((plugin) =>
+        plugin.id === "org.campusos.schedule"
+          ? { ...plugin, enabled: false, status: "disabled" as const }
+          : plugin
+      )
+    });
+
+    expect(buildActivityItems(plugins).map((item) => item.id)).toEqual([
+      "dashboard",
+      "academic",
+      "materials",
       "extensions",
       "settings"
     ]);
@@ -61,8 +66,8 @@ describe("loadPlugins", () => {
 
   it("lists an installed third-party manifest without importing untrusted renderer code", async () => {
     const manifest: PluginManifestV2 = {
-      ...officialPluginManifests.find(
-        (candidate) => candidate.id === "org.campusos.calendar-workspace"
+      ...officialUserPluginManifests.find(
+        (candidate) => candidate.id === "org.campusos.schedule"
       ) as PluginManifestV2,
       id: "dev.example.countdown",
       name: "countdown",
@@ -100,8 +105,8 @@ describe("loadPlugins", () => {
 
   it("maps an eligible active third-party view to a host-owned sandbox iframe", async () => {
     const manifest: PluginManifestV2 = {
-      ...officialPluginManifests.find(
-        (candidate) => candidate.id === "org.campusos.calendar-workspace"
+      ...officialUserPluginManifests.find(
+        (candidate) => candidate.id === "org.campusos.schedule"
       ) as PluginManifestV2,
       id: "dev.example.countdown",
       name: "countdown",

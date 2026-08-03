@@ -24,6 +24,18 @@
       "@campusos/shared": [
         "packages/shared/src/index.ts"
       ],
+      "@campusos/plugin-academic": [
+        "plugins/official/academic/src/index.ts"
+      ],
+      "@campusos/plugin-academic/manifest": [
+        "plugins/official/academic/src/manifest.ts"
+      ],
+      "@campusos/plugin-schedule": [
+        "plugins/official/schedule/src/index.ts"
+      ],
+      "@campusos/plugin-schedule/manifest": [
+        "plugins/official/schedule/src/manifest.ts"
+      ],
       "@campusos/plugin-academic-grades": [
         "plugins/official/academic-grades/src/index.tsx"
       ],
@@ -33,29 +45,11 @@
       "@campusos/plugin-academic-grades/model": [
         "plugins/official/academic-grades/src/model.ts"
       ],
-      "@campusos/plugin-academic-scraper": [
-        "plugins/official/academic-scraper/src/index.tsx"
-      ],
-      "@campusos/plugin-academic-scraper/manifest": [
-        "plugins/official/academic-scraper/src/manifest.ts"
-      ],
-      "@campusos/plugin-calendar": [
-        "plugins/official/calendar/src/index.tsx"
-      ],
-      "@campusos/plugin-calendar/manifest": [
-        "plugins/official/calendar/src/manifest.ts"
-      ],
       "@campusos/plugin-materials": [
         "plugins/official/materials/src/index.tsx"
       ],
       "@campusos/plugin-materials/manifest": [
         "plugins/official/materials/src/manifest.ts"
-      ],
-      "@campusos/plugin-dingtalk-entry": [
-        "plugins/official/dingtalk-entry/src/index.tsx"
-      ],
-      "@campusos/plugin-dingtalk-entry/manifest": [
-        "plugins/official/dingtalk-entry/src/manifest.ts"
       ],
       "@campusos/plugin-zju-undergraduate/manifest": [
         "plugins/official/zju-undergraduate/src/manifest.ts"

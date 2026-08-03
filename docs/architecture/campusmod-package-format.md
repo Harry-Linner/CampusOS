@@ -8,19 +8,18 @@
 
 ## 1. 当前能力边界
 
-`.campusmod` 是 ZIP 归档。当前版本支持通过扩展页文件选择器检查、确认、原子安装、升级、持久注册、损坏隔离和卸载。安装成功的第三方插件默认停用。只有符合 renderer sandbox v1 严格 profile、且用户明确授予 `storage:local` 的单活动视图插件可以启用；其他包继续保持 install-only，主进程不会执行其 `main`，renderer 也不会直接 `import()` 其代码。
+`.campusmod` 是 ZIP 归档。当前版本支持通过扩展页文件选择器检查、确认、原子安装、升级、持久注册、损坏隔离和卸载。安装成功的第三方插件默认停用；只有符合 renderer sandbox v1 严格 profile、且用户明确授予 `storage:local` 的单活动视图插件可以安装和启用，不符合该 profile 的包会在检查阶段拒绝，主进程不会执行第三方 `main`，renderer 也不会直接 `import()` 其代码。
 
 安装器会显示 `unsigned`、`verified` 或 `invalid`。当 manifest 同时提供 `contentHash`、`developerSignature` 和 `developerPublicKey` 时，主进程使用 Ed25519 验证规范载荷：载荷包含移除签名字段后的完整 manifest（包括 entrypoint）以及所有非 manifest 文件的路径和 SHA-256。检查、安装和每次重载都会重算；部分签名字段会被拒绝，签名状态与安装记录不一致的目录会被隔离。签名只证明该包由对应私钥签发，不建立开发者信任目录，也不自动授权或开放第三方 headless 执行。
 
 ## 2. 归档结构
 
-`manifest.json` 必须位于归档根目录。代码入口必须是归档内已有的 `.js` 或 `.mjs` 文件；声明 `syncJobs` 必须提供 `main`，声明 `views` 必须提供 `renderer`。
+`manifest.json` 必须位于归档根目录。当前可安装的用户模块必须提供归档内已有的 `.js` 或 `.mjs` renderer 文件；不接受 `syncJobs`、其他 headless 贡献或第三方 `main` 执行入口。
 
 ```text
 example.campusmod
 ├── manifest.json
 ├── dist/
-│   ├── main.js
 │   └── renderer.js
 └── assets/
     └── icon.svg

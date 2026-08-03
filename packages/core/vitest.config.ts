@@ -14,6 +14,14 @@ export default defineConfig({
       "@vite/env": resolve(rootDir, "test/vite-env.ts"),
       "@renderer": resolve(rootDir, "src/renderer"),
       "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
+      "@campusos/plugin-academic/manifest": resolve(
+        rootDir,
+        "../../plugins/official/academic/src/manifest.ts"
+      ),
+      "@campusos/plugin-schedule/manifest": resolve(
+        rootDir,
+        "../../plugins/official/schedule/src/manifest.ts"
+      ),
       "@campusos/plugin-academic-timetable-events/manifest": resolve(
         rootDir,
         "../../plugins/official/academic-timetable-events/src/manifest.ts"
@@ -34,22 +42,6 @@ export default defineConfig({
         rootDir,
         "../../plugins/official/exam-countdown/src/index.tsx"
       ),
-      "@campusos/plugin-academic-scraper/manifest": resolve(
-        rootDir,
-        "../../plugins/official/academic-scraper/src/manifest.ts"
-      ),
-      "@campusos/plugin-academic-scraper": resolve(
-        rootDir,
-        "../../plugins/official/academic-scraper/src/index.tsx"
-      ),
-      "@campusos/plugin-calendar/manifest": resolve(
-        rootDir,
-        "../../plugins/official/calendar/src/manifest.ts"
-      ),
-      "@campusos/plugin-calendar": resolve(
-        rootDir,
-        "../../plugins/official/calendar/src/index.tsx"
-      ),
       "@campusos/plugin-materials/manifest": resolve(
         rootDir,
         "../../plugins/official/materials/src/manifest.ts"
@@ -57,14 +49,6 @@ export default defineConfig({
       "@campusos/plugin-materials": resolve(
         rootDir,
         "../../plugins/official/materials/src/index.tsx"
-      ),
-      "@campusos/plugin-dingtalk-entry/manifest": resolve(
-        rootDir,
-        "../../plugins/official/dingtalk-entry/src/manifest.ts"
-      ),
-      "@campusos/plugin-dingtalk-entry": resolve(
-        rootDir,
-        "../../plugins/official/dingtalk-entry/src/index.tsx"
       ),
       "@campusos/plugin-zju-undergraduate/manifest": resolve(
         rootDir,

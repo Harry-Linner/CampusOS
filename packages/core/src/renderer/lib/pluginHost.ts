@@ -8,6 +8,10 @@ import {
   type PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { createPluginCapabilityClient } from "./pluginBridge";
+import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
+import { AcademicView } from "../views/AcademicView";
+import { CalendarView } from "../views/CalendarView";
 
 type PluginModule = {
   manifest: PluginManifestV2;
@@ -42,28 +46,16 @@ const createSandboxedRendererComponent = (
 
 const pluginDefinitions: PluginDefinition[] = [
   {
-    id: "org.campusos.academic-grades",
-    load: () => import("@campusos/plugin-academic-grades")
+    id: academicManifest.id,
+    load: async () => ({ manifest: academicManifest, Component: AcademicView })
   },
   {
-    id: "org.campusos.academic-scraper",
-    load: () => import("@campusos/plugin-academic-scraper")
-  },
-  {
-    id: "org.campusos.calendar-workspace",
-    load: () => import("@campusos/plugin-calendar")
+    id: scheduleManifest.id,
+    load: async () => ({ manifest: scheduleManifest, Component: CalendarView })
   },
   {
     id: "org.campusos.materials",
     load: () => import("@campusos/plugin-materials")
-  },
-  {
-    id: "org.campusos.dingtalk-entry",
-    load: () => import("@campusos/plugin-dingtalk-entry")
-  },
-  {
-    id: "org.campusos.exam-countdown",
-    load: () => import("@campusos/plugin-exam-countdown")
   }
 ];
 

@@ -37,17 +37,23 @@ const createManifest = (
   kind: "feature",
   description: "显示考试倒计时。",
   icon: "计",
-  permissions: ["storage:domain:countdown"],
+  permissions: ["storage:local"],
   sourceScope: ["local"],
   releaseStage: "ready",
   provides: [],
   requires: [],
   optionalRequires: [],
   contributes: {
-    commands: ["countdown.open"]
+    views: [{
+      id: "countdown-main",
+      title: "考试倒计时",
+      icon: "Clock",
+      location: "activity",
+      activityTarget: "mod-dev-example-countdown"
+    }]
   },
   entrypoints: {
-    main: "dist/main.js"
+    renderer: "dist/renderer.js"
   },
   ...overrides
 });
@@ -57,18 +63,18 @@ const createArchive = (
   extraEntries: Record<string, Uint8Array> = {}
 ): Uint8Array => zipSync({
   "manifest.json": strToU8(JSON.stringify(manifest)),
-  "dist/main.js": strToU8("export const activate = () => ({ deactivate() {} });"),
+  "dist/renderer.js": strToU8("export const mount = () => document.body;"),
   ...extraEntries
 });
 
 const createSignedArchive = (): Uint8Array => {
   const manifest = createManifest();
-  const main = strToU8("export const activate = () => ({ deactivate() {} });");
+  const renderer = strToU8("export const mount = () => document.body;");
   const signaturePayload = createCampusmodSigningPayload(
     manifest,
     new Map([
       ["manifest.json", strToU8(JSON.stringify(manifest))],
-      ["dist/main.js", main]
+      ["dist/renderer.js", renderer]
     ])
   );
   const { privateKey } = generateEd25519KeyPair();
@@ -80,7 +86,7 @@ const createSignedArchive = (): Uint8Array => {
     developerSignature: signature.signature,
     developerPublicKey: signature.publicKey
   }, {
-    "dist/main.js": main
+    "dist/renderer.js": renderer
   });
 };
 
@@ -124,6 +130,67 @@ describe("CampusmodPackageRegistry", () => {
     await expect(registry.inspect(sourcePath)).rejects.toThrow("签名字段必须同时提供");
   });
 
+  it("rejects headless campusmods that do not provide one sidebar module", async () => {
+    const workspace = await createTemporaryDirectory();
+    const sourcePath = join(workspace, "headless.campusmod");
+    await writeFile(sourcePath, createArchive(createManifest({
+      contributes: { syncJobs: ["countdown.refresh"] },
+      entrypoints: { main: "dist/main.js" }
+    })));
+    const registry = createCampusmodPackageRegistry({
+      rootPath: join(workspace, "installed")
+    });
+
+    await expect(registry.inspect(sourcePath)).rejects.toThrow(
+      "User campusmod cannot contribute headless jobs"
+    );
+  });
+
+  it("rejects a package that passes the shape check but cannot run in the renderer sandbox", async () => {
+    const workspace = await createTemporaryDirectory();
+    const cases = [
+      {
+        name: "wrong-target",
+        overrides: {
+          contributes: {
+            views: [{
+              id: "countdown-main",
+              title: "考试倒计时",
+              icon: "Clock",
+              location: "activity",
+              activityTarget: "countdown"
+            }]
+          }
+        },
+        issue: "renderer sandbox"
+      },
+      {
+        name: "capability-dependent",
+        overrides: {
+          requires: ["academic.grades@1"]
+        },
+        issue: "capability"
+      },
+      {
+        name: "network-permission",
+        overrides: {
+          permissions: ["network:https://example.com"]
+        },
+        issue: "storage:local"
+      }
+    ] as const;
+
+    for (const testCase of cases) {
+      const sourcePath = join(workspace, `${testCase.name}.campusmod`);
+      await writeFile(sourcePath, createArchive(createManifest(testCase.overrides)));
+      const registry = createCampusmodPackageRegistry({
+        rootPath: join(workspace, `${testCase.name}-installed`)
+      });
+
+      await expect(registry.inspect(sourcePath)).rejects.toThrow(testCase.issue);
+    }
+  });
+
   it("inspects, atomically installs, upgrades and loads a real campusmod archive", async () => {
     const workspace = await createTemporaryDirectory();
     const rootPath = join(workspace, "installed");
@@ -142,7 +209,7 @@ describe("CampusmodPackageRegistry", () => {
         id: "dev.example.countdown",
         version: "1.0.0"
       },
-      entrypoints: { main: "dist/main.js" },
+      entrypoints: { renderer: "dist/renderer.js" },
       signatureStatus: "unsigned"
     });
     expect(JSON.stringify(inspection)).not.toContain(sourcePath);
@@ -157,12 +224,12 @@ describe("CampusmodPackageRegistry", () => {
       "安装确认已失效"
     );
     await expect(readFile(
-      join(rootPath, "dev.example.countdown", "dist", "main.js"),
+      join(rootPath, "dev.example.countdown", "dist", "renderer.js"),
       "utf8"
-    )).resolves.toContain("activate");
+    )).resolves.toContain("mount");
     await expect(registry.readFile(
       "dev.example.countdown",
-      "dist/main.js"
+      "dist/renderer.js"
     )).resolves.toEqual(expect.any(Uint8Array));
     await expect(registry.readFile(
       "dev.example.countdown",
@@ -182,7 +249,7 @@ describe("CampusmodPackageRegistry", () => {
     await expect(registry.load()).resolves.toMatchObject({
       packages: [{
         manifest: { id: "dev.example.countdown", version: "1.1.0" },
-        entrypoints: { main: "dist/main.js" }
+        entrypoints: { renderer: "dist/renderer.js" }
       }],
       issues: []
     });
@@ -207,7 +274,7 @@ describe("CampusmodPackageRegistry", () => {
     const caseCollisionPath = join(workspace, "case-collision.campusmod");
     const parentCollisionPath = join(workspace, "parent-collision.campusmod");
     await writeFile(caseCollisionPath, createArchive(createManifest(), {
-      "DIST/main.js": strToU8("duplicate on case-insensitive filesystems")
+      "DIST/renderer.js": strToU8("duplicate on case-insensitive filesystems")
     }));
     await writeFile(parentCollisionPath, createArchive(createManifest(), {
       "dist": strToU8("cannot also be a directory")
@@ -308,7 +375,7 @@ describe("CampusmodPackageRegistry", () => {
     await registry.install(inspection.token);
 
     await writeFile(
-      join(rootPath, "dev.example.countdown", "dist", "main.js"),
+      join(rootPath, "dev.example.countdown", "dist", "renderer.js"),
       "tampered",
       "utf8"
     );

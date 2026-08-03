@@ -7,7 +7,10 @@ import type {
 import { getSandboxedRendererExecutionIssue } from "@campusos/shared";
 import {
   corePluginCapabilities,
-  officialPluginManifests
+  officialCoreModuleManifests,
+  officialRuntimeManifests,
+  officialUserPluginManifests,
+  toUserPluginSnapshot
 } from "./officialPluginCatalog";
 import { createOfficialHeadlessPluginLoaders } from "./officialHeadlessPluginLoaders";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
@@ -28,6 +31,7 @@ export interface PluginPackageMutationResult {
 
 export interface OfficialPluginRuntimeService {
   load: () => Promise<PluginRuntimeSnapshot>;
+  loadInternal: () => Promise<PluginRuntimeSnapshot>;
   configure: (
     input: PluginRuntimeConfigurationInput
   ) => Promise<PluginRuntimeSnapshot>;
@@ -50,8 +54,14 @@ export const getOfficialPluginRuntimeService =
     if (service) return service;
 
     const pluginRootPath = join(app.getPath("userData"), "plugins");
-    const officialPluginIds = new Set(
-      officialPluginManifests.map((manifest) => manifest.id)
+    const officialRuntimeIds = new Set(
+      officialRuntimeManifests.map((manifest) => manifest.id)
+    );
+    const officialUserPluginIds = new Set(
+      officialUserPluginManifests.map((manifest) => manifest.id)
+    );
+    const officialCoreModuleIds = new Set(
+      officialCoreModuleManifests.map((manifest) => manifest.id)
     );
     const packageRegistry = createCampusmodPackageRegistry({
       rootPath: join(pluginRootPath, "installed")
@@ -59,18 +69,26 @@ export const getOfficialPluginRuntimeService =
     const repository = createPluginRuntimeRepository({
       storagePath: join(pluginRootPath, "runtime-state.json"),
       loadManifests: async () => [
-        ...officialPluginManifests,
+        ...officialRuntimeManifests,
         ...(await packageRegistry.load()).packages.map(
           (installedPackage) => installedPackage.manifest
         )
       ],
       coreCapabilities: corePluginCapabilities,
-      isEnabledByDefault: (manifest) => officialPluginIds.has(manifest.id),
+      isEnabledByDefault: (manifest) => officialRuntimeIds.has(manifest.id),
       defaultGrantedPermissions: (manifest) =>
-        officialPluginIds.has(manifest.id) ? [...manifest.permissions] : [],
-      canEnable: (manifest) => officialPluginIds.has(manifest.id)
+        officialRuntimeIds.has(manifest.id) ? [...manifest.permissions] : [],
+      canEnable: (manifest) => officialRuntimeIds.has(manifest.id)
         ? null
-        : getSandboxedRendererExecutionIssue(manifest)
+        : getSandboxedRendererExecutionIssue(manifest),
+      isAlwaysEnabled: (manifest) => officialCoreModuleIds.has(manifest.id),
+      legacyPluginIds: {
+        "org.campusos.academic": [
+          "org.campusos.academic-grades",
+          "org.campusos.exam-countdown"
+        ],
+        "org.campusos.schedule": ["org.campusos.calendar-workspace"]
+      }
     });
     const lifecycle = createPluginLifecycleCoordinator({
       loaders: createOfficialHeadlessPluginLoaders({
@@ -78,12 +96,22 @@ export const getOfficialPluginRuntimeService =
       })
     });
 
-    const load = async (): Promise<PluginRuntimeSnapshot> =>
+    const loadInternal = async (): Promise<PluginRuntimeSnapshot> =>
       lifecycle.reconcile(await repository.load());
+    const load = async (): Promise<PluginRuntimeSnapshot> =>
+      toUserPluginSnapshot(await loadInternal());
     service = {
       load,
-      configure: async (input) =>
-        lifecycle.reconcile(await repository.configure(input)),
+      loadInternal,
+      configure: async (input) => {
+        if (officialCoreModuleIds.has(input.pluginId)) {
+          throw new Error("Core modules cannot be configured as plugins.");
+        }
+        const snapshot = await lifecycle.reconcile(
+          await repository.configure(input)
+        );
+        return toUserPluginSnapshot(snapshot);
+      },
       inspectPackage: (sourcePath) => packageRegistry.inspect(sourcePath),
       discardPackageInspection: (token) => packageRegistry.discard(token),
       installPackage: async (token) => {
@@ -98,7 +126,7 @@ export const getOfficialPluginRuntimeService =
       readPackageFile: (pluginId, relativePath) =>
         packageRegistry.readFile(pluginId, relativePath),
       uninstallPackage: async (pluginId) => {
-        if (officialPluginIds.has(pluginId)) {
+        if (officialUserPluginIds.has(pluginId)) {
           throw new Error("内置官方插件不能通过第三方包管理器卸载。");
         }
         const current = await load();

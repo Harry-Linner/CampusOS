@@ -34,31 +34,31 @@ const verifiedRecord: AcademicCredentialRecord = {
 };
 
 const stubPlugin: PluginRuntimeRecord = {
-  id: "org.campusos.calendar-workspace",
+  id: "org.campusos.schedule",
   manifest: {
-    id: "org.campusos.calendar-workspace",
-    name: "calendar-workspace",
-    displayName: "日历工作台",
-    version: "0.3.0",
+    id: "org.campusos.schedule",
+    name: "schedule",
+    displayName: "日程",
+    version: "0.1.0",
     apiVersion: 2,
     kind: "feature",
     description: "消费统一事件能力，展示课程、考试、截止事项。",
     icon: "Calendar",
-    permissions: ["storage:domain:calendar", "notification"],
+    permissions: [],
     sourceScope: ["capability:calendar.events"],
     releaseStage: "ready",
     provides: [],
-    requires: ["core.workspace-snapshot@1", "calendar.events@1"],
-    optionalRequires: [],
+    requires: ["core.workspace-snapshot@1"],
+    optionalRequires: ["calendar.events@1"],
     contributes: {
       views: [
         {
-          id: "calendar-main",
-          title: "日历",
+          id: "schedule-main",
+          title: "日程",
           icon: "Calendar",
           location: "activity",
-          activityTarget: "calendar",
-          order: 1
+          activityTarget: "schedule",
+          order: 20
         }
       ]
     }
@@ -408,10 +408,21 @@ describe("OnboardingWizard", () => {
       screen.getByRole("button", { name: "安装选中插件" })
     );
     expect(await screen.findByText("一切就绪")).toBeDefined();
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledTimes(3);
     expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
-      pluginId: stubPlugin.id,
+      pluginId: "org.campusos.academic",
       enabled: true,
-      grantedPermissions: stubPlugin.manifest.permissions
+      grantedPermissions: []
+    });
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
+      pluginId: "org.campusos.schedule",
+      enabled: true,
+      grantedPermissions: []
+    });
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
+      pluginId: "org.campusos.materials",
+      enabled: true,
+      grantedPermissions: ["storage:domain:materials"]
     });
 
     // Step 4: done → complete

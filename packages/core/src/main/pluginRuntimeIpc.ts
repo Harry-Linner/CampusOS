@@ -47,7 +47,7 @@ export const registerPluginRuntimeHandlers = (): void => {
   const runtime = getOfficialPluginRuntimeService();
   const capabilityRepository = getOfficialCapabilityRepository();
   const capabilityAccess = createPluginCapabilityAccess({
-    loadRuntime: () => runtime.load(),
+    loadRuntime: () => runtime.loadInternal(),
     readRecords: <T>(capability: PluginCapability) =>
       capabilityRepository.read<T>(capability),
     readVerifiedAccountId: async () => {

@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
 import type { AcademicProgram } from "../../shared/credentialBridge";
-import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
-import { manifest as academicGradesManifest } from "@campusos/plugin-academic-grades/manifest";
-import { manifest as calendarManifest } from "@campusos/plugin-calendar/manifest";
-import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
+import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
+import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useCampusWorkspace } from "../hooks/useCampusWorkspace";
 import { usePluginHost } from "../hooks/usePluginHost";
@@ -39,38 +38,32 @@ const allowsFixtureOnboarding =
   rendererEnvironment?.DEV === true || rendererEnvironment?.MODE === "e2e";
 
 const RECOMMENDED_PLUGIN_IDS = [
-  "org.campusos.calendar-workspace",
-  "org.campusos.academic-grades",
-  "org.campusos.plugin-deadline-assistant",
-  "org.campusos.plugin-academic-exams"
+  academicManifest.id,
+  scheduleManifest.id,
+  materialsManifest.id
 ];
 
 const recommendedPluginPermissions = new Map([
-  calendarManifest,
-  academicGradesManifest,
-  deadlineAssistantManifest,
-  academicExamsManifest
+  academicManifest,
+  scheduleManifest,
+  materialsManifest
 ].map((manifest) => [manifest.id, manifest.permissions] as const));
 
 const RECOMMENDED_PLUGIN_DETAILS: Record<
   string,
   { name: string; description: string }
 > = {
-  "org.campusos.calendar-workspace": {
-    name: "日历工作台",
-    description: "月历、日程与单日时间线，统一展示课程、考试和待办事项。"
+  "org.campusos.academic": {
+    name: "学业",
+    description: "在一个模块内查看课表、课程、考试、成绩与实践数据。"
   },
-  "org.campusos.academic-grades": {
-    name: "学业成绩",
-    description: "汇总教务成绩并基于教务返回的绩点计算加权概览。"
+  "org.campusos.schedule": {
+    name: "日程",
+    description: "统一查看课程、考试、截止事项与个人安排。"
   },
-  "org.campusos.plugin-deadline-assistant": {
-    name: "DDL 助手",
-    description: "把学在浙大作业截止时间转换为统一日历事件。"
-  },
-  "org.campusos.plugin-academic-exams": {
-    name: "考试日历",
-    description: "把有明确时间的考试导入日历，支持倒计时与提醒。"
+  "org.campusos.materials": {
+    name: "资料",
+    description: "按课程浏览资料，并使用受控下载队列保存文件。"
   }
 };
 
@@ -731,7 +724,7 @@ export const OnboardingWizard = ({
                 <div className="onboarding-done-item">
                   <strong>扩展已就绪</strong>
                 <span>
-                  日历、成绩、DDL 和考试功能可用
+                  学业、日程和资料模块可用
                 </span>
               </div>
             </div>

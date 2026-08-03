@@ -17,7 +17,7 @@ import {
   type UnzipFile
 } from "fflate";
 import {
-  validateManifestV2,
+  validateUserPluginManifestV2,
   type PluginManifestV2
 } from "@campusos/shared";
 import {
@@ -356,7 +356,16 @@ const parseManifest = (
     throw new Error("插件 manifest 不是有效的 UTF-8 JSON。");
   }
 
-  const validation = validateManifestV2(candidate);
+  // Keep the official namespace boundary ahead of sandbox eligibility errors.
+  // This prevents a malformed package from receiving a misleading runtime
+  // capability error and preserves the package identity contract.
+  if (
+    typeof candidate.id === "string" &&
+    candidate.id.startsWith("org.campusos.")
+  ) {
+    throw new Error("第三方插件不能使用 CampusOS 官方命名空间。");
+  }
+  const validation = validateUserPluginManifestV2(candidate);
   if (!validation.ok) {
     throw new Error(`插件 manifest 无效：${validation.issues.join("；")}`);
   }
@@ -366,9 +375,6 @@ const parseManifest = (
     !/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/.test(candidate.id)
   ) {
     throw new Error("第三方插件 ID 必须是小写反向域名格式。");
-  }
-  if (candidate.id.startsWith("org.campusos.")) {
-    throw new Error("第三方插件不能使用 CampusOS 官方命名空间。");
   }
   if (
     typeof candidate.version !== "string" ||
@@ -511,7 +517,7 @@ const parseInstalledMetadata = (value: unknown): StoredInstallMetadata => {
     throw new Error("安装元数据不是对象。");
   }
   const candidate = value as Partial<StoredInstallMetadata>;
-  const validation = validateManifestV2(candidate.manifest);
+  const validation = validateUserPluginManifestV2(candidate.manifest);
   if (
     candidate.dataVersion !== 1 ||
     !validation.ok ||

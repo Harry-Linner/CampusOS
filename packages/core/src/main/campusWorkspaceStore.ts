@@ -94,7 +94,7 @@ const assertAcademicRefreshAvailable = async (
 const buildGeneratedRecord = async (
   hydratedFrom: "generated" | "synced"
 ): Promise<CampusWorkspaceRecord> => {
-  const pluginRuntime = await getOfficialPluginRuntimeService().load();
+  const pluginRuntime = await getOfficialPluginRuntimeService().loadInternal();
   const refreshResults = await pluginRefreshCoordinator.runAll();
   const academicCredential = await readAcademicCredentialRecord();
   const verifiedAcademicAccountId =

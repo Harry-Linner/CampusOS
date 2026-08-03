@@ -8,7 +8,7 @@ CampusOS 是一个面向浙江大学学生的桌面校园工作台。当前处�
 - `总览`、`扩展`、`设置` 三个 Core 入口 + 由已激活模块动态生成的插件入口；标准导航为 `总览 → 学业 → 日程 → 资料 → 扩展 → 设置`，每个插件恰好占用一个一级侧栏入口
 - 月历、周视图、线性日程与单日时间线的课程、作业与考试聚合视图
 - Plugin Runtime v2 内置插件路径：Manifest v2、能力依赖解析、逐项授权、持久化、主进程无头生命周期与刷新协调
-- `.campusmod` 本地包管理：真实 ZIP 流式校验、一次性确认、原子安装/升级、崩溃恢复、逐文件完整性检查、持久注册与卸载；符合严格本地单视图 profile 的包可在 Electron 43 Chromium 沙箱、独立 origin、无 Node/网络/IPC 的 iframe 中运行，其他第三方包保持 install-only，详见 [包格式与安装边界](docs/architecture/campusmod-package-format.md)
+- `.campusmod` 本地包管理：真实 ZIP 流式校验、一次性确认、原子安装/升级、崩溃恢复、逐文件完整性检查、持久注册与卸载；所有可安装的第三方包都必须符合严格本地单视图 profile，并在 Electron 43 Chromium 沙箱、独立 origin、无 Node/网络/IPC 的 iframe 中运行，不符合的包在检查阶段拒绝，详见 [包格式与安装边界](docs/architecture/campusmod-package-format.md)
 - 统一日历事件能力：`calendar.events@1` 支持多个独立 provider；Core 事件投影服务按刷新依赖顺序把可信考试、DDL 与课程时间转换为事件，`日程`模块不依赖具体连接器 ID
 - 本科教务连接器：通过核心不透明业务 Session 读取当前与下一学年课表、考试及成绩，逐条容错并持久化 provenance；有明确日期时间的考试进入工作台，只有相对考试周描述的记录保留原文、不猜测日期
 - 研究生教务连接器：设置页可显式选择研究生路径，核心消费研究生院 CAS ticket、验证认证后成绩结构并仅在主进程内保管 `X-Access-Token`；`学业`模块通过固定操作读取课表、考试和成绩，精确周次原样保留，缺少明确时间的考试不伪造起止时间。自动化协议 fixture 已通过但真实研究生账号尚未验收

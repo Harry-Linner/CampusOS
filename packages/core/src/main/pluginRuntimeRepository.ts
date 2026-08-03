@@ -41,6 +41,8 @@ export interface CreatePluginRuntimeRepositoryOptions {
     manifest: PluginManifestV2
   ) => CampusPermission[];
   canEnable?: (manifest: PluginManifestV2) => string | null;
+  isAlwaysEnabled?: (manifest: PluginManifestV2) => boolean;
+  legacyPluginIds?: Record<string, readonly string[]>;
 }
 
 const createDefaultConfiguration = (
@@ -66,7 +68,9 @@ export const createPluginRuntimeRepository = ({
   coreCapabilities,
   isEnabledByDefault = (manifest) => manifest.releaseStage === "ready",
   defaultGrantedPermissions = () => [],
-  canEnable = () => null
+  canEnable = () => null,
+  isAlwaysEnabled = () => false,
+  legacyPluginIds = {}
 }: CreatePluginRuntimeRepositoryOptions): PluginRuntimeRepository => {
   if (!manifests && !loadManifests) {
     throw new Error("Plugin runtime repository requires a manifest source.");
@@ -90,22 +94,40 @@ export const createPluginRuntimeRepository = ({
         throw new Error("Plugin runtime state has an unsupported schema.");
       }
 
+      const storedConfigurations = payload.plugins;
+
       const plugins: Record<string, StoredPluginConfiguration> = {};
       for (const manifest of currentManifests) {
-        const stored = payload.plugins[manifest.id];
+        const directConfiguration = storedConfigurations[manifest.id];
+        const storedCandidates = directConfiguration
+          ? [directConfiguration]
+          : (legacyPluginIds[manifest.id] ?? [])
+              .map((legacyId) => storedConfigurations[legacyId])
+              .filter((candidate): candidate is StoredPluginConfiguration =>
+                candidate !== undefined
+              );
         const defaults = createDefaultConfiguration(
           manifest,
           isEnabledByDefault,
           defaultGrantedPermissions
         );
-        const storedPermissions = Array.isArray(stored?.grantedPermissions)
-          ? stored.grantedPermissions.filter((permission) =>
-              manifest.permissions.includes(permission)
-            )
+        const storedPermissions = storedCandidates.length > 0
+          ? [
+              ...new Set(
+                storedCandidates.flatMap((candidate) =>
+                  Array.isArray(candidate.grantedPermissions)
+                    ? candidate.grantedPermissions.filter((permission) =>
+                        manifest.permissions.includes(permission)
+                      )
+                    : []
+                )
+              )
+            ]
           : defaults.grantedPermissions;
-        const requestedEnabled =
-          typeof stored?.enabled === "boolean"
-            ? stored.enabled
+        const requestedEnabled = isAlwaysEnabled(manifest)
+          ? true
+          : storedCandidates.length > 0
+            ? storedCandidates.some((candidate) => candidate.enabled === true)
             : defaults.enabled;
         const grantedPermissions =
           requestedEnabled && defaultGrantedPermissions(manifest).length > 0
@@ -124,8 +146,12 @@ export const createPluginRuntimeRepository = ({
             canEnable(manifest) === null,
           grantedPermissions,
           updatedAt:
-            typeof stored?.updatedAt === "string"
-              ? stored.updatedAt
+            storedCandidates.length > 0
+              ? storedCandidates
+                  .map((candidate) => candidate.updatedAt)
+                  .filter((value): value is string => typeof value === "string")
+                  .sort()
+                  .at(-1) ?? defaults.updatedAt
               : defaults.updatedAt
         };
       }
@@ -238,6 +264,9 @@ export const createPluginRuntimeRepository = ({
         const manifest = manifestsById.get(input.pluginId);
         if (!manifest) {
           throw new Error(`Unknown plugin: ${input.pluginId}`);
+        }
+        if (isAlwaysEnabled(manifest)) {
+          throw new Error(`Core module cannot be configured: ${input.pluginId}`);
         }
 
         if (manifest.releaseStage === "placeholder" && input.enabled) {
