@@ -1,6 +1,6 @@
 # Contributing to CampusOS
 
-CampusOS is a local-first desktop workspace for ZJU students. Contributions must preserve the capability-driven plugin boundary: connectors obtain source data through core-owned sessions, and feature plugins consume versioned capabilities instead of source-specific imports.
+CampusOS is a local-first desktop workspace for ZJU students. A plugin is a user-selectable module that contributes exactly one first-level left-navigation destination. Core-managed connectors obtain source data through core-owned sessions; plugins consume versioned capabilities instead of source-specific imports.
 
 ## Development
 
@@ -13,6 +13,8 @@ CampusOS is a local-first desktop workspace for ZJU students. Contributions must
 
 - Keep fixtures at explicit source-adapter boundaries. UI and business flows must use the production capability and IPC contracts.
 - Do not expose passwords, cookies, sessions, tickets, response bodies, or access tokens to plugins or renderer code.
+- Do not register connectors, event projectors, schedulers, search providers, notification policies, or export adapters as user-visible plugins.
+- Keep subfeatures inside their owning module. A plugin must not add multiple first-level navigation destinations.
 - Add focused tests for observable behavior. Mock only external network or data-source boundaries.
 - Update `PRD.md`, `plan.md`, `research.md`, and applicable `docs/specs/` files when product scope, assumptions, or implementation status changes.
 

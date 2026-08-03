@@ -2,13 +2,15 @@
 
 > **历史规格：** 本文中有关活动栏、状态栏、三卡首页、独立日历浮窗与课件一级页面的 UX 决策，已由 [CampusOS Interface v3](campusos-interface-v3.md) 取代。合规、工程化与插件架构决策仍有效。
 
-> **实现检查点（2026-07-29）：** 本科、研究生和学在浙大连接器均通过核心托管的不可导出业务会话与固定操作发布 capability；原始 profile/课表/考试/成绩、作业、课件目录和统一事件支持账号/provider 隔离。学在浙大每轮重取学期、全部课程分页及逐课 activities/uploads，作业与资料分支独立降级；认证下载固定 reference → preview、5 次指数退避、一次受控重认证并保留 Range/大小校验。课表投影已按 Celechron 合并秋冬/春夏重复 session 并使用半学期有界日期格。开发期以真实 `2026-2027 秋冬` 课表为正确性基线，资料视图和新建下载只接受真实 `2025-2026 春/夏/春夏`。私有基线只位于 Git ignored 本地目录。一份授权私有课件的认证下载和字节校验已通过本科真实账号脱敏验证；多设备和研究生真实账号仍待验收。第三方 headless 的 capability/网络权限代理仍未开放，不能据此标记 Runtime v2 完成。
+> **实现检查点（2026-07-29）：** 本科、研究生和学在浙大连接器均通过核心托管的不可导出业务会话与固定操作发布 capability；原始 profile/课表/考试/成绩、作业、课件目录和统一事件支持账号/provider 隔离。学在浙大每轮重取学期、全部课程分页及逐课 activities/uploads，作业与资料分支独立降级；认证下载固定 reference → preview、5 次指数退避、一次受控重认证并保留 Range/大小校验。课表投影已按 Celechron 合并秋冬/春夏重复 session 并使用半学期有界日期格。开发期以真实 `2026-2027 秋冬` 课表为正确性基线，资料视图和新建下载只接受真实 `2025-2026 春/夏/春夏`。私有基线只位于 Git ignored 本地目录。一份授权私有课件的认证下载和字节校验已通过本科真实账号脱敏验证；多设备和研究生真实账号仍待验收。纯 headless/main 与 connector 包已排除在插件产品形态外，不再是 Runtime v2 的完成门槛。
 
 > **版本：** 2.0 | **日期：** 2026-06-18 | **状态：** MVP Phase 2 实现与验收中
 > **基于：** [第一轮技术规格](ideazjuermodapp.md)（14 轮访谈，2026-06-17）
 > **本轮：** 第二轮 Lisa 访谈，覆盖合规路线、14 条 UX 决策、4 条工程化决策、5 条架构决策
 
 ---
+
+> **当前覆盖（2026-08-03）：** 本文的插件粒度和活动栏示意由 [ADR-0002](../adr/0002-user-facing-plugin-modules.md) 与 [Interface v3](campusos-interface-v3.md) 取代。固定 Core 入口为总览、扩展、设置；启用全部官方插件时增加学业、日程、资料三个入口。连接器、事件投影、排程、搜索和导出不作为插件显示。
 
 ## 1. 本轮概述
 
@@ -161,7 +163,7 @@ V2 加入"发现"Tab（市场后端）。
 └────────────────────────────────────────────────────┘
 ```
 
-- 左侧窄活动栏：📊 仪表盘 | 📅 日历 | 📥 课件 | 🧩 扩展 | ⚙ 设置
+- 左侧窄活动栏：总览（Core）| 学业（插件）| 日程（插件）| 资料（插件）| 扩展（Core）| 设置（Core）
 - 点击图标 → 主内容区切换视图
 - 插件内部子导航由插件自己处理
 - 底部状态栏四项信息：学期周次 + 同步状态 + 下载队列 + 网络状态
@@ -182,7 +184,7 @@ V2 加入"发现"Tab（市场后端）。
 
 ### UX-10: 设置页面
 
-- 设置作为活动栏图标（⚙），和其他插件平级
+- 设置作为固定 Core 活动栏图标（⚙），视觉上与插件入口平级但不参与插件启停
 - 点击 → 主内容区显示设置视图
 - 内部按分类组织（账号、通知、外观、关于）
 - MVP 最简设置：通知开关、主题切换、关于页
@@ -196,15 +198,13 @@ V2 加入"发现"Tab（市场后端）。
 ```
 campus-os/
 ├── packages/
-│   ├── core/              # Electron + React 主应用
+│   ├── core/              # Electron + React 主应用、内部服务与数据连接器
 │   └── shared/            # 共享类型（manifest、IPC、schema）
 ├── plugins/
 │   └── official/
-│       ├── zju-undergraduate/  # 本科教务 headless 连接器
-│       ├── zju-learning/       # 学在浙大 headless 连接器
-│       ├── academic-timetable/ # 课表功能插件
-│       ├── calendar/           # 日历工作台插件
-│       └── materials/          # 课件下载插件
+│       ├── academic/       # 学业：课表、课程、考试、成绩与实践记录
+│       ├── schedule/       # 日程：日历、DDL、任务、排程与导出
+│       └── materials/      # 资料：课程资料与下载队列
 ├── docs/                  # 文档
 ├── pnpm-workspace.yaml
 ├── turbo.json
@@ -212,7 +212,7 @@ campus-os/
 ```
 
 - pnpm workspaces + turborepo
-- 统一版本管理，官方插件与核心一起发版
+- 统一版本管理，三个官方插件与核心一起发版；每个插件恰好贡献一个一级侧栏入口
 - `packages/shared/` 定义所有跨包类型
 
 ### ENG-2: CI/CD 流水线
@@ -252,7 +252,7 @@ Phase 3 加入 changesets + 自动发 GitHub Release + electron-updater。
 - 官方内置 React 组件保留编译期受信 import；第三方入口绝不导入宿主 React/Node 上下文
 - renderer sandbox v1 通过 `campusmod://<plugin-id>` 独立 secure origin 和 host-owned iframe 加载，Electron renderer 开启 OS sandbox，CSP 禁止网络/eval，且没有 preload/Node/IPC
 - 当前仅开放唯一 namespaced activity view、`storage:local`、无 capability/后台贡献的 profile
-- 第三方 headless/main 在独立 worker/isolate、资源限制和权限代理完成前禁止执行
+- 纯 headless/main 与 connector 包不属于插件产品形态，不接入第三方插件生命周期
 
 ### ARCH-2: 多窗口状态管理
 
@@ -422,7 +422,7 @@ Phase 2 和 Phase 3 的范围基本不变，但以下部分根据本轮决策调
 |----|------|------|------|
 | US-1 | 工作台骨架 + 插件框架 | 第一轮 | **本轮修订**（UX/布局/视觉） |
 | US-2 | 首次引导 + 账号管理 | 第一轮 | 保持 + 本轮补充失败处理 |
-| US-3 | 教务抓取插件 | 第一轮 | 保持 |
+| US-3 | Core 教务连接器 + 学业插件 | 第一轮 | **本轮修订**（模块边界） |
 | US-4 | 日历 + 提醒系统 | 第一轮 | **本轮修订**（桌面伴侣/DDL/通知） |
 | US-5 | 打包发布 + 自动更新 | 第一轮 | 保持 |
 | US-6 | 插件开发文档 + 示例 | 第一轮 | 保持 |

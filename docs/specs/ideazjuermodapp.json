@@ -5,6 +5,12 @@
   "date": "2026-06-17",
   "status": "superseded",
   "supersededBy": "docs/specs/campusos-interface-v3.md",
+  "currentPluginModel": {
+    "decision": "docs/adr/0002-user-facing-plugin-modules.md",
+    "rule": "one plugin equals exactly one first-level left-navigation module",
+    "officialModules": ["academic", "schedule", "materials"],
+    "coreManaged": ["data connectors", "event projection", "task storage", "auto scheduling", "search", "notifications", "calendar export"]
+  },
   "platform": {
     "primary": "Windows (Electron)",
     "future": ["macOS", "Linux", "Mobile"]
@@ -44,7 +50,7 @@
   "userStories": [
     { "id": "US-1", "title": "Electron 工作台骨架 + 插件框架", "phase": 1 },
     { "id": "US-2", "title": "首次引导 + 账号管理", "phase": 2 },
-    { "id": "US-3", "title": "教务抓取插件 (官方)", "phase": 2 },
+    { "id": "US-3", "title": "Core 教务连接器 + 学业插件", "phase": 2 },
     { "id": "US-4", "title": "日历 + 提醒系统", "phase": 2 },
     { "id": "US-5", "title": "打包发布 + 自动更新", "phase": 3 },
     { "id": "US-6", "title": "插件开发文档 + 示例", "phase": 3 }
@@ -72,7 +78,7 @@
       "tasks": [
         "首次引导向导 (5 步流程 UI)",
         "本地加密存储 (keytar + AES-256-GCM)",
-        "官方教务抓取插件",
+        "Core 教务连接器 + 学业插件",
         "课件下载引擎 (队列、断点续传)",
         "日历组件 (周视图、日视图、冲突检测)",
         "桌面通知系统 + 提醒调度",

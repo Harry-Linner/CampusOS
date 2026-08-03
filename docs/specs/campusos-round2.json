@@ -3,6 +3,12 @@
   "date": "2026-06-18",
   "status": "superseded",
   "supersededBy": "docs/specs/campusos-interface-v3.md",
+  "currentPluginModel": {
+    "decision": "docs/adr/0002-user-facing-plugin-modules.md",
+    "rule": "one plugin equals exactly one first-level left-navigation module",
+    "officialModules": ["academic", "schedule", "materials"],
+    "coreDestinations": ["dashboard", "extensions", "settings"]
+  },
   "feature": {
     "name": "CampusOS Round 2 — 合规、UX、工程化、架构",
     "slug": "campusos-round2",
@@ -33,7 +39,7 @@
   "user_stories": [
     { "id": "US-1", "name": "工作台骨架 + 插件框架", "source": "round1", "status": "revised" },
     { "id": "US-2", "name": "首次引导 + 账号管理", "source": "round1", "status": "kept" },
-    { "id": "US-3", "name": "教务抓取插件", "source": "round1", "status": "kept" },
+    { "id": "US-3", "name": "Core 教务连接器 + 学业插件", "source": "round1", "status": "revised" },
     { "id": "US-4", "name": "日历 + 提醒系统", "source": "round1", "status": "revised" },
     { "id": "US-5", "name": "打包发布 + 自动更新", "source": "round1", "status": "kept" },
     { "id": "US-6", "name": "插件开发文档 + 示例", "source": "round1", "status": "kept" },
@@ -61,7 +67,7 @@
   },
   "engineering": {
     "structure": "pnpm_monorepo",
-    "packages": ["core", "shared", "plugins/official/academic-scraper", "plugins/official/calendar", "plugins/official/materials"],
+    "packages": ["core", "shared", "plugins/official/academic", "plugins/official/schedule", "plugins/official/materials"],
     "ci": "typecheck+lint+test+E2E+build (GitHub Actions)",
     "code_standards": ["ESLint_strict", "Prettier", "Conventional_Commits", "branch_protection"],
     "testing": { "unit": "Vitest", "component": "React_Testing_Library", "e2e": "Playwright" }

@@ -14,16 +14,15 @@ CampusOS is an academic calendar for students, not a system dashboard. The inter
 
 ## Information architecture
 
-The primary navigation always contains four core destinations:
+The primary navigation contains three fixed Core destinations:
 
 1. **总览** — today’s course timeline and an ordered to-do list.
-2. **日历** — switchable month, week, agenda, and day views containing courses, assignments, and exams.
-3. **扩展** — installed extensions as a compact management list.
-4. **设置** — data refresh, account, and reminder controls.
+2. **扩展** — installed extensions as a compact management list.
+3. **设置** — data refresh, account, and reminder controls.
 
-An active feature plugin may contribute an additional first-level destination when it has a complete user-facing view. Those destinations are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient. Connector plugins never add empty navigation placeholders.
+Every enabled plugin contributes exactly one additional first-level destination with a complete user-facing workspace. The three official destinations are **学业**, **日程**, and **资料**. They are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient.
 
-Course materials and grades may occupy first-level destinations only while their corresponding feature plugins are active and have complete views; they are not hard-coded core destinations.
+Data connectors, event projectors, schedulers, search providers, notification policies, and export adapters never contribute navigation or appear as separately installable extensions. Grades live inside 学业; calendar and tasks live inside 日程; course materials live inside 资料.
 
 On desktop, the navigation rail is fixed within the viewport. The main content pane is the sole vertical scroll owner; page content must not make the rail scroll away.
 
@@ -36,17 +35,21 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 - Show deadlines only in the to-do list, excluding any deadline whose Asia/Shanghai calendar date is before today. Reminder scheduler entries never duplicate a deadline as a second to-do.
 - Use composed loading skeletons and concise empty states.
 
-### 学业成绩
+### 学业
+
+- Provide internal tabs for 课表、课程、考试、成绩 and 实践 without creating additional first-level destinations.
+- Course search, detail, history, exam countdown, GPA modes, major identification and practice records all stay within this workspace.
 
 - Privacy masking is on by default and hides original course scores, per-course grade points, weighted GPA, and major weighted GPA together.
 - Turning privacy masking off reveals all four value groups in the existing layout; credit totals remain visible in either mode.
 
 The grades view does not expose connector source-state badges. Major labels are derived from the dedicated major-grade response by `xkkh` matching. Its GPA and earned-credit projection follows Celechron 1.3.0: dropped/pending/deferred/invalid records are excluded from credits, pass/fail and `xtwkc` records are excluded from GPA, and ordinary failed grades remain in the GPA denominator.
 
-### 日历
+### 日程
 
 - Use a Monday-first, continuous 7 × 6 monthly grid with thin shared borders.
 - Provide exactly four views in one page: 月历, 周视图, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
+- Provide additional internal tabs for 接下来、任务、规划 and 导出. Deadline tasks, fixed/repeating schedules and planner periods do not create separate first-level destinations.
 - 周视图 uses the available desktop content width directly and must not create a nested horizontal scroll container. At narrow widths, horizontal scrolling is allowed on the calendar page itself.
 - 月历 places courses, assignments, and exams directly inside the matching date cell.
 - 日程 is a linear, chronological list grouped by date for the visible month, rather than a secondary summary panel.
@@ -60,8 +63,8 @@ The grades view does not expose connector source-state badges. Major labels are 
 - Default rows reveal only extension identity and enabled state.
 - Description, version, permission scope, and data source appear only after selecting “详情”.
 - Do not display internal plugin IDs, lifecycle states, or implementation vocabulary as primary content.
-- A plugin with unmet required capabilities cannot be enabled. The detail view explains the missing user-facing capability and offers the relevant official provider; it must not expose raw dependency IDs as the primary message.
-- Connector plugins may have no standalone page. Their details show connected services, data categories, permission scope and last source status, while normal academic data remains in feature pages.
+- A plugin with unmet required capabilities cannot be enabled. The detail view explains the missing user-facing capability and relevant account/data setting; it must not expose raw dependency IDs as the primary message.
+- Every listed plugin has exactly one left-navigation destination. Core-managed connectors and internal services are shown only as data-source status in settings or diagnostics, never as extensions.
 
 ### 设置
 
@@ -85,12 +88,12 @@ The grades view does not expose connector source-state badges. Major labels are 
 - No status bar.
 - No sync, queue, QoE, source, storage, or scheduler widgets in primary views.
 - No dashboard KPI cards or visualized academic progress.
-- No hard-coded materials, grades, or other plugin destination when its feature plugin is inactive.
+- No hard-coded 学业、日程、资料 or other plugin destination when its plugin is inactive.
 - No explanatory marketing copy inside routine product pages.
 
 ## Acceptance checks
 
-- The main navigation always exposes 总览、日历、扩展、设置; active feature views add and remove their own reachable destinations from runtime contributions.
+- The main navigation always exposes 总览、扩展、设置; enabled plugins add exactly one reachable destination each. With all official plugins enabled, the order is 总览、学业、日程、资料、扩展、设置.
 - The homepage contains one course timeline and one to-do list, without duplicate reminder items.
 - The calendar switches correctly among 月历、周视图、日程、日视图; month, week, and day navigation retain their appropriate period granularity.
 - The monthly grid is usable at desktop width and can horizontally scroll at narrow widths; agenda and day timeline remain readable on narrow screens.

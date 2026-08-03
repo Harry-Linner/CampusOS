@@ -11,6 +11,12 @@
 **Currency:** CNY (¥)
 **Related docs:** [research](research.md) · [plan](plan.md) · [技术规格](docs/specs/ideazjuermodapp.md)
 
+### 插件模块边界（2026-08-03）
+
+CampusOS 的插件是用户可在扩展页启用、禁用，并在左侧栏获得恰好一个一级入口的完整功能模块。官方插件收敛为三个：**学业**（课表、课程、考试、成绩/GPA、素拓实践）、**日程**（日历、DDL、任务、自动排程、系统日历/iCal）和**资料**（课程资料与下载队列）。总览、扩展、设置和全局搜索属于 Core。
+
+本科/研究生教务、学在浙大、素拓和在线校历是 Core 托管的数据连接器，不是插件，不出现在扩展列表或左侧栏。事件投影、任务存储、排程算法、通知、诊断和系统导出是内部服务。移动端专属功能不进入桌面端产品范围。该边界以 [ADR-0002](docs/adr/0002-user-facing-plugin-modules.md) 和 [模块设计](docs/design/celechron-inspired-plugin-suite.md) 为准。
+
 ---
 
 ## One-liner
@@ -31,7 +37,7 @@
 
 **Persona:** 小陈，大三计算机科学与技术专业。每天打开电脑第一件事是开 5 个浏览器 Tab（学在浙大、教务系统、CC98、课程平台、邮箱）。Chrome 内存占用飙到 2GB。课表通过截图设为桌面背景，但每周手动更新。课件分散在 3 个平台，期末考前翻历史下载记录找文件。他想写个脚本自动化这一切，但更想把时间花在真正想做的事情上。
 
-**Adjacent segment (watch):** ZJU 研究生 — 课表需求弱，但课题/实验室日程管理 + 论文材料聚合需求强。其他 985 高校本科生 — 二期扩展目标，但需要插件适配各自的教务系统接口。
+**Adjacent segment (watch):** ZJU 研究生 — 课表需求弱，但课题/实验室日程管理 + 论文材料聚合需求强。其他 985 高校本科生 — 二期扩展目标，但需要 Core 数据连接器适配各自的教务系统接口。
 
 ---
 
@@ -83,14 +89,14 @@
 
 1. 下载安装 CampusOS Windows 包 → 启动 App
 2. 5 步向导：欢迎 → 输入 ZJU 教务账号 → 自动拉取课表（预览确认）→ 推荐官方插件 → 进入主页
-3. 主页：固定核心导航（总览/日历/扩展/设置）+ 已激活功能插件的动态入口 + 主内容区；总览聚焦今日课程时间线与待办，休课期明确预览下一学期同星期课程，日历提供月历、线性日程与单日时间线三种视图
+3. 主页：固定 Core 导航（总览/扩展/设置）+ 已启用插件入口（学业/日程/资料）+ 主内容区；总览聚焦今日课程时间线与待办，休课期明确预览下一学期同星期课程，日程插件提供月历、周视图、线性日程、单日时间线、任务和自动排程
 4. 日常使用：打开 App → 总览确认今日课程与尚未过期的待办，或进入日历按月、连续日程或单日时间线查看课程、作业与考试 → 系统通知提醒上课
 5. 发现新插件：通过扩展面板安装官方插件，或用文件选择器审查并安装 `.campusmod` 社区插件；拖入与 URL 安装仍是后续入口
 
 ### Key capabilities
 
-- **插件框架（MVP 核心骨架）** — `.campusmod` 生命周期、manifest v2、版本化 `provides/requires` 能力解析、headless connector、React 视图、JS 沙箱和权限系统。认证、Session、刷新、缓存、诊断与通知由核心统一提供，不能由插件各自伪造。
-- **Celechron 启发的官方插件集** — 不再使用一个大而全的“教务抓取插件”。本科教务、研究生教务、学在浙大、素拓、在线校历和校园卡作为数据连接器；课表、考试、成绩/GPA、DDL、实践、任务规划、日历桥接和搜索作为能力消费者。完整清单与依赖图见 [官方插件集设计](docs/design/celechron-inspired-plugin-suite.md)。
+- **插件框架（MVP 核心骨架）** — `.campusmod` 生命周期、manifest v2、版本化 `provides/requires` 能力解析、React 视图、JS 沙箱和权限系统。每个可安装插件必须恰好贡献一个完整左侧栏入口；纯后台包、连接器和内部算法不属于插件产品形态。
+- **Celechron 对照的三个官方插件** — “学业”整合课表、课程、考试、成绩/GPA 和素拓实践；“日程”整合日历、DDL、个人任务、自动排程、系统日历和 iCal；“资料”整合课程资料和下载队列。数据连接器和内部服务由 Core 托管，继续通过细粒度 capability 协作。完整边界与迁移表见 [模块设计](docs/design/celechron-inspired-plugin-suite.md)。
 - **校内数据接入稳定性基线** — 教务网、学在浙大、素质拓展平台及后续校内 adapter 必须严格参考 Celechron 1.3.0 已验证的认证状态机、局部成功、重试分类、缓存回退、刷新互斥、下一学年探测、解析隔离和脱敏诊断设计。详细基线见 [Celechron 1.3.0 校内数据接入参考](docs/references/celechron-1.3.0-ingestion-baseline.md)。
 - **统一身份认证核心登录** — 设置页“连接并保存”已接通 ZJUAM 动态公钥登录、本科教务网 Session、素拓 CAS/正式 `SESSION`、非匿名 `ctx` 与 `getMyInfo` 账号匹配汇总；只有取得真实认证后业务数据才写入凭据并展示回执。本科课表、考试、成绩和学在浙大作业通过正式 capability 链路进入当前账号的正式 workspace；关键 connector 不可用时同步失败，不能伪造成功或以 mock 项替代。完整状态机见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)。
 - **学在浙大课程资料** — 严格对照 [ZJU Learning Assistant 课程资料基线](docs/references/zju-learning-assistant-courseware-baseline.md)：刷新前重新读取学期、全部课程分页和每门课程的 activities/uploads；reference blob 失败后才使用 preview blob，最多重试 5 次；本地文件不存在或大小改变时允许重新下载。目录发现及一份授权私有文件的认证下载和字节校验已通过真实账号脱敏验证；多设备现场验收仍是发布门槛。
@@ -114,12 +120,12 @@
 - Electron + React + TypeScript + Vite 项目骨架
 - 工作台 UI（简洁导航 + 主内容区；不设状态栏或系统运行指标面板）
 - `.campusmod` 插件加载/卸载/生命周期管理，以及 manifest v2 能力依赖解析
-- 第三方 renderer 通过自定义 secure origin + Chromium sandbox iframe mount contract 加载；headless/main 代码进入独立 worker/isolate 后才可执行
+- 第三方插件通过自定义 secure origin + Chromium sandbox iframe mount contract 加载唯一 renderer 视图；纯 headless/main 包和 connector 包不属于支持的插件形态
 - 权限声明解析 + 安装确认 UI
 - SQLite 初始化 + migration 框架
 - 5 步首次引导向导
 - Electron `safeStorage` 凭据加密；Windows 使用 DPAPI 保护密钥
-- 首批官方连接器与功能插件：本科/研究生教务、在线校历、学在浙大、课表、考试、DDL 和日历工作台
+- 首批 Core 数据连接器：本科/研究生教务、在线校历、学在浙大；首批官方插件固定为 `学业`、`日程`、`资料` 三个完整左侧栏模块
 - 首批接入源优先覆盖：教务处网站、学在浙大、计算机学院院网、云峰学院院网、ETA 三全育人平台
 - 校内 adapter 通过 Celechron 1.3.0 接入稳定性验收矩阵；不得以单次 happy path 登录或整批失败式抓取替代
 - 课件下载引擎 (队列管理 + 断点续传)
@@ -133,7 +139,7 @@
 ### Non-goals (explicit — do NOT do these in v1)
 > _This is the most important section of the PRD. Bad PRDs die because they don't have this._
 
-- **移动端 (iOS/Android)** — Electron 方案无法直接平移；移动端需要独立技术方案。等桌面端验证了核心价值后再启动移动端调研。
+- **移动端 (iOS/Android)** — Electron 方案无法直接平移；校园卡、付款码等移动端专属能力不进入桌面端功能或插件设计。等桌面端验证了核心价值后再启动独立的移动端调研。
 - **云端数据同步** — V1 纯本地；云端同步引入服务器成本和隐私复杂性。当"换电脑数据没了"成为用户高频反馈时再启动。
 - **商业化插件市场 / 付费插件体系** — V1 不做任何收费功能。社区插件先靠手动安装 `.campusmod` 文件（拖入/文件选择器/URL）；未来如需插件目录，也优先考虑开源、非商业分发。
 - **用户账户系统** — 没有自己的用户系统；教务账号仅用于抓取，不用于登录 CampusOS。避免"又一个要注册的 APP"。
@@ -160,7 +166,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 - ZJU 学生（尤其是工科生）熟悉 VS Code 工作台范式，安装 Desktop App 的意愿高于普通用户
 - 课件下载和本地归档是 ZJU 学生的高频需求
 - 首批 50–100 个种子用户可以从 CC98 论坛获取
-- 社区贡献者会在首批 5–8 个高优先级官方插件稳定之后出现（6–12 个月窗口）；完整官方插件集按阶段交付
+- 社区贡献者会在 `学业`、`日程`、`资料` 三个官方模块稳定之后出现（6–12 个月窗口）；后续扩展继续遵守“一个插件对应一个完整一级侧栏模块”
 
 ---
 
@@ -191,7 +197,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 ## Non-functional requirements
 
 - **Performance:** 冷启动时间 < 3 秒（Windows 10/11, SSD）；后台内存 < 200MB；日历视图滚动 60fps
-- **Security:** Electron `safeStorage` 加密凭据（Windows DPAPI）；认证仅在主进程执行；IPC 校验调用 frame；主 renderer 开启 Chromium OS sandbox；第三方 renderer 使用独立 custom-protocol origin、严格 CSP 和无 preload iframe；headless/main 使用独立 worker/isolate；权限细粒度控制（network 按精确 origin、storage 按领域命名空间）；插件不能读取凭据，只能申请核心绑定业务服务的不透明请求句柄
+- **Security:** Electron `safeStorage` 加密凭据（Windows DPAPI）；认证和上游请求仅在主进程 Core 连接器执行；IPC 校验调用 frame；主 renderer 开启 Chromium OS sandbox；第三方插件使用独立 custom-protocol origin、严格 CSP 和无 preload iframe；每个插件只获得隔离本地存储及已声明、已授权的结构化 capability，不获得凭据、业务 Session、通用网络句柄或原始响应
 - **Privacy:** 纯本地存储 V1；无数据上传服务器；无用户行为追踪（Sentry crash-only）；插件安装时逐项确认权限
 - **Accessibility:** 键盘导航支持 (Tab/Arrow/Enter/Esc)；高对比度主题支持；屏幕阅读器兼容（基础）
 - **Compliance:** 遵循中国《个人信息保护法》；GDPR 无需（不服务欧洲用户）；MIT 许可合规

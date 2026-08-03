@@ -17,7 +17,16 @@
 
 ## TL;DR
 
-- **MVP:** Electron 桌面工作台 + 插件框架 + 官方教务抓取/日历/课件插件 → 可装可用的 Windows 安装包
+### Module consolidation decision (2026-08-03)
+
+- Official user-facing plugins are limited to three left-navigation modules: **学业**, **日程**, and **资料**.
+- Each installable plugin contributes exactly one first-level activity destination. Internal tabs do not become separate plugins.
+- Undergraduate/graduate academic affairs, ZJU Learning, quality-development records, and calendar configuration are Core-managed connectors rather than plugins.
+- Event projection, task persistence, automatic scheduling, global search, notifications, system-calendar write and iCal serialization are Core services.
+- The current `academic-scraper` package is removed during migration. Existing granular official packages are folded into the three modules or moved behind the Core boundary without changing their verified upstream request logic.
+- Mobile-only functionality is outside the desktop roadmap.
+
+- **MVP:** Electron 桌面工作台 + Core 教务连接器 + 学业/日程/资料三个官方插件 → 可装可用的 Windows 安装包
 - **Platform:** Windows 桌面端 (Electron) — 所有竞品在手机端，桌面是空白；ZJU 工科生在桌边场景天然匹配
 - **Stack:** Electron + React 18 + TypeScript 5 + Vite + Zustand + SQLite (better-sqlite3) + Electron safeStorage + Vitest/Playwright
 - **Timeline to MVP:** ~8 周（Phase 1 地基 2 周 + Phase 2 核心 4 周 + Phase 3 交付 2 周）
@@ -29,14 +38,14 @@
 - `zju-undergraduate` 已通过核心不透明业务 Session 发布脱敏身份、真实课表和真实考试 capability；明确日期时间的考试进入工作台，相对考试周记录只保留原始语义，不强制换算日期。密码、Cookie、Session 和 ticket 不进入插件。
 - `zju-graduate` 已通过独立 CAS service、一次性 ticket 和主进程内存 token broker 发布研究生 profile、课表、考试和成绩 capability；固定业务操作、精确周次解析、单条容错和缓存局部回退已由外部 HTTP fixture 覆盖，缺少明确钟点的考试不会被补成全天或任意时段。
 - `zju-calendar-config` 已从浙江大学官方 HTTPS 页面读取学季边界和开课日，并动态驱动当前/下一学季状态；已内置 ZJU 紫金港标准节次时间表（14 节）作为默认配置数据，供课程日历事件展开使用。
-- `academic-timetable-events` 作为官方无头功能插件，读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
+- 当前技术包 `academic-timetable-events` 是待迁入 Core 的事件投影服务：读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
 - 设置页”诊断与测试”已连接真实刷新协调器和主进程持久化日志，支持查看、清空与自动脱敏 TXT 导出。
-- `calendar.events@1` 已实现多 provider collection contract；`academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 作为无头功能插件，按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。工作区只消费事件 feed，不再 import 具体连接器；未验证账号不能命中旧账号事件缓存。
+- `calendar.events@1` 已实现多 provider collection contract；当前技术包 `academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 将迁入 Core 事件投影服务，继续按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。`日程`模块只消费事件 feed，不再 import 具体连接器；未验证账号不能命中旧账号事件缓存。
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
 - `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。开发期仍完整刷新上游目录，但工作区资料投影和新建下载任务只接受真实 `2025-2026 春/夏/春夏` 课程基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
-- 第三方 headless 已完成 QuickJS/WASM 同步执行内核（含 CPU/内存/堆栈限制与 deadline 中断）；utility process 外层已完成 coordinator/runner/host/protocol 全套进程生命周期、启动/执行超时、外部 RSS 内存监控与崩溃回收，尚未接入 capability/网络权限代理。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不开放第三方 headless 生命周期。
+- 既有 QuickJS/WASM 与 utility process headless 隔离实现保留为安全研究和历史技术资产，不接入 `.campusmod` 生命周期；纯 headless、main 和 connector 包不再属于插件产品形态。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不扩大插件执行边界。
 - SQLite `DatabaseService` 已完成 v1/v2 migration：工作区快照、官方 capability provenance 与下载队列写入同一数据库，旧 v3 工作区 JSON 和下载队列 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
 - 桌面壳层已调整为固定左侧导航与右侧主内容滚动；周视图在桌面直接填充主内容宽度，窄屏才使用横向滚动。
@@ -45,9 +54,9 @@
 - 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消、状态广播、预期大小校验和按大小变化重下已用协议边界测试覆盖。学在浙大 URL 仅接受固定 HTTPS host/path/正整数 ID，并由主进程注入业务 Session；renderer 和下载队列不能取得 Cookie。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移。
 - 自动更新：electron-updater 集成，GitHub Releases 源，检查/下载/安装 IPC。
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
-- 考试倒计时插件：消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"。
+- 当前考试倒计时视图消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"；该视图后续并入 `academic` 插件，不保留独立官方插件。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
-- Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-29 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，以及一份授权私有课件的认证下载和实际字节校验，敏感输出为 0。剩余未完成：多设备现场流程、第三方 headless capability/网络权限代理、全新 Windows 安装和 GitHub Release/分发验收。
+- Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-29 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，以及一份授权私有课件的认证下载和实际字节校验，敏感输出为 0。剩余未完成：多设备现场流程、全新 Windows 安装和 GitHub Release/分发验收。
 
 ---
 
@@ -63,13 +72,13 @@
 
 **Step 4 — Auto sync.** ⏳ "正在拉取课表..." → 进度条走完 → 预览显示："周一 08:00–09:35 高等数学 (紫金港东1A-301)、周一 10:00–11:35 线性代数 (紫金港西2-205)…"共 8 门课。小陈快速扫了一眼："看起来对吗？" → 点击"确认"。
 
-**Step 5 — Plugin recommendations.** 向导推荐安装官方插件：☑ 教务抓取 ☑ 课件下载 ☑ 日历提醒。小陈全选 → "安装选中插件" → 3 秒安装完成。
+**Step 5 — Plugin recommendations.** 向导推荐安装三个官方模块：☑ 学业 ☑ 日程 ☑ 资料。小陈全选 → “安装选中插件” → 左侧栏出现对应三个入口。
 
-**Step 6 — Landing.** 进入主界面。导航提供总览、日历、扩展和设置。默认总览以今日课程时间线和未过期待办清单为主体；休课期改为明确标注的下一学期同星期课程预览。日历可在月历、线性日程与单日时间线间切换，统一展示课程、作业和考试，悬停事项可查看时间、地点、提交或准备信息。不展示状态栏、同步指标或学期进度卡片。
+**Step 6 — Landing.** 进入主界面。固定导航提供总览、扩展和设置，已启用插件提供学业、日程和资料。默认总览以今日课程时间线和未过期待办清单为主体；休课期改为明确标注的下一学期同星期课程预览。日程模块统一展示课程、作业、考试、任务和计划段。不展示状态栏、同步指标或学期进度卡片。
 
 **Step 7 — Daily use (Monday morning).** 07:45。距离高数课还有 15 分钟，桌面弹出系统通知："📚 高等数学 — 08:00–09:35 紫金港东1A-301"。小陈点击通知，CampusOS 切到前台，仪表盘和日历都能显示今天的安排。这还不是"不漏事"的完全体，但在桌面场景下已经能覆盖最常见的一半提醒需求。
 
-**Step 8 — Download materials.** 周五下午。小陈通过对应官方扩展的入口查看本周高数课更新的 PDF 课件，勾选 → "下载选中" → 进度条走完 → 文件在 `~/CampusOS/materials/2025-2026-夏/高等数学/` 目录下整齐排列。资料能力不再占用一级导航。
+**Step 8 — Download materials.** 周五下午。小陈进入“资料”插件的唯一一级侧栏入口，查看本周高数课更新的 PDF 课件，勾选 → "下载选中" → 进度条走完 → 文件在 `~/CampusOS/materials/2025-2026-夏/高等数学/` 目录下整齐排列。
 
 **Step 9 — Discovery.** 第二周。小陈在 CC98 上看到有人分享了一个 "ZJU 考试倒计时" 的 `.campusmod` 文件。他拖入 CampusOS 窗口 → 权限列表弹出（仅 `storage:local`）→ 确认安装 → 活动栏多了倒计时入口。他开始想：自己是不是也可以写一个实验室座位监控插件。
 
@@ -139,7 +148,7 @@ flowchart TD
 | **State** | Redux Toolkit | Zustand | Jotai / Zedux |
 | **Database** | better-sqlite3 | better-sqlite3 + Drizzle ORM | libSQL (Turso) |
 | **Encryption** | Electron safeStorage（当前） | Web Crypto AES-256-GCM + OS-wrapped key | OS-native with TPM |
-| **Plugin Sandbox** | 同上下文 iframe | Electron OS sandbox + 独立 custom-protocol origin（renderer）/ worker isolate（headless） | 独立插件进程 + 签名 |
+| **Plugin Sandbox** | 同上下文 iframe | Electron OS sandbox + 独立 custom-protocol origin（单视图 renderer） | 独立 renderer 进程 + 签名 |
 | **Testing** | Jest + manual E2E | Vitest + Playwright | Vitest browser mode |
 | **Monitoring** | console.log | Sentry (crash) + PostHog (usage, opt-in) | OpenTelemetry |
 | **CI/CD** | GitHub Actions | GitHub Actions + electron-builder | Nix + Earthly |
@@ -148,11 +157,11 @@ flowchart TD
 **Recommended:** Modern column across the board. 
 - Electron over Tauri for MVP — Tauri 2.0 is the better tech but the ZJU developer pool knows Electron/React better, and "shipping fast" beats "shipping small" right now.
 - Zustand over Redux — plugin-friendly lightweight state that doesn't require root reducer boilerplate when a plugin adds its own state.
-- 第三方 renderer 使用 Electron Chromium OS sandbox、独立 custom-protocol origin、严格 CSP 和无 preload iframe；这保留浏览器 UI 兼容性，同时不把代码导入宿主上下文。headless/main 在 worker isolate 与资源限制完成前不执行。
+- 第三方插件 renderer 使用 Electron Chromium OS sandbox、独立 custom-protocol origin、严格 CSP 和无 preload iframe；这保留浏览器 UI 兼容性，同时不把代码导入宿主上下文。纯 headless/main 与 connector 包不接入插件生命周期。
 
 **Migration path:**
 - Consider **Tauri** when Electron bundle size (150MB+) becomes a documented conversion barrier (measured by installer-abandonment rate > 50%).
-- 在开放第三方 headless/main 前完成 **worker isolate** 选型和恶意包 E2E；不能等到真实安全事件发生后再补隔离。
+- 第三方插件持续限制为单一 renderer 工作区；数据连接器和后台服务由 Core 托管，不通过 `.campusmod` 开放。
 - Consider **PostHog** when WAU > 200 — need funnel analytics; Sentry alone doesn't tell you install → activate → retain.
 
 ---
@@ -161,19 +170,19 @@ flowchart TD
 
 ### Phase 1 — MVP: 地基 (weeks 0–2)
 
-**Goal:** Electron 窗口能运行，插件不仅能渲染页面，还能以版本化能力契约安全注册 headless connector。验证"插件工作台 + 数据连接器"架构可行。
+**Goal:** Electron 窗口能运行，插件能以版本化能力契约渲染一个完整活动工作区；Core 托管连接器能独立发布领域数据。验证“左侧栏模块插件 + Core 数据连接器”架构可行。
 
 **Scope (the thin vertical slice):**
 - Electron + React 18 + TypeScript 5 + Vite 项目初始化
-- 工作台 UI 骨架（简洁导航 + 主内容区；总览、月历、扩展、设置）
+- 工作台 UI 骨架（简洁导航 + 主内容区；Core 固定提供总览、扩展、设置，启用的插件各增加一个入口）
 - 插件加载器（.campusmod ZIP 解析 → manifest v2 校验 → 注册到插件注册表）
 - `provides/requires/optionalRequires` 能力解析、API 版本检查、循环依赖与 provider 冲突拒绝
-- headless connector、sync job、command、settings 和 search provider contribution
+- Core 托管 connector、sync job、search index 和受控 capability publication
 - 主进程不透明 service-session request capability；插件永远拿不到密码和 Cookie
 - renderer sandbox iframe mount contract + headless worker/isolate
 - 权限声明系统（manifest 权限解析 + 安装确认 UI + 运行时检查）
 - SQLite 初始化 + database migration 框架
-- hello-world 视图插件 + fixture connector → 证明 UI 和 headless capability 两条生命周期
+- hello-world 单视图插件 + fixture source adapter → 证明插件 UI 与 Core capability 两条边界
 - Vitest 单元测试覆盖核心模块
 
 **Out of scope (tempting but not now):**
@@ -186,7 +195,7 @@ flowchart TD
 **Success metrics:**
 - `npm run test` 全绿，覆盖率 > 70%
 - `npm run typecheck` TypeScript strict 零错误
-- hello-world 插件可见，fixture connector 提供的能力可被消费者解析
+- hello-world 插件恰好产生一个左侧栏入口，fixture source adapter 提供的能力可被消费者解析
 - 插件安装/卸载生命周期正常（load → activate → deactivate → unload）
 - 缺失依赖、循环依赖、provider 冲突、权限拒绝和 API 不兼容全部 fail closed
 
@@ -222,7 +231,7 @@ flowchart TD
 **Scope additions over Phase 1:**
 - 5 步首次引导向导 (欢迎 → 账号配置 → 拉取课表 → 推荐插件 → 主页)
 - Electron `safeStorage` 凭据加密（Windows DPAPI）
-- 按 [Celechron 启发的官方插件集设计](docs/design/celechron-inspired-plugin-suite.md) 实现 Phase 1：`zju-calendar-config`、本科/研究生教务连接器、`zju-learning`、课表、考试、DDL 与日历工作台；禁止继续扩张单体 `academic-scraper`
+- 按 [Celechron 对照的模块设计](docs/design/celechron-inspired-plugin-suite.md) 实现三个官方插件及其 Core 连接器：先完成日程任务/排程闭环，再补齐学业课程/GPA/实践，最后收敛资料关联；禁止继续扩张单体 `academic-scraper`
 - 校内数据接入以 Celechron 1.3.0 为强制行为参考：认证后业务身份确认、分源错误隔离、超时/重试/重登、缓存 provenance、刷新互斥、下一学年探测、单条解析隔离和脱敏诊断；具体要求见 [参考基线](docs/references/celechron-1.3.0-ingestion-baseline.md)
 - 课件下载引擎（队列管理 + 断点续传 + 进度展示 + 学期/课程名 目录组织）
 - 日历组件（月历、线性日程、单日时间线 + 课程/作业/考试统一展示 + 悬停详情）
@@ -334,8 +343,8 @@ flowchart TD
 
 **Scope additions over MVP:**
 - UI 打磨（主题系统：亮色/暗色/高对比度；动画过渡；键盘快捷键）
-- 官方成绩看板插件 (GPA tracker)
-- 官方考试倒计时插件
+- `academic` 插件内的成绩看板（GPA tracker）
+- `academic` 插件内的考试倒计时视图
 - 插件热更新（不重启 App 更新插件）
 - 用户反馈通道（App 内 feedback 按钮 → GitHub Issues template）
 - 备选教务登录方案（Cookie 导入 + 浏览器扩展辅助 — 防验证码）
@@ -372,7 +381,7 @@ flowchart TD
 - [ ] 亮色/暗色主题切换
 - [x] 成绩看板首个纵向切片（原始成绩、显式绩点加权、真实刷新与账号隔离）
 - [x] 成绩多口径、主修标记、隐私遮罩与真实账号验收
-- [ ] 考试倒计时插件
+- [ ] `academic` 插件内的考试倒计时视图
 - [ ] 插件热更新
 - [ ] App 内 feedback 通道
 - [ ] Cookie 导入方案（备选登录）
@@ -388,7 +397,7 @@ flowchart TD
 
 > CampusOS 是 ZJU 学生打开电脑后第一个启动的应用。它不只是一个课表工具——它是整个校园数字生活的桌面中枢。早上 7:50 它提醒你第一节高数课在 10 分钟后开始；课间你一键下载了教授刚上传的 PDF 课件；午休时你在日历里添加了晚上的社团例会；下午你发现 CC98 上有人分享了一个"ZJU 图书馆实时座位图"插件，拖入后立刻可用；期末考试前，成绩看板帮你追踪 GPA 变化趋势，AI 插件根据历史考试数据给你排了复习优先级。
 >
-> 社区有 20+ 个活跃插件贡献者，覆盖了计算机学院院网、云峰学院院网、ETA 三全育人平台、教务处网站等核心信息源。三个其他 985 高校的学生自发组织了 CampusOS 适配小组，每个学校有了自己的教务抓取插件。安卓 Companion 补齐了离开电脑后的提醒闭环，桌面端负责规划/归档，手机端负责最后一公里提醒。
+> 社区有 20+ 个活跃插件贡献者，围绕完整的用户工作区扩展 CampusOS；计算机学院院网、云峰学院院网、ETA 三全育人平台、教务处网站等核心信息源由受控 Core 数据连接器覆盖。三个其他 985 高校的学生自发组织了 CampusOS 适配小组，为各自学校维护 Core 教务连接器。安卓 Companion 补齐了离开电脑后的提醒闭环，桌面端负责规划/归档，手机端负责最后一公里提醒。
 >
 > 项目保持完全开源，不以内置收费或插件抽成为目标；维护依靠个人投入和社区贡献。如果未来需要插件目录，也优先走开源、非商业分发路线。
 
@@ -452,7 +461,7 @@ flowchart TD
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | 单人开发进度风险 — 8 周 MVP 可能超期 | 中 | 中 | 严格按 Phase 优先级：如果延期，砍 Phase 3 的"插件调试工具"和"2 个示例插件"，保安装包 |
-| 教务系统 DOM 结构频繁变化 | 中 | 中 | 设计插件时把 DOM 选择器抽成配置；提供选择器热更新（不更新插件本体） |
+| 教务系统 DOM 结构频繁变化 | 中 | 中 | 在 Core 连接器内把 DOM 选择器抽成受控配置；提供连接器配置热更新（不更新用户插件） |
 | 课表同步成功后，用户没有持续打开的习惯 | 中 | 高 | 桌面通知是 MVP 阶段最主要的拉回机制——必须做到尽可能可靠；离开电脑后的完整闭环由后续 Android Companion 补齐 |
 | CC98 社区反馈冷淡 | 低 | 中 | 如果社区反馈不足，改为线下 1v1；熟人比陌生人更愿意给真实反馈 |
 

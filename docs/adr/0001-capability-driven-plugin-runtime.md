@@ -4,6 +4,8 @@
 **日期：** 2026-07-19  
 **关联设计：** [Celechron 1.3.0 启发的 CampusOS 官方插件集设计](../design/celechron-inspired-plugin-suite.md)
 
+> **后续决策（2026-08-03）：** [ADR-0002](0002-user-facing-plugin-modules.md) 部分取代本文的产品分类。capability、权限、安全、会话隔离和 fail-closed 决策继续有效；“插件”现仅指恰好贡献一个左侧栏入口的用户模块，连接器和无头服务改由 Core 托管。
+
 ## 背景
 
 CampusOS 当前插件宿主通过 renderer 静态导入 React 组件，manifest 不表达依赖或提供的能力，也没有 headless 生命周期、主进程隔离、schema migration、刷新协调和 provider 冲突处理。该模型无法安全承载本科教务、研究生教务、学在浙大、素拓等真实数据源，也会迫使功能继续堆进单体 `academic-scraper`。

@@ -6,6 +6,8 @@
 
 ---
 
+> **当前覆盖（2026-08-03）：** 本文的插件分类和导航示意由 [ADR-0002](../adr/0002-user-facing-plugin-modules.md) 与 [Interface v3](campusos-interface-v3.md) 取代。插件现指恰好贡献一个左侧栏入口的用户模块；官方插件仅为学业、日程、资料。数据连接器和无头服务由 Core 托管，不作为插件安装或展示。本文其余未冲突的安全、持久化和发布约束继续有效。
+
 ## 1. 项目概述
 
 **CampusOS** 是面向浙江大学本科生的全站式校园服务平台。基于 Electron + React + TypeScript 构建桌面工作台界面，采用插件化架构，所有功能（抓取、日历、课件下载、绩点看板等）均作为插件运行。MVP 的主卖点是官方整合能力，插件是底层扩展骨架。核心框架与官方插件全部 MIT 开源，暂不预设商业化。
@@ -29,7 +31,7 @@
 | 9 | 提醒方式 | 桌面系统通知（MVP 桌面侧约 50% 完成度）→ 后期 Android Companion 补齐 |
 | 10 | 数据同步 | V1 纯本地 SQLite（better-sqlite3），V2 可选云同步 |
 | 11 | 插件安全 | 权限声明（按域名/类型控制）+ 安装时用户逐项确认 |
-| 12 | 插件 UI | React 组件动态加载，无缝融入主界面 |
+| 12 | 插件 UI | 每个插件动态加载一个完整 React 工作区，并恰好贡献一个左侧栏入口 |
 | 13 | 插件分发 V1 | 手动安装 .campusmod 文件（ZIP：manifest.json + 代码 + 资源） |
 | 14 | 插件目录 | V1 不做后端；如未来需要目录/索引，优先开源、非商业分发 |
 | 15 | 容错策略 | 失败展示缓存数据 + "最后更新于 X 分钟前" + 手动重试按钮 |
@@ -86,7 +88,7 @@
 ├─────────────────────── IPC ─────────────────────────┤
 │              插件沙箱 (JS Sandbox)                     │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐              │
-│  │ 教务插件  │  │ 日历插件  │  │ 自定义插件 │  ...       │
+│  │ 学业插件  │  │ 日程插件  │  │ 资料插件   │  ...       │
 │  │ React 组件│  │ React 组件│  │ React 组件│            │
 │  └─────────┘  └─────────┘  └─────────┘              │
 └─────────────────────────────────────────────────────┘
@@ -102,39 +104,42 @@
 
 | 类型 | 说明 | 示例 |
 |------|------|------|
-| 🧩 连接器插件 | 主进程受控的数据源协议、解析与同步作业 | 本科教务、学在浙大、素拓 |
-| 📊 视图插件 | 新增 App 内功能页面（React 组件） | 绩点看板、考试倒计时 |
-| 🔔 通知插件 | 扩展提醒渠道 | 微信推送、邮件通知 |
-| 🎨 主题插件 | UI 定制 | 暗色主题、自定义配色 |
+| 用户模块插件 | 恰好新增一个左侧栏完整工作区 | 学业、日程、资料 |
+| Core 数据连接器 | 受控的数据源协议、解析与同步作业，不属于插件 | 本科/研究生教务、学在浙大、素拓、在线校历 |
+| Core 内部服务 | 为模块提供事件、排程、搜索、通知和导出，不属于插件 | 事件投影、自动排程、全局搜索、iCal |
 
 ### 4.2 插件清单规范（manifest.json）
 
 ```json
 {
-  "id": "org.campusos.zju-undergraduate",
+  "id": "org.campusos.academic",
+  "name": "academic",
   "version": "1.0.0",
-  "apiVersion": "2",
-  "kind": "connector",
-  "displayName": "浙江大学本科教务连接器",
-  "provides": [
+  "apiVersion": 2,
+  "kind": "feature",
+  "displayName": "学业",
+  "description": "课表、课程、考试、成绩与实践记录。",
+  "icon": "GraduationCap",
+  "provides": [],
+  "requires": [
+    "academic.profile@1",
     "academic.course-catalog@1",
     "academic.timetable@1",
     "academic.exams@1",
     "academic.grades@1"
   ],
-  "requires": [
-    "core.auth.zju-service-session@1",
-    "core.refresh@1",
-    "core.provenance-store@1"
-  ],
-  "permissions": [
-    "auth:service:zdbk.zju.edu.cn",
-    "network:https://zdbk.zju.edu.cn",
-    "storage:domain:academic"
-  ],
+  "optionalRequires": ["practice.records@1"],
+  "permissions": ["storage:local"],
   "contributes": {
-    "syncJobs": ["refresh-academic"],
-    "settings": ["undergraduate-source"]
+    "views": [
+      {
+        "id": "academic-main",
+        "title": "学业",
+        "icon": "GraduationCap",
+        "location": "activity",
+        "activityTarget": "mod-org-campusos-academic"
+      }
+    ]
   }
 }
 ```
@@ -143,9 +148,9 @@ Manifest v2 的完整方向、官方插件清单与依赖关系见 [Celechron �
 
 ### 4.3 安全模型
 
-- **权限细粒度控制：** network 按精确 origin、storage 按领域命名空间、业务认证按 service 授权
+- **权限细粒度控制：** 插件按隔离存储与结构化 capability 授权；Core 连接器的上游 origin 和业务认证由主进程固定约束
 - **安装确认：** 安装时逐项展示权限清单，用户逐项确认
-- **JS 沙箱：** 第三方 renderer 运行在 Electron OS sandbox + 独立 custom-protocol origin iframe，不进入宿主 React/Node；第三方 headless/main 进入独立 worker/isolate 后才可执行
+- **JS 沙箱：** 第三方插件的唯一 renderer 视图运行在 Electron OS sandbox + 独立 custom-protocol origin iframe，不进入宿主 React/Node；纯 headless/main 与 connector 包不属于支持的插件形态
 - **数据隔离：** 插件间数据隔离，仅通过主程序提供的安全 API 通信
 - **凭据保护：** 不向插件暴露凭据 API，插件无法直接访问加密数据
 - **不透明会话：** 连接器只能调用核心绑定业务域名的请求句柄，不能读取密码、Cookie、Session 或 ticket
@@ -337,9 +342,9 @@ interface PluginAPI {
 
 ---
 
-### US-3: 首批教务连接器与学业插件（官方）
+### US-3: Core 教务连接器与学业插件（官方）
 
-**描述：** 作为用户，我能通过独立的数据连接器同步课表到日历，并由资料插件按领域能力获取课件。
+**描述：** 作为用户，我能通过 Core 数据连接器同步教务数据，由学业、日程和资料插件分别消费结构化领域能力。
 
 **验收标准：**
 - [ ] 自动从教务系统抓取学期课表数据（课程名、教师、地点、时间、周次）
@@ -348,7 +353,7 @@ interface PluginAPI {
 - [ ] 支持勾选批量下载课件
 - [ ] 下载文件按 `学期/课程名/` 目录组织
 - [ ] 抓取失败展示缓存数据 + "最后更新于 X 分钟前" + 手动重试按钮
-- [ ] 教务连接器、学习平台连接器、课表和资料下载为独立插件，通过版本化能力协作
+- [ ] 教务与学习平台作为 Core 数据连接器；学业、日程、资料各自恰好贡献一个一级侧栏入口，并通过版本化能力协作
 - [ ] 每个连接器只申请所需的精确 HTTPS origin、业务会话和领域存储权限
 
 ---
@@ -415,8 +420,8 @@ interface PluginAPI {
 | FR-16 | App 启动时自动检查 GitHub Releases 更新 |
 | FR-17 | 崩溃时自动上报 Sentry（堆栈 + 版本 + OS） |
 | FR-18 | 提供完整的插件开发文档和示例代码 |
-| FR-19 | manifest v2 支持版本化能力提供/依赖、headless connector、API 兼容检查和 provider 冲突拒绝 |
-| FR-20 | 官方插件按连接器与功能消费者拆分，依赖领域 capability，不直接 import 其他插件 |
+| FR-19 | manifest v2 支持版本化能力提供/依赖、API 兼容检查和 provider 冲突拒绝；可安装插件必须恰好提供一个 activity view |
+| FR-20 | 官方用户插件收敛为学业、日程、资料；数据连接器与无头服务由 Core 托管，并通过领域 capability 与模块协作 |
 
 ## 9. 非功能需求（NFR）
 
@@ -521,7 +526,7 @@ interface PluginAPI {
 |---|------|------|
 | 1 | 首次引导向导（5 步流程 UI） | 2 天 |
 | 2 | 本地加密存储（Electron `safeStorage` + 原子写入） | 2 天 |
-| 3 | 官方教务抓取插件（登录、课表解析、课件列表） | 3 天 |
+| 3 | Core 教务连接器 + 学业插件（登录、课表解析、学业视图） | 3 天 |
 | 4 | 课件下载引擎（队列管理、断点续传、进度展示） | 2 天 |
 | 5 | 日历组件（周视图、日视图、冲突检测高亮） | 3 天 |
 | 6 | 桌面通知系统 + 提醒调度 | 1 天 |

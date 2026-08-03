@@ -1,5 +1,7 @@
 # `.campusmod` 本地插件包格式与安装边界
 
+> **模块边界（2026-08-03）：** `.campusmod` 插件必须是用户可启停的完整功能模块，并恰好贡献一个左侧栏 activity view。纯后台、零视图、多 activity view 和 connector 包不属于支持的插件产品形态；数据连接器及内部服务由 Core 托管。见 [ADR-0002](../adr/0002-user-facing-plugin-modules.md)。
+
 **状态：** 安装与审查链路、受限 renderer sandbox v1 已实现；第三方 headless/main 执行未开放  
 **日期：** 2026-07-19  
 **关联决策：** [ADR-0001：能力驱动的 Plugin Runtime v2](../adr/0001-capability-driven-plugin-runtime.md)
@@ -88,11 +90,11 @@ export async function mount(root, host) {
 
 `host` 当前只包含冻结的 `apiVersion: 1` 和 `pluginId`。隔离本地存储由每个 `campusmod://<plugin-id>` origin 的 Web Storage 提供。当前没有网络或 capability 代理。
 
-## 5. Headless isolate POC
+## 5. Headless isolate POC（历史技术资产）
 
-第三方 headless 内层选用 QuickJS/WASM。当前 POC 只接受不含模块导入的同步 ESM，入口导出 `run(input)`，输入和输出都必须是 JSON；QuickJS realm 不提供 `process`、`require`、`Buffer`、`fetch` 或 `WebSocket`。默认限制为源码 1 MiB、输入/输出各 256 KiB、执行 100 ms、普通 JS 堆 16 MiB、栈 512 KiB。测试已覆盖死循环中断、4 MiB 堆压力、导入拒绝、异步拒绝和非 JSON 输出拒绝。
+早期第三方 headless POC 的内层选用 QuickJS/WASM，只接受不含模块导入的同步 ESM，入口导出 `run(input)`，输入和输出都必须是 JSON；QuickJS realm 不提供 `process`、`require`、`Buffer`、`fetch` 或 `WebSocket`。默认限制为源码 1 MiB、输入/输出各 256 KiB、执行 100 ms、普通 JS 堆 16 MiB、栈 512 KiB。测试已覆盖死循环中断、4 MiB 堆压力、导入拒绝、异步拒绝和非 JSON 输出拒绝。
 
-该内核尚未由插件 lifecycle 调用，第三方 headless 仍不能启用。QuickJS 的 JS 堆限制不能代替整个宿主进程限制，尤其是 TypedArray 等外部内存；接入前还必须把内核放入 utility process，完成进程超时、总内存、崩溃回收和严格消息协议。
+该内核未由插件 lifecycle 调用，也不会作为当前插件产品形态开放。数据连接器和内部后台服务由 Core 托管；若未来重新评估无界面第三方执行，必须新建 ADR，而不能沿用本 POC 默认恢复入口。
 
 ```js
 export function run(input) {
@@ -116,7 +118,7 @@ export function run(input) {
 
 ## 7. 后续开放条件
 
-renderer sandbox v1 已能承载无网络的本地单视图，但不等于完整第三方执行平台。自动化测试已使用真实 ZIP 完成“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”链路；这不替代 Electron 窗口内的进程隔离验收。开放 headless/main、capability 或网络权限前必须完成并验证：独立 worker/isolate、受控 capability API、精确 origin 网络代理、资源与超时限制、崩溃回收和恶意插件测试。还需验证跨 origin frame 是否稳定落入独立 renderer 进程，并增加 CPU/内存失控恢复。包签名验证已实现，但信任目录和签名密钥连续性仍属于后续工作。
+renderer sandbox v1 已能承载无网络的本地单视图，但不等于完整第三方执行平台。自动化测试已使用真实 ZIP 完成“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”链路；这不替代 Electron 窗口内的进程隔离验收。后续只在单视图 renderer 边界内评估受控 capability API；插件网络权限、headless/main 和 connector 包保持不开放。还需验证跨 origin frame 是否稳定落入独立 renderer 进程，并增加 CPU/内存失控恢复。包签名验证已实现，但信任目录和签名密钥连续性仍属于后续工作。
 
 实现采用 Electron 官方安全基线与自定义协议生命周期：scheme 在 `ready` 前注册，handler 在 `ready` 后安装；BrowserWindow 显式启用 OS sandbox、context isolation 与 web security，并禁用 Node integration、webview、新窗口和网页权限。依赖安装只允许固定版本 Electron 与 esbuild 执行生命周期脚本，未审查的新增脚本会使安装失败。
 

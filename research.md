@@ -38,13 +38,13 @@ This research was generated in autonomous mode based on the dense spec at `docs/
 
 ## Interface direction (2026-07-17)
 
-当前界面不把 CampusOS 定义为数据仪表盘，而定义为学生每天打开一次的学术日历。总览只回答“今天有什么课、有什么待办”；休课期用下一完整学期首次出现的同星期课程做明确标注的预览，不改写课程真实日期。DDL 在上海自然日早于今天后不再作为待办。日历在月历、线性日程与单日时间线之间切换，课程、作业与考试使用稳定课程颜色进入同一套日程；扩展与设置均采用按需展开的管理界面。设置页提供显式“刷新数据”操作，走与后台调度相同的正式主进程刷新链；未认证开发场景只在 adapter/fixture 边界注入数据。同步状态、下载队列、学期进度和资料归档不占用一级页面或首页注意力。
+当前界面不把 CampusOS 定义为数据仪表盘，而定义为学生每天打开一次的学术日历。总览只回答“今天有什么课、有什么待办”；休课期用下一完整学期首次出现的同星期课程做明确标注的预览，不改写课程真实日期。DDL 在上海自然日早于今天后不再作为待办。日历在“日程”插件内于月历、线性日程与单日时间线之间切换，课程、作业与考试使用稳定课程颜色进入同一套日程；“资料”插件以一个一级入口承载资料归档和下载队列，扩展与设置采用按需展开的 Core 管理界面。设置页提供显式“刷新数据”操作，走与后台调度相同的正式主进程刷新链；未认证开发场景只在 adapter/fixture 边界注入数据。同步状态和学期进度不额外占用一级页面或首页注意力。
 
 这一方向参考学生日程产品对课程/作业/考试对象的区分、学习管理系统对跨课程月历的聚合，以及桌面扩展产品的列表—详情管理方式。相关的当前实现定义见 [interface v3](docs/specs/campusos-interface-v3.md)。
 
 ## Architecture evidence (2026-07-19)
 
-Plugin Runtime v2 纵向切片已经验证“核心基础设施 + 无头连接器 + 无头功能插件 + 视图消费者”的拆分可在现有 Electron 工程中工作：权限和运行时状态由主进程持久化，刷新作业按依赖拓扑分波执行，数据写入携带 provider、账号与 `live/cache/fallback/unavailable` 来源状态。原始 profile/课表/考试/成绩能力和 `calendar.events@1` 都是显式允许多 provider 的 collection capability；考试与 DDL 功能插件分别消费所有已绑定学业来源并发布统一事件，核心工作区不依赖浙大连接器 ID。renderer feature 通过主进程鉴权的 capability read IPC 读取自身已声明且已绑定的 provider 数据，主进程只选择当前已验证账号或无账号记录，避免旧账号缓存串入视图。活动视图贡献由运行时状态自动生成导航入口，不再依赖 App 中手工注册插件页面。
+Plugin Runtime v2 纵向切片曾以“核心基础设施 + 无头连接器包 + 无头事件投影包 + 视图消费者”的技术拆分验证现有 Electron 工程：权限和运行时状态由主进程持久化，刷新作业按依赖拓扑分波执行，数据写入携带 provider、账号与 `live/cache/fallback/unavailable` 来源状态。原始 profile/课表/考试/成绩能力和 `calendar.events@1` 都是显式允许多 provider 的 collection capability；考试与 DDL 投影包分别消费所有已绑定学业来源并发布统一事件，工作区不依赖浙大连接器 ID。renderer 通过主进程鉴权的 capability read IPC 读取自身已声明且已绑定的 provider 数据，主进程只选择当前已验证账号或无账号记录，避免旧账号缓存串入视图。该段是迁移前技术证据；ADR-0002 的目标分类将数据源适配和事件投影分别收归 Core 连接器与内部服务，只把贡献一个完整活动视图的模块称为插件。
 
 `.campusmod` 纵向切片已经验证本地 ZIP 可完成主进程检查、权限确认、确认后重读、SHA-256 防换包、受限解压、原子目录换位、崩溃恢复、逐文件完整性复核、动态注册和卸载。清单与代码正文不进入 IPC。renderer sandbox v1 只接受唯一 namespaced activity view、恰好 `storage:local` 且无 capability/后台贡献的 profile；宿主通过 `campusmod://<plugin-id>` 独立 secure origin 和 host-owned iframe 加载，不把入口导入 CampusOS renderer。Electron 43 主 renderer 已启用 Chromium OS sandbox、CJS preload 和严格 CSP；协议禁止网络/eval、逐请求复核 active 状态与安装完整性，所有网页权限、新窗口和跨 origin frame 导航由主进程拒绝。真实 ZIP 已通过“安装 → 持久授权 → 协议读取 → 实际 mount/dispose”自动化纵向测试；Electron 窗口内跨 origin 进程隔离 E2E 仍未完成。headless 内层 QuickJS/WASM POC 已验证插件看不到 Node/网络全局，模块导入、异步与非 JSON 返回被拒绝，死循环和普通 JS 堆增长受限；TypedArray 等外部内存、WASM 宿主崩溃仍必须由 utility process 外层处理。102 项测试、生产构建和 8 秒真实冷启动通过。当前摘要不是数字签名，headless lifecycle 接入、权限代理、进程级资源回收、真实恶意包 E2E 和 schema migration 仍是扩大执行面的硬门槛。格式和限制见 [`.campusmod` 本地插件包格式与安装边界](docs/architecture/campusmod-package-format.md)。
 
@@ -52,7 +52,7 @@ Plugin Runtime v2 纵向切片已经验证“核心基础设施 + 无头连接�
 
 研究生纵向切片已按 Celechron 1.3.0 的协议证据实现独立 CAS service、ticket 回调校验、`validateLogin` token 交换和固定课表/考试/成绩操作。token 只在主进程内存中作为 `X-Access-Token` 使用，连接器拿不到凭据或请求头；精确周次、单双周和不完整记录按字段容错，考试只有在日期与起止钟点都有效时才生成绝对时间。设置页由用户明确选择本科或研究生，避免服务临时故障造成自动误判；研究生路径必须验证认证后成绩结构才保存凭据，IPC 只返回记录数而不返回正文。自动化 fixture、v3 到 v4 兼容、UI 和缓存局部回退已经通过，真实研究生账号验收尚未完成。
 
-课表已可通过日期日历展示。`zju-calendar-config` 从浙江大学官方 HTTPS 校历页 `https://www.zju.edu.cn/english/19600/list.htm` 提取学季边界和开课日，并以 capability 驱动当前周或下一学季状态；`academic-timetable-events` 先按校历选择唯一的当前完整学期，休课期选择下一完整学期，再使用官方插件内置、可配置的紫金港标准 14 节节次表按学季、周次、单双周和节次生成课程事件。该边界避免当前/下一学年课程同时进入工作区。节假日调补尚无稳定机器源，真实账号与校历交叉验收前不得把该配置宣称为校方完整日历事实。
+课表已可通过日期日历展示。当前技术包 `zju-calendar-config` 从浙江大学官方 HTTPS 校历页 `https://www.zju.edu.cn/english/19600/list.htm` 提取学季边界和开课日，并以 capability 驱动当前周或下一学季状态；待迁入 Core 的 `academic-timetable-events` 先按校历选择唯一的当前完整学期，休课期选择下一完整学期，再使用 Core 事件投影服务内置、可配置的紫金港标准 14 节节次表按学季、周次、单双周和节次生成课程事件。该边界避免当前/下一学年课程同时进入工作区。节假日调补尚无稳定机器源，真实账号与校历交叉验收前不得把该配置宣称为校方完整日历事实。
 
 ### Verification update (2026-07-29)
 
@@ -68,11 +68,13 @@ CampusOS 需要吸收的不是 Flutter/Dart 代码，而是统一认证后业务
 
 CampusOS 的统一认证核心纵向链路已覆盖动态 RSA 登录、有效 SSO Cookie、本科教务网 `JSESSIONID`/`route`、研究生院内存 token、学在浙大独立业务 `session`、素拓 CAS/正式 `SESSION`、非匿名 `ctx`、本科 `getMyInfo` 账号匹配回执，以及研究生认证后成绩结构回执，并通过结构化 IPC 和 `safeStorage` 原子持久化。设置页只有收到所选培养层次的真实业务回执才显示成功；研究生 IPC 仅包含认证账号、数据集类型、记录数和时间，不包含 token 或成绩正文。环境变量现场测试支持本科/研究生分支，且不输出学号、密码、汇总、Cookie、Session、ticket、课程/考试/成绩/作业/课件正文或数量。本科真实账号路径已在 2026-07-29 通过脱敏验证，包括一份授权私有文件的认证下载和字节校验；研究生和多设备仍待验收。实现边界见 [统一身份认证架构](docs/architecture/zju-unified-auth.md)，课程资料对照见 [ZJU Learning Assistant 基线](docs/references/zju-learning-assistant-courseware-baseline.md)。
 
-## Celechron 功能插件化结论（2026-07-19）
+## Celechron 模块化结论（2026-07-19）
 
-Celechron 1.3.0 的功能盘点确认可迁移范围包括本科/研究生课表、考试、成绩与 GPA、学在浙大 DDL、素拓实践、在线校历、任务管理、自动排程、系统日历/iCal、搜索、校园卡、后台通知和诊断。架构上不能复制其单体 `Spider + Scholar` 聚合方式，也不能继续扩张当前 `academic-scraper` 占位包；应把数据源连接器与用户功能插件分离，通过版本化 capability contract 和统一领域仓库连接。
+Celechron 1.3.0 的桌面端可迁移范围包括本科/研究生课表、课程、考试、成绩与 GPA、学在浙大 DDL、素拓实践、在线校历、任务管理、自动排程、系统日历/iCal、搜索、后台通知和诊断。移动端专属能力不进入 CampusOS 桌面端范围。架构上不能复制其单体 `Spider + Scholar` 聚合方式，也不能继续扩张当前 `academic-scraper` 占位包。
 
-当前内置官方插件路径已支持 headless connector/feature、能力解析、主进程生命周期、不透明业务 Session 和统一事件 collection；第三方包已支持安全检查、安装、注册、卸载和受限 renderer sandbox v1。第三方 headless 的 QuickJS/WASM 内层已经完成资源失控 POC，但 utility process 外层、schema migration、受控 capability/网络代理和进程级资源回收仍是 Plugin Runtime v2 的关键缺口。完整插件清单、能力契约、依赖图、实施阶段和测试矩阵见 [Celechron 启发的官方插件集设计](docs/design/celechron-inspired-plugin-suite.md)。
+2026-08-03 的产品边界进一步确认：插件必须是左侧栏中用户可启停的完整模块，官方插件仅保留“学业、日程、资料”三个。数据源协议适配改为 Core 托管连接器，事件投影、排程、搜索、通知和导出改为内部服务；它们继续使用版本化 capability contract，但不再作为插件向用户展示。该结论取代“每个 connector/feature 都是独立插件”的早期分类，不改变已验证的认证、请求、缓存、降级和解析流程。
+
+当前代码仍以 headless connector/feature 包承载部分内置实现，这是待迁移的技术现状，不是目标产品分类。第三方包已支持安全检查、安装、注册、卸载和受限 renderer sandbox v1；目标形态只允许恰好一个完整活动视图的插件。完整模块清单、能力契约、依赖图、实施阶段和测试矩阵见 [Celechron 对照的模块设计](docs/design/celechron-inspired-plugin-suite.md)。
 
 ---
 
@@ -238,7 +240,7 @@ Functional, emotional, social layers. Top jobs ranked.
 - 没有一款面向中国大学生的 **PC 桌面端一站式校园工作台**。所有竞品都在手机端，且要么是校方强推的"管理工具"（学生抵触），要么是功能单一的工具 APP（无法整合）。
 - VS Code 式插件架构在校园场景没有先例。现有的学生自建工具（Celechron、浙大教室）都是单体应用，无法扩展。
 - 现有竞品的商业模式与用户体验矛盾（广告 → 差评 → 流失）。完全开源、非商业优先的路线天然避免了这一矛盾。
-- **Wedge:** ZJU 工科生 → 桌面端 VS Code 式工作台 → 教务抓取插件 + 日历 + 课件下载。先让 100 个 CC98 技术板块用户成为核心用户和首批插件贡献者，再向普通学生扩散，最后向其他高校横向扩展。
+- **Wedge:** ZJU 工科生 → 桌面端 VS Code 式工作台 → Core 教务连接器 + 学业/日程/资料三个模块。先让 100 个 CC98 技术板块用户成为核心用户和首批插件贡献者，再向普通学生扩散，最后向其他高校横向扩展。
 
 ---
 
