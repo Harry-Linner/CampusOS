@@ -69,7 +69,10 @@ describe("AcademicGradesView", () => {
 
     expect(await screen.findByText("程序设计")).toBeDefined();
     expect(screen.getByText("加权绩点 · 5.0 制")).toBeDefined();
-    expect(screen.getByText("实时获取")).toBeDefined();
+    expect(screen.queryByText("实时获取")).toBeNull();
+    expect(screen.queryByText("1 个学业数据源")).toBeNull();
+    expect(screen.queryByText("绩点覆盖 8 学分")).toBeNull();
+    expect(screen.queryByText("主修 8 学分")).toBeNull();
     expect(readCalls).toEqual(["academic.grades@1"]);
 
     fireEvent.click(screen.getByRole("button", { name: "刷新成绩" }));

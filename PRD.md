@@ -247,3 +247,7 @@ _Changelog_
 ### Timetable source correction (2026-08-03)
 
 This correction supersedes the earlier UI-only diagnosis in the acceptance record above. The future-term timetable request must send the complete academic-year label (`YYYY-YYYY`) in `xnm`, matching the Celechron 1.3.0 `ugrs_spider.dart` -> `zdbk.dart` flow. Sending only the start year can return HTTP 200 with a different timetable, so status 200 is not evidence that the requested term was loaded. The authenticated 2026-2027 first-term acceptance uses a local-only oracle: the forbidden-course predicate must be false and every same-term final-exam course must be present in the timetable. Private course names and response bodies stay outside the repository.
+
+### Academic-grade calculation correction (2026-08-03)
+
+Undergraduate major-course labels come from the dedicated major-grade endpoint and are projected by matching `xkkh` against the all-grades response. GPA and earned-credit behavior follows Celechron 1.3.0: dropped, pending, deferred, and invalid grades do not contribute credits; pass/fail labels and `xtwkc` records do not contribute GPA; ordinary failures remain GPA-weighted at the returned point value. The grades page shows course count, earned credits, overall GPA, and major GPA without source-status badges.

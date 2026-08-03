@@ -41,7 +41,7 @@ export type ExamsFetchResult =
   | { ok: false; message: string };
 
 export type GradesFetchResult =
-  | { ok: true; body: string }
+  | { ok: true; body: string; majorBody: string }
   | { ok: false; message: string };
 
 export interface ZjuUndergraduateConnectorDependencies {
@@ -324,7 +324,10 @@ export const parseExamsResponse = (body: string): AcademicExamRecord[] => {
   });
 };
 
-const parseGradeRecord = (value: unknown): AcademicGradeRecord | null => {
+const parseGradeRecord = (
+  value: unknown,
+  majorCourseIds: ReadonlySet<string>
+): AcademicGradeRecord | null => {
   const item = asRecord(value);
   if (!item) return null;
   const sourceId = asString(item.xkkh)?.trim();
@@ -351,12 +354,33 @@ const parseGradeRecord = (value: unknown): AcademicGradeRecord | null => {
     gradePoint: gradePoint !== null && gradePoint >= 0 ? gradePoint : null,
     academicYearStart,
     termNumber,
-    isMajorCourse: true,
+    isMajorCourse: majorCourseIds.has(sourceId),
     courseCategory: asString(item.kcxz)?.trim() || null
   };
 };
 
-export const parseGradesResponse = (body: string): AcademicGradesData => {
+export const parseMajorCourseIdsResponse = (body: string): Set<string> => {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch (error) {
+    throw new Error("教务网主修成绩响应不是有效 JSON。", { cause: error });
+  }
+  const items = asRecord(payload)?.items;
+  if (!Array.isArray(items)) {
+    throw new Error("教务网主修成绩响应缺少 items 数组。");
+  }
+  return new Set(
+    items
+      .map((value) => asString(asRecord(value)?.xkkh)?.trim())
+      .filter((sourceId): sourceId is string => Boolean(sourceId))
+  );
+};
+
+export const parseGradesResponse = (
+  body: string,
+  majorCourseIds: ReadonlySet<string> = new Set()
+): AcademicGradesData => {
   let payload: unknown;
   try {
     payload = JSON.parse(body);
@@ -368,7 +392,7 @@ export const parseGradesResponse = (body: string): AcademicGradesData => {
     throw new Error("教务网成绩响应缺少 items 数组。");
   }
   const grades = items
-    .map(parseGradeRecord)
+    .map((item) => parseGradeRecord(item, majorCourseIds))
     .filter((grade): grade is AcademicGradeRecord => grade !== null);
   return {
     grades: [...new Map(grades.map((grade) => [grade.sourceId, grade])).values()]
@@ -448,12 +472,15 @@ export const createZjuUndergraduateConnector = ({
     );
     if (result.ok) {
       try {
+        // Celechron: lib/http/ugrs_spider.dart:667-702, 792-795 fetches the
+        // transcript and dedicated major transcript, then projects xkkh IDs.
+        const majorCourseIds = parseMajorCourseIdsResponse(result.majorBody);
         await publish({
           capability: "academic.grades@1",
           accountId: proof.studentId,
           state: "live",
           updatedAt,
-          data: parseGradesResponse(result.body)
+          data: parseGradesResponse(result.body, majorCourseIds)
         });
         return "live";
       } catch {

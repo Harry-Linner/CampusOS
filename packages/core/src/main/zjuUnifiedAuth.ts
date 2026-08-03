@@ -11,6 +11,8 @@ const UNDERGRADUATE_EXAMS_URL =
   "https://zdbk.zju.edu.cn/jwglxt/xskscx/kscx_cxXsgrksIndex.html?doType=query&queryModel.showCount=5000";
 const UNDERGRADUATE_GRADES_URL =
   "https://zdbk.zju.edu.cn/jwglxt/cxdy/xscjcx_cxXscjIndex.html?doType=query&queryModel.showCount=5000";
+const UNDERGRADUATE_MAJOR_GRADES_URL =
+  "https://zdbk.zju.edu.cn/jwglxt/zycjtj/xszgkc_cxXsZgkcIndex.html?doType=query&queryModel.showCount=5000";
 const ZJU_BROWSER_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.63";
 const GRADUATE_ACADEMIC_SERVICE_URL = "https://yjsy.zju.edu.cn/";
@@ -87,7 +89,8 @@ export type ZjuUndergraduateServiceRequest =
       season: ZjuUndergraduateSeason;
     }
   | { operation: "exams" }
-  | { operation: "grades" };
+  | { operation: "grades" }
+  | { operation: "major-grades" };
 
 export interface ZjuUndergraduateServiceResponse {
   status: number;
@@ -1763,7 +1766,9 @@ class ZjuUnifiedAuthClient {
       ? UNDERGRADUATE_TIMETABLE_URL
       : request.operation === "exams"
         ? UNDERGRADUATE_EXAMS_URL
-        : UNDERGRADUATE_GRADES_URL;
+        : request.operation === "major-grades"
+          ? UNDERGRADUATE_MAJOR_GRADES_URL
+          : UNDERGRADUATE_GRADES_URL;
     const requestBody =
       request.operation === "timetable"
         // Celechron lib/http/ugrs_spider.dart:383-491 passes the full academic
@@ -1775,6 +1780,8 @@ class ZjuUnifiedAuthClient {
       ? "教务网课表接口"
       : request.operation === "exams"
         ? "教务网考试接口"
+        : request.operation === "major-grades"
+          ? "教务网主修成绩接口"
         : "教务网成绩接口";
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const session = await this.#getUndergraduateSession(credentials);

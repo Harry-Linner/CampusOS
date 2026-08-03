@@ -39,7 +39,9 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 ### 学业成绩
 
 - Privacy masking is on by default and hides original course scores, per-course grade points, weighted GPA, and major weighted GPA together.
-- Turning privacy masking off reveals all four value groups in the existing layout; credit totals and data-source state remain visible in either mode.
+- Turning privacy masking off reveals all four value groups in the existing layout; credit totals remain visible in either mode.
+
+The grades view does not expose connector source-state badges. Major labels are derived from the dedicated major-grade response by `xkkh` matching. Its GPA and earned-credit projection follows Celechron 1.3.0: dropped/pending/deferred/invalid records are excluded from credits, pass/fail and `xtwkc` records are excluded from GPA, and ordinary failed grades remain in the GPA denominator.
 
 ### 日历
 

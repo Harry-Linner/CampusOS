@@ -75,25 +75,33 @@ const compareTerms = (
   return rightYear - leftYear || rightTerm - leftTerm;
 };
 
-const weightGrades = (
-  grades: readonly AcademicGradeRecord[],
-  isMajorOnly: boolean
-): { credits: number; weightedTotal: number } => {
-  let credits = 0;
-  let weightedTotal = 0;
+const CREDIT_EXCLUDED_SCORES = new Set([
+  "\u5f03\u4fee",
+  "\u5f85\u5f55",
+  "\u7f13\u8003",
+  "\u65e0\u6548"
+]);
+const GPA_EXCLUDED_SCORES = new Set(["\u5408\u683c", "\u4e0d\u5408\u683c"]);
 
-  for (const grade of grades) {
-    if (isMajorOnly && !grade.isMajorCourse) continue;
-    if (grade.gradePoint === null || !Number.isFinite(grade.gradePoint)) continue;
+const validCredit = (grade: AcademicGradeRecord): number =>
+  Number.isFinite(grade.credit) && grade.credit > 0 ? grade.credit : 0;
 
-    const credit = Number.isFinite(grade.credit) && grade.credit > 0 ? grade.credit : 0;
-    if (credit > 0) {
-      credits += credit;
-      weightedTotal += grade.gradePoint * credit;
-    }
-  }
+const creditIncluded = (grade: AcademicGradeRecord): boolean =>
+  !CREDIT_EXCLUDED_SCORES.has(grade.originalScore);
 
-  return { credits, weightedTotal };
+const gpaIncluded = (grade: AcademicGradeRecord): boolean =>
+  creditIncluded(grade) &&
+  !GPA_EXCLUDED_SCORES.has(grade.originalScore) &&
+  !grade.sourceId.includes("xtwkc");
+
+const earnedCredit = (grade: AcademicGradeRecord): number => {
+  const credit = validCredit(grade);
+  if (!creditIncluded(grade)) return 0;
+  return grade.gradePoint !== null &&
+    Number.isFinite(grade.gradePoint) &&
+    (grade.gradePoint !== 0 || grade.sourceId.includes("xtwkc"))
+    ? credit
+    : 0;
 };
 
 export const scaleGpaFromSource = (
@@ -130,12 +138,15 @@ export const summarizeAcademicGrades = (
   let majorWeightedGradePointTotal = 0;
 
   for (const grade of grades) {
-    const credit = Number.isFinite(grade.credit) && grade.credit > 0
-      ? grade.credit
-      : 0;
-    totalCredits += credit;
+    const credit = validCredit(grade);
+    totalCredits += earnedCredit(grade);
 
-    if (grade.gradePoint !== null && Number.isFinite(grade.gradePoint) && credit > 0) {
+    if (
+      gpaIncluded(grade) &&
+      grade.gradePoint !== null &&
+      Number.isFinite(grade.gradePoint) &&
+      credit > 0
+    ) {
       gradedCredits += credit;
       weightedGradePointTotal += grade.gradePoint * credit;
 
@@ -154,8 +165,8 @@ export const summarizeAcademicGrades = (
       majorCredits: 0
     };
     term.grades.push(grade);
-    term.credits += credit;
-    if (grade.isMajorCourse) term.majorCredits += credit;
+    term.credits += earnedCredit(grade);
+    if (grade.isMajorCourse) term.majorCredits += earnedCredit(grade);
     terms.set(key, term);
   }
 

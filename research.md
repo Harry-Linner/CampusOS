@@ -370,3 +370,7 @@ _Changelog_
 ### Timetable diagnosis update (2026-08-03)
 
 This supersedes the earlier UI-only diagnosis in the user acceptance record above. The previous snapshot was fresh but mislabeled: CampusOS sent only the start year as `xnm`, while Celechron 1.3.0 sends the complete `YYYY-YYYY` academic-year label. The upstream endpoint returned HTTP 200 and silently supplied another term, which explains the older-course timetable. After the request was corrected and the Electron main process restarted, the real authenticated path produced the target 2026-2027 first-term timetable, refreshed the capability store, and rebuilt the workspace projection. Local acceptance now checks that a forbidden-course predicate is false and that every same-term final-exam course appears in the timetable; private names remain only in ignored local oracle inputs.
+
+### Academic-grade calculation update (2026-08-03)
+
+The earlier grades implementation marked every undergraduate record as major and therefore made overall and major GPA identical. The corrected flow follows Celechron 1.3.0: `getTranscript` and `getMajorGrade` run independently, the major `xkkh` set is projected onto transcript records, and GPA/earned-credit inclusion uses the reference `Grade` and `GpaHelper` rules. This is implemented at the connector/model boundary; the view consumes formal capability data and no longer exposes internal source-status metrics.

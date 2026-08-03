@@ -467,3 +467,10 @@ _Changelog_
 - [x] Send the full academic-year label in the undergraduate timetable `xnm` form field, as required by the Celechron 1.3.0 reference flow.
 - [x] Re-sync the authenticated 2026-2027 first-term capability and SQLite workspace projection after restarting the Electron main process.
 - [x] Validate the local private baseline with a forbidden-course predicate and same-term final-exam/course correspondence; keep those values out of Git, logs, and CI.
+
+### Academic-grade acceptance correction (2026-08-03)
+
+- [x] Fetch the all-grades and dedicated major-grades endpoints through the same authenticated undergraduate session.
+- [x] Mark a course as major only when its `xkkh` is returned by the major endpoint.
+- [x] Apply the Celechron 1.3.0 credit/GPA inclusion rules for dropped, pending, deferred, invalid, pass/fail, `xtwkc`, and ordinary failed grades.
+- [x] Remove internal source-status and fallback metrics from the grades page.

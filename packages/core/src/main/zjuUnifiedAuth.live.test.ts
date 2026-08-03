@@ -190,6 +190,32 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(examsPayload.items);
 
         expect(examsStructureValid).toBe(true);
+        currentStage = "undergraduate-grades";
+        const gradesResponse = await client.requestUndergraduateService(
+          { username, password },
+          { operation: "grades" }
+        );
+        const gradesPayload = JSON.parse(gradesResponse.body) as unknown;
+        const gradesStructureValid =
+          typeof gradesPayload === "object" &&
+          gradesPayload !== null &&
+          "items" in gradesPayload &&
+          Array.isArray(gradesPayload.items);
+        expect(gradesStructureValid).toBe(true);
+
+        currentStage = "undergraduate-major-grades";
+        const majorGradesResponse = await client.requestUndergraduateService(
+          { username, password },
+          { operation: "major-grades" }
+        );
+        const majorGradesPayload = JSON.parse(majorGradesResponse.body) as unknown;
+        const majorGradesStructureValid =
+          typeof majorGradesPayload === "object" &&
+          majorGradesPayload !== null &&
+          "items" in majorGradesPayload &&
+          Array.isArray(majorGradesPayload.items);
+        expect(majorGradesStructureValid).toBe(true);
+
         if (process.env.CAMPUSOS_TIMETABLE_ORACLE === "1") {
           const forbiddenCourse = Buffer.from(
             process.env.CAMPUSOS_TIMETABLE_FORBIDDEN_B64 ?? "",
@@ -240,19 +266,6 @@ describe("ZJU unified authentication live verification", () => {
           );
           return;
         }
-        currentStage = "undergraduate-grades";
-        const gradesResponse = await client.requestUndergraduateService(
-          { username, password },
-          { operation: "grades" }
-        );
-        const gradesPayload = JSON.parse(gradesResponse.body) as unknown;
-        const gradesStructureValid =
-          typeof gradesPayload === "object" &&
-          gradesPayload !== null &&
-          "items" in gradesPayload &&
-          Array.isArray(gradesPayload.items);
-
-        expect(gradesStructureValid).toBe(true);
         currentStage = "learning-todos";
         const learningResponse = await client.requestLearningService(
           { username, password },

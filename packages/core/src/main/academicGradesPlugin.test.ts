@@ -46,7 +46,7 @@ describe("academic grades feature", () => {
     const summary = summarizeAcademicGrades(grades);
 
     expect(summary.courseCount).toBe(3);
-    expect(summary.totalCredits).toBe(9);
+    expect(summary.totalCredits).toBe(8);
     expect(summary.gradedCredits).toBe(8);
     expect(summary.majorGradedCredits).toBe(8);
     expect(summary.weightedGradePoint).toBeCloseTo(3.8875);
@@ -71,5 +71,59 @@ describe("inferGpaScale", () => {
         { sourceId: "a", courseCode: null, courseName: "A", credit: 1, originalScore: "90", gradePoint: 3.8, academicYearStart: 2025, termNumber: 1, isMajorCourse: true, courseCategory: null }
       ])
     ).toBe("4.0");
+  });
+});
+
+describe("Celechron grade inclusion rules", () => {
+  it("excludes deferred and binary grades while retaining failed GPA weight", () => {
+    const grades: AcademicGradeRecord[] = [
+      {
+        sourceId: "normal", courseCode: null, courseName: "normal", credit: 3,
+        originalScore: "90", gradePoint: 4, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: true, courseCategory: null
+      },
+      {
+        sourceId: "deferred", courseCode: null, courseName: "deferred", credit: 2,
+        originalScore: "\u7f13\u8003", gradePoint: 0, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: true, courseCategory: null
+      },
+      {
+        sourceId: "failed", courseCode: null, courseName: "failed", credit: 1,
+        originalScore: "\u4e0d\u53ca\u683c", gradePoint: 0, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: false, courseCategory: null
+      },
+      {
+        sourceId: "binary-pass", courseCode: null, courseName: "binary-pass", credit: 1,
+        originalScore: "\u5408\u683c", gradePoint: 0, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: false, courseCategory: null
+      }
+    ];
+
+    const summary = summarizeAcademicGrades(grades);
+
+    expect(summary.totalCredits).toBe(3);
+    expect(summary.gradedCredits).toBe(4);
+    expect(summary.majorGradedCredits).toBe(3);
+    expect(summary.weightedGradePoint).toBe(3);
+    expect(summary.majorWeightedGradePoint).toBe(4);
+  });
+
+  it("keeps overall GPA and major GPA on their respective course sets", () => {
+    const summary = summarizeAcademicGrades([
+      {
+        sourceId: "major", courseCode: null, courseName: "major", credit: 3,
+        originalScore: "90", gradePoint: 4, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: true, courseCategory: null
+      },
+      {
+        sourceId: "elective", courseCode: null, courseName: "elective", credit: 2,
+        originalScore: "70", gradePoint: 2, academicYearStart: 2025,
+        termNumber: 1, isMajorCourse: false, courseCategory: null
+      }
+    ]);
+
+    expect(summary.weightedGradePoint).toBeCloseTo(3.2);
+    expect(summary.majorWeightedGradePoint).toBe(4);
+    expect(summary.weightedGradePoint).not.toBe(summary.majorWeightedGradePoint);
   });
 });

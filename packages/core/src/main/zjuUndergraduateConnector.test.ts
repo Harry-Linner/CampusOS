@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createTimetableQueries,
   createZjuUndergraduateConnector,
+  parseGradesResponse,
+  parseMajorCourseIdsResponse,
   type TimetableQuery
 } from "@campusos/plugin-zju-undergraduate/main";
 
@@ -77,6 +79,9 @@ describe("zju undergraduate connector", () => {
             },
             { kcmc: "损坏成绩", cj: "95" }
           ]
+        }),
+        majorBody: JSON.stringify({
+          items: [{ xkkh: "(2025-2026-2)-SE1001-001-1" }]
         })
       })),
       loadCachedGrades: vi.fn(async () => null),
@@ -233,7 +238,8 @@ describe("zju undergraduate connector", () => {
       loadCachedExams: async () => null,
       fetchGrades: async () => ({
         ok: true,
-        body: JSON.stringify({ items: [] })
+        body: JSON.stringify({ items: [] }),
+        majorBody: JSON.stringify({ items: [] })
       }),
       loadCachedGrades: async () => null,
       publish,
@@ -272,7 +278,11 @@ describe("zju undergraduate connector", () => {
       loadCachedTimetable: async () => null,
       fetchExams: async () => ({ ok: true, body: JSON.stringify({ items: [] }) }),
       loadCachedExams: async () => null,
-      fetchGrades: async () => ({ ok: true, body: JSON.stringify({ items: [] }) }),
+      fetchGrades: async () => ({
+        ok: true,
+        body: JSON.stringify({ items: [] }),
+        majorBody: JSON.stringify({ items: [] })
+      }),
       loadCachedGrades: async () => null,
       publish,
       registerRefreshJob: () => () => undefined,
@@ -290,5 +300,21 @@ describe("zju undergraduate connector", () => {
       state: "unavailable",
       message: expect.stringContaining("2025 1|秋")
     }));
+  });
+});
+
+describe("undergraduate major-grade projection", () => {
+  it("marks only transcript records returned by the dedicated major endpoint", () => {
+    const majorIds = parseMajorCourseIdsResponse(JSON.stringify({
+      items: [{ xkkh: "(2025-2026-1)-MAJOR-001-1" }]
+    }));
+    const result = parseGradesResponse(JSON.stringify({
+      items: [
+        { xkkh: "(2025-2026-1)-MAJOR-001-1", kcmc: "major", xf: 3, cj: "90", jd: 4 },
+        { xkkh: "(2025-2026-1)-OTHER-001-1", kcmc: "other", xf: 2, cj: "88", jd: 3.9 }
+      ]
+    }), majorIds);
+
+    expect(result.grades.map((grade) => grade.isMajorCourse)).toEqual([true, false]);
   });
 });

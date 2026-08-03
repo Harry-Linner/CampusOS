@@ -32,3 +32,7 @@
 ## Timetable correctness guard (2026-08-03)
 
 The 2026-2027 autumn/winter baseline captured before the `xnm` correction is invalid even if its capture timestamp is recent: the upstream can answer HTTP 200 while returning another academic year when only `2026` is sent. Recapture only after a real authenticated request uses the full `2026-2027` label and after the capability store, workspace snapshot, and user-visible calendar all refresh. The local oracle asserts a zero forbidden-course count and complete same-term final-exam/course correspondence without committing private course names.
+
+## Academic-grade baseline guard (2026-08-03)
+
+Grade correctness requires both authenticated undergraduate responses: the all-grades transcript and the dedicated major-grade list. Acceptance must verify that major flags are an `xkkh` intersection rather than an all-record default, and that the Celechron 1.3.0 earned-credit/GPA inclusion rules are preserved. Baseline artifacts may contain only redacted structure and counts; course names and response bodies stay local and ignored.

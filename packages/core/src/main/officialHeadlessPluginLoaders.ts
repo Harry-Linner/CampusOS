@@ -499,10 +499,15 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       fetchGrades: async () => {
         try {
-          const response = await requestUndergraduateAcademicService({
-            operation: "grades"
-          });
-          return { ok: true as const, body: response.body };
+          const [transcript, major] = await Promise.all([
+            requestUndergraduateAcademicService({ operation: "grades" }),
+            requestUndergraduateAcademicService({ operation: "major-grades" })
+          ]);
+          return {
+            ok: true as const,
+            body: transcript.body,
+            majorBody: major.body
+          };
         } catch (error) {
           return {
             ok: false as const,

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import type {
   AcademicGradesData,
-  CapabilityDataState,
   CapabilityRecord,
   PluginComponentProps
 } from "@campusos/shared";
@@ -12,31 +11,6 @@ export { manifest } from "./manifest";
 const numberFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2
 });
-
-const dateTimeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit"
-});
-
-const stateLabels: Record<CapabilityDataState, string> = {
-  live: "实时获取",
-  cache: "本地缓存",
-  fallback: "回退数据",
-  unavailable: "当前不可用"
-};
-
-const aggregateState = (
-  records: readonly CapabilityRecord<AcademicGradesData>[]
-): CapabilityDataState => {
-  if (records.length === 0) return "unavailable";
-  const states = records.map((record) => record.state);
-  if (states.every((state) => state === "live")) return "live";
-  if (states.every((state) => state === "unavailable")) return "unavailable";
-  if (states.every((state) => state === "cache")) return "cache";
-  return "fallback";
-};
 
 export const Component = ({
   capabilities,
@@ -102,12 +76,6 @@ export const Component = ({
   const gpaScale = inferGpaScale(grades);
   const busy = !loaded || workspaceLoading || refreshing;
   const availableRecords = records.filter((record) => record.data !== null);
-  const state = aggregateState(records);
-  const updatedAt = records
-    .map((record) => record.updatedAt)
-    .filter((value) => Number.isFinite(Date.parse(value)))
-    .sort()
-    .at(-1) ?? null;
 
   return (
     <section className="page academic-grades-page">
@@ -195,25 +163,6 @@ export const Component = ({
               </strong>
             </article>
           </div>
-
-          <div className="badge-row" aria-label="成绩数据来源">
-            <span className="badge">{stateLabels[state]}</span>
-            {updatedAt ? (
-              <span className="badge">
-                更新于 {dateTimeFormatter.format(new Date(updatedAt))}
-              </span>
-            ) : null}
-            <span className="badge">{availableRecords.length} 个学业数据源</span>
-            <span className="badge">
-              绩点覆盖 {numberFormatter.format(summary.gradedCredits)} 学分
-            </span>
-            <span className="badge">
-              主修 {numberFormatter.format(summary.majorGradedCredits)} 学分
-            </span>
-          </div>
-          <p className="muted grade-method-note">
-            加权绩点仅使用教务接口明确返回的绩点与学分；缺少绩点的课程不会被推算。
-          </p>
 
           {summary.terms.length === 0 ? (
             <article className="panel-card">
