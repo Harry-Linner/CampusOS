@@ -1,5 +1,9 @@
 # CampusOS Interface v3
 
+## 暑假下学期课表验收约束（2026-08-03）
+
+当官方校历处于休课期时，总览必须消费下一完整学期的真实课程事件，并明确标注“秋冬学期”或“春夏学期”。主进程周期刷新保存新快照后，必须通过受控 IPC 使已打开窗口重新 hydrate；不得要求用户重启应用，也不得用 mock 或静态成功状态替代真实刷新。
+
 **Date:** 2026-07-17  
 **Status:** Current UX baseline  
 **Supersedes:** UX portions of `campusos-round2.md` and `ideazjuermodapp.md`

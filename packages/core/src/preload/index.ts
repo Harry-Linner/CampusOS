@@ -8,7 +8,13 @@ contextBridge.exposeInMainWorld("campusos", {
   },
   workspace: {
     hydrate: () => ipcRenderer.invoke("campusos:workspace:hydrate"),
-    sync: () => ipcRenderer.invoke("campusos:workspace:sync")
+    sync: () => ipcRenderer.invoke("campusos:workspace:sync"),
+    subscribe: (listener: () => void) => {
+      const channel = "campusos:workspace:changed";
+      const handler = () => listener();
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
   },
   credentials: {
     academicAffairs: {

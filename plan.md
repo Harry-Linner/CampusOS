@@ -1,6 +1,12 @@
 # Execution Plan — ZJU CampusOS
 
 **Date:** 2026-06-17
+
+### 验收增量（2026-08-03）
+
+- 暑假查看下学期：沿用 Celechron 对齐的完整学期选择和真实教务请求；校历的秋/冬、春/夏季度在工作区标签中合并显示。
+- 启动一致性：后台同步写入 SQLite 快照后，通过受控 IPC 通知 renderer 重新 hydrate，避免界面永久停留在旧学期快照。
+- 工具链：`gh` 可执行文件位于 `C:\Program Files\GitHub CLI\gh.exe`，版本与认证状态已在本机确认。
 **Tier:** T3 · S3
 **Currency:** CNY (¥)
 **Related docs:** [PRD](PRD.md) · [research](research.md) · [技术规格](docs/specs/ideazjuermodapp.md)

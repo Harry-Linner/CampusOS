@@ -159,8 +159,28 @@ const formatShanghaiDate = (isoDateTime: string): string => {
 const dateOnlyTimestamp = (value: string): number =>
   Date.parse(`${value}T00:00:00Z`);
 
-const formatQuarterLabel = (quarter: AcademicCalendarQuarter): string =>
-  `${quarter.academicYearStart}-${quarter.academicYearStart + 1} ${quarter.season.slice(2)}学期`;
+const formatSemesterLabel = (
+  quarter: AcademicCalendarQuarter,
+  quarters: readonly AcademicCalendarQuarter[]
+): string => {
+  const season = quarter.season.split("|").at(-1);
+  const semesterSeasons = season === "\u79cb" || season === "\u51ac"
+    ? ["\u79cb", "\u51ac"]
+    : season === "\u6625" || season === "\u590f"
+      ? ["\u6625", "\u590f"]
+      : season
+        ? [season]
+        : [];
+  const hasFullSemester = semesterSeasons.every((candidate) =>
+    quarters.some(
+      (item) =>
+        item.academicYearStart === quarter.academicYearStart &&
+        item.season.split("|").at(-1) === candidate
+    )
+  );
+  const label = hasFullSemester ? semesterSeasons.join("") : season ?? "";
+  return `${quarter.academicYearStart}-${quarter.academicYearStart + 1} ${label}学期`;
+};
 
 export const mergeAcademicCalendarIntoWorkspace = (
   snapshot: CampusWorkspaceSnapshot,
@@ -198,7 +218,7 @@ export const mergeAcademicCalendarIntoWorkspace = (
     return {
       ...snapshot,
       term: {
-        label: formatQuarterLabel(active),
+        label: formatSemesterLabel(active, quarters),
         phase: "active",
         currentWeek: Math.floor(elapsedDays / 7) + 1,
         progressPercent: Math.min(
@@ -216,7 +236,7 @@ export const mergeAcademicCalendarIntoWorkspace = (
     return {
       ...snapshot,
       term: {
-        label: formatQuarterLabel(upcoming),
+        label: formatSemesterLabel(upcoming, quarters),
         phase: "upcoming",
         currentWeek: null,
         progressPercent: 0

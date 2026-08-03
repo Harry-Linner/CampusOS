@@ -20,6 +20,7 @@ import {
   resumeDownload,
   subscribeToDownloadChanges
 } from "./lib/downloadBridge";
+import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 
 const isDevelopmentBuild =
   (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
@@ -33,9 +34,13 @@ export const App = (): JSX.Element => {
   const workspace = useCampusWorkspace();
 
   useEffect(() => {
+    const unsubscribe = subscribeToCampusWorkspaceChanges(() => {
+      void workspace.load();
+    });
     void pluginHost.load();
     void workspace.load();
     // Bootstrap plugin discovery and the local campus workspace snapshot once.
+    return unsubscribe;
   }, []);
 
   useEffect(() => subscribeToDownloadChanges(() => {

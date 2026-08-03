@@ -222,6 +222,26 @@ describe("workspace capability integration", () => {
         currentWeek: 2
       })
     );
+
+    const fullSemesterRecord = {
+      ...calendarRecord,
+      data: {
+        ...calendarRecord.data,
+        quarters: [
+          ...calendarRecord.data.quarters,
+          {
+            academicYearStart: 2026,
+            season: "1|\u51ac" as const,
+            startDate: "2026-11-09",
+            classesBeginDate: "2026-11-09",
+            endDate: "2027-01-15"
+          }
+        ]
+      }
+    };
+    expect(
+      mergeAcademicCalendarIntoWorkspace(createSnapshot(), fullSemesterRecord).term.label
+    ).toBe("2026-2027 \u79cb\u51ac\u5b66\u671f");
   });
 
   it("selects one record per active provider without leaking another account", () => {

@@ -27,3 +27,10 @@ export const syncCampusWorkspaceRecord =
   async (): Promise<CampusWorkspaceRecord> => {
     return requireCampusosBridge().workspace.sync();
   };
+
+export const subscribeToCampusWorkspaceChanges = (
+  listener: () => void
+): (() => void) => {
+  const subscribe = requireCampusosBridge().workspace.subscribe;
+  return subscribe ? subscribe(listener) : () => undefined;
+};

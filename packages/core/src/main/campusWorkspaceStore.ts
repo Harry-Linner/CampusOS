@@ -1,4 +1,4 @@
-import { app, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "node:path";
 import type {
   AcademicCalendarConfigData,
@@ -40,6 +40,13 @@ import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
 import { appendDiagnosticEntry } from "./diagnosticLogStore";
 
 const WORKSPACE_STORE_FILE = "campus-workspace.json";
+export const CAMPUS_WORKSPACE_CHANGED_CHANNEL = "campusos:workspace:changed";
+
+export const notifyCampusWorkspaceChanged = (): void => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(CAMPUS_WORKSPACE_CHANGED_CHANNEL);
+  }
+};
 
 const getLegacyWorkspaceStorePath = (): string =>
   join(app.getPath("userData"), "workspace", WORKSPACE_STORE_FILE);

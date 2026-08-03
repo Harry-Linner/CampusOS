@@ -23,6 +23,7 @@ export interface CampusWorkspaceRecord {
 export interface CampusWorkspaceBridge {
   hydrate: () => Promise<CampusWorkspaceRecord>;
   sync: () => Promise<CampusWorkspaceRecord>;
+  subscribe?: (listener: () => void) => () => void;
 }
 
 export interface CampusosBridge {

@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAcademicCredentialHandlers } from "./academicCredentialStore";
 import {
+  notifyCampusWorkspaceChanged,
   registerCampusWorkspaceHandlers,
   syncCampusWorkspace
 } from "./campusWorkspaceStore";
@@ -25,7 +26,11 @@ import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
 const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
-  refresh: syncCampusWorkspace
+  refresh: async () => {
+    const result = await syncCampusWorkspace();
+    notifyCampusWorkspaceChanged();
+    return result;
+  }
 });
 
 const createMainWindow = async (): Promise<void> => {
