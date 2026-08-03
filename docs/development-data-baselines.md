@@ -28,3 +28,7 @@
 ## 验收规则
 
 基线验收必须闭环覆盖“真实账号输入 -> 实际上游请求 -> 脱敏上游反馈 -> parser/capability -> 工作区投影 -> 用户可见结果”。自动化测试可使用从基线抽象的脱敏结构 fixture 固定重复、上下半学期、单双周和学期筛选行为，但 fixture、mock、build 或 UI 截图均不能单独证明真实抓取正确。
+
+## Timetable correctness guard (2026-08-03)
+
+The 2026-2027 autumn/winter baseline captured before the `xnm` correction is invalid even if its capture timestamp is recent: the upstream can answer HTTP 200 while returning another academic year when only `2026` is sent. Recapture only after a real authenticated request uses the full `2026-2027` label and after the capability store, workspace snapshot, and user-visible calendar all refresh. The local oracle asserts a zero forbidden-course count and complete same-term final-exam/course correspondence without committing private course names.

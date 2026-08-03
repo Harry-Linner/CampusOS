@@ -243,3 +243,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 _Changelog_
 - 2026-06-17: initial draft — based on Lisa's 14-round spec interview + 8 market research searches
+
+### Timetable source correction (2026-08-03)
+
+This correction supersedes the earlier UI-only diagnosis in the acceptance record above. The future-term timetable request must send the complete academic-year label (`YYYY-YYYY`) in `xnm`, matching the Celechron 1.3.0 `ugrs_spider.dart` -> `zdbk.dart` flow. Sending only the start year can return HTTP 200 with a different timetable, so status 200 is not evidence that the requested term was loaded. The authenticated 2026-2027 first-term acceptance uses a local-only oracle: the forbidden-course predicate must be false and every same-term final-exam course must be present in the timetable. Private course names and response bodies stay outside the repository.

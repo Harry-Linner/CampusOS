@@ -1766,11 +1766,10 @@ class ZjuUnifiedAuthClient {
         : UNDERGRADUATE_GRADES_URL;
     const requestBody =
       request.operation === "timetable"
-        ? new URLSearchParams({
-            xnm: String(request.academicYearStart),
-            xqm: request.season,
-            captcha_value: "null"
-          }).toString()
+        // Celechron lib/http/ugrs_spider.dart:383-491 passes the full academic
+        // year label to zdbk.dart:508. The endpoint accepts a start year but can
+        // silently return another schedule instead of the requested term.
+        ? `xnm=${request.academicYearStart}-${request.academicYearStart + 1}&xqm=${request.season}&captcha_value=null`
         : "";
     const requestContext = request.operation === "timetable"
       ? "教务网课表接口"

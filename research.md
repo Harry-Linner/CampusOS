@@ -366,3 +366,7 @@ Things we couldn't resolve in this pass but that would change the plan.
 
 _Changelog_
 - 2026-06-17: initial draft — 8 WebSearches, 0 WebFetches (competitor pages were stale/non-functional); 28 sources cited
+
+### Timetable diagnosis update (2026-08-03)
+
+This supersedes the earlier UI-only diagnosis in the user acceptance record above. The previous snapshot was fresh but mislabeled: CampusOS sent only the start year as `xnm`, while Celechron 1.3.0 sends the complete `YYYY-YYYY` academic-year label. The upstream endpoint returned HTTP 200 and silently supplied another term, which explains the older-course timetable. After the request was corrected and the Electron main process restarted, the real authenticated path produced the target 2026-2027 first-term timetable, refreshed the capability store, and rebuilt the workspace projection. Local acceptance now checks that a forbidden-course predicate is false and that every same-term final-exam course appears in the timetable; private names remain only in ignored local oracle inputs.

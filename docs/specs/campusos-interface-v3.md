@@ -95,3 +95,7 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 - All interactive controls have visible keyboard focus and do not rely on hover alone.
 - Settings retain existing credential and reminder persistence behavior; test builds expose a working data refresh action with visible result feedback.
 - Settings diagnostics reload persisted refresh records, clear them through IPC, and export a sanitized TXT without exposing account IDs, passwords, Cookie, Session, ticket, token or sensitive URL parameters.
+
+## Future-term timetable integrity (2026-08-03)
+
+When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.

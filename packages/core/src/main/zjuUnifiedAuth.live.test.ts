@@ -7,7 +7,11 @@ import {
   createZjuUnifiedAuthClient,
   type ZjuAuthTransport
 } from "./zjuUnifiedAuth";
-import { createTimetableQueries } from "@campusos/plugin-zju-undergraduate/main";
+import {
+  createTimetableQueries,
+  parseExamsResponse,
+  parseTimetableResponse
+} from "@campusos/plugin-zju-undergraduate/main";
 import { DownloadEngine } from "./downloadEngine";
 import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
@@ -136,6 +140,10 @@ describe("ZJU unified authentication live verification", () => {
 
         expect(valid).toBe(true);
         const timetableQueries = createTimetableQueries(new Date());
+        const futureAcademicYearStart = Math.max(
+          ...timetableQueries.map((query) => query.academicYearStart)
+        );
+        const futureFirstSemesterCourseNames = new Set<string>();
         for (const [index, query] of timetableQueries.entries()) {
           currentStage = `undergraduate-timetable-${index + 1}`;
           const timetableResponse = await client.requestUndergraduateService(
@@ -157,6 +165,17 @@ describe("ZJU unified authentication live verification", () => {
               "kbList" in timetablePayload &&
               Array.isArray(timetablePayload.kbList));
           expect(timetableStructureValid).toBe(true);
+          if (
+            query.academicYearStart === futureAcademicYearStart &&
+            query.season.startsWith("1|")
+          ) {
+            for (const session of parseTimetableResponse(
+              query,
+              timetableResponse.body
+            )) {
+              futureFirstSemesterCourseNames.add(session.courseName);
+            }
+          }
         }
         currentStage = "undergraduate-exams";
         const examsResponse = await client.requestUndergraduateService(
@@ -171,6 +190,56 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(examsPayload.items);
 
         expect(examsStructureValid).toBe(true);
+        if (process.env.CAMPUSOS_TIMETABLE_ORACLE === "1") {
+          const forbiddenCourse = Buffer.from(
+            process.env.CAMPUSOS_TIMETABLE_FORBIDDEN_B64 ?? "",
+            "base64"
+          ).toString("utf8");
+          const requiredCourse = Buffer.from(
+            process.env.CAMPUSOS_TIMETABLE_REQUIRED_B64 ?? "",
+            "base64"
+          ).toString("utf8");
+          if (!forbiddenCourse || !requiredCourse) {
+            throw new Error("课表真实验收缺少本地判据。");
+          }
+          const sameTermExamCourses = new Set(
+            parseExamsResponse(examsResponse.body)
+              .filter((exam) =>
+                exam.courseId.startsWith(
+                  `(${futureAcademicYearStart}-${futureAcademicYearStart + 1}-1)`
+                )
+              )
+              .map((exam) => exam.courseName)
+          );
+          const allSameTermExamCoursesPresent = [...sameTermExamCourses].every(
+            (courseName) => futureFirstSemesterCourseNames.has(courseName)
+          );
+          const matchingExamExists = parseExamsResponse(examsResponse.body).some(
+            (exam) =>
+              exam.courseName === requiredCourse &&
+              exam.courseId.startsWith(
+                `(${futureAcademicYearStart}-${futureAcademicYearStart + 1}-1)`
+              )
+          );
+          const forbiddenCourseExists = [
+            ...futureFirstSemesterCourseNames
+          ].some((courseName) => courseName.includes(forbiddenCourse));
+          process.stdout.write(
+            `[TIMETABLE-ORACLE] exam=${matchingExamExists}; all_exam_courses=${allSameTermExamCoursesPresent}; forbidden=${forbiddenCourseExists}; required=${futureFirstSemesterCourseNames.has(requiredCourse)}\n`
+          );
+          expect(matchingExamExists).toBe(true);
+          expect(allSameTermExamCoursesPresent).toBe(true);
+          expect(forbiddenCourseExists).toBe(false);
+          expect(futureFirstSemesterCourseNames.has(requiredCourse)).toBe(true);
+          process.stdout.write(
+            [
+              "[PASS] 下一学年第一学期课表通过本地课程判据",
+              "[PASS] 同期考试课程与课表一致",
+              "[PASS] 敏感字段输出：0"
+            ].join("\n") + "\n"
+          );
+          return;
+        }
         currentStage = "undergraduate-grades";
         const gradesResponse = await client.requestUndergraduateService(
           { username, password },

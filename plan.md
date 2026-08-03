@@ -461,3 +461,9 @@ flowchart TD
 _Changelog_
 - 2026-06-17: initial draft — incorporating Lisa's phase breakdown + metrics framework + kill criteria
 - 2026-07-12: synced with clarified direction — official integrations first, full open-source/non-commercial stance, Android as post-MVP reminder completion, prioritized data sources, DingTalk import added to research scope
+
+### Timetable acceptance correction (2026-08-03)
+
+- [x] Send the full academic-year label in the undergraduate timetable `xnm` form field, as required by the Celechron 1.3.0 reference flow.
+- [x] Re-sync the authenticated 2026-2027 first-term capability and SQLite workspace projection after restarting the Electron main process.
+- [x] Validate the local private baseline with a forbidden-course predicate and same-term final-exam/course correspondence; keep those values out of Git, logs, and CI.

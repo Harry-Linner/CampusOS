@@ -203,7 +203,10 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(requests[5].headers.Cookie).toContain("JSESSIONID=academic-session");
     expect(requests[5].headers.Cookie).toContain("route=route-value");
     expect(new URLSearchParams(requests[5].body)).toEqual(
-      new URLSearchParams({ xnm: "2025", xqm: "2|夏", captcha_value: "null" })
+      new URLSearchParams({ xnm: "2025-2026", xqm: "2|夏", captcha_value: "null" })
+    );
+    expect(requests[5].body).toBe(
+      "xnm=2025-2026&xqm=2|\u590f&captcha_value=null"
     );
     expect(requests[5].headers.Connection).toBe("close");
     expect(requests[5].headers["User-Agent"]).toContain("Edg/110.0.1587.63");
