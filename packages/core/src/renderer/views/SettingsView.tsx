@@ -101,7 +101,7 @@ export const SettingsView = ({
         if (active) setGpaStrategy(record.strategy);
       })
       .catch(() => {
-        if (active) setGpaStrategyError("GPA ç­–ç•¥è¯»å–å¤±è´¥ã€‚");
+        if (active) setGpaStrategyError("GPA 策略读取失败。");
       });
     return () => {
       active = false;
@@ -695,7 +695,7 @@ export const SettingsView = ({
               className="primary-button"
               type="button"
               disabled={!window.campusos?.academic?.saveGpaStrategy}
-              aria-label="Save GPA"
+              aria-label="保存 GPA 设置"
               onClick={() => {
                 void (async () => {
                   const bridge = window.campusos?.academic;
@@ -706,15 +706,15 @@ export const SettingsView = ({
                     setGpaStrategyError(null);
                   } catch (error) {
                     setGpaStrategyError(
-                      error instanceof Error ? error.message : "GPA ç­–ç•¥ä¿å­˜å¤±è´¥ã€‚"
+                      error instanceof Error ? error.message : "GPA 策略保存失败。"
                     );
                   }
                 })();
               }}
             >
-              ä¿å­˜ GPA è®¾ç½®
+              保存 GPA 设置
             </button>
-            {gpaStrategySaved ? <span className="save-note">å·²ä¿å­˜</span> : null}
+            {gpaStrategySaved ? <span className="save-note">已保存</span> : null}
           </div>
           {gpaStrategyError ? <p className="error-copy" role="alert">{gpaStrategyError}</p> : null}
         </section>

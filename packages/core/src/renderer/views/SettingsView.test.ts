@@ -351,10 +351,10 @@ describe("SettingsView", () => {
     render(createElement(SettingsView, { onRefresh: vi.fn().mockResolvedValue(undefined) }));
     const first = await screen.findByRole("radio", { name: /取首次/ });
     fireEvent.click(first);
-    fireEvent.click(screen.getByRole("button", { name: /GPA/ }));
+    fireEvent.click(screen.getByRole("button", { name: "保存 GPA 设置" }));
 
     expect(saveGpaStrategy).toHaveBeenCalledWith("first");
-    expect(await screen.findByRole("button", { name: /GPA/ })).toBeDefined();
+    expect(await screen.findByText("已保存")).toBeDefined();
   });
 
   it("saves reminder settings without requiring a remote workspace refresh", async () => {
