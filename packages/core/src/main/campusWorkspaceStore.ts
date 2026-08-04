@@ -16,10 +16,6 @@ import type {
   ReminderSchedulerState,
   ReminderSettingsRecord
 } from "../shared/reminderBridge";
-import {
-  createDefaultCampusAdapterContext,
-  loadCampusWorkspace
-} from "../shared/campusWorkspace";
 import { readAcademicCredentialRecord } from "./academicCredentialStore";
 import { readReminderSettingsRecord } from "./reminderSettingsStore";
 import { scheduleWorkspaceReminders } from "./reminderScheduler";
@@ -29,6 +25,7 @@ import {
 } from "./refreshCoordinator";
 import {
   createLiveWorkspaceSnapshot,
+  createEmptyWorkspaceSnapshot,
   findAcademicCalendarRecord,
   findCalendarEventRecords,
   findLearningMaterialsRecord,
@@ -44,6 +41,8 @@ import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { processGradeChangeNotification } from "./gradeChangeNotification";
 import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
 import { appendDiagnosticEntry } from "./diagnosticLogStore";
+import { publishE2eFixtureCapabilities } from "./e2eFixtureSources";
+import { useE2eFixtureSources } from "./officialAcademicCalendarRequest";
 
 const WORKSPACE_STORE_FILE = "campus-workspace.json";
 export const CAMPUS_WORKSPACE_CHANGED_CHANNEL = "campusos:workspace:changed";
@@ -103,6 +102,9 @@ const buildGeneratedRecord = async (
 ): Promise<CampusWorkspaceRecord> => {
   const pluginRuntime = await getOfficialPluginRuntimeService().loadInternal();
   const refreshResults = await pluginRefreshCoordinator.runAll();
+  if (useE2eFixtureSources()) {
+    await publishE2eFixtureCapabilities(getOfficialCapabilityRepository());
+  }
   const academicCredential = await readAcademicCredentialRecord();
   const verifiedAcademicAccountId =
     academicCredential.verificationState === "verified" &&
@@ -144,15 +146,9 @@ const buildGeneratedRecord = async (
         generatedAt: now.toISOString(),
         accountId: verifiedAcademicAccountId
       })
-    : await loadCampusWorkspace(
-        createDefaultCampusAdapterContext(now, {
-          "academic-affairs": {
-            configured: academicCredential.configured,
-            username: academicCredential.username,
-            savedAt: academicCredential.savedAt
-          }
-        }, reminderSettings.leadMinutes)
-      );
+    : createEmptyWorkspaceSnapshot({
+        generatedAt: now.toISOString()
+      });
   const eventRecords =
     await getOfficialCapabilityRepository().read<CalendarEventsData>(
       "calendar.events@1"

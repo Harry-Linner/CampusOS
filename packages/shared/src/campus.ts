@@ -29,12 +29,6 @@ export type CampusDownloadStatus =
   | "failed"
   | "ready";
 
-export interface CampusSourceCredentialContext {
-  configured: boolean;
-  username: string | null;
-  savedAt: string | null;
-}
-
 export interface CampusSourceDefinition {
   id: CampusSourceId;
   label: string;
@@ -161,32 +155,6 @@ export interface CampusWorkspaceSnapshot {
   downloads: CampusDownloadTask[];
   reminders: CampusReminder[];
   summary: CampusWorkspaceSummary;
-}
-
-export interface CampusAdapterContext {
-  now: string;
-  semesterLabel: string;
-  downloadRoot: string;
-  reminderLeadMinutes: number[];
-  sourceCredentials: Partial<Record<CampusSourceId, CampusSourceCredentialContext>>;
-}
-
-export interface CampusAdapterResult {
-  sourceId: CampusSourceId;
-  status: CampusSyncStatus;
-  connectionState?: CampusSourceConnectionState;
-  syncedAt: string;
-  summary: string;
-  actionLabel?: string;
-  configuredUsername?: string | null;
-  courses: CampusCourseSession[];
-  deadlines: CampusDeadline[];
-  materials: CampusMaterialRecord[];
-}
-
-export interface CampusSourceAdapter {
-  source: CampusSourceDefinition;
-  ingest: (context: CampusAdapterContext) => Promise<CampusAdapterResult>;
 }
 
 export const firstWaveSourceCatalog = [

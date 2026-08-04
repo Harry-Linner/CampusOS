@@ -5,6 +5,7 @@ import type {
   CampusWorkspaceSnapshot
 } from "@campusos/shared";
 import {
+  createEmptyWorkspaceSnapshot,
   createLiveWorkspaceSnapshot,
   findCalendarEventRecords,
   mergeAcademicCalendarIntoWorkspace,
@@ -137,6 +138,28 @@ const learningEventsRecord: CapabilityRecord<CalendarEventsData> = {
 };
 
 describe("workspace capability integration", () => {
+  it("keeps an unverified workspace empty and marks authenticated sources unavailable", () => {
+    const snapshot = createEmptyWorkspaceSnapshot({
+      generatedAt: "2026-08-05T04:00:00.000Z"
+    });
+
+    expect(snapshot.courses).toEqual([]);
+    expect(snapshot.deadlines).toEqual([]);
+    expect(snapshot.materials).toEqual([]);
+    expect(snapshot.term.phase).toBe("unavailable");
+    expect(snapshot.sourceStates).toContainEqual(
+      expect.objectContaining({
+        sourceId: "academic-affairs",
+        status: "planned",
+        connectionState: "needs-credentials",
+        configuredUsername: null
+      })
+    );
+    expect(snapshot.sourceStates).not.toContainEqual(
+      expect.objectContaining({ summary: expect.stringContaining("mock") })
+    );
+  });
+
   it("starts verified accounts from an empty live snapshot instead of mock courses", () => {
     const snapshot = createLiveWorkspaceSnapshot({
       generatedAt: "2026-07-19T04:00:00.000Z",

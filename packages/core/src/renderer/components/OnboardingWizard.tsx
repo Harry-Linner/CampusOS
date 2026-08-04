@@ -229,6 +229,12 @@ export const OnboardingWizard = ({
     academicCredential.record.program === program;
 
   const hasSynced = syncStarted && workspace.ready && !workspace.loading;
+  const hasWorkspaceData = Boolean(
+    workspace.snapshot &&
+      (workspace.snapshot.courses.length > 0 ||
+        workspace.snapshot.deadlines.length > 0 ||
+        workspace.snapshot.materials.length > 0)
+  );
 
   const readyPluginIds = useMemo(
     () =>
@@ -581,9 +587,7 @@ export const OnboardingWizard = ({
                     {workspace.snapshot.term.phase === "active" &&
                     workspace.snapshot.term.currentWeek
                       ? `当前：${workspace.snapshot.term.label} · 第 ${workspace.snapshot.term.currentWeek} 周`
-                      : workspace.snapshot.term.phase === "mock"
-                        ? `当前：${workspace.snapshot.term.label}`
-                        : `当前：${workspace.snapshot.term.label}`}
+                      : `当前：${workspace.snapshot.term.label}`}
                   </p>
                 ) : null}
                 <p className="page-copy">看起来对吗？</p>
@@ -711,14 +715,16 @@ export const OnboardingWizard = ({
                   <strong>{authSkipped ? "认证暂未连接" : "账号已连接"}</strong>
                   <span>
                     {authSkipped
-                      ? "开发模式使用本地 mock 数据"
+                      ? "未连接认证；同步结果不代表真实账号数据"
                       : `${program === "undergraduate" ? "本科生" : "研究生"} · 凭据由系统安全保管`}
                   </span>
                 </div>
                 <div className="onboarding-done-item">
                   <strong>数据已同步</strong>
                 <span>
-                  课程与待办事项已汇入工作台
+                  {hasWorkspaceData
+                    ? "课程与待办事项已汇入工作台"
+                    : "暂无可用课程与待办数据，请先连接真实账号"}
                 </span>
               </div>
                 <div className="onboarding-done-item">

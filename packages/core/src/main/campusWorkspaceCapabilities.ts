@@ -76,6 +76,60 @@ export const createLiveWorkspaceSnapshot = ({
   };
 };
 
+export const createEmptyWorkspaceSnapshot = ({
+  generatedAt
+}: {
+  generatedAt: string;
+}): CampusWorkspaceSnapshot => {
+  const sourceStates: CampusSourceSyncState[] = firstWaveSourceCatalog.map(
+    (source) => {
+      const requiresCredentials =
+        source.id === "academic-affairs" || source.id === "learning-platform";
+      return {
+        sourceId: source.id,
+        label: source.label,
+        status: "planned",
+        connectionState: requiresCredentials ? "needs-credentials" : "not-required",
+        lastSyncedAt: generatedAt,
+        itemCount: 0,
+        summary: requiresCredentials
+          ? "请先在设置页连接统一身份认证。"
+          : "该数据源尚未接入真实连接器。",
+        actionLabel: requiresCredentials
+          ? "前往设置页连接统一身份认证"
+          : "等待连接器接入",
+        configuredUsername: null
+      };
+    }
+  );
+
+  return {
+    generatedAt,
+    term: {
+      label: "尚未连接教务日历",
+      phase: "unavailable",
+      currentWeek: null,
+      progressPercent: 0
+    },
+    sourceStates,
+    courses: [],
+    todayCourses: [],
+    deadlines: [],
+    materialCourses: [],
+    materials: [],
+    downloads: [],
+    reminders: [],
+    summary: {
+      readySources: 0,
+      totalSources: sourceStates.length,
+      downloadsInFlight: 0,
+      materialsReady: 0,
+      remindersQueued: 0,
+      deadlinesDueSoon: 0
+    }
+  };
+};
+
 export const findAcademicCalendarRecord = (
   records: CapabilityRecord<AcademicCalendarConfigData>[],
   providerId: string
