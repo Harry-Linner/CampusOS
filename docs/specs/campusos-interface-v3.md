@@ -40,7 +40,7 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 - Provide internal tabs for 课表、课程、考试、成绩 and 实践 without creating additional first-level destinations.
 - Course search, detail, history, exam countdown, GPA modes, major identification and practice records all stay within this workspace.
 
-- Privacy masking is on by default and hides original course scores, per-course grade points, weighted GPA, and major weighted GPA together.
+- Privacy masking is on by default and hides original course scores, per-course grade points, academic GPA, and major GPA together.
 - Turning privacy masking off reveals all four value groups in the existing layout; credit totals remain visible in either mode.
 
 The grades view does not expose connector source-state badges. Major labels are derived from the dedicated major-grade response by `xkkh` matching. Its GPA and earned-credit projection follows Celechron 1.3.0: dropped/pending/deferred/invalid records are excluded from credits, pass/fail and `xtwkc` records are excluded from GPA, and ordinary failed grades remain in the GPA denominator.
@@ -118,4 +118,4 @@ When the calendar is in a vacation period, the preview must use the next complet
 
 ## Academic major summary integrity (2026-08-04)
 
-The undergraduate connector carries the dedicated Celechron `getMajorGrade` GPA and earned-credit projection alongside transcript records. The renderer uses that projection by default, while an explicitly saved custom-weight map enables the local weighted view. The source projection and `xkkh` major labels remain account-scoped capability data.
+The undergraduate connector carries the dedicated Celechron `getMajorGrade` GPA and earned-credit projection alongside transcript records. The renderer uses that projection directly; CampusOS does not add a custom-weight GPA branch. The source projection and `xkkh` major labels remain account-scoped capability data.

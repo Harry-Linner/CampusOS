@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   AcademicGpaStrategy,
   AcademicGradesData,
@@ -25,31 +25,23 @@ export const Component = ({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshRequest, setRefreshRequest] = useState(0);
   const [privacyMask, setPrivacyMask] = useState(true);
-  const [weights, setWeights] = useState<Record<string, number>>({});
   const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("first");
-  const savedWeights = useRef<Record<string, number>>({});
-  const [weightError, setWeightError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoaded(false);
 
     const academicBridge = window.campusos?.academic;
-    const weightsPromise = academicBridge?.loadGpaWeights()
-      .catch(() => ({ weights: {}, savedAt: null }));
     const strategyPromise = academicBridge?.loadGpaStrategy
       ? academicBridge.loadGpaStrategy().catch(() => ({ strategy: "first" as const, savedAt: null }))
       : Promise.resolve({ strategy: "first" as const, savedAt: null });
     void Promise.all([
       capabilities.read<AcademicGradesData>("academic.grades@1"),
-      weightsPromise ?? Promise.resolve({ weights: {}, savedAt: null }),
       strategyPromise
     ])
-      .then(([nextRecords, nextWeights, nextStrategy]) => {
+      .then(([nextRecords, nextStrategy]) => {
         if (!active) return;
         setRecords(nextRecords);
-        setWeights(nextWeights.weights);
-        savedWeights.current = nextWeights.weights;
         setGpaStrategy(nextStrategy.strategy);
         setError(null);
       })
@@ -96,34 +88,12 @@ export const Component = ({
     : undefined;
   const summary = summarizeAcademicGrades(
     grades,
-    new Map(Object.entries(weights)),
     gpaStrategy,
     sourceMajorSummary
   );
   const gpaScale = inferGpaScale(grades);
   const busy = !loaded || workspaceLoading || refreshing;
   const availableRecords = records.filter((record) => record.data !== null);
-
-  const saveWeight = async (sourceId: string, value: string): Promise<void> => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
-      setWeightError("权重必须是 0 到 100 之间的数值。");
-      return;
-    }
-    const next = { ...weights, [sourceId]: parsed };
-    setWeights(next);
-    setWeightError(null);
-    try {
-      const saved = await window.campusos?.academic?.saveGpaWeights(next);
-      if (saved) {
-        savedWeights.current = saved.weights;
-        setWeights(saved.weights);
-      }
-    } catch (nextError) {
-      setWeights(savedWeights.current);
-      setWeightError(nextError instanceof Error ? nextError.message : "权重保存失败。");
-    }
-  };
 
   return (
     <section className="page academic-grades-page">
@@ -162,8 +132,6 @@ export const Component = ({
           <p className="muted">{error}</p>
         </article>
       ) : null}
-      {weightError ? <p className="panel-error" role="alert">{weightError}</p> : null}
-
       {!loaded ? (
         <article className="panel-card" aria-live="polite">
           <h2>正在读取</h2>
@@ -193,7 +161,7 @@ export const Component = ({
               <strong>{numberFormatter.format(summary.totalCredits)}</strong>
             </article>
             <article className="grade-summary-card">
-              <span>加权绩点 · {gpaScale} 制</span>
+              <span>学业平均绩点 · {gpaScale} 制</span>
               <strong>
                 {privacyMask
                   ? "***"
@@ -203,7 +171,7 @@ export const Component = ({
               </strong>
             </article>
             <article className="grade-summary-card">
-              <span>主修加权绩点</span>
+              <span>主修平均绩点</span>
               <strong>
                 {privacyMask
                   ? "***"
@@ -247,7 +215,7 @@ export const Component = ({
                           <span className="grade-major-tag">主修</span>
                         ) : null}
                       </strong>
-                      <span className="meta-line">
+                        <span className="meta-line">
                         {grade.realId ?? grade.courseCode ?? "课程代码未返回"} / {numberFormatter.format(grade.credit)} 学分
                         {grade.courseCategory ? ` · ${grade.courseCategory}` : ""}
                       </span>
@@ -265,19 +233,6 @@ export const Component = ({
                           ? "绩点未返回"
                           : `绩点 ${numberFormatter.format(grade.gradePoint)}`}
                         </span>
-                        <label className="grade-weight-control">
-                          <span>权重</span>
-                          <input
-                            aria-label={`${grade.courseName} 权重`}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.05"
-                            value={weights[grade.sourceId] ?? 1}
-                            onChange={(event) => setWeights((current) => ({ ...current, [grade.sourceId]: Number(event.target.value) }))}
-                            onBlur={(event) => void saveWeight(grade.sourceId, event.target.value)}
-                          />
-                        </label>
                       </div>
                   </li>
                 ))}

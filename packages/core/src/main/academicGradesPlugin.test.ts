@@ -67,7 +67,7 @@ describe("academic grades feature", () => {
   });
 });
 
-describe("Celechron GPA conversion and custom weights", () => {
+describe("Celechron GPA conversion", () => {
   it("returns zero GPA projections when no course contributes GPA", () => {
     const result = calculateAcademicGpa([
       {
@@ -94,15 +94,15 @@ describe("Celechron GPA conversion and custom weights", () => {
     });
   });
 
-  it("uses exact 5-to-4.3 mappings and keeps credits unchanged when weighted", () => {
+  it("uses exact 5-to-4.3 mappings and credit-weighted averages", () => {
     const grades: AcademicGradeRecord[] = [
       { sourceId: "a", courseCode: null, courseName: "a", credit: 3, originalScore: "95", gradePoint: 5, academicYearStart: 2025, termNumber: 1, isMajorCourse: true, courseCategory: null },
       { sourceId: "b", courseCode: null, courseName: "b", credit: 1, originalScore: "90", gradePoint: 4.5, academicYearStart: 2025, termNumber: 1, isMajorCourse: false, courseCategory: null }
     ];
-    const weighted = calculateAcademicGpa(grades, new Map([["a", 2]]));
-    expect(weighted.fivePoint).toBeCloseTo(34.5 / 4);
-    expect(weighted.fourPoint).toBeCloseTo((4.3 * 2 * 3 + 4.1) / 4);
-    expect(weighted.earnedCredits).toBe(4);
+    const result = calculateAcademicGpa(grades);
+    expect(result.fivePoint).toBeCloseTo((5 * 3 + 4.5) / 4);
+    expect(result.fourPoint).toBeCloseTo((4.3 * 3 + 4.1) / 4);
+    expect(result.earnedCredits).toBe(4);
   });
 });
 
@@ -219,8 +219,8 @@ describe("Celechron repeated-course GPA strategies", () => {
   ];
 
   it("selects the first or highest attempt without double-counting credits", () => {
-    const first = summarizeAcademicGrades(repeatedGrades, new Map(), "first");
-    const best = summarizeAcademicGrades(repeatedGrades, new Map(), "best");
+    const first = summarizeAcademicGrades(repeatedGrades, "first");
+    const best = summarizeAcademicGrades(repeatedGrades, "best");
 
     expect(first.totalCredits).toBe(5);
     expect(first.weightedGradePoint).toBeCloseTo((1 * 3 + 3 * 2) / 5);
@@ -241,7 +241,7 @@ describe("Celechron repeated-course GPA strategies", () => {
     const selected = summarizeAcademicGrades([
       { ...repeatedGrades[0], sourceId: "provider-a:attempt-1" },
       { ...repeatedGrades[1], sourceId: "provider-b:attempt-2" }
-    ], new Map(), "best");
+    ], "best");
 
     expect(selected.totalCredits).toBe(6);
   });
@@ -251,7 +251,7 @@ describe("Celechron repeated-course GPA strategies", () => {
       { ...repeatedGrades[0], sourceId: "empty-real-id", realId: "", courseCode: "CS201" },
       { ...repeatedGrades[1], sourceId: "empty-real-id-2", realId: "", courseCode: "CS201" }
     ];
-    const summary = summarizeAcademicGrades(grades, new Map(), "best", {
+    const summary = summarizeAcademicGrades(grades, "best", {
       fivePointGpa: 4.5,
       fourPointGpa: 4.1,
       fourPointLegacyGpa: 4,

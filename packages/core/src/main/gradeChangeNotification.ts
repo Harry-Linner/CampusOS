@@ -73,7 +73,6 @@ export const processGradeChangeNotification = async ({
   const strategy = database.loadAcademicGpaStrategy(accountId)?.strategy ?? "first";
   const summary = summarizeAcademicGrades(
     gradeRecord.data.grades,
-    new Map(),
     strategy
   );
   const nextBaseline = {

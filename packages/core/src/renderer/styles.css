@@ -2654,26 +2654,6 @@ input:focus-visible {
   text-align: right;
 }
 
-.grade-weight-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--ink-faint);
-  font-size: 0.7rem;
-}
-
-.grade-weight-control input {
-  width: 54px;
-  min-height: 24px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 0 5px;
-  font: inherit;
-  text-align: right;
-}
-
 .workspace-error-banner {
   margin-bottom: 18px;
   border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));

@@ -9,7 +9,6 @@ import type {
   PluginCapability,
   PluginCapabilityClient
 } from "@campusos/shared";
-import type { CampusosBridge } from "../../shared/campusBridge";
 import { GradesView as AcademicGradesView } from "@campusos/plugin-academic";
 
 afterEach(() => {
@@ -72,7 +71,7 @@ describe("AcademicGradesView", () => {
     }));
 
     expect(await screen.findByText("程序设计")).toBeDefined();
-    expect(screen.getByText("加权绩点 · 5.0 制")).toBeDefined();
+    expect(screen.getByText("学业平均绩点 · 5.0 制")).toBeDefined();
     expect(screen.queryByText("实时获取")).toBeNull();
     expect(screen.queryByText("1 个学业数据源")).toBeNull();
     expect(screen.queryByText("绩点覆盖 8 学分")).toBeNull();
@@ -118,37 +117,4 @@ describe("AcademicGradesView", () => {
     expect(screen.queryByText("***")).toBeNull();
   });
 
-  it("restores the last persisted GPA weight when saving fails", async () => {
-    const sourceId = "org.campusos.zju-undergraduate:grade-1";
-    window.campusos = {
-      academic: {
-        loadGpaWeights: vi.fn(async () => ({
-          weights: { [sourceId]: 1 },
-          savedAt: "2026-08-04T00:00:00.000Z"
-        })),
-        saveGpaWeights: vi.fn(async () => {
-          throw new Error("权重保存失败。");
-        })
-      }
-    } as unknown as CampusosBridge;
-    const capabilities: PluginCapabilityClient = {
-      read: async <T>() => [liveRecord] as unknown as CapabilityRecord<T>[]
-    };
-
-    render(createElement(AcademicGradesView, {
-      capabilities,
-      loading: false,
-      onRefresh: vi.fn(async () => undefined),
-      snapshot: null
-    }));
-
-    await screen.findByText("程序设计");
-    const input = screen.getByLabelText("程序设计 权重") as HTMLInputElement;
-    expect(input.value).toBe("1");
-    fireEvent.change(input, { target: { value: "2" } });
-    fireEvent.blur(input);
-
-    expect((await screen.findByRole("alert")).textContent).toContain("权重保存失败");
-    expect(input.value).toBe("1");
-  });
 });

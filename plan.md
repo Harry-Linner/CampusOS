@@ -471,9 +471,9 @@ _Changelog_
 
 ### Verification update (2026-08-04)
 
-- The current implementation also closes the academic course catalog join, practice detail/summary partial-success fallback, Celechron GPA/major rules, and account-isolated custom GPA IPC. New tests cover concurrent quality-development session reuse, GPA input boundaries, academic tabs/search/term refresh, and connector partial success.
+- The current implementation also closes the academic course catalog join, practice detail/summary partial-success fallback, and Celechron GPA/major rules. New tests cover concurrent quality-development session reuse, GPA input boundaries, academic tabs/search/term refresh, and connector partial success.
 - The user plugin boundary remains exactly three left-navigation modules: Academic, Schedule, and Materials. Campus Card is not a desktop module.
-- Materials course browsing/batch queue, Core global search, updater/About/MIT surfaces, GPA weight rollback, and desktop/narrow Electron E2E are complete.
+- Materials course browsing/batch queue, Core global search, updater/About/MIT surfaces, and desktop/narrow Electron E2E are complete.
 - Real-account status remains bounded: the authorized undergraduate 2026-08-04 run passed the private timetable/materials/download oracle; graduate real-account closure, multi-device use, clean Windows installation, desktop notification, and Release distribution are still pending and must not be described as passed.
 
 日程闭环已通过正式 IPC、SQLite v3、Celechron 任务/排程测试；系统日历采用 RFC 5545 文件交接，参见 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
@@ -503,7 +503,7 @@ _Changelog_
 ### Academic major summary acceptance (2026-08-04)
 
 - [x] Preserve Celechron's independent `getMajorGrade` GPA and earned-credit projection in the formal grades capability.
-- [x] Use the source major projection by default and switch to the explicit user-weighted calculation only when custom weights are present.
+- [x] Use the independent Celechron major projection without introducing a CampusOS-only GPA weighting rule.
 - [x] Cover source-summary publication, empty course-id grouping fallback, and renderer consumption with tests.
 
 ### Grade-change notification acceptance (2026-08-05)

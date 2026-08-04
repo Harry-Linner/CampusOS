@@ -87,24 +87,14 @@ describe("database service", () => {
         schedule: { valid: true, segments: [] },
         savedAt: "2026-07-20T08:04:00.000Z"
       });
-      database.saveAcademicGpaWeights(
-        "account-a",
-        { "course-a": 1.25, "course-b": 0 },
-        "2026-07-20T08:05:00.000Z"
-      );
-      expect(database.loadAcademicGpaWeights("account-a")).toEqual({
-        weights: { "course-a": 1.25, "course-b": 0 },
-        savedAt: "2026-07-20T08:05:00.000Z"
-      });
-      expect(database.loadAcademicGpaWeights("account-b")).toBeNull();
       database.saveAcademicGpaStrategy(
         "account-a",
         "first",
-        "2026-07-20T08:06:00.000Z"
+        "2026-07-20T08:05:00.000Z"
       );
       expect(database.loadAcademicGpaStrategy("account-a")).toEqual({
         strategy: "first",
-        savedAt: "2026-07-20T08:06:00.000Z"
+        savedAt: "2026-07-20T08:05:00.000Z"
       });
       expect(database.loadAcademicGpaStrategy("account-b")).toBeNull();
     } finally {

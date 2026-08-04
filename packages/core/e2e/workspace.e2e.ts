@@ -61,6 +61,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     for (const label of ["课表", "课程", "考试", "成绩", "素拓"]) {
       await expect(page.getByRole("button", { name: label, exact: true })).toBeVisible();
     }
+    await page.getByRole("button", { name: "成绩", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "学业成绩" })).toBeVisible();
+    await expect(page.getByLabel(/权重/)).toHaveCount(0);
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({
@@ -128,6 +131,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
 
     await page.setViewportSize({ width: 820, height: 900 });
     await page.getByLabel("主导航").getByRole("button", { name: "学业" }).click();
+    await page.getByRole("button", { name: "成绩", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "学业成绩" })).toBeVisible();
+    await expect(page.getByLabel(/权重/)).toHaveCount(0);
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({

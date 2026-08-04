@@ -6,8 +6,6 @@ const state = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   record: null as AcademicCredentialRecord | null,
   database: {
-    loadAcademicGpaWeights: vi.fn(),
-    saveAcademicGpaWeights: vi.fn(),
     loadAcademicGpaStrategy: vi.fn(),
     saveAcademicGpaStrategy: vi.fn()
   }
@@ -69,55 +67,10 @@ describe("academic GPA IPC", () => {
     process.env.ELECTRON_RENDERER_URL = "http://localhost:5173/";
     state.handlers.clear();
     state.record = verifiedRecord("account-a");
-    state.database.loadAcademicGpaWeights.mockReset();
-    state.database.saveAcademicGpaWeights.mockReset();
     state.database.loadAcademicGpaStrategy.mockReset();
     state.database.saveAcademicGpaStrategy.mockReset();
-    state.database.loadAcademicGpaWeights.mockReturnValue(null);
     state.database.loadAcademicGpaStrategy.mockReturnValue(null);
     registerAcademicGpaHandlers();
-  });
-
-  it("isolates saved weights by the verified account id", async () => {
-    state.database.loadAcademicGpaWeights.mockImplementation((accountId: string) =>
-      accountId === "account-a"
-        ? { weights: { "course-1": 90 }, savedAt: "2026-08-04T00:00:00.000Z" }
-        : null
-    );
-
-    const loaded = await invoke("campusos:academic:gpa-weights:load");
-    expect(loaded).toEqual({
-      weights: { "course-1": 90 },
-      savedAt: "2026-08-04T00:00:00.000Z"
-    });
-    expect(state.database.loadAcademicGpaWeights).toHaveBeenCalledWith("account-a");
-
-    state.record = verifiedRecord("account-b");
-    expect(await invoke("campusos:academic:gpa-weights:load")).toEqual({
-      weights: {},
-      savedAt: null
-    });
-    expect(state.database.loadAcademicGpaWeights).toHaveBeenLastCalledWith("account-b");
-  });
-
-  it("rejects saving before an account is verified", async () => {
-    state.record = { ...verifiedRecord("account-a"), verificationState: "unverified", authenticatedProfile: null };
-
-    await expect(invoke("campusos:academic:gpa-weights:save", { "course-1": 80 }))
-      .rejects.toThrow("请先连接并验证学业账号");
-    expect(state.database.saveAcademicGpaWeights).not.toHaveBeenCalled();
-  });
-
-  it("rejects empty accounts, non-objects, and non-finite or out-of-range values", async () => {
-    state.record = verifiedRecord("  ");
-    await expect(invoke("campusos:academic:gpa-weights:save", { "course-1": 80 }))
-      .rejects.toThrow("请先连接并验证学业账号");
-
-    state.record = verifiedRecord("account-a");
-    for (const input of [null, [], { "course-1": Number.NaN }, { "course-1": Infinity }, { "course-1": -1 }, { "course-1": 101 }]) {
-      await expect(invoke("campusos:academic:gpa-weights:save", input)).rejects.toThrow();
-    }
-    expect(state.database.saveAcademicGpaWeights).not.toHaveBeenCalled();
   });
 
   it("isolates and validates the Celechron repeated-course strategy", async () => {

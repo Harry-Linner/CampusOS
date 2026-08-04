@@ -28,7 +28,6 @@ export interface AcademicGradeSummary {
   majorFourPointGpa: number | null;
   majorFourPointLegacyGpa: number | null;
   majorHundredPointGpa: number | null;
-  weighted: boolean;
   terms: AcademicGradeTermSummary[];
 }
 
@@ -225,7 +224,6 @@ export const inferGpaScale = (
 
 export const calculateAcademicGpa = (
   grades: readonly AcademicGradeRecord[],
-  weightMap: ReadonlyMap<string, number> = new Map(),
   strategy: AcademicGpaStrategy = "first"
 ): AcademicGpaResult => {
   const selected = selectAcademicGpaGrades(grades, strategy);
@@ -239,14 +237,11 @@ export const calculateAcademicGpa = (
   }
   const totals = included.reduce(
     (sum, grade) => {
-      const weight = Number.isFinite(weightMap.get(grade.sourceId))
-        ? Math.max(0, weightMap.get(grade.sourceId) ?? 1)
-        : 1;
       const credit = validCredit(grade);
-      sum.fivePoint += fivePoint(grade) * weight * credit;
-      sum.fourPoint += fourPoint(grade) * weight * credit;
-      sum.fourPointLegacy += fourPointLegacy(grade) * weight * credit;
-      sum.hundredPoint += hundredPoint(grade) * weight * credit;
+      sum.fivePoint += fivePoint(grade) * credit;
+      sum.fourPoint += fourPoint(grade) * credit;
+      sum.fourPointLegacy += fourPointLegacy(grade) * credit;
+      sum.hundredPoint += hundredPoint(grade) * credit;
       return sum;
     },
     { fivePoint: 0, fourPoint: 0, fourPointLegacy: 0, hundredPoint: 0 }
@@ -263,7 +258,6 @@ export const calculateAcademicGpa = (
 
 export const summarizeAcademicGrades = (
   grades: readonly AcademicGradeRecord[],
-  weightMap: ReadonlyMap<string, number> = new Map(),
   strategy: AcademicGpaStrategy = "first",
   sourceMajorSummary?: AcademicMajorGradeSummary
 ): AcademicGradeSummary => {
@@ -288,13 +282,12 @@ export const summarizeAcademicGrades = (
     terms.set(key, term);
   }
 
-  const overall = calculateAcademicGpa(selectedGrades, weightMap, strategy);
+  const overall = calculateAcademicGpa(selectedGrades, strategy);
   const major = calculateAcademicGpa(
     selectedGrades.filter((grade) => grade.isMajorCourse),
-    weightMap,
     strategy
   );
-  const majorProjection = weightMap.size === 0 && sourceMajorSummary
+  const majorProjection = sourceMajorSummary
     ? sourceMajorSummary
     : {
         fivePointGpa: major.fivePoint,
@@ -321,7 +314,6 @@ export const summarizeAcademicGrades = (
     majorFourPointGpa: majorProjection.fourPointGpa,
     majorFourPointLegacyGpa: majorProjection.fourPointLegacyGpa,
     majorHundredPointGpa: majorProjection.hundredPointGpa,
-    weighted: weightMap.size > 0,
     terms: [...terms.values()].sort(compareTerms)
   };
 };

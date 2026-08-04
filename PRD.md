@@ -249,7 +249,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 Repeated grades now follow Celechron 1.3.0 `Scholar.recalculateGpa`: records are grouped by normalized course identity, the default `first` strategy selects the first returned attempt for the academic GPA, and Settings can explicitly switch to `best` for the separate highest-score projection. Only the selected attempt contributes GPA and earned credits. The strategy is persisted per verified academic account through the main-process SQLite boundary.
 
-The undergraduate grades capability also carries the independent `getMajorGrade` GPA/credit projection. With no custom weights, the grades view uses that source projection for major GPA; custom weights remain an explicit CampusOS presentation mode.
+The undergraduate grades capability also carries the independent `getMajorGrade` GPA/credit projection. The grades view uses that source projection for major GPA and does not expose a CampusOS-only GPA weighting rule.
 
 ---
 
@@ -262,7 +262,7 @@ This correction supersedes the earlier UI-only diagnosis in the acceptance recor
 
 ### Current implementation acceptance (2026-08-04)
 
-- Academic now includes the joined timetable/exam/grade course catalog, practice detail and summary projection, Celechron GPA inclusion rules, dedicated-major xkkh matching, deferred/failed/pass-fail handling, and account-isolated custom GPA weights.
+- Academic now includes the joined timetable/exam/grade course catalog, practice detail and summary projection, Celechron GPA inclusion rules, dedicated-major xkkh matching, and deferred/failed/pass-fail handling.
 - The grades view no longer exposes internal source or fallback metrics; privacy masking remains the default renderer behavior.
 - User-visible official modules are exactly Academic, Schedule, and Materials. Connectors and event projections remain Core-owned; Campus Card is explicitly out of scope for the desktop product.
 - Materials now provides target-semester course browsing, per-course empty states, multi-select/batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification through formal IPC.

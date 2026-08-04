@@ -105,6 +105,8 @@ Electron 官方说明 `safeStorage` 使用操作系统提供的加密系统，Wi
 
 ## Current implementation acceptance (2026-08-04)
 
+The grade renderer now follows Celechron's credit-weighted GPA path directly. The earlier account-scoped custom-weight branch has been removed from the renderer, preload, IPC, and new-database schema; existing local databases are not destructively rewritten.
+
 The earlier grade-panel limitation is superseded: undergraduate transcript and dedicated-major responses are joined by xkkh, Celechron GPA/credit rules are applied for deferred, pending, dropped, invalid, pass/fail, and ordinary failed records, and the renderer has default privacy masking without internal source-status panels. The course catalog and quality-development capability preserve partial success and account-isolated cache provenance. The 2026-08-04 authorized undergraduate run closed the timetable, exam, grade, assignment, complete materials catalog, and authenticated download-byte gates against the ignored private baselines. Graduate still has no real-account closed-loop evidence.
 
 ## 已实现边界与待验收
