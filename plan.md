@@ -492,3 +492,10 @@ _Changelog_
 - [x] Mark a course as major only when its `xkkh` is returned by the major endpoint.
 - [x] Apply the Celechron 1.3.0 credit/GPA inclusion rules for dropped, pending, deferred, invalid, pass/fail, `xtwkc`, and ordinary failed grades.
 - [x] Remove internal source-status and fallback metrics from the grades page.
+
+### Academic repeat-course strategy acceptance (2026-08-04)
+
+- [x] Group repeated grades by the Celechron normalized course identity, preserving the physical-education key rule.
+- [x] Support the Celechron `best` (default) and `first` strategies and calculate GPA/earned credits from the selected attempt only.
+- [x] Persist the strategy per verified account through SQLite, preload IPC, Settings, and the grades view.
+- [x] Cover repeated attempts, provider isolation, strategy validation, migration, and Settings persistence with tests.

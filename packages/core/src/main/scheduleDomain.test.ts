@@ -1,5 +1,6 @@
 import type { CampusWorkspaceSnapshot, LocalTaskRecord, PlannerSettings } from "@campusos/shared";
 import { describe, expect, it } from "vitest";
+import type { CalendarEventRecord } from "@campusos/shared";
 import {
   createIcalContent,
   createTaskRecord,
@@ -53,6 +54,24 @@ const snapshot = (courses: CampusWorkspaceSnapshot["courses"] = []): CampusWorks
     remindersQueued: 0,
     deadlinesDueSoon: 0
   }
+});
+
+const calendarEvent = (
+  overrides: Partial<CalendarEventRecord> = {}
+): CalendarEventRecord => ({
+  id: "event-1",
+  originId: "origin-1",
+  originCapability: "academic.exams@1",
+  sourceId: "academic-affairs",
+  kind: "exam",
+  title: "Final exam",
+  startAt: "2026-08-04T11:00:00+08:00",
+  endAt: "2026-08-04T13:00:00+08:00",
+  timezone: "Asia/Shanghai",
+  location: "Exam room",
+  courseName: "Final exam",
+  note: "Seat 1",
+  ...overrides
 });
 
 describe("schedule domain", () => {
@@ -186,6 +205,98 @@ describe("schedule domain", () => {
     expect(result.valid).toBe(false);
     expect(result.segments).toEqual([]);
     expect(result.reason).toContain("Impossible");
+  });
+
+  it("blocks planner time with canonical exam events", () => {
+    const result = generatePlannerSchedule(
+      {
+        ...snapshot(),
+        calendarEvents: [calendarEvent()]
+      },
+      [task({
+        id: "exam-blocked",
+        title: "Study",
+        timeNeededMinutes: 120,
+        endAt: "2026-08-04T14:00:00+08:00"
+      })],
+      {
+        workMinutes: 120,
+        restMinutes: 0,
+        availableStartHour: 10,
+        availableEndHour: 14,
+        horizonDays: 1
+      },
+      now
+    );
+    expect(result.valid).toBe(true);
+    expect(result.segments.map((segment) => [segment.startAt.slice(11, 16), segment.endAt.slice(11, 16)])).toEqual([
+      ["02:00", "03:00"],
+      ["05:00", "06:00"]
+    ]);
+  });
+
+  it("keeps an unrepresented baseline course as a planner blocker", () => {
+    const result = generatePlannerSchedule(
+      {
+        ...snapshot([{
+          id: "baseline-course",
+          title: "Baseline course",
+          location: "Room 3",
+          startAt: "2026-08-04T13:00:00+08:00",
+          endAt: "2026-08-04T14:00:00+08:00",
+          sourceId: "cs-college"
+        }]),
+        calendarEvents: [calendarEvent()]
+      },
+      [task({
+        id: "blocked-by-baseline",
+        title: "Study",
+        timeNeededMinutes: 120,
+        endAt: "2026-08-04T14:00:00+08:00"
+      })],
+      {
+        workMinutes: 120,
+        restMinutes: 0,
+        availableStartHour: 10,
+        availableEndHour: 14,
+        horizonDays: 1
+      },
+      now
+    );
+    expect(result.valid).toBe(false);
+  });
+
+  it("exports canonical exam times and does not turn them into one-hour deadlines", () => {
+    const result = createIcalContent(
+      { ...snapshot(), calendarEvents: [calendarEvent()] },
+      [],
+      { academicYearStart: 2026, termLabel: "2026-2027 ç§‹å†¬" },
+      now
+    );
+    expect(result.eventCount).toBe(1);
+    expect(result.content).toContain("SUMMARY:Final exam");
+    expect(result.content).toContain("DTSTART;TZID=Asia/Shanghai:20260804T110000");
+    expect(result.content).toContain("DTEND;TZID=Asia/Shanghai:20260804T130000");
+  });
+
+  it("excludes canonical tasks when task export is disabled", () => {
+    const result = createIcalContent(
+      {
+        ...snapshot(),
+        calendarEvents: [{
+          ...calendarEvent(),
+          id: "canonical-task",
+          kind: "task",
+          title: "Canonical task"
+        }]
+      },
+      [],
+      { academicYearStart: 2026, termLabel: "2026-2027", includeTasks: false },
+      now
+    );
+
+    expect(result.eventCount).toBe(0);
+    expect(result.content).not.toContain("SUMMARY:Canonical task");
   });
 
   it("generates stable RFC 5545 content with escaped fields", () => {

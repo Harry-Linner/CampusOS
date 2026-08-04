@@ -7,7 +7,7 @@ export const Component = ({
   loading: workspaceLoading,
   onRefresh
 }: PluginComponentProps): JSX.Element => {
-  const [entries, setEntries] = useState<ExamCountdownEntry[]>([]);
+  const [records, setRecords] = useState<CapabilityRecord<CalendarEventsData>[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -19,7 +19,7 @@ export const Component = ({
     void capabilities.read<CalendarEventsData>("calendar.events@1")
       .then((records) => {
         if (!active) return;
-        setEntries(computeExamCountdowns(records, new Date()));
+        setRecords(records);
         setError(null);
       })
       .catch((e: unknown) => {
@@ -33,6 +33,7 @@ export const Component = ({
     return () => { active = false; clearInterval(interval); };
   }, [capabilities]);
 
+  const entries: ExamCountdownEntry[] = computeExamCountdowns(records, now);
   const busy = !loaded || workspaceLoading;
 
   return (

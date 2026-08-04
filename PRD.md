@@ -245,6 +245,10 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 诊断完成后的路径选项：pivot 为纯移动端 PWA / 聚焦单个功能（课表同步）放弃工作台野心 / 开源移交社区。
 
+### Academic repeat-course strategy update (2026-08-04)
+
+Repeated grades now follow Celechron 1.3.0 `Scholar.recalculateGpa`: records are grouped by normalized course identity, the default `best` strategy selects the highest hundred-point projection, and Settings can switch to `first`. Only the selected attempt contributes GPA and earned credits. The strategy is persisted per verified academic account through the main-process SQLite boundary.
+
 ---
 
 _Changelog_

@@ -16,7 +16,7 @@
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "verify:zju-auth": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/zjuUnifiedAuth.live.test.ts --reporter=verbose",
     "verify:headless-sandbox": "electron-vite build && electron ../../scripts/headless-sandbox-smoke",
-    "lint": "node ../../scripts/run-eslint.mjs packages/core"
+    "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials"
   },
   "dependencies": {
     "@campusos/plugin-academic": "workspace:*",

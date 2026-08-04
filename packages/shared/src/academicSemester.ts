@@ -119,11 +119,14 @@ export const mergeAcademicTimetableSessions = (
   // The context fields only preserve provider and semester provenance.
   const courses = new Map<string, AcademicTimetableSessionContext[]>();
   for (const entry of entries) {
+    const courseIdentity = entry.session.courseId?.trim()
+      ? `id:${entry.session.courseId.trim()}`
+      : `name:${entry.session.courseName}`;
     const courseKey = [
       entry.providerId,
       entry.academicYearStart,
       entry.semesterNumber,
-      entry.session.courseName
+      courseIdentity
     ].join(":");
     const sessions = courses.get(courseKey) ?? [];
     const firstPeriod = entry.session.periods[0];

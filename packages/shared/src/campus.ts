@@ -130,6 +130,8 @@ export interface CampusSourceSyncState {
   connectionState: CampusSourceConnectionState;
   lastSyncedAt: string;
   itemCount: number;
+  /** Upstream item totals keyed by capability, used to replace feed counts on refresh. */
+  itemCountsByCapability?: Record<string, number>;
   summary: string;
   actionLabel?: string;
   configuredUsername?: string | null;
@@ -151,6 +153,8 @@ export interface CampusWorkspaceSnapshot {
   courses: CampusCourseSession[];
   todayCourses: CampusCourseSession[];
   deadlines: CampusDeadline[];
+  /** Canonical calendar projection consumed by the Schedule module. */
+  calendarEvents?: import("./pluginCapabilities").CalendarEventRecord[];
   /** Filtered learning-platform catalog used by the Materials workspace. */
   materialCourses?: CampusMaterialCourse[];
   materials: CampusMaterialRecord[];

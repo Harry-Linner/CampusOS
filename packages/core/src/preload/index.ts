@@ -34,7 +34,10 @@ contextBridge.exposeInMainWorld("campusos", {
   academic: {
     loadGpaWeights: () => ipcRenderer.invoke("campusos:academic:gpa-weights:load"),
     saveGpaWeights: (weights: Record<string, number>) =>
-      ipcRenderer.invoke("campusos:academic:gpa-weights:save", weights)
+      ipcRenderer.invoke("campusos:academic:gpa-weights:save", weights),
+    loadGpaStrategy: () => ipcRenderer.invoke("campusos:academic:gpa-strategy:load"),
+    saveGpaStrategy: (strategy: "best" | "first") =>
+      ipcRenderer.invoke("campusos:academic:gpa-strategy:save", strategy)
   },
   downloads: {
     list: () => ipcRenderer.invoke("campusos:downloads:list"),

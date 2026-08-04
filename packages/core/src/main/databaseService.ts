@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import type { AcademicGpaStrategy } from "@campusos/shared";
 
 export interface StoredWorkspaceSnapshot {
   snapshot: unknown;
@@ -34,6 +35,11 @@ export interface StoredAcademicGpaWeights {
   savedAt: string;
 }
 
+export interface StoredAcademicGpaStrategy {
+  strategy: AcademicGpaStrategy;
+  savedAt: string;
+}
+
 export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
@@ -59,6 +65,12 @@ export interface DatabaseService {
     savedAt: string
   ) => void;
   loadAcademicGpaWeights: (accountId: string) => StoredAcademicGpaWeights | null;
+  saveAcademicGpaStrategy: (
+    accountId: string,
+    strategy: AcademicGpaStrategy,
+    savedAt: string
+  ) => void;
+  loadAcademicGpaStrategy: (accountId: string) => StoredAcademicGpaStrategy | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -129,6 +141,14 @@ const migrate = (database: Database.Database): void => {
       account_key TEXT PRIMARY KEY,
       account_id TEXT NOT NULL,
       weights_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+  `);
+  applyMigration(5, `
+    CREATE TABLE academic_gpa_strategies (
+      account_key TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      strategy TEXT NOT NULL CHECK (strategy IN ('best', 'first')),
       saved_at TEXT NOT NULL
     );
   `);
@@ -325,6 +345,39 @@ export const createDatabaseService = ({
         }
       }
       return { weights, savedAt: row.saved_at };
+    },
+    saveAcademicGpaStrategy: (accountId, strategy, savedAt) => {
+      if (!accountId.trim()) throw new Error("GPA ç­–ç•¥è´¦æˆ·ä¸èƒ½ä¸ºç©ºã€‚");
+      if (strategy !== "best" && strategy !== "first") {
+        throw new Error("GPA ç­–ç•¥å¿…é¡»æ˜¯ best æˆ– firstã€‚");
+      }
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("GPA ç­–ç•¥ä¿å­˜æ—¶é—´æ— æ•ˆã€‚");
+      }
+      database.prepare(`
+        INSERT INTO academic_gpa_strategies (
+          account_key, account_id, strategy, saved_at
+        ) VALUES (?, ?, ?, ?)
+        ON CONFLICT(account_key) DO UPDATE SET
+          account_id = excluded.account_id,
+          strategy = excluded.strategy,
+          saved_at = excluded.saved_at
+      `).run(capabilityAccountKey(accountId), accountId, strategy, savedAt);
+    },
+    loadAcademicGpaStrategy: (accountId) => {
+      if (!accountId.trim()) return null;
+      const row = database.prepare(`
+        SELECT strategy, saved_at
+        FROM academic_gpa_strategies
+        WHERE account_key = ? AND account_id = ?
+      `).get(capabilityAccountKey(accountId), accountId) as {
+        strategy: string;
+        saved_at: string;
+      } | undefined;
+      if (!row || (row.strategy !== "best" && row.strategy !== "first")) {
+        return null;
+      }
+      return { strategy: row.strategy, savedAt: row.saved_at };
     }
   };
 };

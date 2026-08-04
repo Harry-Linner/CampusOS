@@ -149,3 +149,67 @@ describe("Celechron grade inclusion rules", () => {
     expect(summary.weightedGradePoint).not.toBe(summary.majorWeightedGradePoint);
   });
 });
+
+describe("Celechron repeated-course GPA strategies", () => {
+  const repeatedGrades: AcademicGradeRecord[] = [
+    {
+      sourceId: "attempt-1",
+      realId: "course-repeat",
+      courseCode: "CS201",
+      courseName: "repeat",
+      credit: 3,
+      originalScore: "60",
+      gradePoint: 1,
+      academicYearStart: 2024,
+      termNumber: 1,
+      isMajorCourse: true,
+      courseCategory: null
+    },
+    {
+      sourceId: "attempt-2",
+      realId: "course-repeat",
+      courseCode: "CS201",
+      courseName: "repeat",
+      credit: 3,
+      originalScore: "90",
+      gradePoint: 4,
+      academicYearStart: 2025,
+      termNumber: 1,
+      isMajorCourse: true,
+      courseCategory: null
+    },
+    {
+      sourceId: "other",
+      courseCode: "HIST100",
+      courseName: "other",
+      credit: 2,
+      originalScore: "80",
+      gradePoint: 3,
+      academicYearStart: 2025,
+      termNumber: 1,
+      isMajorCourse: false,
+      courseCategory: null
+    }
+  ];
+
+  it("selects the first or highest attempt without double-counting credits", () => {
+    const first = summarizeAcademicGrades(repeatedGrades, new Map(), "first");
+    const best = summarizeAcademicGrades(repeatedGrades, new Map(), "best");
+
+    expect(first.totalCredits).toBe(5);
+    expect(first.weightedGradePoint).toBeCloseTo((1 * 3 + 3 * 2) / 5);
+    expect(best.totalCredits).toBe(5);
+    expect(best.weightedGradePoint).toBeCloseTo((4 * 3 + 3 * 2) / 5);
+    expect(best.majorWeightedGradePoint).toBe(4);
+    expect(best.terms.find((term) => term.key === "2024:1")?.credits).toBe(0);
+  });
+
+  it("uses the source namespace when two providers expose the same realId", () => {
+    const selected = summarizeAcademicGrades([
+      { ...repeatedGrades[0], sourceId: "provider-a:attempt-1" },
+      { ...repeatedGrades[1], sourceId: "provider-b:attempt-2" }
+    ], new Map(), "best");
+
+    expect(selected.totalCredits).toBe(6);
+  });
+});

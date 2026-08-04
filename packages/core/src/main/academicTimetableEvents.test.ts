@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type {
   AcademicCalendarConfigData,
   AcademicTimetableData,
+  AcademicTimetableSessionContext,
   CapabilityRecord
 } from "@campusos/shared";
+import { mergeAcademicTimetableSessions } from "@campusos/shared";
 import { deriveTimetableCalendarEvents } from "@campusos/plugin-academic-timetable-events/main";
 
 const calendarConfig: AcademicCalendarConfigData = {
@@ -64,6 +66,50 @@ const timetableRecord: CapabilityRecord<AcademicTimetableData> = {
 };
 
 describe("academic timetable events", () => {
+  it("uses course ids before names when merging repeated timetable sessions", () => {
+    const base: Omit<AcademicTimetableSessionContext, "session"> = {
+      providerId: "provider",
+      academicYearStart: 2026,
+      semesterNumber: 1
+    };
+    const sessions = mergeAcademicTimetableSessions([
+      {
+        ...base,
+        session: {
+          sourceId: "one",
+          courseId: "course-a",
+          courseName: "同名课程",
+          teacher: "teacher",
+          location: "room",
+          dayOfWeek: 1,
+          periods: [1],
+          firstHalf: true,
+          secondHalf: false,
+          weekPattern: "all",
+          confirmed: true
+        }
+      },
+      {
+        ...base,
+        session: {
+          sourceId: "two",
+          courseId: "course-b",
+          courseName: "同名课程",
+          teacher: "teacher",
+          location: "room",
+          dayOfWeek: 1,
+          periods: [2],
+          firstHalf: true,
+          secondHalf: false,
+          weekPattern: "all",
+          confirmed: true
+        }
+      }
+    ]);
+
+    expect(sessions).toHaveLength(2);
+  });
+
   it("expands a weekly course session into concrete calendar events", () => {
     const generatedAt = "2026-07-19T12:00:00.000Z";
     const result = deriveTimetableCalendarEvents(

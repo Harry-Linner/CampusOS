@@ -36,6 +36,8 @@ export type AcademicTimetableSeason = "1|秋" | "1|冬" | "2|春" | "2|夏";
 
 export interface AcademicTimetableSession {
   sourceId: string;
+  /** Raw course selection id when the timetable endpoint exposes one. */
+  courseId?: string;
   courseName: string;
   teacher: string;
   location: string | null;
@@ -141,6 +143,9 @@ export interface AcademicGradeRecord {
   gpaIncluded?: boolean;
   creditIncluded?: boolean;
 }
+
+/** Celechron-compatible strategy for selecting a repeated course attempt. */
+export type AcademicGpaStrategy = "best" | "first";
 
 export type GpaScale = "4.0" | "4.3" | "5.0";
 

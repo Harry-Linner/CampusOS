@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusWorkspaceSnapshot, LocalTaskPeriod, LocalTaskRecord, PluginComponentProps } from "@campusos/shared";
-import { groupEventsByDay, ScheduleView } from "@campusos/plugin-schedule";
+import { getShanghaiDayNumber, groupEventsByDay, ScheduleView } from "@campusos/plugin-schedule";
 
 afterEach(cleanup);
 
@@ -163,6 +163,76 @@ describe("ScheduleView", () => {
 });
 
 describe("schedule event ranges", () => {
+  it("renders exams from the canonical calendar event projection", async () => {
+    const examSnapshot: CampusWorkspaceSnapshot = {
+      ...snapshot,
+      calendarEvents: [{
+        id: "exam-event",
+        originId: "exam-event",
+        originCapability: "academic.exams@1",
+        sourceId: "academic-affairs",
+        kind: "exam",
+        title: "Canonical exam",
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        timezone: "Asia/Shanghai",
+        location: "Room 2",
+        courseName: "Course",
+        note: "Seat 1"
+      }]
+    };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot: examSnapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule([])
+    }));
+
+    expect((await screen.findAllByText("Canonical exam")).length).toBeGreaterThan(0);
+  });
+
+  it("keeps baseline courses visible when a canonical feed is empty or partial", async () => {
+    const partialSnapshot: CampusWorkspaceSnapshot = {
+      ...snapshot,
+      courses: [{
+        id: "baseline-course",
+        title: "Baseline course",
+        sourceId: "cs-college",
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        location: "Room 3"
+      }],
+      calendarEvents: [{
+        id: "exam-event",
+        originId: "exam-event",
+        originCapability: "academic.exams@1",
+        sourceId: "academic-affairs",
+        kind: "exam",
+        title: "Canonical exam",
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        timezone: "Asia/Shanghai",
+        location: "Room 2",
+        courseName: "Course",
+        note: "Seat 1"
+      }]
+    };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot: partialSnapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule([])
+    }));
+
+    expect((await screen.findAllByText("Baseline course")).length).toBeGreaterThan(0);
+  });
+
+  it("uses the Shanghai date when the process timezone is elsewhere", () => {
+    expect(getShanghaiDayNumber(new Date("2026-08-03T16:00:00.000Z"))).toBe(4);
+  });
+
   it("groups only events intersecting the active view and includes spanning days", () => {
     const grouped = groupEventsByDay([
       {

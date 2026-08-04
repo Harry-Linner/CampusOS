@@ -444,6 +444,7 @@ export const mergeCalendarEventsIntoWorkspace = (
 
   let courses = [...snapshot.courses];
   let deadlines = [...snapshot.deadlines];
+  let calendarEvents = snapshot.calendarEvents ? [...snapshot.calendarEvents] : [];
   const sourceStates = [...snapshot.sourceStates];
   const now = Date.parse(snapshot.generatedAt);
   const today = formatShanghaiDate(snapshot.generatedAt);
@@ -482,6 +483,10 @@ export const mergeCalendarEventsIntoWorkspace = (
           .map((event) => [event.id, event])
       ).values()
     ];
+    calendarEvents = calendarEvents.filter(
+      (event) => event.sourceId !== sourceId || !supportedKinds.has(event.kind)
+    );
+    calendarEvents.push(...events);
     const newCourses = events
       .map(toCourse)
       .filter((course): course is CampusCourseSession => course !== null);
@@ -505,6 +510,31 @@ export const mergeCalendarEventsIntoWorkspace = (
     const existingState = sourceStates.find(
       (source) => source.sourceId === sourceId
     );
+    const previousFeedCounts = existingState?.itemCountsByCapability ?? {};
+    const currentFeedCounts = sourceRecords.reduce<Record<string, number>>(
+      (counts, record) => {
+        counts[record.capability] =
+          (counts[record.capability] ?? 0) + record.data.totalItems;
+        return counts;
+      },
+      {}
+    );
+    const previousReplacedCount = Object.entries(currentFeedCounts).reduce(
+      (total, [capability]) => total + (previousFeedCounts[capability] ?? 0),
+      0
+    );
+    const fallbackReplacedCount =
+      Object.keys(previousFeedCounts).length === 0
+        ? removedCourseCount + removedDeadlineCount
+        : previousReplacedCount;
+    const retainedItemCount = Math.max(
+      0,
+      (existingState?.itemCount ?? 0) - fallbackReplacedCount
+    );
+    const itemCountsByCapability = {
+      ...previousFeedCounts,
+      ...currentFeedCounts
+    };
     const accountScoped = sourceRecords.some(
       (record) => record.data.accountScoped
     );
@@ -525,11 +555,9 @@ export const mergeCalendarEventsIntoWorkspace = (
       lastSyncedAt: latestTimestamp(sourceRecords),
       itemCount: Math.max(
         0,
-        (existingState?.itemCount ?? 0) -
-          removedCourseCount -
-          removedDeadlineCount +
-          totalItems
+        retainedItemCount + totalItems
       ),
+      itemCountsByCapability,
       summary: buildFeedSummary(
         sourceRecords,
         acceptedEventCount,
@@ -574,6 +602,7 @@ export const mergeCalendarEventsIntoWorkspace = (
     courses,
     todayCourses,
     deadlines,
+    calendarEvents: [...new Map(calendarEvents.map((event) => [event.id, event])).values()],
     reminders,
     summary: {
       ...snapshot.summary,

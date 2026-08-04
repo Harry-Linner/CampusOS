@@ -331,4 +331,29 @@ describe("SettingsView", () => {
       program: "graduate"
     });
   });
+
+  it("persists the Celechron repeated-course GPA strategy", async () => {
+    installBridge(vi.fn(async () => connectedRecord));
+    const saveGpaStrategy = vi.fn(async (strategy: "best" | "first") => ({
+      strategy,
+      savedAt: "2026-08-04T00:00:00.000Z"
+    }));
+    if (!window.campusos) {
+      throw new Error("CampusOS bridge is not installed");
+    }
+    Object.assign(window.campusos, {
+      academic: {
+        loadGpaStrategy: vi.fn(async () => ({ strategy: "best" as const, savedAt: null })),
+        saveGpaStrategy
+      }
+    });
+
+    render(createElement(SettingsView, { onRefresh: vi.fn().mockResolvedValue(undefined) }));
+    const first = await screen.findByRole("radio", { name: /取首次/ });
+    fireEvent.click(first);
+    fireEvent.click(screen.getByRole("button", { name: /GPA/ }));
+
+    expect(saveGpaStrategy).toHaveBeenCalledWith("first");
+    expect(await screen.findByRole("button", { name: /GPA/ })).toBeDefined();
+  });
 });

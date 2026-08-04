@@ -219,6 +219,9 @@ const parseSession = (
 
   return {
     sourceId,
+    ...(asString(item.xkkh)?.trim()
+      ? { courseId: asString(item.xkkh)!.trim() }
+      : {}),
     courseName,
     teacher,
     location,
@@ -459,16 +462,58 @@ export const buildCourseCatalog = ({
   grades: readonly AcademicGradeRecord[];
 }): AcademicCourseCatalogData => {
   const byKey = new Map<string, AcademicCourseRecord>();
-  const gradeByKey = new Map<string, AcademicGradeRecord>();
-  const sourceToKey = new Map<string, string>();
+  const identityKeysByName = new Map<string, Set<string>>();
+  const gradeKeysById = new Map<string, string>();
+  const sessionBucketsByName = new Map<string, string>();
+  const termNameKey = (academicYearStart: number | null, season: AcademicTimetableSeason | null, courseName: string): string =>
+    `${academicYearStart ?? "unknown"}:${season ?? "unknown"}:${courseName}`;
+
+  const registerIdentity = (key: string, courseName: string, academicYearStart: number | null, season: AcademicTimetableSeason | null): void => {
+    const nameKey = termNameKey(academicYearStart, season, courseName);
+    const keys = identityKeysByName.get(nameKey) ?? new Set<string>();
+    keys.add(key);
+    identityKeysByName.set(nameKey, keys);
+  };
+
+  const addSession = (course: AcademicCourseRecord, session: AcademicTimetableSession): void => {
+    if (!course.teachers.includes(session.teacher)) course.teachers.push(session.teacher);
+    const firstPeriod = session.periods[0];
+    if (firstPeriod === undefined) return;
+    const duplicate = course.sessions.find((candidate) =>
+      candidate.dayOfWeek === session.dayOfWeek &&
+      candidate.weekPattern === session.weekPattern &&
+      candidate.location === session.location &&
+      candidate.periods.includes(firstPeriod)
+    );
+    if (duplicate) {
+      duplicate.firstHalf ||= session.firstHalf;
+      duplicate.secondHalf ||= session.secondHalf;
+      return;
+    }
+    const adjacent = course.sessions.find((candidate) =>
+      candidate.dayOfWeek === session.dayOfWeek &&
+      candidate.weekPattern === session.weekPattern &&
+      candidate.location === session.location &&
+      candidate.periods.at(-1)! + 1 === firstPeriod
+    );
+    if (adjacent) {
+      adjacent.periods.push(...session.periods);
+      adjacent.firstHalf ||= session.firstHalf;
+      adjacent.secondHalf ||= session.secondHalf;
+      return;
+    }
+    course.sessions.push({
+      ...session,
+      periods: [...session.periods],
+      ...(session.weeks ? { weeks: [...session.weeks] } : {})
+    });
+  };
+
   for (const grade of grades) {
     const term = academicTermFromSourceId(grade.sourceId);
-    const key = `${term?.academicYearStart ?? grade.academicYearStart ?? "unknown"}:` +
-      `${term?.termNumber ?? grade.termNumber ?? "unknown"}:${grade.courseName}`;
-    gradeByKey.set(key, grade);
-    sourceToKey.set(grade.sourceId, key);
     const season = seasonForTerm(term?.termNumber ?? grade.termNumber);
-    byKey.set(key, {
+    const key = `id:${grade.sourceId}`;
+    const course: AcademicCourseRecord = {
       sourceId: grade.sourceId,
       realId: grade.realId ?? deriveCelechronRealId(grade.sourceId),
       courseCode: grade.courseCode,
@@ -484,17 +529,50 @@ export const buildCourseCatalog = ({
       gradeSourceId: grade.sourceId,
       examSourceIds: [],
       sessions: []
-    });
+    };
+    byKey.set(key, course);
+    gradeKeysById.set(grade.sourceId, key);
+    registerIdentity(key, course.courseName, course.academicYearStart, course.season);
+  }
+
+  for (const exam of exams) {
+    const term = academicTermFromSourceId(exam.courseId);
+    const academicYearStart = term?.academicYearStart ?? null;
+    const season = seasonForTerm(term?.termNumber ?? null);
+    const key = gradeKeysById.get(exam.courseId) ?? `id:${exam.courseId}`;
+    const existing = byKey.get(key) ?? {
+      sourceId: exam.courseId,
+      realId: deriveCelechronRealId(exam.courseId),
+      courseCode: null,
+      courseName: exam.courseName,
+      teachers: [],
+      credit: 0,
+      academicYearStart,
+      season,
+      semesterLabel: academicYearStart && season
+        ? `${academicYearStart}-${academicYearStart + 1} ${season}`
+        : null,
+      courseCategory: null,
+      gradeSourceId: null,
+      examSourceIds: [],
+      sessions: []
+    } satisfies AcademicCourseRecord;
+    if (!existing.examSourceIds.includes(exam.sourceId)) existing.examSourceIds.push(exam.sourceId);
+    byKey.set(key, existing);
+    registerIdentity(key, existing.courseName, existing.academicYearStart, existing.season);
   }
 
   for (const term of terms) {
     for (const session of term.sessions) {
-      const keyPrefix = `${term.academicYearStart}:` +
-        `${term.season.startsWith("1|") ? 1 : 2}:${session.courseName}`;
-      const key = keyPrefix;
+      const nameKey = termNameKey(term.academicYearStart, term.season, session.courseName);
+      const key = session.courseId
+        ? gradeKeysById.get(session.courseId) ?? `id:${session.courseId}`
+        : (identityKeysByName.get(nameKey)?.size === 1
+          ? [...identityKeysByName.get(nameKey)!][0]
+          : sessionBucketsByName.get(nameKey) ?? `session:${nameKey}`);
       const existing = byKey.get(key) ?? {
-        sourceId: session.sourceId,
-        realId: null,
+        sourceId: session.courseId ?? session.sourceId,
+        realId: session.courseId ? deriveCelechronRealId(session.courseId) : null,
         courseCode: null,
         courseName: session.courseName,
         teachers: [],
@@ -506,68 +584,13 @@ export const buildCourseCatalog = ({
         gradeSourceId: null,
         examSourceIds: [],
         sessions: []
-      };
-      if (!existing.teachers.includes(session.teacher)) existing.teachers.push(session.teacher);
-      const firstPeriod = session.periods[0];
-      const duplicate = existing.sessions.find((candidate) =>
-        candidate.dayOfWeek === session.dayOfWeek &&
-        candidate.weekPattern === session.weekPattern &&
-        candidate.location === session.location &&
-        candidate.periods.includes(firstPeriod)
-      );
-      if (duplicate) {
-        duplicate.firstHalf ||= session.firstHalf;
-        duplicate.secondHalf ||= session.secondHalf;
-      } else {
-        const adjacent = existing.sessions.find((candidate) =>
-          candidate.dayOfWeek === session.dayOfWeek &&
-          candidate.weekPattern === session.weekPattern &&
-          candidate.location === session.location &&
-          candidate.periods.at(-1)! + 1 === firstPeriod
-        );
-        if (adjacent) {
-          adjacent.periods.push(...session.periods);
-          adjacent.firstHalf ||= session.firstHalf;
-          adjacent.secondHalf ||= session.secondHalf;
-        } else {
-          existing.sessions.push({
-            ...session,
-            periods: [...session.periods],
-            ...(session.weeks ? { weeks: [...session.weeks] } : {})
-          });
-        }
-      }
+      } satisfies AcademicCourseRecord;
+      addSession(existing, session);
       byKey.set(key, existing);
+      if (!session.courseId && !identityKeysByName.get(nameKey)?.size) {
+        sessionBucketsByName.set(nameKey, key);
+      }
     }
-  }
-
-  for (const exam of exams) {
-    const term = academicTermFromSourceId(exam.courseId);
-    const key = `${term?.academicYearStart ?? "unknown"}:` +
-      `${term?.termNumber ?? "unknown"}:${exam.courseName}`;
-    const existingKey = sourceToKey.get(exam.courseId) ?? key;
-    const existing = byKey.get(existingKey) ?? {
-      sourceId: exam.courseId,
-      realId: deriveCelechronRealId(exam.courseId),
-      courseCode: null,
-      courseName: exam.courseName,
-      teachers: [],
-      credit: 0,
-      academicYearStart: term?.academicYearStart ?? null,
-      season: seasonForTerm(term?.termNumber ?? null),
-      semesterLabel: term?.academicYearStart && term.termNumber
-        ? `${term.academicYearStart}-${term.academicYearStart + 1} ${seasonForTerm(term.termNumber)}`
-        : null,
-      courseCategory: null,
-      gradeSourceId: null,
-      examSourceIds: [],
-      sessions: []
-    };
-    if (!existing.examSourceIds.includes(exam.sourceId)) {
-      existing.examSourceIds.push(exam.sourceId);
-    }
-    byKey.set(existingKey, existing);
-    sourceToKey.set(exam.courseId, existingKey);
   }
 
   return {

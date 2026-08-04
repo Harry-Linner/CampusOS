@@ -19,7 +19,7 @@ interface ScheduleViewProps extends PluginComponentProps {
 type ScheduleEvent = {
   id: string;
   title: string;
-  kind: "course" | "deadline" | "task";
+  kind: "course" | "exam" | "assignment" | "deadline" | "task";
   startAt: string;
   endAt: string;
   location?: string;
@@ -141,6 +141,9 @@ const dateFromDayKey = (value: string): Date => {
 
 const getShanghaiHour = (value: string): number => Number(getShanghaiDateParts(new Date(value)).hour);
 
+export const getShanghaiDayNumber = (value: Date): number =>
+  Number(getShanghaiDateParts(value).day);
+
 const weekdayLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 const formatMonth = (value: Date): string =>
@@ -223,24 +226,43 @@ const buildEvents = (
     location: period.location,
     status: period.status
   }));
+  const canonicalEventIds = new Set(
+    snapshot.calendarEvents?.map((event) => event.id) ?? []
+  );
+  const projectedCalendarEvents: ScheduleEvent[] = [
+    ...(snapshot.calendarEvents ?? []).map((event) => ({
+      id: `calendar:${event.id}`,
+      kind: event.kind,
+      title: event.title,
+      startAt: event.startAt,
+      endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
+      location: event.location ?? undefined,
+      note: event.note ?? undefined
+    })),
+    ...snapshot.courses
+      .filter((course) => !canonicalEventIds.has(course.id))
+      .map((course) => ({
+        id: `course:${course.id}`,
+        kind: "course" as const,
+        title: course.title,
+        startAt: course.startAt,
+        endAt: course.endAt,
+        location: course.location,
+        note: course.note
+      })),
+    ...snapshot.deadlines
+      .filter((deadline) => !canonicalEventIds.has(deadline.id))
+      .map((deadline) => ({
+        id: `deadline:${deadline.id}`,
+        kind: "deadline" as const,
+        title: deadline.title,
+        startAt: new Date(new Date(deadline.dueAt).getTime() - 60 * 60 * 1000).toISOString(),
+        endAt: deadline.dueAt,
+        note: deadline.note
+      }))
+  ];
   return [
-    ...snapshot.courses.map((course) => ({
-      id: `course:${course.id}`,
-      kind: "course" as const,
-      title: course.title,
-      startAt: course.startAt,
-      endAt: course.endAt,
-      location: course.location,
-      note: course.note
-    })),
-    ...snapshot.deadlines.map((deadline) => ({
-      id: `deadline:${deadline.id}`,
-      kind: "deadline" as const,
-      title: deadline.title,
-      startAt: new Date(new Date(deadline.dueAt).getTime() - 60 * 60 * 1000).toISOString(),
-      endAt: deadline.dueAt,
-      note: deadline.note
-    })),
+    ...projectedCalendarEvents,
     ...periods.map((period) => ({
       id: `task:${period.id}`,
       taskId: period.taskId,
@@ -615,7 +637,7 @@ export const ScheduleView = ({
                 const outside = monthKey(day) !== monthKey(selectedDate);
                 return (
                   <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)}>
-                    <time dateTime={day.toISOString()}>{day.getDate()}</time>
+                    <time dateTime={day.toISOString()}>{getShanghaiDayNumber(day)}</time>
                     <div className="schedule-event-list">
                       {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}>{event.title}</button>)}
                       {items.length > 5 ? <small>+{items.length - 5} 项</small> : null}
@@ -630,7 +652,7 @@ export const ScheduleView = ({
             <div className="schedule-week-grid">
               {weekDays.map((day) => (
                 <section className={`schedule-week-column${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)}>
-                  <header><span>{weekdayLabels[(day.getDay() + 6) % 7]}</span><strong>{day.getDate()}</strong></header>
+                  <header><span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span><strong>{getShanghaiDayNumber(day)}</strong></header>
                   <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
                 </section>
               ))}

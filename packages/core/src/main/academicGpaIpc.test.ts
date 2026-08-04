@@ -7,7 +7,9 @@ const state = vi.hoisted(() => ({
   record: null as AcademicCredentialRecord | null,
   database: {
     loadAcademicGpaWeights: vi.fn(),
-    saveAcademicGpaWeights: vi.fn()
+    saveAcademicGpaWeights: vi.fn(),
+    loadAcademicGpaStrategy: vi.fn(),
+    saveAcademicGpaStrategy: vi.fn()
   }
 }));
 
@@ -69,7 +71,10 @@ describe("academic GPA IPC", () => {
     state.record = verifiedRecord("account-a");
     state.database.loadAcademicGpaWeights.mockReset();
     state.database.saveAcademicGpaWeights.mockReset();
+    state.database.loadAcademicGpaStrategy.mockReset();
+    state.database.saveAcademicGpaStrategy.mockReset();
     state.database.loadAcademicGpaWeights.mockReturnValue(null);
+    state.database.loadAcademicGpaStrategy.mockReturnValue(null);
     registerAcademicGpaHandlers();
   });
 
@@ -113,5 +118,32 @@ describe("academic GPA IPC", () => {
       await expect(invoke("campusos:academic:gpa-weights:save", input)).rejects.toThrow();
     }
     expect(state.database.saveAcademicGpaWeights).not.toHaveBeenCalled();
+  });
+
+  it("isolates and validates the Celechron repeated-course strategy", async () => {
+    state.database.loadAcademicGpaStrategy.mockImplementation((accountId: string) =>
+      accountId === "account-a"
+        ? { strategy: "first", savedAt: "2026-08-04T00:00:00.000Z" }
+        : null
+    );
+
+    expect(await invoke("campusos:academic:gpa-strategy:load")).toEqual({
+      strategy: "first",
+      savedAt: "2026-08-04T00:00:00.000Z"
+    });
+    state.record = verifiedRecord("account-b");
+    expect(await invoke("campusos:academic:gpa-strategy:load")).toEqual({
+      strategy: "best",
+      savedAt: null
+    });
+
+    await invoke("campusos:academic:gpa-strategy:save", "best");
+    expect(state.database.saveAcademicGpaStrategy).toHaveBeenCalledWith(
+      "account-b",
+      "best",
+      expect.any(String)
+    );
+    await expect(invoke("campusos:academic:gpa-strategy:save", "invalid"))
+      .rejects.toThrow();
   });
 });

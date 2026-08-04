@@ -505,6 +505,74 @@ describe("undergraduate practice and course catalog projections", () => {
     expect(catalog.courses[0]?.sessions[0]).toMatchObject({ periods: [1, 2], firstHalf: true, secondHalf: true });
     expect(catalog.courses[0]?.examSourceIds).toEqual(["exam-1"]);
   });
+
+  it("keeps same-name repeated courses separate when their xkkh differs", () => {
+    const catalog = buildCourseCatalog({
+      terms: [],
+      exams: [
+        {
+          sourceId: "exam-a",
+          courseId: "(2025-2026-1)-REPEAT-A-1",
+          courseName: "重复课程",
+          kind: "final",
+          scheduleText: "exam",
+          startAt: null,
+          endAt: null,
+          dateLabel: null,
+          location: null,
+          seat: null
+        },
+        {
+          sourceId: "exam-b",
+          courseId: "(2025-2026-1)-REPEAT-B-1",
+          courseName: "重复课程",
+          kind: "final",
+          scheduleText: "exam",
+          startAt: null,
+          endAt: null,
+          dateLabel: null,
+          location: null,
+          seat: null
+        }
+      ],
+      grades: [
+        {
+          sourceId: "(2025-2026-1)-REPEAT-A-1",
+          realId: "(2025-2026-1)-REPEAT-A",
+          courseCode: "REPEAT-A",
+          courseName: "重复课程",
+          credit: 2,
+          originalScore: "90",
+          gradePoint: 4,
+          academicYearStart: 2025,
+          termNumber: 1,
+          isMajorCourse: false,
+          courseCategory: null
+        },
+        {
+          sourceId: "(2025-2026-1)-REPEAT-B-1",
+          realId: "(2025-2026-1)-REPEAT-B",
+          courseCode: "REPEAT-B",
+          courseName: "重复课程",
+          credit: 3,
+          originalScore: "80",
+          gradePoint: 3,
+          academicYearStart: 2025,
+          termNumber: 1,
+          isMajorCourse: false,
+          courseCategory: null
+        }
+      ]
+    });
+
+    expect(catalog.courses).toHaveLength(2);
+    expect(catalog.courses.map((course) => course.gradeSourceId)).toEqual([
+      "(2025-2026-1)-REPEAT-A-1",
+      "(2025-2026-1)-REPEAT-B-1"
+    ]);
+    expect(catalog.courses[0]?.examSourceIds).toEqual(["exam-a"]);
+    expect(catalog.courses[1]?.examSourceIds).toEqual(["exam-b"]);
+  });
 });
 describe("undergraduate cached timetable projection", () => {
   it("merges cached timetable terms into the course catalog when only some terms fail", async () => {

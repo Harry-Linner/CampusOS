@@ -477,7 +477,23 @@ const buildAvailablePeriods = (
     const dayEnd = dateAtShanghaiHour(day, endHour).getTime();
     const availableStart = Math.max(dayStart, offset === 0 ? now.getTime() : dayStart);
     const blocked: Array<{ start: number; end: number }> = [];
+    const canonicalEventIds = new Set(
+      snapshot.calendarEvents?.map((event) => event.id) ?? []
+    );
+    for (const event of snapshot.calendarEvents ?? []) {
+      if (event.kind !== "course" && event.kind !== "exam") continue;
+      if (!event.endAt) continue;
+      const start = Date.parse(event.startAt);
+      const end = Date.parse(event.endAt);
+      if (Number.isFinite(start) && Number.isFinite(end) && start < end) {
+        blocked.push({ start, end });
+      }
+    }
+    // Keep legacy/base courses that are not represented by the canonical feed.
+    // This matters for partial refreshes and for snapshots written before
+    // calendar.events@1 existed.
     for (const course of snapshot.courses) {
+      if (canonicalEventIds.has(course.id)) continue;
       blocked.push({ start: Date.parse(course.startAt), end: Date.parse(course.endAt) });
     }
     for (const period of taskPeriods) {
@@ -651,15 +667,44 @@ export const createIcalContent = (
   input: CalendarExportInput,
   now = new Date()
 ): { content: string; eventCount: number } => {
-  const events: IcalEvent[] = snapshot.courses.map((course) => ({
-    id: `course:${course.id}`,
-    title: course.title,
-    description: course.note,
-    location: course.location,
-    startAt: course.startAt,
-    endAt: course.endAt
-  }));
+  const events: IcalEvent[] = [];
+  const canonicalEventIds = new Set(
+    snapshot.calendarEvents?.map((event) => event.id) ?? []
+  );
+  for (const event of snapshot.calendarEvents ?? []) {
+    if (event.kind === "exam" && input.includeExams === false) continue;
+    if (event.kind === "task" && input.includeTasks === false) continue;
+    const startMs = Date.parse(event.startAt);
+    const endMs = event.endAt
+      ? Date.parse(event.endAt)
+      : startMs + 60 * MINUTE_MS;
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) continue;
+    const isDueAtEvent = event.kind === "assignment" || event.kind === "task";
+    const startAt = isDueAtEvent
+      ? new Date(startMs - 60 * MINUTE_MS).toISOString()
+      : new Date(startMs).toISOString();
+    events.push({
+      id: `calendar:${event.id}`,
+      title: event.title,
+      description: event.note ?? undefined,
+      location: event.location ?? undefined,
+      startAt,
+      endAt: isDueAtEvent ? new Date(startMs).toISOString() : new Date(endMs).toISOString()
+    });
+  }
+  for (const course of snapshot.courses) {
+    if (canonicalEventIds.has(course.id)) continue;
+    events.push({
+      id: `course:${course.id}`,
+      title: course.title,
+      description: course.note,
+      location: course.location,
+      startAt: course.startAt,
+      endAt: course.endAt
+    });
+  }
   for (const deadline of snapshot.deadlines) {
+    if (canonicalEventIds.has(deadline.id)) continue;
     if (input.includeExams === false && deadline.kind === "exam") continue;
     const start = new Date(Date.parse(deadline.dueAt) - 60 * MINUTE_MS);
     events.push({

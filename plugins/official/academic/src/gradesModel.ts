@@ -1,4 +1,8 @@
-import type { AcademicGradeRecord, GpaScale } from "@campusos/shared";
+import type {
+  AcademicGpaStrategy,
+  AcademicGradeRecord,
+  GpaScale
+} from "@campusos/shared";
 
 export interface AcademicGradeTermSummary {
   key: string;
@@ -152,6 +156,41 @@ const hundredPoint = (grade: AcademicGradeRecord): number => {
   return numeric ? Number.parseInt(numeric, 10) : 0;
 };
 
+const repeatedCourseKey = (grade: AcademicGradeRecord): string => {
+  const separator = grade.sourceId.indexOf(":");
+  const provider = separator > 0 ? grade.sourceId.slice(0, separator) : "";
+  const sourceId = separator > 0 ? grade.sourceId.slice(separator + 1) : grade.sourceId;
+
+  // Celechron lib/model/scholar.dart:557-574 groups normal repeats by course
+  // code and keeps PPAE/401 physical-education registrations term-specific.
+  const match = sourceId.match(/(\(.*\)-(.*?))-.*/);
+  let key = match?.[2] ?? grade.realId?.trim() ?? grade.courseCode?.trim() ?? sourceId;
+  if (key.startsWith("PPAE") || key.startsWith("401")) {
+    key = match?.[1] ?? grade.realId?.trim() ?? sourceId;
+  }
+  return provider ? `${provider}:${key}` : key;
+};
+
+export const selectAcademicGpaGrades = (
+  grades: readonly AcademicGradeRecord[],
+  strategy: AcademicGpaStrategy = "best"
+): AcademicGradeRecord[] => {
+  const groups = new Map<string, AcademicGradeRecord[]>();
+  for (const grade of grades) {
+    const key = repeatedCourseKey(grade);
+    groups.set(key, [...(groups.get(key) ?? []), grade]);
+  }
+
+  // Celechron lib/model/scholar.dart:576-589 uses the first response item for
+  // "first" and the highest hundred-point projection for "best".
+  return [...groups.values()].map((attempts) => {
+    if (strategy === "first") return attempts[0];
+    return attempts.reduce((best, attempt) =>
+      hundredPoint(attempt) > hundredPoint(best) ? attempt : best
+    );
+  });
+};
+
 const earnedCredit = (grade: AcademicGradeRecord): number => {
   const credit = validCredit(grade);
   if (!creditIncluded(grade)) return 0;
@@ -185,11 +224,13 @@ export const inferGpaScale = (
 
 export const calculateAcademicGpa = (
   grades: readonly AcademicGradeRecord[],
-  weightMap: ReadonlyMap<string, number> = new Map()
+  weightMap: ReadonlyMap<string, number> = new Map(),
+  strategy: AcademicGpaStrategy = "best"
 ): AcademicGpaResult => {
-  const included = grades.filter(gpaIncluded);
+  const selected = selectAcademicGpaGrades(grades, strategy);
+  const included = selected.filter(gpaIncluded);
   const credits = included.reduce((total, grade) => total + validCredit(grade), 0);
-  const earnedCredits = grades.reduce((total, grade) => total + earnedCredit(grade), 0);
+  const earnedCredits = selected.reduce((total, grade) => total + earnedCredit(grade), 0);
   if (credits <= 0) {
     return { fivePoint: null, fourPoint: null, fourPointLegacy: null, hundredPoint: null, credits: 0, earnedCredits };
   }
@@ -219,15 +260,14 @@ export const calculateAcademicGpa = (
 
 export const summarizeAcademicGrades = (
   grades: readonly AcademicGradeRecord[],
-  weightMap: ReadonlyMap<string, number> = new Map()
+  weightMap: ReadonlyMap<string, number> = new Map(),
+  strategy: AcademicGpaStrategy = "best"
 ): AcademicGradeSummary => {
   const terms = new Map<string, AcademicGradeTermSummary>();
-  let totalCredits = 0;
+  const selectedGrades = selectAcademicGpaGrades(grades, strategy);
+  const selectedGradeSet = new Set(selectedGrades);
 
   for (const grade of grades) {
-    const credit = validCredit(grade);
-    totalCredits += earnedCredit(grade);
-
     const key = createTermKey(grade);
     const term = terms.get(key) ?? {
       key,
@@ -237,21 +277,24 @@ export const summarizeAcademicGrades = (
       majorCredits: 0
     };
     term.grades.push(grade);
-    term.credits += earnedCredit(grade);
-    if (grade.isMajorCourse) term.majorCredits += earnedCredit(grade);
+    if (selectedGradeSet.has(grade)) {
+      term.credits += earnedCredit(grade);
+      if (grade.isMajorCourse) term.majorCredits += earnedCredit(grade);
+    }
     terms.set(key, term);
   }
 
-  const overall = calculateAcademicGpa(grades, weightMap);
+  const overall = calculateAcademicGpa(selectedGrades, weightMap, strategy);
   const major = calculateAcademicGpa(
-    grades.filter((grade) => grade.isMajorCourse),
-    weightMap
+    selectedGrades.filter((grade) => grade.isMajorCourse),
+    weightMap,
+    strategy
   );
-  const sourceScale = inferGpaScale(grades);
+  const sourceScale = inferGpaScale(selectedGrades);
 
   return {
     courseCount: grades.length,
-    totalCredits,
+    totalCredits: overall.earnedCredits,
     gradedCredits: overall.credits,
     majorGradedCredits: major.credits,
     weightedGradePoint: overall[sourceScale === "5.0" ? "fivePoint" : sourceScale === "4.3" ? "fourPoint" : "fourPointLegacy"],

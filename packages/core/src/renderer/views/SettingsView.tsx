@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { AcademicGpaStrategy } from "@campusos/shared";
 import type { AcademicProgram } from "../../shared/credentialBridge";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useReminderSettings } from "../hooks/useReminderSettings";
@@ -53,6 +54,9 @@ export const SettingsView = ({
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [selectedLeadMinutes, setSelectedLeadMinutes] = useState<number[]>([15, 120]);
   const [reminderSaved, setReminderSaved] = useState(false);
+  const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("best");
+  const [gpaStrategySaved, setGpaStrategySaved] = useState(false);
+  const [gpaStrategyError, setGpaStrategyError] = useState<string | null>(null);
   const [refreshState, setRefreshState] = useState<
     "idle" | "refreshing" | "success" | "error"
   >("idle");
@@ -87,6 +91,22 @@ export const SettingsView = ({
       setSelectedLeadMinutes(reminderSettings.record.leadMinutes);
     }
   }, [reminderSettings.record]);
+
+  useEffect(() => {
+    const bridge = window.campusos?.academic;
+    if (!bridge?.loadGpaStrategy) return;
+    let active = true;
+    void bridge.loadGpaStrategy()
+      .then((record) => {
+        if (active) setGpaStrategy(record.strategy);
+      })
+      .catch(() => {
+        if (active) setGpaStrategyError("GPA ç­–ç•¥è¯»å–å¤±è´¥ã€‚");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const reloadDiagnostics = async (): Promise<void> => {
     setDiagnosticState("loading");
@@ -625,6 +645,78 @@ export const SettingsView = ({
               {academicCredential.error}
             </p>
           ) : null}
+        </section>
+
+        <section className="settings-section" aria-labelledby="gpa-heading">
+          <header className="settings-section-heading">
+            <h2 id="gpa-heading">GPA</h2>
+          </header>
+          <fieldset className="academic-program-fieldset">
+            <legend>重修成绩计算</legend>
+            <div className="academic-program-options">
+              <label className={gpaStrategy === "best" ? "selected" : undefined}>
+                <input
+                  type="radio"
+                  name="gpa-strategy"
+                  value="best"
+                  checked={gpaStrategy === "best"}
+                  onChange={() => {
+                    setGpaStrategySaved(false);
+                    setGpaStrategyError(null);
+                    setGpaStrategy("best");
+                  }}
+                />
+                <span>
+                  <strong>取最高</strong>
+                  <small>按课程号选择最高百分制成绩</small>
+                </span>
+              </label>
+              <label className={gpaStrategy === "first" ? "selected" : undefined}>
+                <input
+                  type="radio"
+                  name="gpa-strategy"
+                  value="first"
+                  checked={gpaStrategy === "first"}
+                  onChange={() => {
+                    setGpaStrategySaved(false);
+                    setGpaStrategyError(null);
+                    setGpaStrategy("first");
+                  }}
+                />
+                <span>
+                  <strong>取首次</strong>
+                  <small>按成绩接口返回顺序选择首次记录</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <div className="settings-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!window.campusos?.academic?.saveGpaStrategy}
+              aria-label="Save GPA"
+              onClick={() => {
+                void (async () => {
+                  const bridge = window.campusos?.academic;
+                  if (!bridge?.saveGpaStrategy) return;
+                  try {
+                    await bridge.saveGpaStrategy(gpaStrategy);
+                    setGpaStrategySaved(true);
+                    setGpaStrategyError(null);
+                  } catch (error) {
+                    setGpaStrategyError(
+                      error instanceof Error ? error.message : "GPA ç­–ç•¥ä¿å­˜å¤±è´¥ã€‚"
+                    );
+                  }
+                })();
+              }}
+            >
+              ä¿å­˜ GPA è®¾ç½®
+            </button>
+            {gpaStrategySaved ? <span className="save-note">å·²ä¿å­˜</span> : null}
+          </div>
+          {gpaStrategyError ? <p className="error-copy" role="alert">{gpaStrategyError}</p> : null}
         </section>
 
         <section className="settings-section" aria-labelledby="reminder-heading">

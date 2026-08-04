@@ -500,6 +500,25 @@ describe("workspace capability integration", () => {
     ]);
   });
 
+  it("does not accumulate upstream item totals across repeated refreshes", () => {
+    const initial = mergeCalendarEventsIntoWorkspace(
+      createLiveWorkspaceSnapshot({
+        generatedAt: "2026-07-19T04:00:00.000Z",
+        accountId: "3240100001"
+      }),
+      [learningEventsRecord],
+      [60]
+    );
+    const refreshed = mergeCalendarEventsIntoWorkspace(
+      initial,
+      [learningEventsRecord],
+      [60]
+    );
+
+    expect(initial.sourceStates.find((source) => source.sourceId === "learning-platform")?.itemCount).toBe(2);
+    expect(refreshed.sourceStates.find((source) => source.sourceId === "learning-platform")?.itemCount).toBe(2);
+  });
+
   it("removes an assignment and its reminders when the live source removes it", () => {
     const initial = mergeCalendarEventsIntoWorkspace(
       createLiveWorkspaceSnapshot({

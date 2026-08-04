@@ -5,6 +5,7 @@ export { Component as ExamCountdownView } from "./ExamCountdownView";
 export {
   calculateAcademicGpa,
   inferGpaScale,
+  selectAcademicGpaGrades,
   summarizeAcademicGrades
 } from "./gradesModel";
 export { computeExamCountdowns } from "./examCountdown";

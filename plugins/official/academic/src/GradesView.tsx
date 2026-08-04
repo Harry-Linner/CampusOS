@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type {
+  AcademicGpaStrategy,
   AcademicGradesData,
   CapabilityRecord,
   PluginComponentProps
@@ -25,6 +26,7 @@ export const Component = ({
   const [refreshRequest, setRefreshRequest] = useState(0);
   const [privacyMask, setPrivacyMask] = useState(true);
   const [weights, setWeights] = useState<Record<string, number>>({});
+  const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("best");
   const savedWeights = useRef<Record<string, number>>({});
   const [weightError, setWeightError] = useState<string | null>(null);
 
@@ -32,17 +34,23 @@ export const Component = ({
     let active = true;
     setLoaded(false);
 
-    const weightsPromise = window.campusos?.academic?.loadGpaWeights()
+    const academicBridge = window.campusos?.academic;
+    const weightsPromise = academicBridge?.loadGpaWeights()
       .catch(() => ({ weights: {}, savedAt: null }));
+    const strategyPromise = academicBridge?.loadGpaStrategy
+      ? academicBridge.loadGpaStrategy().catch(() => ({ strategy: "best" as const, savedAt: null }))
+      : Promise.resolve({ strategy: "best" as const, savedAt: null });
     void Promise.all([
       capabilities.read<AcademicGradesData>("academic.grades@1"),
-      weightsPromise ?? Promise.resolve({ weights: {}, savedAt: null })
+      weightsPromise ?? Promise.resolve({ weights: {}, savedAt: null }),
+      strategyPromise
     ])
-      .then(([nextRecords, nextWeights]) => {
+      .then(([nextRecords, nextWeights, nextStrategy]) => {
         if (!active) return;
         setRecords(nextRecords);
         setWeights(nextWeights.weights);
         savedWeights.current = nextWeights.weights;
+        setGpaStrategy(nextStrategy.strategy);
         setError(null);
       })
       .catch((nextError: unknown) => {
@@ -80,7 +88,11 @@ export const Component = ({
       sourceId: `${record.providerId}:${grade.sourceId}`
     }))
   );
-  const summary = summarizeAcademicGrades(grades, new Map(Object.entries(weights)));
+  const summary = summarizeAcademicGrades(
+    grades,
+    new Map(Object.entries(weights)),
+    gpaStrategy
+  );
   const gpaScale = inferGpaScale(grades);
   const busy = !loaded || workspaceLoading || refreshing;
   const availableRecords = records.filter((record) => record.data !== null);
@@ -114,6 +126,7 @@ export const Component = ({
           <h1>学业成绩</h1>
         </div>
         <div className="grade-header-actions">
+          <span className="save-note">GPA {gpaStrategy === "best" ? "取最高" : "取首次"}</span>
           <label className="setting-switch" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>
             <input
               type="checkbox"
