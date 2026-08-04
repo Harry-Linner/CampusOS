@@ -26,6 +26,7 @@ export const ActivityBar = ({
       key={item.id}
       className={item.id === activeView ? "nav-item is-active" : "nav-item"}
       aria-current={item.id === activeView ? "page" : undefined}
+      data-activity-id={item.id}
       type="button"
       onClick={() => onSelect(item.id)}
     >
