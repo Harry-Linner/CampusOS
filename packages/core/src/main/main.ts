@@ -18,7 +18,7 @@ import {
   registerCampusmodRendererScheme
 } from "./campusmodRendererProtocol";
 import { initSentryMain } from "./sentryInit";
-import { registerUpdateHandlers } from "./autoUpdater";
+import { checkForUpdates, registerUpdateHandlers } from "./autoUpdater";
 import { registerPluginHotReloadHandlers } from "./pluginHotReload";
 import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
@@ -91,6 +91,9 @@ app.whenReady().then(async () => {
   registerPluginHotReloadHandlers();
   registerUpdateHandlers();
   await createMainWindow();
+  // The updater is intentionally started after the first window exists so
+  // packaged startup status is visible through the normal renderer event.
+  void checkForUpdates();
   workspaceRefreshScheduler.start();
 
   app.on("activate", async () => {
