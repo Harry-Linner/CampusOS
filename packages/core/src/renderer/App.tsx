@@ -143,6 +143,7 @@ export const App = (): JSX.Element => {
           resume: resumeDownload,
           cancel: cancelDownload
         }}
+        schedule={window.campusos?.schedule}
       />
     );
   } else {

@@ -19,6 +19,16 @@ export interface StoredDownloadQueue {
   savedAt: string;
 }
 
+export interface StoredLocalTasks {
+  tasks: unknown;
+  savedAt: string;
+}
+
+export interface StoredPlannerSchedule {
+  schedule: unknown;
+  savedAt: string;
+}
+
 export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
@@ -34,6 +44,10 @@ export interface DatabaseService {
   readCapabilityRecords: (capability: string) => StoredCapabilityRecord[];
   saveDownloadQueue: (queue: unknown, savedAt: string) => void;
   loadDownloadQueue: () => StoredDownloadQueue | null;
+  saveLocalTasks: (tasks: unknown, savedAt: string) => void;
+  loadLocalTasks: () => StoredLocalTasks | null;
+  savePlannerSchedule: (schedule: unknown, savedAt: string) => void;
+  loadPlannerSchedule: () => StoredPlannerSchedule | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -84,6 +98,18 @@ const migrate = (database: Database.Database): void => {
     CREATE TABLE download_queues (
       singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
       queue_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+  `);
+  applyMigration(3, `
+    CREATE TABLE local_task_sets (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      tasks_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+    CREATE TABLE planner_schedules (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      schedule_json TEXT NOT NULL,
       saved_at TEXT NOT NULL
     );
   `);
@@ -196,6 +222,42 @@ export const createDatabaseService = ({
         queue: JSON.parse(row.queue_json) as unknown,
         savedAt: row.saved_at
       };
+    },
+    saveLocalTasks: (tasks, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("任务保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO local_task_sets (singleton, tasks_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          tasks_json = excluded.tasks_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(tasks), savedAt);
+    },
+    loadLocalTasks: () => {
+      const row = database.prepare(
+        "SELECT tasks_json, saved_at FROM local_task_sets WHERE singleton = 1"
+      ).get() as { tasks_json: string; saved_at: string } | undefined;
+      return row ? { tasks: JSON.parse(row.tasks_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    savePlannerSchedule: (schedule, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("规划保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO planner_schedules (singleton, schedule_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          schedule_json = excluded.schedule_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(schedule), savedAt);
+    },
+    loadPlannerSchedule: () => {
+      const row = database.prepare(
+        "SELECT schedule_json, saved_at FROM planner_schedules WHERE singleton = 1"
+      ).get() as { schedule_json: string; saved_at: string } | undefined;
+      return row ? { schedule: JSON.parse(row.schedule_json) as unknown, savedAt: row.saved_at } : null;
     }
   };
 };

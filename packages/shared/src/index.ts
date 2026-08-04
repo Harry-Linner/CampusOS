@@ -1,5 +1,15 @@
 import type { CampusDownloadRequest, CampusWorkspaceSnapshot } from "./campus";
-import type { PluginCapabilityClient } from "./pluginCapabilities";
+import type {
+  CalendarExportInput,
+  CalendarExportResult,
+  LocalTaskInput,
+  LocalTaskMutation,
+  LocalTaskPeriod,
+  LocalTasksData,
+  PlannerScheduleData,
+  PlannerSettings,
+  PluginCapabilityClient
+} from "./pluginCapabilities";
 
 export * from "./campus";
 export * from "./pluginCapabilities";
@@ -136,6 +146,16 @@ export interface PluginComponentProps {
     pause: (id: string) => Promise<void>;
     resume: (id: string) => Promise<void>;
     cancel: (id: string) => Promise<void>;
+  };
+  schedule?: {
+    loadTasks: () => Promise<LocalTasksData>;
+    loadPeriods: (input: { startAt: string; endAt: string }) => Promise<LocalTaskPeriod[]>;
+    saveTask: (input: LocalTaskInput) => Promise<LocalTasksData>;
+    mutateTask: (input: LocalTaskMutation) => Promise<LocalTasksData>;
+    generatePlan: (settings: PlannerSettings) => Promise<PlannerScheduleData>;
+    loadPlan: () => Promise<PlannerScheduleData | null>;
+    exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
+    subscribe: (listener: () => void) => () => void;
   };
 }
 

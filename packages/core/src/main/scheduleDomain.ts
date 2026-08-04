@@ -1,0 +1,699 @@
+import { createHash, randomUUID } from "node:crypto";
+import type {
+  CampusWorkspaceSnapshot,
+  CalendarExportInput,
+  LocalTaskInput,
+  LocalTaskMutation,
+  LocalTaskRecord,
+  LocalTaskRepeatType,
+  LocalTaskStatus,
+  LocalTaskType,
+  PlannerSegment,
+  PlannerScheduleData,
+  PlannerSettings
+} from "@campusos/shared";
+
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
+
+export interface TaskPeriod {
+  id: string;
+  taskId: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  type: LocalTaskType;
+  status: LocalTaskStatus;
+  blocksPlanning: boolean;
+}
+
+export interface TaskRefreshResult {
+  tasks: LocalTaskRecord[];
+  changed: boolean;
+}
+
+export interface ScheduleDomainOptions {
+  now?: Date;
+  idFactory?: () => string;
+}
+
+interface MutablePeriod {
+  uid: string;
+  startMs: number;
+  endMs: number;
+}
+
+interface DeadlineWork {
+  id: string;
+  title: string;
+  description: string;
+  location: string;
+  endMs: number;
+  remainingMinutes: number;
+  breakable: boolean;
+}
+
+interface FindSolutionResult {
+  valid: boolean;
+  restMinutes: number;
+  segments: PlannerSegment[];
+  failedTaskId: string | null;
+}
+
+const getIdFactory = (options?: ScheduleDomainOptions): (() => string) =>
+  options?.idFactory ?? randomUUID;
+
+const parseDate = (value: string, field: string): Date => {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    throw new Error(`${field} 不是有效时间。`);
+  }
+  return new Date(timestamp);
+};
+
+const toIso = (value: Date | number): string =>
+  new Date(value).toISOString();
+
+const startOfDay = (value: Date): Date =>
+  new Date(value.getFullYear(), value.getMonth(), value.getDate());
+
+const dateOnly = (value: Date): Date => startOfDay(value);
+
+const dateOnlyIso = (value: string, field: string): string =>
+  toIso(dateOnly(parseDate(value, field))).slice(0, 10);
+
+const daysInMonth = (year: number, month: number): number =>
+  new Date(year, month + 1, 0).getDate();
+
+const addDays = (value: Date, days: number): Date =>
+  new Date(value.getTime() + days * DAY_MS);
+
+const addNextPeriod = (
+  start: Date,
+  end: Date,
+  repeatType: LocalTaskRepeatType,
+  repeatPeriod: number
+): { start: Date; end: Date } => {
+  if (repeatType === "days") {
+    const delta = Math.max(1, repeatPeriod) * DAY_MS;
+    return { start: new Date(start.getTime() + delta), end: new Date(end.getTime() + delta) };
+  }
+
+  if (repeatType === "month") {
+    let year = start.getFullYear();
+    let month = start.getMonth() + 1;
+    while (daysInMonth(year, month) < start.getDate()) {
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+    }
+    const nextStart = new Date(
+      year,
+      month,
+      start.getDate(),
+      start.getHours(),
+      start.getMinutes(),
+      start.getSeconds(),
+      start.getMilliseconds()
+    );
+    const delta = nextStart.getTime() - start.getTime();
+    return { start: nextStart, end: new Date(end.getTime() + delta) };
+  }
+
+  if (repeatType === "year") {
+    let year = start.getFullYear() + 1;
+    while (daysInMonth(year, start.getMonth()) < start.getDate()) year += 1;
+    const nextStart = new Date(
+      year,
+      start.getMonth(),
+      start.getDate(),
+      start.getHours(),
+      start.getMinutes(),
+      start.getSeconds(),
+      start.getMilliseconds()
+    );
+    const delta = nextStart.getTime() - start.getTime();
+    return { start: nextStart, end: new Date(end.getTime() + delta) };
+  }
+
+  return { start, end };
+};
+
+const normalizeStatus = (value: unknown): LocalTaskStatus => {
+  const statuses: LocalTaskStatus[] = [
+    "running",
+    "suspended",
+    "completed",
+    "failed",
+    "deleted",
+    "outdated"
+  ];
+  return statuses.includes(value as LocalTaskStatus)
+    ? (value as LocalTaskStatus)
+    : "running";
+};
+
+const normalizeType = (value: unknown): LocalTaskType =>
+  value === "fixed" || value === "fixedlegacy" ? value : "deadline";
+
+const normalizeRepeatType = (value: unknown): LocalTaskRepeatType =>
+  value === "days" || value === "month" || value === "year" ? value : "norepeat";
+
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+export const normalizeTaskRecord = (
+  value: LocalTaskRecord,
+  options?: ScheduleDomainOptions
+): LocalTaskRecord => {
+  const start = parseDate(value.startAt, "任务开始时间");
+  const end = parseDate(value.endAt, "任务结束时间");
+  if (!(start.getTime() < end.getTime())) {
+    throw new Error("任务开始时间必须早于结束时间。");
+  }
+  const needed = Math.max(1, Math.round(finiteNumber(value.timeNeededMinutes, 60)));
+  const spent = Math.min(
+    needed,
+    Math.max(0, Math.round(finiteNumber(value.timeSpentMinutes, 0)))
+  );
+
+  return {
+    id: typeof value.id === "string" && value.id.length > 0 ? value.id : getIdFactory(options)(),
+    status: normalizeStatus(value.status),
+    description: typeof value.description === "string" ? value.description : "",
+    timeSpentMinutes: spent,
+    timeNeededMinutes: needed,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    location: typeof value.location === "string" ? value.location : "",
+    title: typeof value.title === "string" && value.title.trim() ? value.title.trim() : "未命名任务",
+    breakable: value.breakable !== false,
+    type: normalizeType(value.type),
+    repeatType: normalizeRepeatType(value.repeatType),
+    repeatPeriod: Math.max(1, Math.round(finiteNumber(value.repeatPeriod, 1))),
+    repeatEndsOn: dateOnlyIso(value.repeatEndsOn, "重复结束日期"),
+    blocksPlanning: value.blocksPlanning !== false,
+    fromId: typeof value.fromId === "string" ? value.fromId : null
+  };
+};
+
+export const createTaskRecord = (
+  input: LocalTaskInput,
+  options?: ScheduleDomainOptions
+): LocalTaskRecord => {
+  const idFactory = getIdFactory(options);
+  const record = normalizeTaskRecord(
+    {
+      id: input.id ?? idFactory(),
+      status: "running",
+      ...input,
+      fromId: null
+    },
+    { ...options, idFactory }
+  );
+  if (record.type === "fixedlegacy") {
+    throw new Error("不能新建过去日程。");
+  }
+  return record;
+};
+
+export const applyTaskMutation = (
+  tasks: LocalTaskRecord[],
+  mutation: LocalTaskMutation
+): LocalTaskRecord[] => {
+  let found = false;
+  const result = tasks.map((task) => {
+    if (task.id !== mutation.id) return task;
+    found = true;
+    const next = { ...task };
+    if (mutation.status) next.status = mutation.status;
+    if (mutation.timeSpentMinutes !== undefined) {
+      next.timeSpentMinutes = Math.min(
+        next.timeNeededMinutes,
+        Math.max(0, Math.round(mutation.timeSpentMinutes))
+      );
+    }
+    if (next.status === "completed") next.timeSpentMinutes = next.timeNeededMinutes;
+    return next;
+  });
+  if (!found) throw new Error("任务不存在。");
+  return result;
+};
+
+const taskChanged = (left: LocalTaskRecord[], right: LocalTaskRecord[]): boolean =>
+  JSON.stringify(left) !== JSON.stringify(right);
+
+export const refreshLocalTasks = (
+  source: LocalTaskRecord[],
+  now = new Date(),
+  options?: ScheduleDomainOptions
+): TaskRefreshResult => {
+  const idFactory = getIdFactory(options);
+  const current = source
+    .filter((task) => task.status !== "deleted")
+    .map((task) => normalizeTaskRecord(task, { ...options, idFactory }));
+  const existingFixedIds = new Set<string>();
+  const historical: LocalTaskRecord[] = [];
+
+  for (const task of current) {
+    if (task.type === "deadline") {
+      if (task.timeSpentMinutes >= task.timeNeededMinutes) {
+        task.status = "completed";
+      } else if (task.status !== "completed" && Date.parse(task.endAt) < now.getTime()) {
+        task.status = "failed";
+      }
+      continue;
+    }
+
+    if (task.type !== "fixed") continue;
+    existingFixedIds.add(task.id);
+    const repeatEnd = dateOnly(parseDate(task.repeatEndsOn, "重复结束日期"));
+    let start = parseDate(task.startAt, "任务开始时间");
+    let end = parseDate(task.endAt, "任务结束时间");
+    task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
+
+    let guard = 0;
+    while (end.getTime() < now.getTime() && task.status !== "outdated") {
+      const legacy: LocalTaskRecord = {
+        ...task,
+        id: idFactory(),
+        status: "outdated",
+        type: "fixedlegacy",
+        title: `${task.title}（过去日程）`,
+        repeatType: "norepeat",
+        repeatPeriod: 1,
+        repeatEndsOn: toIso(dateOnly(end)).slice(0, 10),
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        fromId: task.id
+      };
+      historical.push(legacy);
+      if (task.repeatType === "norepeat") {
+        task.status = "outdated";
+        break;
+      }
+      const next = addNextPeriod(start, end, task.repeatType, task.repeatPeriod);
+      start = next.start;
+      end = next.end;
+      task.startAt = start.toISOString();
+      task.endAt = end.toISOString();
+      task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
+      if (++guard > 20_000) throw new Error("重复任务实例数量超过安全上限。");
+    }
+  }
+
+  const result = current
+    .concat(historical)
+    .filter((task) => task.type !== "fixedlegacy" || existingFixedIds.has(task.fromId ?? ""))
+    .sort((left, right) =>
+      Date.parse(left.endAt) - Date.parse(right.endAt) || left.id.localeCompare(right.id)
+    );
+  return { tasks: result, changed: taskChanged(source, result) };
+};
+
+const periodForDay = (
+  start: Date,
+  end: Date,
+  date: Date
+): { start: Date; end: Date } | null => {
+  const dayStart = startOfDay(date);
+  const dayEnd = addDays(dayStart, 1);
+  const left = Math.max(start.getTime(), dayStart.getTime());
+  const right = Math.min(end.getTime(), dayEnd.getTime());
+  return left < right ? { start: new Date(left), end: new Date(right) } : null;
+};
+
+const buildTaskInstances = (
+  task: LocalTaskRecord,
+  rangeStart: Date,
+  rangeEnd: Date
+): TaskPeriod[] => {
+  const result: TaskPeriod[] = [];
+  const start = parseDate(task.startAt, "任务开始时间");
+  const end = parseDate(task.endAt, "任务结束时间");
+  const addInstance = (instanceStart: Date, instanceEnd: Date, suffix: string): void => {
+    if (instanceEnd.getTime() <= rangeStart.getTime() || instanceStart.getTime() >= rangeEnd.getTime()) return;
+    for (
+      let cursor = startOfDay(instanceStart);
+      cursor.getTime() < instanceEnd.getTime();
+      cursor = addDays(cursor, 1)
+    ) {
+      const chopped = periodForDay(instanceStart, instanceEnd, cursor);
+      if (!chopped) continue;
+      result.push({
+        id: `${task.id}${suffix}-${cursor.toISOString().slice(0, 10)}`,
+        taskId: task.id,
+        title: task.title,
+        description: task.description,
+        location: task.location,
+        startAt: chopped.start.toISOString(),
+        endAt: chopped.end.toISOString(),
+        type: task.type,
+        status: task.status,
+        blocksPlanning: task.blocksPlanning
+      });
+    }
+  };
+
+  if (task.type === "deadline") {
+    addInstance(start, end, "");
+    return result;
+  }
+
+  let instanceStart = start;
+  let instanceEnd = end;
+  const repeatEnd = dateOnly(parseDate(task.repeatEndsOn, "重复结束日期"));
+  let guard = 0;
+  while (instanceStart.getTime() <= rangeEnd.getTime() && dateOnly(instanceStart).getTime() <= repeatEnd.getTime()) {
+    addInstance(instanceStart, instanceEnd, `-${instanceStart.toISOString()}`);
+    if (task.repeatType === "norepeat") break;
+    const next = addNextPeriod(instanceStart, instanceEnd, task.repeatType, task.repeatPeriod);
+    instanceStart = next.start;
+    instanceEnd = next.end;
+    if (++guard > 20_000) break;
+  }
+  return result;
+};
+
+export const getTaskCalendarPeriods = (
+  tasks: LocalTaskRecord[],
+  rangeStart: Date,
+  rangeEnd: Date
+): TaskPeriod[] => tasks.flatMap((task) => buildTaskInstances(task, rangeStart, rangeEnd));
+
+const subtractBlockedPeriods = (
+  availableStart: number,
+  availableEnd: number,
+  blocked: Array<{ start: number; end: number }>
+): Array<{ start: number; end: number }> => {
+  const merged = blocked
+    .map(({ start, end }) => ({
+      start: Math.max(availableStart, start),
+      end: Math.min(availableEnd, end)
+    }))
+    .filter(({ start, end }) => start < end)
+    .sort((left, right) => left.start - right.start || left.end - right.end);
+  const result: Array<{ start: number; end: number }> = [];
+  let cursor = availableStart;
+  for (const interval of merged) {
+    if (interval.start > cursor) result.push({ start: cursor, end: interval.start });
+    cursor = Math.max(cursor, interval.end);
+  }
+  if (cursor < availableEnd) result.push({ start: cursor, end: availableEnd });
+  return result;
+};
+
+const buildAvailablePeriods = (
+  snapshot: CampusWorkspaceSnapshot,
+  tasks: LocalTaskRecord[],
+  now: Date,
+  settings: PlannerSettings
+): MutablePeriod[] => {
+  const result: MutablePeriod[] = [];
+  const horizon = Math.max(1, Math.round(settings.horizonDays));
+  const startHour = Math.max(0, Math.min(23, settings.availableStartHour));
+  const endHour = Math.max(startHour + 1, Math.min(24, settings.availableEndHour));
+  const taskPeriods = getTaskCalendarPeriods(
+    tasks.filter((task) => task.type === "fixed" && task.blocksPlanning),
+    startOfDay(now),
+    addDays(startOfDay(now), horizon + 1)
+  );
+
+  for (let offset = 0; offset < horizon; offset += 1) {
+    const day = addDays(startOfDay(now), offset);
+    const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour).getTime();
+    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour).getTime();
+    const availableStart = Math.max(dayStart, offset === 0 ? now.getTime() : dayStart);
+    const blocked: Array<{ start: number; end: number }> = [];
+    for (const course of snapshot.courses) {
+      blocked.push({ start: Date.parse(course.startAt), end: Date.parse(course.endAt) });
+    }
+    for (const period of taskPeriods) {
+      blocked.push({ start: Date.parse(period.startAt), end: Date.parse(period.endAt) });
+    }
+    for (const interval of subtractBlockedPeriods(availableStart, dayEnd, blocked)) {
+      if (interval.end - interval.start <= Math.max(0, settings.restMinutes) * MINUTE_MS) continue;
+      result.push({
+        uid: `available-${offset}-${interval.start}`,
+        startMs: interval.start,
+        endMs: interval.end
+      });
+    }
+  }
+  return result;
+};
+
+const findSolution = (
+  workMinutes: number,
+  targetRestMinutes: number,
+  deadlines: DeadlineWork[],
+  sourcePeriods: MutablePeriod[]
+): FindSolutionResult => {
+  const deadlineList = deadlines.map((deadline) => ({ ...deadline }));
+  const ableList = sourcePeriods.map((period) => ({ ...period }));
+  ableList.sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs);
+  ableList.reverse();
+  const isFresh = new Map<string, boolean>();
+  for (const period of ableList) isFresh.set(period.uid, true);
+  const segments: PlannerSegment[] = [];
+  let segmentIndex = 0;
+
+  for (const task of deadlineList) {
+    if (targetRestMinutes <= 0) task.breakable = false;
+    let isStarting = task.breakable;
+    while (task.remainingMinutes > 0) {
+      if (ableList.length === 0) {
+        return { valid: false, restMinutes: targetRestMinutes, segments: [], failedTaskId: task.id };
+      }
+      const period = ableList.pop()!;
+      if (isStarting) {
+        if (!isFresh.get(period.uid)) period.startMs += targetRestMinutes * MINUTE_MS;
+        isStarting = false;
+      }
+      if (period.startMs >= period.endMs) continue;
+      const freeMinutes = (period.endMs - period.startMs) / MINUTE_MS;
+      let cut = Math.min(task.remainingMinutes, freeMinutes);
+      if (task.breakable) cut = Math.min(cut, workMinutes);
+      if (cut <= 0 || period.startMs + cut * MINUTE_MS > task.endMs) {
+        return { valid: false, restMinutes: targetRestMinutes, segments: [], failedTaskId: task.id };
+      }
+      const segmentStart = period.startMs;
+      const segmentEnd = segmentStart + cut * MINUTE_MS;
+      segments.push({
+        id: `flow-${task.id}-${segmentIndex++}`,
+        taskId: task.id,
+        title: task.title,
+        description: task.description,
+        location: task.location,
+        startAt: toIso(segmentStart),
+        endAt: toIso(segmentEnd)
+      });
+      task.remainingMinutes -= cut;
+      period.startMs = segmentEnd;
+      if (task.breakable) period.startMs += targetRestMinutes * MINUTE_MS;
+      isFresh.set(period.uid, task.breakable && task.remainingMinutes <= 0);
+      if (period.startMs < period.endMs) ableList.push(period);
+    }
+  }
+  return { valid: true, restMinutes: targetRestMinutes, segments, failedTaskId: null };
+};
+
+export const generatePlannerSchedule = (
+  snapshot: CampusWorkspaceSnapshot,
+  tasks: LocalTaskRecord[],
+  settings: PlannerSettings,
+  now = new Date()
+): PlannerScheduleData => {
+  const normalizedSettings: PlannerSettings = {
+    workMinutes: Math.max(1, Math.round(settings.workMinutes)),
+    restMinutes: Math.max(0, Math.round(settings.restMinutes)),
+    availableStartHour: Math.max(0, Math.min(23, Math.round(settings.availableStartHour))),
+    availableEndHour: Math.max(1, Math.min(24, Math.round(settings.availableEndHour))),
+    horizonDays: Math.max(1, Math.min(366, Math.round(settings.horizonDays)))
+  };
+  if (normalizedSettings.availableEndHour <= normalizedSettings.availableStartHour) {
+    normalizedSettings.availableEndHour = Math.min(24, normalizedSettings.availableStartHour + 1);
+  }
+  const deadlines: DeadlineWork[] = tasks
+    .filter((task) => task.type === "deadline" && task.status === "running")
+    .filter((task) => task.timeNeededMinutes > task.timeSpentMinutes)
+    .filter((task) => Date.parse(task.endAt) >= now.getTime())
+    .sort((left, right) => Date.parse(left.endAt) - Date.parse(right.endAt))
+    .map((task) => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      location: task.location,
+      endMs: Date.parse(task.endAt),
+      remainingMinutes: task.timeNeededMinutes - task.timeSpentMinutes,
+      breakable: task.breakable
+    }));
+  const available = buildAvailablePeriods(snapshot, tasks, now, normalizedSettings);
+  const initial = findSolution(
+    normalizedSettings.workMinutes,
+    normalizedSettings.restMinutes,
+    deadlines,
+    available
+  );
+  let answer = initial;
+  if (!initial.valid) {
+    let left = 0;
+    let right = normalizedSettings.restMinutes - 1;
+    while (right >= left) {
+      const middle = Math.floor((left + right) / 2);
+      const candidate = findSolution(
+        normalizedSettings.workMinutes,
+        middle,
+        deadlines,
+        available
+      );
+      if (candidate.valid) {
+        answer = candidate;
+        left = middle + 1;
+      } else {
+        right = middle - 1;
+      }
+    }
+  }
+  const reason = answer.valid
+    ? null
+    : answer.failedTaskId
+      ? `无法在截止时间前完成任务「${tasks.find((task) => task.id === answer.failedTaskId)?.title ?? "未命名任务"}」。`
+      : "当前可用时间不足，无法生成排程。";
+  return {
+    valid: answer.valid,
+    reason,
+    restMinutes: answer.valid ? answer.restMinutes : normalizedSettings.restMinutes,
+    generatedAt: now.toISOString(),
+    settings: normalizedSettings,
+    segments: answer.valid ? answer.segments : []
+  };
+};
+
+const shanghaiDateParts = (value: Date): Record<string, string> => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHANGHAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(value);
+  return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+};
+
+const toIcalLocal = (value: Date): string => {
+  const parts = shanghaiDateParts(value);
+  return `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`;
+};
+
+const toIcalUtc = (value: Date): string =>
+  value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+
+const escapeIcal = (value: string): string =>
+  value.replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
+
+const stableUid = (value: string): string =>
+  `${createHash("sha1").update(value, "utf8").digest("hex")}@campusos`;
+
+interface IcalEvent {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  startAt: string;
+  endAt: string;
+}
+
+export const createIcalContent = (
+  snapshot: CampusWorkspaceSnapshot,
+  tasks: LocalTaskRecord[],
+  input: CalendarExportInput,
+  now = new Date()
+): { content: string; eventCount: number } => {
+  const events: IcalEvent[] = snapshot.courses.map((course) => ({
+    id: `course:${course.id}`,
+    title: course.title,
+    description: course.note,
+    location: course.location,
+    startAt: course.startAt,
+    endAt: course.endAt
+  }));
+  for (const deadline of snapshot.deadlines) {
+    if (input.includeExams === false && deadline.kind === "exam") continue;
+    const start = new Date(Date.parse(deadline.dueAt) - 60 * MINUTE_MS);
+    events.push({
+      id: `deadline:${deadline.id}`,
+      title: deadline.title,
+      description: deadline.note,
+      location: "",
+      startAt: start.toISOString(),
+      endAt: deadline.dueAt
+    });
+  }
+  if (input.includeTasks !== false) {
+    const taskPeriods = getTaskCalendarPeriods(
+      tasks,
+      addDays(startOfDay(now), -365),
+      addDays(startOfDay(now), 1095)
+    );
+    for (const task of taskPeriods) {
+      events.push({
+        id: `task:${task.id}`,
+        title: task.title,
+        description: task.description,
+        location: task.location,
+        startAt: task.startAt,
+        endAt: task.endAt
+      });
+    }
+  }
+  events.sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt) || left.id.localeCompare(right.id));
+  const generatedAt = toIcalUtc(now);
+  const lines = [
+    "BEGIN:VCALENDAR",
+    `X-WR-CALNAME:${escapeIcal(input.termLabel || `CampusOS ${input.academicYearStart ?? ""}`)}`,
+    "PRODID:-//CampusOS//Schedule 1.0//CN",
+    "VERSION:2.0",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VTIMEZONE",
+    "TZID:Asia/Shanghai",
+    "BEGIN:STANDARD",
+    "DTSTART:19700101T000000",
+    "TZOFFSETFROM:+0800",
+    "TZOFFSETTO:+0800",
+    "END:STANDARD",
+    "END:VTIMEZONE"
+  ];
+  for (const event of events) {
+    const identity = `${event.id}|${event.title}|${event.startAt}|${event.endAt}|${event.location ?? ""}`;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${stableUid(identity)}`,
+      `DTSTAMP:${generatedAt}`,
+      `DTSTART;TZID=Asia/Shanghai:${toIcalLocal(new Date(event.startAt))}`,
+      `DTEND;TZID=Asia/Shanghai:${toIcalLocal(new Date(event.endAt))}`,
+      `SUMMARY:${escapeIcal(event.title)}`,
+      ...(event.description ? [`DESCRIPTION:${escapeIcal(event.description)}`] : []),
+      ...(event.location ? [`LOCATION:${escapeIcal(event.location)}`] : []),
+      "SEQUENCE:0",
+      "TRANSP:OPAQUE",
+      "BEGIN:VALARM",
+      "TRIGGER:-PT15M",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${escapeIcal(event.title)}`,
+      "END:VALARM",
+      "END:VEVENT"
+    );
+  }
+  lines.push("END:VCALENDAR");
+  return { content: `${lines.join("\r\n")}\r\n`, eventCount: events.length };
+};

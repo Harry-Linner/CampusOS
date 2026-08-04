@@ -186,3 +186,113 @@ export interface CalendarEventsData {
   omittedItems: number;
   events: CalendarEventRecord[];
 }
+
+export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
+export type LocalTaskStatus =
+  | "running"
+  | "suspended"
+  | "completed"
+  | "failed"
+  | "deleted"
+  | "outdated";
+export type LocalTaskRepeatType = "norepeat" | "days" | "month" | "year";
+
+export interface LocalTaskRecord {
+  id: string;
+  status: LocalTaskStatus;
+  description: string;
+  timeSpentMinutes: number;
+  timeNeededMinutes: number;
+  startAt: string;
+  endAt: string;
+  location: string;
+  title: string;
+  breakable: boolean;
+  type: LocalTaskType;
+  repeatType: LocalTaskRepeatType;
+  repeatPeriod: number;
+  repeatEndsOn: string;
+  blocksPlanning: boolean;
+  fromId: string | null;
+}
+
+export interface LocalTaskInput {
+  id?: string;
+  description: string;
+  timeSpentMinutes: number;
+  timeNeededMinutes: number;
+  startAt: string;
+  endAt: string;
+  location: string;
+  title: string;
+  breakable: boolean;
+  type: Exclude<LocalTaskType, "fixedlegacy">;
+  repeatType: LocalTaskRepeatType;
+  repeatPeriod: number;
+  repeatEndsOn: string;
+  blocksPlanning: boolean;
+}
+
+export interface LocalTaskMutation {
+  id: string;
+  status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
+  timeSpentMinutes?: number;
+}
+
+export interface LocalTasksData {
+  tasks: LocalTaskRecord[];
+  updatedAt: string;
+}
+
+export interface LocalTaskPeriod {
+  id: string;
+  taskId: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  type: LocalTaskType;
+  status: LocalTaskStatus;
+  blocksPlanning: boolean;
+}
+
+export interface PlannerSettings {
+  workMinutes: number;
+  restMinutes: number;
+  availableStartHour: number;
+  availableEndHour: number;
+  horizonDays: number;
+}
+
+export interface PlannerSegment {
+  id: string;
+  taskId: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+}
+
+export interface PlannerScheduleData {
+  valid: boolean;
+  reason: string | null;
+  restMinutes: number;
+  generatedAt: string;
+  settings: PlannerSettings;
+  segments: PlannerSegment[];
+}
+
+export interface CalendarExportInput {
+  academicYearStart: number;
+  termLabel: string;
+  includeExams?: boolean;
+  includeTasks?: boolean;
+}
+
+export interface CalendarExportResult {
+  filePath: string;
+  eventCount: number;
+  generatedAt: string;
+}

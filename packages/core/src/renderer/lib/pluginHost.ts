@@ -11,7 +11,7 @@ import { createPluginCapabilityClient } from "./pluginBridge";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
 import { AcademicView } from "../views/AcademicView";
-import { CalendarView } from "../views/CalendarView";
+import { ScheduleView } from "../views/ScheduleView";
 
 type PluginModule = {
   manifest: PluginManifestV2;
@@ -51,7 +51,7 @@ const pluginDefinitions: PluginDefinition[] = [
   },
   {
     id: scheduleManifest.id,
-    load: async () => ({ manifest: scheduleManifest, Component: CalendarView })
+    load: async () => ({ manifest: scheduleManifest, Component: ScheduleView })
   },
   {
     id: "org.campusos.materials",

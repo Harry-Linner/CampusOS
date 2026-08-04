@@ -50,6 +50,52 @@ contextBridge.exposeInMainWorld("campusos", {
       return () => ipcRenderer.removeListener(channel, handler);
     }
   },
+  schedule: {
+    loadTasks: () => ipcRenderer.invoke("campusos:schedule:tasks:load"),
+    loadPeriods: (input: { startAt: string; endAt: string }) =>
+      ipcRenderer.invoke("campusos:schedule:periods:load", input),
+    saveTask: (input: {
+      id?: string;
+      description: string;
+      timeSpentMinutes: number;
+      timeNeededMinutes: number;
+      startAt: string;
+      endAt: string;
+      location: string;
+      title: string;
+      breakable: boolean;
+      type: "deadline" | "fixed";
+      repeatType: "norepeat" | "days" | "month" | "year";
+      repeatPeriod: number;
+      repeatEndsOn: string;
+      blocksPlanning: boolean;
+    }) => ipcRenderer.invoke("campusos:schedule:task:save", input),
+    mutateTask: (input: {
+      id: string;
+      status?: "running" | "suspended" | "completed" | "deleted";
+      timeSpentMinutes?: number;
+    }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
+    generatePlan: (settings: {
+      workMinutes: number;
+      restMinutes: number;
+      availableStartHour: number;
+      availableEndHour: number;
+      horizonDays: number;
+    }) => ipcRenderer.invoke("campusos:schedule:plan:generate", settings),
+    loadPlan: () => ipcRenderer.invoke("campusos:schedule:plan:load"),
+    exportIcal: (input: {
+      academicYearStart: number;
+      termLabel: string;
+      includeExams?: boolean;
+      includeTasks?: boolean;
+    }) => ipcRenderer.invoke("campusos:schedule:ical:export", input),
+    subscribe: (listener: () => void) => {
+      const channel = "campusos:schedule:changed";
+      const handler = () => listener();
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
+  },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),
     configure: (input: {

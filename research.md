@@ -367,6 +367,10 @@ Things we couldn't resolve in this pass but that would change the plan.
 ---
 
 _Changelog_
+
+### Verification update (2026-08-04)
+
+日程闭环已按 Celechron 1.3.0 的 task/arrange/flow 逻辑迁入 Core：任务和排程写入 SQLite v3，renderer 只通过正式 schedule IPC 读写；Windows 系统日历采用 RFC 5545 `.ics` 文件和默认文件关联交接，`shell.openPath` 失败会沿 IPC 返回错误，不伪造原生日历写入成功。边界记录在 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
 - 2026-06-17: initial draft — 8 WebSearches, 0 WebFetches (competitor pages were stale/non-functional); 28 sources cited
 
 ### Timetable diagnosis update (2026-08-03)

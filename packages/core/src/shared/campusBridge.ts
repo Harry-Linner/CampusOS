@@ -4,6 +4,7 @@ import type { ReminderBridge } from "./reminderBridge";
 import type { PluginRuntimeBridge } from "./pluginBridge";
 import type { DiagnosticBridge } from "./diagnosticBridge";
 import type { DownloadBridge } from "./downloadBridge";
+import type { ScheduleBridge } from "./scheduleBridge";
 
 export type CampusWorkspaceHydratedFrom = "disk" | "generated" | "synced";
 
@@ -34,6 +35,7 @@ export interface CampusosBridge {
   };
   reminders: ReminderBridge;
   downloads: DownloadBridge;
+  schedule?: ScheduleBridge;
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;
 }
