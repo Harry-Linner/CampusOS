@@ -100,10 +100,11 @@ const buildGeneratedRecord = async (
   hydratedFrom: "generated" | "synced",
   notifyGradeChanges = false
 ): Promise<CampusWorkspaceRecord> => {
+  const now = new Date();
   const pluginRuntime = await getOfficialPluginRuntimeService().loadInternal();
   const refreshResults = await pluginRefreshCoordinator.runAll();
   if (useE2eFixtureSources()) {
-    await publishE2eFixtureCapabilities(getOfficialCapabilityRepository());
+    await publishE2eFixtureCapabilities(getOfficialCapabilityRepository(), now);
   }
   const academicCredential = await readAcademicCredentialRecord();
   const verifiedAcademicAccountId =
@@ -140,7 +141,6 @@ const buildGeneratedRecord = async (
       database: getOfficialDatabaseService()
     });
   }
-  const now = new Date();
   const baseSnapshot = verifiedAcademicAccountId
     ? createLiveWorkspaceSnapshot({
         generatedAt: now.toISOString(),

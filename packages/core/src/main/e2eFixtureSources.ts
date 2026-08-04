@@ -13,6 +13,7 @@ import type { CapabilityRepository } from "./capabilityRepository";
 
 const FIXTURE_ACCOUNT_ID = null;
 const FIXTURE_UPDATED_AT = "2026-08-05T04:00:00.000Z";
+const HOUR_IN_MS = 60 * 60 * 1000;
 
 const publish = async <T>(
   repository: CapabilityRepository,
@@ -147,11 +148,13 @@ const practice: AcademicPracticeData = {
   detailsAvailable: true
 };
 
-const timetableEvents: CalendarEventsData = {
+export const createE2eFixtureTimetableEvents = (
+  now: Date
+): CalendarEventsData => ({
   feedId: "e2e-timetable-events",
   sourceId: "academic-affairs",
   sourceLabel: "教务处网站",
-  sourceUpdatedAt: FIXTURE_UPDATED_AT,
+  sourceUpdatedAt: now.toISOString(),
   upstreamCapability: "academic.timetable@1",
   upstreamProviderId: "org.campusos.zju-undergraduate",
   upstreamProviderIds: ["org.campusos.zju-undergraduate"],
@@ -167,21 +170,23 @@ const timetableEvents: CalendarEventsData = {
       sourceId: "academic-affairs",
       kind: "course",
       title: "软件工程课程设计",
-      startAt: "2026-08-05T08:00:00+08:00",
-      endAt: "2026-08-05T09:40:00+08:00",
+      startAt: new Date(now.getTime() + HOUR_IN_MS).toISOString(),
+      endAt: new Date(now.getTime() + 2 * HOUR_IN_MS).toISOString(),
       timezone: "Asia/Shanghai",
       location: "紫金港校区",
       courseName: "软件工程课程设计",
       note: "E2E fixture"
     }
   ]
-};
+});
 
-const deadlineEvents: CalendarEventsData = {
+export const createE2eFixtureDeadlineEvents = (
+  now: Date
+): CalendarEventsData => ({
   feedId: "e2e-deadline-events",
   sourceId: "learning-platform",
   sourceLabel: "学在浙大",
-  sourceUpdatedAt: FIXTURE_UPDATED_AT,
+  sourceUpdatedAt: now.toISOString(),
   upstreamCapability: "learning.assignments@1",
   upstreamProviderId: "org.campusos.zju-learning",
   upstreamProviderIds: ["org.campusos.zju-learning"],
@@ -197,7 +202,7 @@ const deadlineEvents: CalendarEventsData = {
       sourceId: "learning-platform",
       kind: "assignment",
       title: "软件工程课程设计报告",
-      startAt: "2026-08-06T23:59:00+08:00",
+      startAt: new Date(now.getTime() + 26 * HOUR_IN_MS).toISOString(),
       endAt: null,
       timezone: "Asia/Shanghai",
       location: null,
@@ -205,7 +210,7 @@ const deadlineEvents: CalendarEventsData = {
       note: "E2E fixture"
     }
   ]
-};
+});
 
 const materials: LearningMaterialsData = {
   courses: [
@@ -236,11 +241,16 @@ const materials: LearningMaterialsData = {
 
 /**
  * E2E-only source boundary. Production startup never calls this function.
- * Fixed dates and names are intentionally isolated here as sanitized fixtures.
+ * Static term data and names stay isolated here as sanitized fixtures. Near-term
+ * event times use the injected clock so this E2E gate is date-safe.
  */
 export const publishE2eFixtureCapabilities = async (
-  repository: CapabilityRepository
+  repository: CapabilityRepository,
+  now = new Date()
 ): Promise<void> => {
+  const timetableEvents = createE2eFixtureTimetableEvents(now);
+  const deadlineEvents = createE2eFixtureDeadlineEvents(now);
+  const runtimeUpdatedAt = now.toISOString();
   await publish(repository, "org.campusos.zju-calendar-config", [
     "academic.calendar-config@1"
   ], {
@@ -292,10 +302,10 @@ export const publishE2eFixtureCapabilities = async (
   ], { capability: "practice.records@1", accountId: FIXTURE_ACCOUNT_ID, state: "live", updatedAt: FIXTURE_UPDATED_AT, data: practice });
   await publish(repository, "org.campusos.academic-timetable-events", [
     "calendar.events@1"
-  ], { capability: "calendar.events@1", accountId: FIXTURE_ACCOUNT_ID, state: "live", updatedAt: FIXTURE_UPDATED_AT, data: timetableEvents });
+  ], { capability: "calendar.events@1", accountId: FIXTURE_ACCOUNT_ID, state: "live", updatedAt: runtimeUpdatedAt, data: timetableEvents });
   await publish(repository, "org.campusos.deadline-assistant", [
     "calendar.events@1"
-  ], { capability: "calendar.events@1", accountId: FIXTURE_ACCOUNT_ID, state: "live", updatedAt: FIXTURE_UPDATED_AT, data: deadlineEvents });
+  ], { capability: "calendar.events@1", accountId: FIXTURE_ACCOUNT_ID, state: "live", updatedAt: runtimeUpdatedAt, data: deadlineEvents });
   await publish(repository, "org.campusos.zju-learning", [
     "learning.assignments@1",
     "learning.materials@1"
