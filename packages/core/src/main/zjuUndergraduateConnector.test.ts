@@ -268,6 +268,16 @@ describe("zju undergraduate connector", () => {
       .toEqual([2025, 2026]);
   });
 
+  it("uses the Shanghai academic-year boundary regardless of the process timezone", () => {
+    // 2027-08-31T16:30Z is 2027-09-01 in Shanghai, so the current year is 2027.
+    const queries = createTimetableQueries(
+      new Date("2027-08-31T16:30:00.000Z")
+    );
+
+    expect([...new Set(queries.map(({ academicYearStart }) => academicYearStart))])
+      .toEqual([2027, 2028]);
+  });
+
   it("keeps the last successful timetable when every live term fails", async () => {
     const cached = {
       terms: [

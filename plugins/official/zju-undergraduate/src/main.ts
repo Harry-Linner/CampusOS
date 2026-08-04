@@ -107,10 +107,24 @@ const seasons: readonly AcademicTimetableSeason[] = [
   "2|夏"
 ];
 
+const shanghaiAcademicClock = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "numeric"
+});
+
 export const createTimetableQueries = (now: Date): TimetableQuery[] => {
-  const calendarYear = now.getFullYear();
+  // Celechron derives the academic year from the university's Shanghai
+  // calendar, rather than the host process timezone.
+  const parts = shanghaiAcademicClock.formatToParts(now);
+  const calendarYear = Number(
+    parts.find((part) => part.type === "year")?.value
+  );
+  const calendarMonth = Number(
+    parts.find((part) => part.type === "month")?.value
+  );
   const currentAcademicYearStart =
-    now.getMonth() >= 8 ? calendarYear : calendarYear - 1;
+    calendarMonth >= 9 ? calendarYear : calendarYear - 1;
 
   return [currentAcademicYearStart, currentAcademicYearStart + 1].flatMap(
     (academicYearStart) =>
