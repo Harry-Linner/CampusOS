@@ -10,7 +10,7 @@ import { getOfficialDatabaseService } from "./officialDatabaseService";
 
 const emptyWeights: AcademicGpaWeightsRecord = { weights: {}, savedAt: null };
 const defaultStrategy: AcademicGpaStrategyRecord = {
-  strategy: "best",
+  strategy: "first",
   savedAt: null
 };
 

@@ -174,7 +174,7 @@ const repeatedCourseKey = (grade: AcademicGradeRecord): string => {
 
 export const selectAcademicGpaGrades = (
   grades: readonly AcademicGradeRecord[],
-  strategy: AcademicGpaStrategy = "best"
+  strategy: AcademicGpaStrategy = "first"
 ): AcademicGradeRecord[] => {
   const groups = new Map<string, AcademicGradeRecord[]>();
   for (const grade of grades) {
@@ -226,14 +226,16 @@ export const inferGpaScale = (
 export const calculateAcademicGpa = (
   grades: readonly AcademicGradeRecord[],
   weightMap: ReadonlyMap<string, number> = new Map(),
-  strategy: AcademicGpaStrategy = "best"
+  strategy: AcademicGpaStrategy = "first"
 ): AcademicGpaResult => {
   const selected = selectAcademicGpaGrades(grades, strategy);
   const included = selected.filter(gpaIncluded);
   const credits = included.reduce((total, grade) => total + validCredit(grade), 0);
   const earnedCredits = selected.reduce((total, grade) => total + earnedCredit(grade), 0);
   if (credits <= 0) {
-    return { fivePoint: null, fourPoint: null, fourPointLegacy: null, hundredPoint: null, credits: 0, earnedCredits };
+    // Celechron lib/utils/gpa_helper.dart:12-14 returns zero projections when
+    // no course contributes GPA, while preserving earned credits.
+    return { fivePoint: 0, fourPoint: 0, fourPointLegacy: 0, hundredPoint: 0, credits: 0, earnedCredits };
   }
   const totals = included.reduce(
     (sum, grade) => {
@@ -262,7 +264,7 @@ export const calculateAcademicGpa = (
 export const summarizeAcademicGrades = (
   grades: readonly AcademicGradeRecord[],
   weightMap: ReadonlyMap<string, number> = new Map(),
-  strategy: AcademicGpaStrategy = "best",
+  strategy: AcademicGpaStrategy = "first",
   sourceMajorSummary?: AcademicMajorGradeSummary
 ): AcademicGradeSummary => {
   const terms = new Map<string, AcademicGradeTermSummary>();

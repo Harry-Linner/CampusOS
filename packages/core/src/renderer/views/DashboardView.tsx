@@ -190,13 +190,15 @@ export const DashboardView = ({
           <span>
             {snapshot.term.phase === "active" && snapshot.term.currentWeek
               ? `第 ${snapshot.term.currentWeek} 周`
+              : snapshot.term.phase === "active"
+                ? "学期进行中"
               : snapshot.term.phase === "upcoming"
                 ? "未开始"
                 : snapshot.term.phase === "unavailable"
                   ? "校历不可用"
                   : snapshot.term.currentWeek
-                    ? `第 ${snapshot.term.currentWeek} 周 · mock`
-                    : "mock"}
+                    ? `第 ${snapshot.term.currentWeek} 周 · 开发数据`
+                    : "开发数据"}
           </span>
         </div>
       </header>

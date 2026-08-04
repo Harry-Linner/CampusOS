@@ -133,7 +133,7 @@ describe("academic GPA IPC", () => {
     });
     state.record = verifiedRecord("account-b");
     expect(await invoke("campusos:academic:gpa-strategy:load")).toEqual({
-      strategy: "best",
+      strategy: "first",
       savedAt: null
     });
 

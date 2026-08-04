@@ -68,6 +68,32 @@ describe("academic grades feature", () => {
 });
 
 describe("Celechron GPA conversion and custom weights", () => {
+  it("returns zero GPA projections when no course contributes GPA", () => {
+    const result = calculateAcademicGpa([
+      {
+        sourceId: "deferred",
+        courseCode: null,
+        courseName: "deferred",
+        credit: 2,
+        originalScore: "缓考",
+        gradePoint: 0,
+        academicYearStart: 2025,
+        termNumber: 1,
+        isMajorCourse: false,
+        courseCategory: null
+      }
+    ]);
+
+    expect(result).toEqual({
+      fivePoint: 0,
+      fourPoint: 0,
+      fourPointLegacy: 0,
+      hundredPoint: 0,
+      credits: 0,
+      earnedCredits: 0
+    });
+  });
+
   it("uses exact 5-to-4.3 mappings and keeps credits unchanged when weighted", () => {
     const grades: AcademicGradeRecord[] = [
       { sourceId: "a", courseCode: null, courseName: "a", credit: 3, originalScore: "95", gradePoint: 5, academicYearStart: 2025, termNumber: 1, isMajorCourse: true, courseCategory: null },
@@ -202,6 +228,13 @@ describe("Celechron repeated-course GPA strategies", () => {
     expect(best.weightedGradePoint).toBeCloseTo((4 * 3 + 3 * 2) / 5);
     expect(best.majorWeightedGradePoint).toBe(4);
     expect(best.terms.find((term) => term.key === "2024:1")?.credits).toBe(0);
+  });
+
+  it("uses Celechron's first-attempt GPA strategy by default", () => {
+    const summary = summarizeAcademicGrades(repeatedGrades);
+
+    expect(summary.weightedGradePoint).toBeCloseTo((1 * 3 + 3 * 2) / 5);
+    expect(summary.terms.find((term) => term.key === "2024:1")?.credits).toBe(3);
   });
 
   it("uses the source namespace when two providers expose the same realId", () => {

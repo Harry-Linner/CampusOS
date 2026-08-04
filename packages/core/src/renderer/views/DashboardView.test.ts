@@ -92,4 +92,18 @@ describe("DashboardView", () => {
     expect(screen.queryByText("秋季周三课程")).toBeNull();
     expect(screen.queryByText("秋季第二周课程")).toBeNull();
   });
+
+  it("does not expose a mock marker when an active term has no week number", () => {
+    const snapshot = createUpcomingSnapshot();
+    snapshot.term = {
+      ...snapshot.term,
+      phase: "active",
+      currentWeek: null
+    };
+
+    render(createElement(DashboardView, { loading: false, snapshot }));
+
+    expect(screen.getByText("学期进行中")).toBeDefined();
+    expect(screen.queryByText("mock")).toBeNull();
+  });
 });

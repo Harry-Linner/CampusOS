@@ -26,7 +26,7 @@ export const Component = ({
   const [refreshRequest, setRefreshRequest] = useState(0);
   const [privacyMask, setPrivacyMask] = useState(true);
   const [weights, setWeights] = useState<Record<string, number>>({});
-  const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("best");
+  const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("first");
   const savedWeights = useRef<Record<string, number>>({});
   const [weightError, setWeightError] = useState<string | null>(null);
 
@@ -38,8 +38,8 @@ export const Component = ({
     const weightsPromise = academicBridge?.loadGpaWeights()
       .catch(() => ({ weights: {}, savedAt: null }));
     const strategyPromise = academicBridge?.loadGpaStrategy
-      ? academicBridge.loadGpaStrategy().catch(() => ({ strategy: "best" as const, savedAt: null }))
-      : Promise.resolve({ strategy: "best" as const, savedAt: null });
+      ? academicBridge.loadGpaStrategy().catch(() => ({ strategy: "first" as const, savedAt: null }))
+      : Promise.resolve({ strategy: "first" as const, savedAt: null });
     void Promise.all([
       capabilities.read<AcademicGradesData>("academic.grades@1"),
       weightsPromise ?? Promise.resolve({ weights: {}, savedAt: null }),

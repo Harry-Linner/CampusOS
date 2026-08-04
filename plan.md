@@ -496,7 +496,7 @@ _Changelog_
 ### Academic repeat-course strategy acceptance (2026-08-04)
 
 - [x] Group repeated grades by the Celechron normalized course identity, preserving the physical-education key rule.
-- [x] Support the Celechron `best` (default) and `first` strategies and calculate GPA/earned credits from the selected attempt only.
+- [x] Support Celechron's `first` academic-GPA strategy by default and the explicit `best` highest-score projection; calculate GPA/earned credits from the selected attempt only.
 - [x] Persist the strategy per verified account through SQLite, preload IPC, Settings, and the grades view.
 - [x] Cover repeated attempts, provider isolation, strategy validation, migration, and Settings persistence with tests.
 
