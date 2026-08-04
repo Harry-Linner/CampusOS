@@ -36,9 +36,9 @@
 | 提醒价值 | 至少一台设备收到一次真实课程或截止事项的桌面通知 | 记录系统通知权限、App 运行状态和事件时间 |
 | 故障可诊断 | 每个失败都有来源、操作、时长、错误分类和脱敏信息 | 缺失诊断即不能关闭问题 |
 
-## Current implementation acceptance (2026-08-04)
+## Current implementation acceptance (2026-08-05)
 
-Automated evidence now covers the Academic five-tab view, summer selection of the next complete autumn-winter semester, course search/detail, GPA rules and account-isolated weight persistence, practice partial-success projection, all four Schedule views, Celechron task/planner behavior, Materials course browsing and batch downloads, Core search/update/About/license surfaces, and Electron IPC at 1440px and 820px widths. The authorized undergraduate live run on 2026-08-04 closed the 2026-2027 timetable oracle and 2025-2026 materials/download-byte gates without emitting private content. This is not a public-release GO: graduate real-account acceptance, multiple-device field use, a clean Windows installation, a real desktop notification, and GitHub Release distribution remain open.
+Automated evidence now covers the Academic five-tab view, summer selection of the next complete autumn-winter semester, course search/detail, Celechron's fixed first-attempt GPA rules and independent major summary, practice partial-success projection, all four Schedule views, Celechron task/planner behavior, Materials course browsing and batch downloads, Core search/update/About/license surfaces, and Electron IPC at 1440px and 820px widths. Authorized undergraduate live runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted chain and closed the repeated time-separated authentication, 2026-2027 timetable-oracle, 2025-2026 materials, authenticated-download, and byte-validation evidence with zero sensitive output. This is still not a public-release GO: graduate real-account acceptance, multiple-device field use, a clean Windows installation, a real desktop notification, and GitHub Release distribution remain open.
 
 ## Go/No-Go
 

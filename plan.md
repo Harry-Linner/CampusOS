@@ -512,3 +512,15 @@ _Changelog_
 - [x] Gate notifications on an entirely live verified academic refresh and keep baselines account-isolated.
 - [x] Add an independent, backward-compatible Settings switch and real Electron IPC coverage.
 - [x] Keep notification copy generic and add tests for no-change, disabled, cache, fallback, unavailable, and account-isolation boundaries.
+
+### Undergraduate live stability acceptance (2026-08-05)
+
+- [x] Complete redacted undergraduate verification on 2026-07-29, 2026-08-04,
+  and 2026-08-05 across distinct time periods.
+- [x] Reconfirm the private 2026-2027 timetable oracle, complete learning
+  materials traversal, one authorized private download, final byte validation,
+  and zero sensitive output.
+- [ ] Complete three-device field onboarding, clean Windows installation, and
+  one real desktop course/deadline notification before Release preparation.
+- [ ] Complete the graduate real-account path separately; undergraduate
+  evidence does not satisfy that gate.

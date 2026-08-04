@@ -119,3 +119,12 @@ When the calendar is in a vacation period, the preview must use the next complet
 ## Academic major summary integrity (2026-08-04)
 
 The undergraduate connector carries the dedicated Celechron `getMajorGrade` GPA and earned-credit projection alongside transcript records. The renderer uses that projection directly; CampusOS does not add a custom-weight GPA branch. The source projection and `xkkh` major labels remain account-scoped capability data.
+
+## Undergraduate live stability acceptance (2026-08-05)
+
+Redacted undergraduate verification passed on 2026-07-29, 2026-08-04, and
+2026-08-05, including the private timetable oracle, complete learning-materials
+traversal, authenticated download, final byte validation, and zero sensitive
+output. These runs close the repeated time-separated undergraduate chain gate;
+they do not replace multi-device, clean-Windows, real desktop-notification,
+graduate-account, or Release-distribution acceptance.

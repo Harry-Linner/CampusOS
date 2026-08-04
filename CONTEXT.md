@@ -30,9 +30,9 @@ Core 中不直接形成用户模块的实现，包括事件投影、任务存储
 
 始终存在且不属于插件的一级入口：总览、扩展和设置。
 
-## Current implementation acceptance (2026-08-04)
+## Current implementation acceptance (2026-08-05)
 
-User-facing plugins are exactly Academic, Schedule, and Materials. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. The authorized undergraduate 2026-08-04 run closed the private 2026-2027 timetable and 2025-2026 materials/download gates. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
+User-facing plugins are exactly Academic, Schedule, and Materials. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. Authorized undergraduate runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted live chain, including the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte gates, with zero sensitive output. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
 
 ## 避免的旧称
 

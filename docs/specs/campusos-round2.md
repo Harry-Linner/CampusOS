@@ -41,10 +41,13 @@ Completed in the current implementation:
 - Celechron-aligned grade and major-course rules;
 - materials filtering and download queue;
 - renderer sandbox, capability provenance, permission confirmation, and persistence boundaries.
+- repeated real undergraduate verification on 2026-07-29, 2026-08-04, and
+  2026-08-05, including the private timetable oracle, complete materials
+  traversal, authenticated download, byte validation, and zero sensitive
+  output.
 
 Not claimed as complete:
 
-- real undergraduate authentication closure while the upstream unified-auth service is timing out;
 - real graduate-account, multi-device, clean-Windows, desktop-notification, and release-package acceptance;
 - any live upstream result based only on fixture, mock, build, or UI evidence.
 

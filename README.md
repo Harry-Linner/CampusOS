@@ -1,5 +1,12 @@
 # CampusOS
 
+> Acceptance status (2026-08-05): the redacted undergraduate live chain has
+> passed on three separate dates, including the private timetable oracle,
+> complete materials traversal, an authenticated private download, final byte
+> validation, and zero sensitive output. Multi-device, clean-Windows, real
+> desktop-notification, graduate-account, and Release-distribution acceptance
+> remain open, so this is not yet a public-release GO.
+
 CampusOS 是一个面向浙江大学学生的桌面校园工作台。当前处于 **MVP Phase 2（核心链路实现与验收）**：Phase 1 插件工作台地基已完成；本科真实账号已脱敏跑通统一认证、教务、素拓、学在浙大作业与完整课件目录，并已完成一份授权私有课件的认证下载与字节校验。但多设备、桌面提醒和全新 Windows 安装仍待现场验收，因此尚不可作为可发布 MVP。当前唯一的发布前门槛见[私有 Alpha 验收清单](docs/alpha-acceptance.md)。
 
 项目采用 [MIT License](LICENSE)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。

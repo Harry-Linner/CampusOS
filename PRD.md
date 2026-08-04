@@ -276,3 +276,15 @@ Undergraduate major-course labels come from the dedicated major-grade endpoint a
 ### Grade-change notification acceptance (2026-08-05)
 
 The desktop notification settings expose an independent grade-change switch. Background refreshes notify only after the verified academic connector and `academic.grades@1` record are both `live`; cache, fallback, unavailable, disabled, and unchanged refreshes do not notify. The comparison follows Celechron 1.3.0 using the five-point GPA and raw grade-record count, with an account-keyed SQLite fuse. Notification text is generic and never includes course names, scores, response bodies, or private URLs.
+
+### Undergraduate live stability acceptance (2026-08-05)
+
+The redacted undergraduate verification chain has now passed on 2026-07-29,
+2026-08-04, and 2026-08-05. The latest run again completed ZJUAM,
+undergraduate academic affairs, quality-development identity, all timetable
+terms, exams, grades, learning assignments, semester/course pagination,
+per-course material traversal, one authorized private download, and final byte
+validation with zero sensitive output. This closes the repeated time-separated
+undergraduate chain gate only. Multi-device field use, a clean Windows
+installation, a real desktop notification, graduate-account verification, and
+Release distribution remain open.

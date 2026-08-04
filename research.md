@@ -372,6 +372,17 @@ _Changelog_
 
 The latest review confirms the Celechron-overlap work is implemented: quality-development sessions are single-flight per account and getSqjl uses the reference Accept and 12-second timeout; academic catalog/practice/GPA/major behavior, task recurrence/planning, and materials download behavior have formal tests. The authorized undergraduate 2026-08-04 run passed the ignored private 2026-2027 timetable and 2025-2026 materials/authenticated-download oracle without emitting private content. Graduate real-account, multi-device, clean Windows installation, desktop notification, and Release distribution remain separate gates.
 
+### Undergraduate live stability update (2026-08-05)
+
+The same redacted undergraduate verification chain passed again on 2026-08-05.
+Together with the 2026-07-29 and 2026-08-04 runs, this provides three
+time-separated successful observations of ZJUAM, academic affairs,
+quality-development identity, timetable/exam/grade parsing, learning-platform
+pagination and per-course material traversal, an authorized private download,
+and byte validation. Sensitive output remained zero. The evidence is still
+single-machine evidence and does not close multi-device, clean-Windows,
+desktop-notification, graduate-account, or Release-distribution acceptance.
+
 日程闭环已按 Celechron 1.3.0 的 task/arrange/flow 逻辑迁入 Core：任务和排程写入 SQLite v3，renderer 只通过正式 schedule IPC 读写；Windows 系统日历采用 RFC 5545 `.ics` 文件和默认文件关联交接，`shell.openPath` 失败会沿 IPC 返回错误，不伪造原生日历写入成功。边界记录在 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
 - 2026-06-17: initial draft — 8 WebSearches, 0 WebFetches (competitor pages were stale/non-functional); 28 sources cited
 
