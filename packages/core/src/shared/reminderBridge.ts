@@ -1,9 +1,13 @@
 export interface ReminderSettingsInput {
   enabled: boolean;
   leadMinutes: number[];
+  /** Optional for compatibility with reminder-settings.json written before v6. */
+  gradeChangesEnabled?: boolean;
 }
 
 export interface ReminderSettingsRecord extends ReminderSettingsInput {
+  /** Normalized to true by the main-process store, optional for legacy callers. */
+  gradeChangesEnabled?: boolean;
   savedAt: string | null;
   storagePath: string | null;
 }
@@ -42,6 +46,7 @@ export const createDefaultReminderSettingsRecord = (
 ): ReminderSettingsRecord => ({
   enabled: true,
   leadMinutes: [...defaultReminderLeadMinutes],
+  gradeChangesEnabled: true,
   savedAt: null,
   storagePath
 });

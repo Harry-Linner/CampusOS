@@ -40,6 +40,13 @@ export interface StoredAcademicGpaStrategy {
   savedAt: string;
 }
 
+export interface StoredAcademicGradeNotificationBaseline {
+  fivePointGpa: number;
+  gradedCourseCount: number;
+  fused: true;
+  savedAt: string;
+}
+
 export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
@@ -71,6 +78,13 @@ export interface DatabaseService {
     savedAt: string
   ) => void;
   loadAcademicGpaStrategy: (accountId: string) => StoredAcademicGpaStrategy | null;
+  saveAcademicGradeNotificationBaseline: (
+    accountId: string,
+    baseline: Omit<StoredAcademicGradeNotificationBaseline, "fused">
+  ) => void;
+  loadAcademicGradeNotificationBaseline: (
+    accountId: string
+  ) => StoredAcademicGradeNotificationBaseline | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -149,6 +163,15 @@ const migrate = (database: Database.Database): void => {
       account_key TEXT PRIMARY KEY,
       account_id TEXT NOT NULL,
       strategy TEXT NOT NULL CHECK (strategy IN ('best', 'first')),
+      saved_at TEXT NOT NULL
+    );
+  `);
+  applyMigration(6, `
+    CREATE TABLE academic_grade_notification_baselines (
+      account_key TEXT PRIMARY KEY,
+      five_point_gpa REAL NOT NULL,
+      graded_course_count INTEGER NOT NULL CHECK (graded_course_count >= 0),
+      fused INTEGER NOT NULL CHECK (fused = 1),
       saved_at TEXT NOT NULL
     );
   `);
@@ -378,6 +401,58 @@ export const createDatabaseService = ({
         return null;
       }
       return { strategy: row.strategy, savedAt: row.saved_at };
+    },
+    saveAcademicGradeNotificationBaseline: (accountId, baseline) => {
+      if (!accountId.trim()) {
+        throw new Error("Grade notification account cannot be empty.");
+      }
+      if (!Number.isFinite(baseline.fivePointGpa)) {
+        throw new Error("Grade notification GPA must be finite.");
+      }
+      if (
+        !Number.isInteger(baseline.gradedCourseCount) ||
+        baseline.gradedCourseCount < 0
+      ) {
+        throw new Error("Grade notification course count must be a non-negative integer.");
+      }
+      if (!Number.isFinite(Date.parse(baseline.savedAt))) {
+        throw new Error("Grade notification baseline time is invalid.");
+      }
+      database.prepare(`
+        INSERT INTO academic_grade_notification_baselines (
+          account_key, five_point_gpa, graded_course_count, fused, saved_at
+        ) VALUES (?, ?, ?, 1, ?)
+        ON CONFLICT(account_key) DO UPDATE SET
+          five_point_gpa = excluded.five_point_gpa,
+          graded_course_count = excluded.graded_course_count,
+          fused = excluded.fused,
+          saved_at = excluded.saved_at
+      `).run(
+        capabilityAccountKey(accountId),
+        baseline.fivePointGpa,
+        baseline.gradedCourseCount,
+        baseline.savedAt
+      );
+    },
+    loadAcademicGradeNotificationBaseline: (accountId) => {
+      if (!accountId.trim()) return null;
+      const row = database.prepare(`
+        SELECT five_point_gpa, graded_course_count, fused, saved_at
+        FROM academic_grade_notification_baselines
+        WHERE account_key = ?
+      `).get(capabilityAccountKey(accountId)) as {
+        five_point_gpa: number;
+        graded_course_count: number;
+        fused: number;
+        saved_at: string;
+      } | undefined;
+      if (!row || row.fused !== 1) return null;
+      return {
+        fivePointGpa: row.five_point_gpa,
+        gradedCourseCount: row.graded_course_count,
+        fused: true,
+        savedAt: row.saved_at
+      };
     }
   };
 };

@@ -17,6 +17,7 @@ const REMINDER_SETTINGS_FILE = "reminder-settings.json";
 interface StoredReminderSettingsPayload {
   enabled: boolean;
   leadMinutes: number[];
+  gradeChangesEnabled?: boolean;
   savedAt: string;
 }
 
@@ -33,6 +34,7 @@ const toReminderSettingsRecord = (
 ): ReminderSettingsRecord => ({
   enabled: payload.enabled,
   leadMinutes: normalizeReminderLeadMinutes(payload.leadMinutes),
+  gradeChangesEnabled: payload.gradeChangesEnabled !== false,
   savedAt: payload.savedAt,
   storagePath
 });
@@ -83,6 +85,7 @@ export const saveReminderSettingsRecord = async (
   const payload: StoredReminderSettingsPayload = {
     enabled: input.enabled,
     leadMinutes: normalizeReminderLeadMinutes(input.leadMinutes),
+    gradeChangesEnabled: input.gradeChangesEnabled !== false,
     savedAt: new Date().toISOString()
   };
 

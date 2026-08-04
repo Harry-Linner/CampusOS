@@ -86,6 +86,7 @@ const installBridge = (
       loadSettings: vi.fn(async () => ({
         enabled: true,
         leadMinutes: [15, 120],
+        gradeChangesEnabled: true,
         savedAt: null,
         storagePath: null
       })),
@@ -369,7 +370,8 @@ describe("SettingsView", () => {
     expect(await screen.findByText("已保存")).toBeDefined();
     expect(window.campusos?.reminders.saveSettings).toHaveBeenCalledWith({
       enabled: false,
-      leadMinutes: [15, 120]
+      leadMinutes: [15, 120],
+      gradeChangesEnabled: true
     });
     expect(onRefresh).not.toHaveBeenCalled();
   });

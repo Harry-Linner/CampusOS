@@ -52,6 +52,7 @@ export const SettingsView = ({
   const [password, setPassword] = useState("");
   const [program, setProgram] = useState<AcademicProgram>("undergraduate");
   const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [gradeChangesEnabled, setGradeChangesEnabled] = useState(true);
   const [selectedLeadMinutes, setSelectedLeadMinutes] = useState<number[]>([15, 120]);
   const [reminderSaved, setReminderSaved] = useState(false);
   const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("best");
@@ -89,6 +90,7 @@ export const SettingsView = ({
     if (reminderSettings.record) {
       setReminderEnabled(reminderSettings.record.enabled);
       setSelectedLeadMinutes(reminderSettings.record.leadMinutes);
+      setGradeChangesEnabled(reminderSettings.record.gradeChangesEnabled !== false);
     }
   }, [reminderSettings.record]);
 
@@ -739,6 +741,21 @@ export const SettingsView = ({
             <span>启用桌面通知</span>
           </label>
 
+          <label className="setting-switch">
+            <input
+              type="checkbox"
+              checked={gradeChangesEnabled}
+              onChange={(event) => {
+                setReminderSaved(false);
+                setGradeChangesEnabled(event.target.checked);
+              }}
+            />
+            <span className="switch-track" aria-hidden="true">
+              <span />
+            </span>
+            <span>启用成绩变化通知</span>
+          </label>
+
           <fieldset className="reminder-options" disabled={!reminderEnabled}>
             <legend>提醒时间</legend>
             <div>
@@ -781,7 +798,8 @@ export const SettingsView = ({
                 void (async () => {
                   const saved = await reminderSettings.save({
                     enabled: reminderEnabled,
-                    leadMinutes: selectedLeadMinutes
+                    leadMinutes: selectedLeadMinutes,
+                    gradeChangesEnabled
                   });
                   setReminderSaved(saved);
                 })();

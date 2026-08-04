@@ -505,3 +505,10 @@ _Changelog_
 - [x] Preserve Celechron's independent `getMajorGrade` GPA and earned-credit projection in the formal grades capability.
 - [x] Use the source major projection by default and switch to the explicit user-weighted calculation only when custom weights are present.
 - [x] Cover source-summary publication, empty course-id grouping fallback, and renderer consumption with tests.
+
+### Grade-change notification acceptance (2026-08-05)
+
+- [x] Port Celechron's first-fuse, GPA-change, and raw-record-count comparison semantics.
+- [x] Gate notifications on an entirely live verified academic refresh and keep baselines account-isolated.
+- [x] Add an independent, backward-compatible Settings switch and real Electron IPC coverage.
+- [x] Keep notification copy generic and add tests for no-change, disabled, cache, fallback, unavailable, and account-isolation boundaries.

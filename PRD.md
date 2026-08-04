@@ -272,3 +272,7 @@ This correction supersedes the earlier UI-only diagnosis in the acceptance recor
 ### Academic-grade calculation correction (2026-08-03)
 
 Undergraduate major-course labels come from the dedicated major-grade endpoint and are projected by matching `xkkh` against the all-grades response. GPA and earned-credit behavior follows Celechron 1.3.0: dropped, pending, deferred, and invalid grades do not contribute credits; pass/fail labels and `xtwkc` records do not contribute GPA; ordinary failures remain GPA-weighted at the returned point value. The grades page shows course count, earned credits, overall GPA, and major GPA without source-status badges.
+
+### Grade-change notification acceptance (2026-08-05)
+
+The desktop notification settings expose an independent grade-change switch. Background refreshes notify only after the verified academic connector and `academic.grades@1` record are both `live`; cache, fallback, unavailable, disabled, and unchanged refreshes do not notify. The comparison follows Celechron 1.3.0 using the five-point GPA and raw grade-record count, with an account-keyed SQLite fuse. Notification text is generic and never includes course names, scores, response bodies, or private URLs.

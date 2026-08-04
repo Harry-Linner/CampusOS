@@ -26,7 +26,11 @@ contextBridge.exposeInMainWorld("campusos", {
   },
   reminders: {
     loadSettings: () => ipcRenderer.invoke("campusos:reminders:settings:load"),
-    saveSettings: (input: { enabled: boolean; leadMinutes: number[] }) =>
+    saveSettings: (input: {
+      enabled: boolean;
+      leadMinutes: number[];
+      gradeChangesEnabled?: boolean;
+    }) =>
       ipcRenderer.invoke("campusos:reminders:settings:save", input),
     loadScheduleState: () =>
       ipcRenderer.invoke("campusos:reminders:schedule-state:load")

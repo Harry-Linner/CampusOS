@@ -234,6 +234,10 @@ Celechron 对照功能收敛为三个官方插件：
 
 The three user modules are the only left-navigation products. Academic owns timetable, course catalog, exams, grades, and practice as internal tabs; Schedule owns the unified event/task projection; Materials owns course browsing, batch selection, and the download queue. Core-owned connectors are never listed as installable modules, and Campus Card is excluded from the desktop scope. Core now also owns global search, update state, About, and MIT license presentation. On 2026-08-04 the authorized undergraduate live path and private baselines closed the 2026-2027 autumn-winter timetable and 2025-2026 spring-summer materials gates, including authenticated download byte validation. Graduate real-account closure is not claimed.
 
+### Grade-change notification implementation note (2026-08-05)
+
+The Core background refresh owns the Celechron-compatible grade fuse. It compares only the formal `academic.grades@1` live payload after an entirely live connector refresh, stores a hashed account baseline in SQLite, and emits generic Electron notification text. The renderer exposes the grade switch alongside, but independently from, course/deadline reminder scheduling.
+
 ## 11. 完成定义
 
 当前状态（2026-08-04）：核心任务、重复实例、四种日历视图、未来 48 小时、Celechron 排程、不可行解释、SQLite 持久化和 RFC 5545/Windows 文件交接已实现并完成自动化测试；真实账号日程与系统日历导入仍需按验收矩阵执行。

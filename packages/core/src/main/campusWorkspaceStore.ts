@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "node:path";
 import type {
   AcademicCalendarConfigData,
+  AcademicGradesData,
   CalendarEventsData,
   LearningMaterialsData,
   PluginRuntimeSnapshot
@@ -40,6 +41,7 @@ import { getOfficialCapabilityRepository } from "./officialCapabilityRepository"
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
 import { getWorkspaceDownloads } from "./downloadIpc";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
+import { processGradeChangeNotification } from "./gradeChangeNotification";
 import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
 import { appendDiagnosticEntry } from "./diagnosticLogStore";
 
@@ -96,7 +98,8 @@ const assertAcademicRefreshAvailable = async (
 };
 
 const buildGeneratedRecord = async (
-  hydratedFrom: "generated" | "synced"
+  hydratedFrom: "generated" | "synced",
+  notifyGradeChanges = false
 ): Promise<CampusWorkspaceRecord> => {
   const pluginRuntime = await getOfficialPluginRuntimeService().loadInternal();
   const refreshResults = await pluginRefreshCoordinator.runAll();
@@ -114,6 +117,27 @@ const buildGeneratedRecord = async (
     );
   }
   const reminderSettings = await readReminderSettingsRecord();
+  if (notifyGradeChanges && verifiedAcademicAccountId && academicCredential.program) {
+    const connectorSourceId = getAcademicConnectorSourceId(academicCredential.program);
+    const gradeRecords = await getOfficialCapabilityRepository().read<AcademicGradesData>(
+      "academic.grades@1"
+    );
+    const gradeRecord = gradeRecords.find(
+      (record) =>
+        record.providerId === connectorSourceId &&
+        record.accountId === verifiedAcademicAccountId
+    ) ?? null;
+    const connectorStatus = refreshResults.find(
+      (result) => result.sourceId === connectorSourceId
+    )?.status ?? "unavailable";
+    await processGradeChangeNotification({
+      accountId: verifiedAcademicAccountId,
+      connectorStatus,
+      gradeRecord,
+      enabled: reminderSettings.gradeChangesEnabled !== false,
+      database: getOfficialDatabaseService()
+    });
+  }
   const now = new Date();
   const baseSnapshot = verifiedAcademicAccountId
     ? createLiveWorkspaceSnapshot({
@@ -228,7 +252,8 @@ export const hydrateCampusWorkspace =
   };
 
 export const syncCampusWorkspace =
-  async (): Promise<CampusWorkspaceRecord> => buildGeneratedRecord("synced");
+  async (options: { notifyGradeChanges?: boolean } = {}): Promise<CampusWorkspaceRecord> =>
+    buildGeneratedRecord("synced", options.notifyGradeChanges === true);
 
 export const rescheduleCampusWorkspaceReminders = async (
   settings: ReminderSettingsRecord,

@@ -69,4 +69,23 @@ describe("reminder settings IPC", () => {
       '"enabled": false'
     );
   });
+
+  it("defaults the independent grade-change switch on for legacy settings", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    const storagePath = join(storageRoot, "preferences", "reminder-settings.json");
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "preferences"), { recursive: true });
+    await (await import("node:fs/promises")).writeFile(storagePath, JSON.stringify({
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: "2026-08-05T08:00:00.000Z"
+    }), "utf8");
+
+    registerReminderSettingsHandlers();
+    const load = electronState.handlers.get("campusos:reminders:settings:load");
+    if (!load) throw new Error("reminder settings load handler was not registered");
+
+    await expect(load({})).resolves.toMatchObject({ gradeChangesEnabled: true });
+  });
 });

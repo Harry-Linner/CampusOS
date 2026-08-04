@@ -384,3 +384,7 @@ This supersedes the earlier UI-only diagnosis in the user acceptance record abov
 The earlier grades implementation marked every undergraduate record as major and therefore made overall and major GPA identical. The corrected flow follows Celechron 1.3.0: `getTranscript` and `getMajorGrade` run independently, the major `xkkh` set is projected onto transcript records, and GPA/earned-credit inclusion uses the reference `Grade` and `GpaHelper` rules. This is implemented at the connector/model boundary; the view consumes formal capability data and no longer exposes internal source-status metrics.
 
 The independent major endpoint projection is now retained as `majorSummary` in `academic.grades@1`, so the default major GPA does not silently become a recomputation over the transcript subset. Custom GPA weights remain opt-in and are the only case where the renderer recalculates the major projection locally.
+
+### Grade-change notification update (2026-08-05)
+
+CampusOS now ports Celechron 1.3.0's background grade fuse. It compares `gpa[0]` semantics through the formal grades model and the raw graded-record count, persists only an account-keyed baseline in SQLite, and skips non-live or degraded refreshes. The setting is independent from course/deadline reminders and legacy reminder JSON defaults it to enabled.

@@ -23,7 +23,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(5);
+      expect(database.schemaVersion).toBe(6);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]

@@ -30,7 +30,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
 const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
   refresh: async () => {
-    const result = await syncCampusWorkspace();
+    const result = await syncCampusWorkspace({ notifyGradeChanges: true });
     notifyCampusWorkspaceChanged();
     return result;
   }
