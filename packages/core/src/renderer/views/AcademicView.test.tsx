@@ -19,7 +19,7 @@ import type {
   PluginCapability,
   PluginCapabilityClient
 } from "@campusos/shared";
-import { AcademicView } from "./AcademicView";
+import { AcademicView } from "@campusos/plugin-academic";
 
 afterEach(cleanup);
 

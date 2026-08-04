@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CalendarEventsData, CapabilityRecord, PluginComponentProps } from "@campusos/shared";
-import { computeExamCountdowns, type ExamCountdownEntry } from "./main";
-
-export { manifest } from "./manifest";
+import { computeExamCountdowns, type ExamCountdownEntry } from "./examCountdown";
 
 export const Component = ({
   capabilities,

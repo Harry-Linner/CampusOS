@@ -14,6 +14,10 @@ export default defineConfig({
       "@vite/env": resolve(rootDir, "test/vite-env.ts"),
       "@renderer": resolve(rootDir, "src/renderer"),
       "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
+      "@campusos/plugin-academic/gradesModel": resolve(
+        rootDir,
+        "../../plugins/official/academic/src/gradesModel.ts"
+      ),
       "@campusos/plugin-academic/manifest": resolve(
         rootDir,
         "../../plugins/official/academic/src/manifest.ts"
@@ -22,6 +26,18 @@ export default defineConfig({
         rootDir,
         "../../plugins/official/schedule/src/manifest.ts"
       ),
+      "@campusos/plugin-materials/manifest": resolve(
+        rootDir,
+        "../../plugins/official/materials/src/manifest.ts"
+      ),
+      "@campusos/plugin-academic": resolve(
+        rootDir,
+        "../../plugins/official/academic/src/index.ts"
+      ),
+      "@campusos/plugin-schedule": resolve(
+        rootDir,
+        "../../plugins/official/schedule/src/index.ts"
+      ),
       "@campusos/plugin-academic-timetable-events/manifest": resolve(
         rootDir,
         "../../plugins/official/academic-timetable-events/src/manifest.ts"
@@ -29,22 +45,6 @@ export default defineConfig({
       "@campusos/plugin-academic-timetable-events/main": resolve(
         rootDir,
         "../../plugins/official/academic-timetable-events/src/main.ts"
-      ),
-      "@campusos/plugin-exam-countdown/manifest": resolve(
-        rootDir,
-        "../../plugins/official/exam-countdown/src/manifest.ts"
-      ),
-      "@campusos/plugin-exam-countdown/main": resolve(
-        rootDir,
-        "../../plugins/official/exam-countdown/src/main.ts"
-      ),
-      "@campusos/plugin-exam-countdown": resolve(
-        rootDir,
-        "../../plugins/official/exam-countdown/src/index.tsx"
-      ),
-      "@campusos/plugin-materials/manifest": resolve(
-        rootDir,
-        "../../plugins/official/materials/src/manifest.ts"
       ),
       "@campusos/plugin-materials": resolve(
         rootDir,

@@ -5,7 +5,7 @@ import type {
   PluginCapability,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
-import { manifest as academicGradesManifest } from "@campusos/plugin-academic-grades/manifest";
+import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
 import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
 import { resolvePluginRuntime } from "./pluginRuntime";
 import { createPluginCapabilityAccess } from "./pluginCapabilityAccess";
@@ -36,9 +36,9 @@ const createRuntime = (gradesEnabled = true): PluginRuntimeSnapshot =>
         grantedPermissions: [...zjuUndergraduateManifest.permissions]
       },
       {
-        manifest: academicGradesManifest,
+        manifest: academicManifest,
         enabled: gradesEnabled,
-        grantedPermissions: []
+        grantedPermissions: [...academicManifest.permissions]
       }
     ],
     coreCapabilities: [
@@ -82,7 +82,7 @@ describe("plugin capability access", () => {
     });
 
     const records = await access.read<AcademicGradesData>({
-      pluginId: academicGradesManifest.id,
+      pluginId: academicManifest.id,
       capability: "academic.grades@1"
     });
 
@@ -102,7 +102,7 @@ describe("plugin capability access", () => {
     });
 
     await expect(access.read({
-      pluginId: academicGradesManifest.id,
+      pluginId: academicManifest.id,
       capability: "academic.grades@1"
     })).resolves.toEqual([unavailable]);
   });
@@ -116,11 +116,11 @@ describe("plugin capability access", () => {
       });
 
     await expect(createAccess(createRuntime()).read({
-      pluginId: academicGradesManifest.id,
-      capability: "academic.exams@1"
+      pluginId: academicManifest.id,
+      capability: "core.auth.zju-verification@1"
     })).rejects.toThrow("未声明");
     await expect(createAccess(createRuntime(false)).read({
-      pluginId: academicGradesManifest.id,
+      pluginId: academicManifest.id,
       capability: "academic.grades@1"
     })).rejects.toThrow("未激活");
   });

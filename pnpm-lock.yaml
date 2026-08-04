@@ -39,18 +39,12 @@ importers:
       '@campusos/plugin-academic-exams':
         specifier: workspace:*
         version: link:../../plugins/official/academic-exams
-      '@campusos/plugin-academic-grades':
-        specifier: workspace:*
-        version: link:../../plugins/official/academic-grades
       '@campusos/plugin-academic-timetable-events':
         specifier: workspace:*
         version: link:../../plugins/official/academic-timetable-events
       '@campusos/plugin-deadline-assistant':
         specifier: workspace:*
         version: link:../../plugins/official/deadline-assistant
-      '@campusos/plugin-exam-countdown':
-        specifier: workspace:*
-        version: link:../../plugins/official/exam-countdown
       '@campusos/plugin-materials':
         specifier: workspace:*
         version: link:../../plugins/official/materials
@@ -166,7 +160,13 @@ importers:
       '@campusos/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
     devDependencies:
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.31
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -181,55 +181,7 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  plugins/official/academic-grades:
-    dependencies:
-      '@campusos/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-    devDependencies:
-      '@types/react':
-        specifier: ^18.3.18
-        version: 18.3.31
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  plugins/official/academic-scraper:
-    dependencies:
-      '@campusos/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-    devDependencies:
-      '@types/react':
-        specifier: ^18.3.18
-        version: 18.3.31
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
   plugins/official/academic-timetable-events: {}
-
-  plugins/official/calendar:
-    dependencies:
-      '@campusos/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-    devDependencies:
-      '@types/react':
-        specifier: ^18.3.18
-        version: 18.3.31
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
 
   plugins/official/deadline-assistant:
     dependencies:
@@ -240,38 +192,6 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
-
-  plugins/official/dingtalk-entry:
-    dependencies:
-      '@campusos/shared':
-        specifier: workspace:*
-        version: link:../../../packages/shared
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-    devDependencies:
-      '@types/react':
-        specifier: ^18.3.18
-        version: 18.3.31
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  plugins/official/exam-countdown:
-    dependencies:
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-    devDependencies:
-      '@types/react':
-        specifier: ^18.3.31
-        version: 18.3.31
-      '@types/react-dom':
-        specifier: ^18.3.7
-        version: 18.3.7(@types/react@18.3.31)
 
   plugins/official/materials:
     dependencies:
@@ -294,7 +214,13 @@ importers:
       '@campusos/shared':
         specifier: workspace:*
         version: link:../../../packages/shared
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
     devDependencies:
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.31
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

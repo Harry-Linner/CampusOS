@@ -3,7 +3,7 @@ import type { AcademicGradeRecord } from "@campusos/shared";
 import {
   calculateAcademicGpa,
   summarizeAcademicGrades
-} from "@campusos/plugin-academic-grades/model";
+} from "@campusos/plugin-academic/gradesModel";
 
 describe("academic grades feature", () => {
   it("matches Celechron's four GPA projections and keeps unknown terms separate", () => {
@@ -82,7 +82,7 @@ describe("Celechron GPA conversion and custom weights", () => {
 
 describe("inferGpaScale", () => {
   it("returns 5.0 when any grade point exceeds 4.0", async () => {
-    const { inferGpaScale } = await import("@campusos/plugin-academic-grades/model");
+    const { inferGpaScale } = await import("@campusos/plugin-academic/gradesModel");
     expect(
       inferGpaScale([
         { sourceId: "a", courseCode: null, courseName: "A", credit: 1, originalScore: "90", gradePoint: 4.5, academicYearStart: 2025, termNumber: 1, isMajorCourse: true, courseCategory: null }

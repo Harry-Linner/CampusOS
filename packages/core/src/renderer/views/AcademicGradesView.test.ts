@@ -10,7 +10,7 @@ import type {
   PluginCapabilityClient
 } from "@campusos/shared";
 import type { CampusosBridge } from "../../shared/campusBridge";
-import { Component as AcademicGradesView } from "@campusos/plugin-academic-grades";
+import { GradesView as AcademicGradesView } from "@campusos/plugin-academic";
 
 afterEach(() => {
   cleanup();

@@ -21,10 +21,8 @@
   "dependencies": {
     "@campusos/plugin-academic": "workspace:*",
     "@campusos/plugin-academic-exams": "workspace:*",
-    "@campusos/plugin-academic-grades": "workspace:*",
     "@campusos/plugin-academic-timetable-events": "workspace:*",
     "@campusos/plugin-deadline-assistant": "workspace:*",
-    "@campusos/plugin-exam-countdown": "workspace:*",
     "@campusos/plugin-materials": "workspace:*",
     "@campusos/plugin-schedule": "workspace:*",
     "@campusos/plugin-zju-calendar-config": "workspace:*",

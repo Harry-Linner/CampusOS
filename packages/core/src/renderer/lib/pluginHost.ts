@@ -8,10 +8,10 @@ import {
   type PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { createPluginCapabilityClient } from "./pluginBridge";
+import { Component as AcademicView } from "@campusos/plugin-academic";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
+import { Component as ScheduleView } from "@campusos/plugin-schedule";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
-import { AcademicView } from "../views/AcademicView";
-import { ScheduleView } from "../views/ScheduleView";
 
 type PluginModule = {
   manifest: PluginManifestV2;

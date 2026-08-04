@@ -8,7 +8,6 @@ const workspaceRuntimeDependencies = [
   "@campusos/shared",
   "@campusos/plugin-academic",
   "@campusos/plugin-academic-exams",
-  "@campusos/plugin-academic-grades",
   "@campusos/plugin-academic-timetable-events",
   "@campusos/plugin-deadline-assistant",
   "@campusos/plugin-materials",
@@ -44,10 +43,6 @@ export default defineConfig({
         "@campusos/plugin-academic/manifest": resolve(
           rootDir,
           "../../plugins/official/academic/src/manifest.ts"
-        ),
-        "@campusos/plugin-academic-grades/manifest": resolve(
-          rootDir,
-          "../../plugins/official/academic-grades/src/manifest.ts"
         ),
         "@campusos/plugin-schedule/manifest": resolve(
           rootDir,
@@ -161,14 +156,6 @@ export default defineConfig({
           rootDir,
           "../../plugins/official/academic/src/manifest.ts"
         ),
-        "@campusos/plugin-academic-grades/manifest": resolve(
-          rootDir,
-          "../../plugins/official/academic-grades/src/manifest.ts"
-        ),
-        "@campusos/plugin-academic-grades": resolve(
-          rootDir,
-          "../../plugins/official/academic-grades/src/index.tsx"
-        ),
         "@campusos/plugin-schedule/manifest": resolve(
           rootDir,
           "../../plugins/official/schedule/src/manifest.ts"
@@ -176,6 +163,14 @@ export default defineConfig({
         "@campusos/plugin-materials/manifest": resolve(
           rootDir,
           "../../plugins/official/materials/src/manifest.ts"
+        ),
+        "@campusos/plugin-academic": resolve(
+          rootDir,
+          "../../plugins/official/academic/src/index.ts"
+        ),
+        "@campusos/plugin-schedule": resolve(
+          rootDir,
+          "../../plugins/official/schedule/src/index.ts"
         ),
         "@campusos/plugin-materials": resolve(
           rootDir,
@@ -189,14 +184,6 @@ export default defineConfig({
           rootDir,
           "../../plugins/official/deadline-assistant/src/manifest.ts"
         ),
-        "@campusos/plugin-exam-countdown/manifest": resolve(
-          rootDir,
-          "../../plugins/official/exam-countdown/src/manifest.ts"
-        ),
-        "@campusos/plugin-exam-countdown": resolve(
-          rootDir,
-          "../../plugins/official/exam-countdown/src/index.tsx"
-        )
       }
     }
   }

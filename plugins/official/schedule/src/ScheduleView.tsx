@@ -7,8 +7,8 @@ import type {
   PlannerSettings,
   PluginComponentProps
 } from "@campusos/shared";
-import { AppIcon } from "../components/AppIcon";
-import { formatDateTime, formatTimeRange } from "../lib/formatters";
+import { AppIcon } from "./AppIcon";
+import { formatDateTime, formatTimeRange } from "./formatters";
 
 type ScheduleViewMode = "month" | "week" | "agenda" | "day";
 

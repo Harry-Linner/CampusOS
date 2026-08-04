@@ -41,7 +41,7 @@
 - `academic-timetable-events` 保留稳定源码包与 provenance ID，由内部 runtime 作为始终启用、不可配置的 Core 事件投影模块装载：读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
 - 设置页”诊断与测试”已连接真实刷新协调器和主进程持久化日志，支持查看、清空与自动脱敏 TXT 导出。
 - `calendar.events@1` 已实现多 provider collection contract；`academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 保留稳定源码包与 provenance ID，由内部 runtime 作为 Core 事件投影模块装载，按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。`日程`模块只消费事件 feed，不 import 具体连接器；未验证账号不能命中旧账号事件缓存。
-- `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
+ - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；Academic 模块通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
 - `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。开发期仍完整刷新上游目录，但工作区资料投影和新建下载任务只接受真实 `2025-2026 春/夏/春夏` 课程基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
@@ -54,7 +54,7 @@
 - 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消、状态广播、预期大小校验和按大小变化重下已用协议边界测试覆盖。学在浙大 URL 仅接受固定 HTTPS host/path/正整数 ID，并由主进程注入业务 Session；renderer 和下载队列不能取得 Cookie。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移。
 - 自动更新：electron-updater 集成，GitHub Releases 源，检查/下载进度/就绪/安装事件通过受信任 IPC 进入设置页；开发版明确显示不可检查更新。
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
-- 考试倒计时视图已作为 `academic` 插件的“考试”页签消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记“临近”；`exam-countdown` 仅保留稳定内部实现，不再注册为独立用户插件。
+ - 考试倒计时视图已作为 Academic 模块的“考试”页签消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记“临近”；倒计时实现与页面均归入 Academic 模块，不再注册为独立用户插件。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
 - Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-29 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，以及一份授权私有课件的认证下载和实际字节校验，敏感输出为 0。剩余未完成：多设备现场流程、全新 Windows 安装和 GitHub Release/分发验收。
 

@@ -4,9 +4,7 @@ import type {
   CapabilityRecord,
   PluginComponentProps
 } from "@campusos/shared";
-import { inferGpaScale, summarizeAcademicGrades } from "./model";
-
-export { manifest } from "./manifest";
+import { inferGpaScale, summarizeAcademicGrades } from "./gradesModel";
 
 const numberFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2

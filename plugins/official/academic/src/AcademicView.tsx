@@ -16,8 +16,8 @@ import {
   mergeAcademicTimetableSessions,
   selectAcademicSemesterWindow
 } from "@campusos/shared";
-import { Component as AcademicGradesView } from "@campusos/plugin-academic-grades";
-import { Component as ExamCountdownView } from "@campusos/plugin-exam-countdown";
+import { Component as AcademicGradesView } from "./GradesView";
+import { Component as ExamCountdownView } from "./ExamCountdownView";
 
 type AcademicSection = "timetable" | "courses" | "exams" | "grades" | "practice";
 

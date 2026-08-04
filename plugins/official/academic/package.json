@@ -5,12 +5,15 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts"
+    "./manifest": "./src/manifest.ts",
+    "./gradesModel": "./src/gradesModel.ts"
   },
   "dependencies": {
-    "@campusos/shared": "workspace:*"
+    "@campusos/shared": "workspace:*",
+    "react": "^18.3.1"
   },
   "devDependencies": {
+    "@types/react": "^18.3.18",
     "typescript": "^5.7.3"
   }
 }
