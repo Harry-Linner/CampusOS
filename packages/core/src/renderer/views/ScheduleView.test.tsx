@@ -160,6 +160,56 @@ describe("ScheduleView", () => {
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "fixed-1", status: "deleted" }));
   });
+
+  it("only exposes a repeat interval for Celechron's day-based recurrence", async () => {
+    const { container } = render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule([])
+    }));
+
+    const createButton = container.querySelector<HTMLButtonElement>(".schedule-actions button");
+    expect(createButton).not.toBeNull();
+    fireEvent.click(createButton!);
+    fireEvent.change(screen.getAllByRole("combobox")[0], {
+      target: { value: "fixed" }
+    });
+    fireEvent.change(screen.getAllByRole("combobox")[1], {
+      target: { value: "days" }
+    });
+    const form = container.querySelector(".schedule-task-form");
+    expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(3);
+
+    fireEvent.change(screen.getAllByRole("combobox")[1], {
+      target: { value: "month" }
+    });
+    expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(2);
+  });
+
+  it("describes monthly recurrence without the ignored day interval", async () => {
+    const monthly: LocalTaskRecord = {
+      ...record,
+      id: "monthly-1",
+      title: "Monthly review",
+      type: "fixed",
+      repeatType: "month",
+      repeatPeriod: 7,
+      repeatEndsOn: "2026-12-31"
+    };
+    const { container } = render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule([monthly])
+    }));
+
+    await screen.findAllByText("Monthly review");
+    expect(container.textContent).toContain("\u6bcf\u6708");
+    expect(container.textContent).not.toContain("\u6bcf\u9694 7 \u6708");
+  });
 });
 
 describe("schedule event ranges", () => {

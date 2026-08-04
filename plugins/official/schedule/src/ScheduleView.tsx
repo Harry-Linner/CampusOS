@@ -559,8 +559,8 @@ export const ScheduleView = ({
         : task.repeatType === "days"
           ? `每隔 ${task.repeatPeriod} 天`
           : task.repeatType === "month"
-            ? `每隔 ${task.repeatPeriod} 月`
-            : `每隔 ${task.repeatPeriod} 年`;
+            ? "每月"
+            : "每年";
       return `${formatTimeRange(task.startAt, task.endAt)} · ${repeat}`;
     }
     return `${formatDateTime(task.endAt)} · ${task.timeSpentMinutes}/${task.timeNeededMinutes} 分钟`;
@@ -726,7 +726,11 @@ export const ScheduleView = ({
               <label className="schedule-check"><input type="checkbox" checked={form.breakable} onChange={(event) => setForm({ ...form, breakable: event.target.checked })} />允许拆分</label>
               <label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label>
               <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option></select></label>
-              {form.type === "fixed" ? <><label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="month">每月</option><option value="year">每年</option></select></label>{form.repeatType !== "norepeat" ? <div className="schedule-form-grid"><label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label><label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label></div> : null}</> : null}
+              {form.type === "fixed" ? <>
+                <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="month">每月</option><option value="year">每年</option></select></label>
+                {form.repeatType === "days" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
+                {form.repeatType !== "norepeat" ? <label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label> : null}
+              </> : null}
               <button className="primary-button" type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</button>
             </form>
           ) : null}
