@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ActivityItemId } from "@campusos/shared";
 import { ActivityBar } from "./components/ActivityBar";
+import { GlobalSearch } from "./components/GlobalSearch";
 import {
   OnboardingWizard,
   readOnboardingCompleted,
@@ -29,6 +30,7 @@ export const App = (): JSX.Element => {
     readOnboardingCompleted()
   );
   const [activeView, setActiveView] = useState<ActivityItemId>("dashboard");
+  const [searchOpen, setSearchOpen] = useState(false);
   const pluginHost = usePluginHost();
   const workspace = useCampusWorkspace();
 
@@ -45,6 +47,17 @@ export const App = (): JSX.Element => {
   useEffect(() => subscribeToDownloadChanges(() => {
     void workspace.load();
   }), []);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
 
   const handleOnboardingComplete = useCallback(() => {
     setOnboardingComplete(true);
@@ -164,6 +177,7 @@ export const App = (): JSX.Element => {
         activeView={activeView}
         items={activityItems}
         onSelect={setActiveView}
+        onSearch={() => setSearchOpen(true)}
       />
       <main id="main-content" className="main-pane">
         {workspace.error ? (
@@ -175,6 +189,12 @@ export const App = (): JSX.Element => {
           {content}
         </div>
       </main>
+      <GlobalSearch
+        open={searchOpen}
+        snapshot={workspace.snapshot}
+        onClose={() => setSearchOpen(false)}
+        onNavigate={setActiveView}
+      />
     </div>
   );
 };

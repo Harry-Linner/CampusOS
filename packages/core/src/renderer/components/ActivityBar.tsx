@@ -9,12 +9,14 @@ interface ActivityBarProps {
     icon: AppIconName;
   }>;
   onSelect: (id: ActivityItemId) => void;
+  onSearch: () => void;
 }
 
 export const ActivityBar = ({
   activeView,
   items,
-  onSelect
+  onSelect,
+  onSearch
 }: ActivityBarProps): JSX.Element => {
   const primaryItems = items.filter((item) => item.id !== "settings");
   const settingsItem = items.find((item) => item.id === "settings");
@@ -40,6 +42,12 @@ export const ActivityBar = ({
         </span>
         <strong>CampusOS</strong>
       </div>
+
+      <button className="search-trigger" type="button" onClick={onSearch}>
+        <AppIcon name="search" size={18} />
+        <span>搜索</span>
+        <kbd>Ctrl K</kbd>
+      </button>
 
       <nav className="primary-navigation" aria-label="主导航">
         {primaryItems.map(renderItem)}

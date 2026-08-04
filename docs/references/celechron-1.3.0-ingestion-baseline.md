@@ -101,11 +101,11 @@ Celechron 使用 GPL-3.0。CampusOS 在没有完成许可证兼容性评审和�
 | 诊断页面 | `lib/page/option/diagnostic_log_page.dart` | 查看、复制、导出、清空的支持流程 |
 | 关键测试 | `test/refresh_coordinator_test.dart`、`test/sztz_auth_test.dart`、`test/zjuam_grs_auth_test.dart`、`test/diagnostic_report_test.dart`、`test/calendar_config_parser_test.dart` | CampusOS 接入测试矩阵的最低参考集合 |
 
-## CampusOS 当前实现状态（2026-07-19）
+## CampusOS 当前实现状态（2026-08-04）
 
 统一身份认证核心链路已经按本基线实现：同会话 `execution`/Cookie、动态 RSA 公钥、有效 SSO Cookie、本科教务网 Session、素拓正式 `SESSION`、非匿名 `ctx`、账号匹配 `getMyInfo` 最小汇总、请求超时与取消、并发连接互斥、结构化脱敏错误，以及认证成功后才执行的 `safeStorage` 原子持久化。旧版未验证凭据不会被误判为已连接。实现说明见 [ZJU 统一身份认证核心登录](../architecture/zju-unified-auth.md)。
 
-本科与研究生课表、考试、成绩及学在浙大作业已经通过核心托管的业务会话、固定操作、单条解析隔离、账号/provider 隔离 capability 缓存、刷新协调和来源状态进入正式代码链路；考试、DDL 和成绩再由独立 feature 消费，renderer 不直接解析网站响应。研究生实现按 `GrsNew` 行为使用 `https://yjsy.zju.edu.cn/` CAS service、固定 `validateLogin` ticket 交换与主进程内存 `X-Access-Token`，缺失考试时间不会套用 Celechron 旧实现中的兜底钟点。首次连接已按用户明确选择的培养层次执行：研究生只有在固定成绩接口返回有效认证后结构时才原子保存，IPC 不返回 token 或成绩正文。诊断页面已连接真实刷新日志并支持脱敏导出。研究生当前仅通过外部 HTTP fixture，尚未执行真实账号现场测试；实践项目明细、完整多级重认证/重试阶段记录、可信节次与课程日期展开、成绩完整口径和多设备验收仍未完成，因此不能把整个数据接入面宣称为生产就绪。插件拆分与依赖关系见 [Celechron 启发的官方插件集设计](../design/celechron-inspired-plugin-suite.md)。
+本科与研究生课表、考试、成绩及学在浙大作业已经通过核心托管的业务会话、固定操作、单条解析隔离、账号/provider 隔离 capability 缓存、刷新协调和来源状态进入正式代码链路；考试、DDL 和成绩由 Core 投影及完整用户模块消费，renderer 不直接解析网站响应。研究生实现按 `GrsNew` 行为使用 `https://yjsy.zju.edu.cn/` CAS service、固定 `validateLogin` ticket 交换与主进程内存 `X-Access-Token`，缺失考试时间不会套用 Celechron 旧实现中的兜底钟点。首次连接按用户明确选择的培养层次执行：研究生只有在固定成绩接口返回有效认证后结构时才原子保存，IPC 不返回 token 或成绩正文。实践项目明细与汇总局部成功、可信学季/节次展开、Celechron 成绩与主修口径、受控重认证和学在浙大退避重试均已进入正式代码链路；诊断页面连接真实刷新日志并支持脱敏导出。2026-08-04 的授权本科链路通过私有课表、资料目录与认证下载字节基线；研究生真实账号、多设备、全新 Windows 安装、真实桌面通知和 Release 分发仍未闭环，因此不能把整个产品宣称为公开发布就绪。插件边界与依赖关系见 [Celechron 启发的官方插件集设计](../design/celechron-inspired-plugin-suite.md)。
 
 ### 课表 session 合并与开发基线
 
@@ -125,6 +125,10 @@ CampusOS 课表投影对照 `lib/model/semester.dart:168-205,216-365,384-403,506
 6. 解析并确认 `ctx` 表示非匿名有效用户后，调用 `GET https://sztz.zju.edu.cn/dekt/student/home/getSqjl`。
 
 顺序不可交换：只有访问 ticket 回调并取得正式业务 SESSION，再通过 `ctx` 确认非匿名身份，才能认为素拓登录完成。
+
+## Current implementation acceptance (2026-08-04)
+
+CampusOS has applied the reference session single-flight to concurrent practice/summary requests and preserved Celechron's getSqjl Accept value and 12-second timeout. Academic course catalog joins timetable, exams, and grades; practice detail/summary can publish a fallback when one endpoint fails; GPA and major-course rules follow the reference model. On 2026-08-04 the authorized undergraduate real path passed the ignored private timetable/materials oracle and authenticated download byte validation. This statement supersedes older pending-undergraduate and pending-complete-grade wording in this historical ingestion record. Graduate real-account feedback remains a mandatory live gate.
 
 ## CampusOS 上线前验收门槛
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  createGraduateTimetableQueries,
   createZjuGraduateConnector,
   parseGraduateExamsResponse,
   parseGraduateGradesResponse,
@@ -127,6 +128,7 @@ describe("zju graduate connector", () => {
       grades: [
         {
           sourceId: "2025-2026-1-GRS1001",
+          realId: "2025-2026-1-GRS1001",
           courseCode: "GRS1001",
           courseName: "研究方法",
           credit: 2.5,
@@ -135,7 +137,9 @@ describe("zju graduate connector", () => {
           academicYearStart: 2025,
           termNumber: 1,
           isMajorCourse: true,
-          courseCategory: null
+          courseCategory: null,
+          gpaIncluded: false,
+          creditIncluded: true
         }
       ]
     });
@@ -242,6 +246,86 @@ describe("zju graduate connector", () => {
           expect.objectContaining({ sourceId: "graduate-exam-1" })
         ])
       }
+    }));
+  });
+});
+
+describe("graduate cached course catalog projection", () => {
+  it("uses cached timetable terms and exams when building the catalog", async () => {
+    const publish = vi.fn(async () => undefined);
+    const now = new Date("2026-07-19T04:00:00.000Z");
+    const cachedQuery = createGraduateTimetableQueries(now).find((query) => query.academicYearStart === 2026)!;
+    const cachedTimetable = {
+      terms: [{
+        academicYearStart: cachedQuery.academicYearStart,
+        season: cachedQuery.season,
+        state: "live" as const,
+        sessions: [{
+          sourceId: "cached-graduate-session",
+          courseName: "cached graduate course",
+          teacher: "teacher",
+          location: "room",
+          dayOfWeek: 3,
+          periods: [4],
+          firstHalf: true,
+          secondHalf: false,
+          weekPattern: "all" as const,
+          confirmed: true,
+          weeks: [1, 2]
+        }]
+      }]
+    };
+    const cachedExams = {
+      exams: [{
+        sourceId: "cached-graduate-exam",
+        courseId: "cached-course-id",
+        courseName: "cached graduate course",
+        kind: "final" as const,
+        scheduleText: "pending",
+        startAt: null,
+        endAt: null,
+        dateLabel: null,
+        location: null,
+        seat: null
+      }]
+    };
+    const connector = createZjuGraduateConnector({
+      loadAcademicProfileProof: async () => ({
+        studentId: "2240100001",
+        verifiedAt: "2026-07-19T04:00:00.000Z",
+        verifiedService: "zju-unified-auth"
+      }),
+      fetchTimetableTerms: async (queries) => queries.map((query, index) => index === 0
+        ? { query, ok: true as const, body: timetableBody }
+        : { query, ok: false as const, message: "term unavailable" }),
+      loadCachedTimetable: async () => cachedTimetable,
+      fetchExams: async (queries) => queries.map((query) => ({ ...query, ok: false as const, message: "exam unavailable" })),
+      loadCachedExams: async () => cachedExams,
+      fetchGrades: async () => ({ ok: true as const, body: gradesBody }),
+      loadCachedGrades: async () => null,
+      loadCachedCourseCatalog: async () => null,
+      publish,
+      registerRefreshJob: () => vi.fn(),
+      now: () => now
+    });
+
+    await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      capability: "academic.course-catalog@1",
+      state: "fallback",
+      data: expect.objectContaining({
+        courses: expect.arrayContaining([
+          expect.objectContaining({
+            courseName: "cached graduate course",
+            examSourceIds: ["cached-graduate-exam"]
+          })
+        ])
+      })
     }));
   });
 });

@@ -15,7 +15,25 @@ export interface AcademicGradeSummary {
   majorGradedCredits: number;
   weightedGradePoint: number | null;
   majorWeightedGradePoint: number | null;
+  fivePointGpa: number | null;
+  fourPointGpa: number | null;
+  fourPointLegacyGpa: number | null;
+  hundredPointGpa: number | null;
+  majorFivePointGpa: number | null;
+  majorFourPointGpa: number | null;
+  majorFourPointLegacyGpa: number | null;
+  majorHundredPointGpa: number | null;
+  weighted: boolean;
   terms: AcademicGradeTermSummary[];
+}
+
+export interface AcademicGpaResult {
+  fivePoint: number | null;
+  fourPoint: number | null;
+  fourPointLegacy: number | null;
+  hundredPoint: number | null;
+  credits: number;
+  earnedCredits: number;
 }
 
 export interface GpaScaleInfo {
@@ -83,23 +101,61 @@ const CREDIT_EXCLUDED_SCORES = new Set([
 ]);
 const GPA_EXCLUDED_SCORES = new Set(["\u5408\u683c", "\u4e0d\u5408\u683c"]);
 
+const FIVE_TO_FOUR = new Map<number, number>([
+  [5, 4.3],
+  [4.8, 4.2],
+  [4.5, 4.1],
+  [4.2, 4]
+]);
+
+const LABEL_TO_HUNDRED = new Map<string, number>([
+  ["A+", 95], ["A", 90], ["A-", 87], ["B+", 83], ["B", 80],
+  ["B-", 77], ["C+", 73], ["C", 70], ["C-", 67], ["D", 60],
+  ["F", 0], ["优秀", 90], ["良好", 80], ["中等", 70], ["及格", 60],
+  ["不及格", 0], ["合格", 75], ["不合格", 0], ["弃修", 0],
+  ["缺考", 0], ["缓考", 0], ["待录", 0], ["无效", 0]
+]);
+
 const validCredit = (grade: AcademicGradeRecord): number =>
   Number.isFinite(grade.credit) && grade.credit > 0 ? grade.credit : 0;
 
 const creditIncluded = (grade: AcademicGradeRecord): boolean =>
-  !CREDIT_EXCLUDED_SCORES.has(grade.originalScore);
+  grade.creditIncluded ?? !CREDIT_EXCLUDED_SCORES.has(grade.originalScore);
 
 const gpaIncluded = (grade: AcademicGradeRecord): boolean =>
-  creditIncluded(grade) &&
-  !GPA_EXCLUDED_SCORES.has(grade.originalScore) &&
-  !grade.sourceId.includes("xtwkc");
+  grade.gpaIncluded ?? (
+    creditIncluded(grade) &&
+    !GPA_EXCLUDED_SCORES.has(grade.originalScore) &&
+    !grade.sourceId.includes("xtwkc")
+  );
+
+const fivePoint = (grade: AcademicGradeRecord): number =>
+  grade.gradePoint !== null && Number.isFinite(grade.gradePoint)
+    ? grade.gradePoint
+    : 0;
+
+const fourPoint = (grade: AcademicGradeRecord): number => {
+  const source = fivePoint(grade);
+  return source > 4 ? FIVE_TO_FOUR.get(source) ?? 4 : source;
+};
+
+const fourPointLegacy = (grade: AcademicGradeRecord): number => {
+  const source = fivePoint(grade);
+  return source > 4 ? 4 : source;
+};
+
+const hundredPoint = (grade: AcademicGradeRecord): number => {
+  const original = grade.originalScore.trim();
+  const mapped = LABEL_TO_HUNDRED.get(original);
+  if (mapped !== undefined) return mapped;
+  const numeric = original.match(/\d+/)?.[0];
+  return numeric ? Number.parseInt(numeric, 10) : 0;
+};
 
 const earnedCredit = (grade: AcademicGradeRecord): number => {
   const credit = validCredit(grade);
   if (!creditIncluded(grade)) return 0;
-  return grade.gradePoint !== null &&
-    Number.isFinite(grade.gradePoint) &&
-    (grade.gradePoint !== 0 || grade.sourceId.includes("xtwkc"))
+  return (fivePoint(grade) !== 0 || grade.sourceId.includes("xtwkc"))
     ? credit
     : 0;
 };
@@ -122,39 +178,55 @@ export const inferGpaScale = (
   grades: readonly AcademicGradeRecord[]
 ): GpaScale => {
   for (const grade of grades) {
-    if (grade.gradePoint !== null && grade.gradePoint > 4.0) return "5.0";
+    if (fivePoint(grade) > 4.0) return "5.0";
   }
   return "4.0";
 };
 
+export const calculateAcademicGpa = (
+  grades: readonly AcademicGradeRecord[],
+  weightMap: ReadonlyMap<string, number> = new Map()
+): AcademicGpaResult => {
+  const included = grades.filter(gpaIncluded);
+  const credits = included.reduce((total, grade) => total + validCredit(grade), 0);
+  const earnedCredits = grades.reduce((total, grade) => total + earnedCredit(grade), 0);
+  if (credits <= 0) {
+    return { fivePoint: null, fourPoint: null, fourPointLegacy: null, hundredPoint: null, credits: 0, earnedCredits };
+  }
+  const totals = included.reduce(
+    (sum, grade) => {
+      const weight = Number.isFinite(weightMap.get(grade.sourceId))
+        ? Math.max(0, weightMap.get(grade.sourceId) ?? 1)
+        : 1;
+      const credit = validCredit(grade);
+      sum.fivePoint += fivePoint(grade) * weight * credit;
+      sum.fourPoint += fourPoint(grade) * weight * credit;
+      sum.fourPointLegacy += fourPointLegacy(grade) * weight * credit;
+      sum.hundredPoint += hundredPoint(grade) * weight * credit;
+      return sum;
+    },
+    { fivePoint: 0, fourPoint: 0, fourPointLegacy: 0, hundredPoint: 0 }
+  );
+  return {
+    fivePoint: totals.fivePoint / credits,
+    fourPoint: totals.fourPoint / credits,
+    fourPointLegacy: totals.fourPointLegacy / credits,
+    hundredPoint: totals.hundredPoint / credits,
+    credits,
+    earnedCredits
+  };
+};
+
 export const summarizeAcademicGrades = (
-  grades: readonly AcademicGradeRecord[]
+  grades: readonly AcademicGradeRecord[],
+  weightMap: ReadonlyMap<string, number> = new Map()
 ): AcademicGradeSummary => {
   const terms = new Map<string, AcademicGradeTermSummary>();
   let totalCredits = 0;
-  let gradedCredits = 0;
-  let weightedGradePointTotal = 0;
-  let majorGradedCredits = 0;
-  let majorWeightedGradePointTotal = 0;
 
   for (const grade of grades) {
     const credit = validCredit(grade);
     totalCredits += earnedCredit(grade);
-
-    if (
-      gpaIncluded(grade) &&
-      grade.gradePoint !== null &&
-      Number.isFinite(grade.gradePoint) &&
-      credit > 0
-    ) {
-      gradedCredits += credit;
-      weightedGradePointTotal += grade.gradePoint * credit;
-
-      if (grade.isMajorCourse) {
-        majorGradedCredits += credit;
-        majorWeightedGradePointTotal += grade.gradePoint * credit;
-      }
-    }
 
     const key = createTermKey(grade);
     const term = terms.get(key) ?? {
@@ -170,17 +242,29 @@ export const summarizeAcademicGrades = (
     terms.set(key, term);
   }
 
+  const overall = calculateAcademicGpa(grades, weightMap);
+  const major = calculateAcademicGpa(
+    grades.filter((grade) => grade.isMajorCourse),
+    weightMap
+  );
+  const sourceScale = inferGpaScale(grades);
+
   return {
     courseCount: grades.length,
     totalCredits,
-    gradedCredits,
-    majorGradedCredits,
-    weightedGradePoint:
-      gradedCredits > 0 ? weightedGradePointTotal / gradedCredits : null,
-    majorWeightedGradePoint:
-      majorGradedCredits > 0
-        ? majorWeightedGradePointTotal / majorGradedCredits
-        : null,
+    gradedCredits: overall.credits,
+    majorGradedCredits: major.credits,
+    weightedGradePoint: overall[sourceScale === "5.0" ? "fivePoint" : sourceScale === "4.3" ? "fourPoint" : "fourPointLegacy"],
+    majorWeightedGradePoint: major[sourceScale === "5.0" ? "fivePoint" : sourceScale === "4.3" ? "fourPoint" : "fourPointLegacy"],
+    fivePointGpa: overall.fivePoint,
+    fourPointGpa: overall.fourPoint,
+    fourPointLegacyGpa: overall.fourPointLegacy,
+    hundredPointGpa: overall.hundredPoint,
+    majorFivePointGpa: major.fivePoint,
+    majorFourPointGpa: major.fourPoint,
+    majorFourPointLegacyGpa: major.fourPointLegacy,
+    majorHundredPointGpa: major.hundredPoint,
+    weighted: weightMap.size > 0,
     terms: [...terms.values()].sort(compareTerms)
   };
 };

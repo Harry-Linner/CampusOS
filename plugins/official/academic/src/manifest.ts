@@ -9,18 +9,26 @@ export const manifest: PluginManifestV2 = {
   kind: "feature",
   description: "统一查看课表、课程、考试、成绩与实践数据。",
   icon: "Grades",
-  permissions: [],
+  permissions: ["storage:local"],
   sourceScope: [
+    "capability:academic.profile",
+    "capability:academic.course-catalog",
+    "capability:academic.calendar-config",
     "capability:academic.timetable",
     "capability:academic.exams",
     "capability:academic.grades"
   ],
   releaseStage: "ready",
   provides: [],
-  requires: ["academic.grades@1"],
-  optionalRequires: [
+  requires: [
+    "academic.profile@1",
+    "academic.course-catalog@1",
     "academic.timetable@1",
     "academic.exams@1",
+    "academic.grades@1"
+  ],
+  optionalRequires: [
+    "academic.calendar-config@1",
     "calendar.events@1",
     "practice.records@1"
   ],

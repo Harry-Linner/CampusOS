@@ -33,8 +33,19 @@ const QUALITY_DEVELOPMENT_CONTEXT_URL =
   "https://sztz.zju.edu.cn/dekt/ctx";
 const QUALITY_DEVELOPMENT_PROFILE_URL =
   "https://sztz.zju.edu.cn/dekt/student/home/getMyInfo";
+const QUALITY_DEVELOPMENT_PRACTICE_URL =
+  "https://sztz.zju.edu.cn/dekt/student/home/getSqjl";
 const DEFAULT_TIMEOUT_MS = 8_000;
 const LEARNING_API_TIMEOUT_MS = 30_000;
+const LEARNING_API_MAX_ATTEMPTS = 6;
+const LEARNING_API_INITIAL_RETRY_DELAY_MS = 100;
+const QUALITY_DEVELOPMENT_PRACTICE_TIMEOUT_MS = 12_000;
+// Celechron lib/http/zjuServices/sztz.dart::_practiceAccept is preserved
+// verbatim for the TypeScript transport adapter.
+const QUALITY_DEVELOPMENT_PRACTICE_ACCEPT =
+  "text/html,application/xhtml+xml,application/xml;q=0.9," +
+  "image/avif,image/webp,image/apng,*/*;q=0.8," +
+  "application/signed-exchange;v=b3;q=0.7";
 const MAX_RESPONSE_LENGTH = 1_048_576;
 const SSO_PROCESS_COOKIE_LIFETIME_MS = 2 * 60 * 1_000;
 
@@ -133,6 +144,15 @@ export interface ZjuLearningDownloadRequest {
   referenceId: string;
   signal: AbortSignal;
   range?: string;
+}
+
+export type ZjuQualityDevelopmentServiceRequest =
+  | { operation: "practice" }
+  | { operation: "summary" };
+
+export interface ZjuQualityDevelopmentServiceResponse {
+  status: number;
+  body: string;
 }
 
 export interface ZjuLearningDownloadTransportRequest {
@@ -1003,6 +1023,8 @@ class ZjuUnifiedAuthClient {
   >();
   readonly #learningSessions = new Map<string, CookieJar>();
   readonly #pendingLearningSessions = new Map<string, Promise<CookieJar>>();
+  readonly #qualitySessions = new Map<string, CookieJar>();
+  readonly #pendingQualitySessions = new Map<string, Promise<CookieJar>>();
   readonly #graduateSessions = new Map<string, string>();
   readonly #pendingGraduateSessions = new Map<string, Promise<string>>();
   readonly #activeCasSessions = new Map<string, ActiveCasSession>();
@@ -1321,19 +1343,41 @@ class ZjuUnifiedAuthClient {
     session: CookieJar,
     url: string
   ): Promise<ZjuAuthHttpResponse> {
-    const response = await this.#request("GET", url, {
-      cookie: session.header(url),
-      minimalHeaders: true,
-      headers: {},
-      // zju-learning-assistant uses reqwest's 30 second default timeout for
-      // course, activity and todo data requests.
-      timeoutMs: LEARNING_API_TIMEOUT_MS
-    });
-    session.store(
-      url,
-      getHeaderValues(response.headers, "set-cookie")
+    let retryDelayMs = LEARNING_API_INITIAL_RETRY_DELAY_MS;
+    for (let attempt = 0; attempt < LEARNING_API_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await this.#request("GET", url, {
+          cookie: session.header(url),
+          minimalHeaders: true,
+          headers: {},
+          timeoutMs: LEARNING_API_TIMEOUT_MS
+        });
+        session.store(
+          url,
+          getHeaderValues(response.headers, "set-cookie")
+        );
+        return response;
+      } catch (error) {
+        const transient =
+          error instanceof ZjuUnifiedAuthError &&
+          (error.code === "timeout" || error.code === "network-error");
+        if (!transient || attempt === LEARNING_API_MAX_ATTEMPTS - 1) {
+          throw error;
+        }
+
+        // zju-learning-assistant src-tauri/src/zju_assist.rs:65-122 retries
+        // transport failures six times with exponential backoff. Electron has
+        // one Node HTTPS transport, so only the proxy/no-proxy client switch is
+        // a mechanical transport adaptation; attempt order and delays match.
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelayMs));
+        retryDelayMs *= 2;
+      }
+    }
+
+    throw new ZjuUnifiedAuthError(
+      "network-error",
+      "å­¦åœ¨æµ™å¤§ä¸šåŠ¡æŽ¥å£è¯·æ±‚å¤±è´¥ã€‚"
     );
-    return response;
   }
 
   async #connectLearningSession(casCookies: CookieJar): Promise<CookieJar> {
@@ -1661,6 +1705,96 @@ class ZjuUnifiedAuthClient {
     );
   }
 
+  async requestQualityDevelopmentService(
+    credentials: ZjuAuthCredentials,
+    request: ZjuQualityDevelopmentServiceRequest
+  ): Promise<ZjuQualityDevelopmentServiceResponse> {
+    const requestUrl = request.operation === "practice"
+      ? QUALITY_DEVELOPMENT_PRACTICE_URL
+      : QUALITY_DEVELOPMENT_PROFILE_URL;
+    const username = credentials.username.trim();
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      // Celechron lib/http/zjuServices/sztz.dart::login uses _loginFuture to
+      // consume a CAS ticket once. This map is the TypeScript single-flight
+      // adaptation for concurrent practice/summary calls.
+      const session = await this.#getQualitySession(credentials);
+
+      const response = await this.#request("GET", requestUrl, {
+        cookie: session.header(requestUrl),
+        headers: {
+          Accept: request.operation === "practice"
+            ? QUALITY_DEVELOPMENT_PRACTICE_ACCEPT
+            : "application/json, text/plain, */*",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache"
+        },
+        // Celechron lib/http/zjuServices/sztz.dart::_requestPracticeData uses
+        // a 12-second timeout; #request supplies AbortSignal to Node HTTPS.
+        timeoutMs: request.operation === "practice"
+          ? QUALITY_DEVELOPMENT_PRACTICE_TIMEOUT_MS
+          : this.#timeoutMs
+      });
+      session.store(requestUrl, getHeaderValues(response.headers, "set-cookie"));
+
+      const expired = response.status === 401 ||
+        response.status === 403 ||
+        isRedirect(response.status) ||
+        serviceBodyIndicatesExpiredSession(response.body);
+      if (expired && attempt === 0) {
+        this.#qualitySessions.delete(username);
+        continue;
+      }
+      if (expired) {
+        throw new ZjuUnifiedAuthError(
+          "service-verification-failed",
+          "素质拓展业务会话已失效，重新认证后仍无法访问。",
+          { statusCode: response.status }
+        );
+      }
+
+      validateStatus(
+        response,
+        request.operation === "practice"
+          ? "素质拓展实践项目接口"
+          : "素质拓展 getMyInfo 接口"
+      );
+      return { status: response.status, body: response.body };
+    }
+
+    throw new ZjuUnifiedAuthError(
+      "service-verification-failed",
+      "素质拓展业务会话建立失败。"
+    );
+  }
+
+  async #getQualitySession(credentials: ZjuAuthCredentials): Promise<CookieJar> {
+    const username = credentials.username.trim();
+    const cached = this.#qualitySessions.get(username);
+    if (cached) return cached;
+
+    const pending = this.#pendingQualitySessions.get(username);
+    if (pending) return pending;
+
+    const operation = this.#authenticateCas(credentials).then(async (cas) => {
+      const connected = await this.#connectQualityDevelopmentProfile(
+        cas.cookies,
+        username,
+        this.#now().toISOString()
+      );
+      this.#qualitySessions.set(username, connected.session);
+      return connected.session;
+    });
+    this.#pendingQualitySessions.set(username, operation);
+    try {
+      return await operation;
+    } finally {
+      if (this.#pendingQualitySessions.get(username) === operation) {
+        this.#pendingQualitySessions.delete(username);
+      }
+    }
+  }
+
   async requestGraduateService(
     credentials: ZjuAuthCredentials,
     request: ZjuGraduateServiceRequest
@@ -1845,7 +1979,7 @@ class ZjuUnifiedAuthClient {
     casCookies: CookieJar,
     username: string,
     authenticatedAt: string
-  ): Promise<ZjuAuthenticatedProfile> {
+  ): Promise<{ profile: ZjuAuthenticatedProfile; session: CookieJar }> {
     const serviceLoginUrl = new URL(ZJU_AUTH_LOGIN_URL);
     serviceLoginUrl.searchParams.set("service", QUALITY_DEVELOPMENT_SERVICE_URL);
     const serviceResponse = await this.#request("GET", serviceLoginUrl.href, {
@@ -1928,17 +2062,22 @@ class ZjuUnifiedAuthClient {
       }
     );
     validateStatus(profileResponse, "素质拓展个人汇总接口");
-    return parseAuthenticatedProfile(
-      profileResponse.body,
-      username,
-      authenticatedAt
-    );
+    return {
+      profile: parseAuthenticatedProfile(
+        profileResponse.body,
+        username,
+        authenticatedAt
+      ),
+      session: qualityCookies
+    };
   }
 
   clearServiceSessions(): void {
     this.#undergraduateSessions.clear();
     this.#pendingUndergraduateSessions.clear();
     this.#learningSessions.clear();
+    this.#qualitySessions.clear();
+    this.#pendingQualitySessions.clear();
     this.#pendingLearningSessions.clear();
     this.#graduateSessions.clear();
     this.#pendingGraduateSessions.clear();
@@ -2024,13 +2163,18 @@ class ZjuUnifiedAuthClient {
       const fulfilled = serviceResults as [
         PromiseFulfilledResult<CookieJar>,
         PromiseFulfilledResult<CookieJar>,
-        PromiseFulfilledResult<ZjuAuthenticatedProfile>
+        PromiseFulfilledResult<{
+          profile: ZjuAuthenticatedProfile;
+          session: CookieJar;
+        }>
       ];
       const learningCookies = fulfilled[0].value;
       const serviceCookies = fulfilled[1].value;
-      const authenticatedProfile = fulfilled[2].value;
+      const qualityResult = fulfilled[2].value;
+      const authenticatedProfile = qualityResult.profile;
       this.#undergraduateSessions.set(username, serviceCookies);
       this.#learningSessions.set(username, learningCookies);
+      this.#qualitySessions.set(username, qualityResult.session);
 
       return {
         provider: "zju-unified-auth",

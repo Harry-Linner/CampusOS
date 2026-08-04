@@ -29,6 +29,11 @@ export interface StoredPlannerSchedule {
   savedAt: string;
 }
 
+export interface StoredAcademicGpaWeights {
+  weights: Record<string, number>;
+  savedAt: string;
+}
+
 export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
@@ -48,6 +53,12 @@ export interface DatabaseService {
   loadLocalTasks: () => StoredLocalTasks | null;
   savePlannerSchedule: (schedule: unknown, savedAt: string) => void;
   loadPlannerSchedule: () => StoredPlannerSchedule | null;
+  saveAcademicGpaWeights: (
+    accountId: string,
+    weights: Record<string, number>,
+    savedAt: string
+  ) => void;
+  loadAcademicGpaWeights: (accountId: string) => StoredAcademicGpaWeights | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -110,6 +121,14 @@ const migrate = (database: Database.Database): void => {
     CREATE TABLE planner_schedules (
       singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
       schedule_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+  `);
+  applyMigration(4, `
+    CREATE TABLE academic_gpa_weights (
+      account_key TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL,
+      weights_json TEXT NOT NULL,
       saved_at TEXT NOT NULL
     );
   `);
@@ -258,6 +277,54 @@ export const createDatabaseService = ({
         "SELECT schedule_json, saved_at FROM planner_schedules WHERE singleton = 1"
       ).get() as { schedule_json: string; saved_at: string } | undefined;
       return row ? { schedule: JSON.parse(row.schedule_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    saveAcademicGpaWeights: (accountId, weights, savedAt) => {
+      if (!accountId.trim()) throw new Error("GPA 权重账户不能为空。");
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("GPA 权重保存时间无效。");
+      }
+      const normalized: Record<string, number> = {};
+      for (const [courseId, rawWeight] of Object.entries(weights)) {
+        if (!courseId.trim()) continue;
+        if (!Number.isFinite(rawWeight) || rawWeight < 0 || rawWeight > 100) {
+          throw new Error("GPA 权重必须是 0 到 100 之间的有限数值。");
+        }
+        normalized[courseId] = rawWeight;
+      }
+      database.prepare(`
+        INSERT INTO academic_gpa_weights (account_key, account_id, weights_json, saved_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(account_key) DO UPDATE SET
+          account_id = excluded.account_id,
+          weights_json = excluded.weights_json,
+          saved_at = excluded.saved_at
+      `).run(
+        capabilityAccountKey(accountId),
+        accountId,
+        JSON.stringify(normalized),
+        savedAt
+      );
+    },
+    loadAcademicGpaWeights: (accountId) => {
+      if (!accountId.trim()) return null;
+      const row = database.prepare(`
+        SELECT weights_json, saved_at
+        FROM academic_gpa_weights
+        WHERE account_key = ? AND account_id = ?
+      `).get(capabilityAccountKey(accountId), accountId) as {
+        weights_json: string;
+        saved_at: string;
+      } | undefined;
+      if (!row) return null;
+      const parsed = JSON.parse(row.weights_json) as unknown;
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+      const weights: Record<string, number> = {};
+      for (const [courseId, value] of Object.entries(parsed)) {
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100) {
+          weights[courseId] = value;
+        }
+      }
+      return { weights, savedAt: row.saved_at };
     }
   };
 };

@@ -627,7 +627,22 @@ describe("workspace capability integration", () => {
       state: "live",
       updatedAt: "2026-07-20T09:00:00.000Z",
       data: {
-        courses: [],
+        courses: [
+          {
+            sourceId: "course-target",
+            name: "target course",
+            academicYearId: "2025-2026",
+            semesterId: "spring-summer",
+            semesterName: "2025-2026春夏"
+          },
+          {
+            sourceId: "course-outside",
+            name: "outside course",
+            academicYearId: "2024-2025",
+            semesterId: "spring-summer",
+            semesterName: "2024-2025春夏"
+          }
+        ],
         materials: [
           material,
           { ...material, sourceId: "2:200", semesterName: "2025-2026春" },
@@ -638,6 +653,13 @@ describe("workspace capability integration", () => {
     });
 
     expect(refreshed.materials.map((item) => item.id)).toEqual(["1:100", "2:200"]);
+    expect(refreshed.materialCourses).toEqual([
+      {
+        id: "course-target",
+        name: "target course",
+        semester: "2025-2026春夏"
+      }
+    ]);
     expect(refreshed.summary.materialsReady).toBe(2);
   });
 });

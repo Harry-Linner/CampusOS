@@ -9,9 +9,13 @@ import type {
   PluginCapability,
   PluginCapabilityClient
 } from "@campusos/shared";
+import type { CampusosBridge } from "../../shared/campusBridge";
 import { Component as AcademicGradesView } from "@campusos/plugin-academic-grades";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  delete window.campusos;
+});
 
 const liveRecord: CapabilityRecord<AcademicGradesData> = {
   capability: "academic.grades@1",
@@ -98,7 +102,7 @@ describe("AcademicGradesView", () => {
     }));
 
     await screen.findByText("程序设计");
-    expect(screen.getAllByText("***")).toHaveLength(6);
+    expect(screen.getAllByText("***")).toHaveLength(14);
     expect(screen.queryByText("92")).toBeNull();
     expect(screen.queryByText("85")).toBeNull();
     expect(screen.queryByText("绩点 4.2")).toBeNull();
@@ -110,7 +114,41 @@ describe("AcademicGradesView", () => {
     expect(screen.getByText("85")).toBeDefined();
     expect(screen.getByText("绩点 4.2")).toBeDefined();
     expect(screen.getByText("绩点 3.7")).toBeDefined();
-    expect(screen.getAllByText("3.89")).toHaveLength(2);
+    expect(screen.getAllByText("3.89")).toHaveLength(4);
     expect(screen.queryByText("***")).toBeNull();
+  });
+
+  it("restores the last persisted GPA weight when saving fails", async () => {
+    const sourceId = "org.campusos.zju-undergraduate:grade-1";
+    window.campusos = {
+      academic: {
+        loadGpaWeights: vi.fn(async () => ({
+          weights: { [sourceId]: 1 },
+          savedAt: "2026-08-04T00:00:00.000Z"
+        })),
+        saveGpaWeights: vi.fn(async () => {
+          throw new Error("权重保存失败。");
+        })
+      }
+    } as unknown as CampusosBridge;
+    const capabilities: PluginCapabilityClient = {
+      read: async <T>() => [liveRecord] as unknown as CapabilityRecord<T>[]
+    };
+
+    render(createElement(AcademicGradesView, {
+      capabilities,
+      loading: false,
+      onRefresh: vi.fn(async () => undefined),
+      snapshot: null
+    }));
+
+    await screen.findByText("程序设计");
+    const input = screen.getByLabelText("程序设计 权重") as HTMLInputElement;
+    expect(input.value).toBe("1");
+    fireEvent.change(input, { target: { value: "2" } });
+    fireEvent.blur(input);
+
+    expect((await screen.findByRole("alert")).textContent).toContain("权重保存失败");
+    expect(input.value).toBe("1");
   });
 });

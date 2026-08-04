@@ -473,6 +473,7 @@ export const loadCampusWorkspace = async (
     courses,
     todayCourses,
     deadlines,
+    materialCourses: [],
     materials,
     downloads,
     reminders,

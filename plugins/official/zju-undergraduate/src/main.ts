@@ -1,10 +1,17 @@
 import type {
   AcademicExamRecord,
   AcademicExamsData,
+  AcademicCourseCatalogData,
+  AcademicCourseRecord,
   AcademicGradeRecord,
   AcademicGradesData,
+  AcademicPracticeData,
+  AcademicPracticeRecord,
+  AcademicPracticeSummary,
+  AcademicPracticeSummarySource,
   AcademicProfileData,
   AcademicTimetableData,
+  AcademicTimetableTermData,
   AcademicTimetableSeason,
   AcademicTimetableSession,
   CapabilityPublication,
@@ -44,6 +51,16 @@ export type GradesFetchResult =
   | { ok: true; body: string; majorBody: string }
   | { ok: false; message: string };
 
+export type PracticeFetchResult =
+  | {
+      ok: true;
+      body?: string;
+      summaryBody?: string;
+      detailsMessage?: string;
+      summaryMessage?: string;
+    }
+  | { ok: false; message: string };
+
 export interface ZjuUndergraduateConnectorDependencies {
   loadAcademicProfileProof: () => Promise<AcademicProfileProof | null>;
   fetchTimetableTerms: (
@@ -56,12 +73,17 @@ export interface ZjuUndergraduateConnectorDependencies {
   loadCachedExams: (accountId: string) => Promise<AcademicExamsData | null>;
   fetchGrades: () => Promise<GradesFetchResult>;
   loadCachedGrades: (accountId: string) => Promise<AcademicGradesData | null>;
+  fetchPractice?: () => Promise<PracticeFetchResult>;
+  loadCachedPractice?: (accountId: string) => Promise<AcademicPracticeData | null>;
+  loadCachedCourseCatalog?: (accountId: string) => Promise<AcademicCourseCatalogData | null>;
   publish: (
     publication: CapabilityPublication<
       | AcademicProfileData
       | AcademicTimetableData
       | AcademicExamsData
       | AcademicGradesData
+      | AcademicCourseCatalogData
+      | AcademicPracticeData
     >
   ) => Promise<void>;
   registerRefreshJob: (
@@ -122,6 +144,13 @@ const asNumber = (value: unknown): number | null => {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+};
+
+// Celechron lib/model/grade.dart:28-34. Keep the raw xkkh as sourceId while
+// exposing the same stable display id used to join a course's public details.
+export const deriveCelechronRealId = (id: string): string => {
+  const match = id.match(/(\(.*\)-.*?)-.*/);
+  return match?.[1] ?? (id.length < 22 ? id : id.slice(0, 22));
 };
 
 const decodeText = (value: string): string =>
@@ -345,6 +374,7 @@ const parseGradeRecord = (
 
   return {
     sourceId,
+    realId: deriveCelechronRealId(sourceId),
     courseCode: asString(item.kch)?.trim() || termMatch?.[4] || null,
     courseName: (asString(item.kcmc)?.trim() || "未知课程")
       .replaceAll("(", "（")
@@ -400,6 +430,363 @@ export const parseGradesResponse = (
   };
 };
 
+const seasonForTerm = (termNumber: 1 | 2 | null): AcademicTimetableSeason | null =>
+  termNumber === 1 ? "1|秋" : termNumber === 2 ? "2|春" : null;
+
+const academicTermFromSourceId = (
+  sourceId: string
+): { academicYearStart: number; termNumber: 1 | 2 } | null => {
+  const match = sourceId.match(/^\((\d{4})-(\d{4})-([12])\)/);
+  if (!match || Number(match[2]) !== Number(match[1]) + 1) return null;
+  return {
+    academicYearStart: Number(match[1]),
+    termNumber: Number(match[3]) as 1 | 2
+  };
+};
+
+/**
+ * Celechron's scholar model exposes one course record which owns its grade,
+ * sessions and exams. CampusOS keeps the same projection at the capability
+ * boundary so the renderer never has to join raw connector responses.
+ */
+export const buildCourseCatalog = ({
+  terms,
+  exams,
+  grades
+}: {
+  terms: readonly AcademicTimetableTermData[];
+  exams: readonly AcademicExamRecord[];
+  grades: readonly AcademicGradeRecord[];
+}): AcademicCourseCatalogData => {
+  const byKey = new Map<string, AcademicCourseRecord>();
+  const gradeByKey = new Map<string, AcademicGradeRecord>();
+  const sourceToKey = new Map<string, string>();
+  for (const grade of grades) {
+    const term = academicTermFromSourceId(grade.sourceId);
+    const key = `${term?.academicYearStart ?? grade.academicYearStart ?? "unknown"}:` +
+      `${term?.termNumber ?? grade.termNumber ?? "unknown"}:${grade.courseName}`;
+    gradeByKey.set(key, grade);
+    sourceToKey.set(grade.sourceId, key);
+    const season = seasonForTerm(term?.termNumber ?? grade.termNumber);
+    byKey.set(key, {
+      sourceId: grade.sourceId,
+      realId: grade.realId ?? deriveCelechronRealId(grade.sourceId),
+      courseCode: grade.courseCode,
+      courseName: grade.courseName,
+      teachers: [],
+      credit: grade.credit,
+      academicYearStart: term?.academicYearStart ?? grade.academicYearStart,
+      season,
+      semesterLabel: term?.academicYearStart && season
+        ? `${term.academicYearStart}-${term.academicYearStart + 1} ${season}`
+        : null,
+      courseCategory: grade.courseCategory,
+      gradeSourceId: grade.sourceId,
+      examSourceIds: [],
+      sessions: []
+    });
+  }
+
+  for (const term of terms) {
+    for (const session of term.sessions) {
+      const keyPrefix = `${term.academicYearStart}:` +
+        `${term.season.startsWith("1|") ? 1 : 2}:${session.courseName}`;
+      const key = keyPrefix;
+      const existing = byKey.get(key) ?? {
+        sourceId: session.sourceId,
+        realId: null,
+        courseCode: null,
+        courseName: session.courseName,
+        teachers: [],
+        credit: 0,
+        academicYearStart: term.academicYearStart,
+        season: term.season,
+        semesterLabel: `${term.academicYearStart}-${term.academicYearStart + 1} ${term.season}`,
+        courseCategory: null,
+        gradeSourceId: null,
+        examSourceIds: [],
+        sessions: []
+      };
+      if (!existing.teachers.includes(session.teacher)) existing.teachers.push(session.teacher);
+      const firstPeriod = session.periods[0];
+      const duplicate = existing.sessions.find((candidate) =>
+        candidate.dayOfWeek === session.dayOfWeek &&
+        candidate.weekPattern === session.weekPattern &&
+        candidate.location === session.location &&
+        candidate.periods.includes(firstPeriod)
+      );
+      if (duplicate) {
+        duplicate.firstHalf ||= session.firstHalf;
+        duplicate.secondHalf ||= session.secondHalf;
+      } else {
+        const adjacent = existing.sessions.find((candidate) =>
+          candidate.dayOfWeek === session.dayOfWeek &&
+          candidate.weekPattern === session.weekPattern &&
+          candidate.location === session.location &&
+          candidate.periods.at(-1)! + 1 === firstPeriod
+        );
+        if (adjacent) {
+          adjacent.periods.push(...session.periods);
+          adjacent.firstHalf ||= session.firstHalf;
+          adjacent.secondHalf ||= session.secondHalf;
+        } else {
+          existing.sessions.push({
+            ...session,
+            periods: [...session.periods],
+            ...(session.weeks ? { weeks: [...session.weeks] } : {})
+          });
+        }
+      }
+      byKey.set(key, existing);
+    }
+  }
+
+  for (const exam of exams) {
+    const term = academicTermFromSourceId(exam.courseId);
+    const key = `${term?.academicYearStart ?? "unknown"}:` +
+      `${term?.termNumber ?? "unknown"}:${exam.courseName}`;
+    const existingKey = sourceToKey.get(exam.courseId) ?? key;
+    const existing = byKey.get(existingKey) ?? {
+      sourceId: exam.courseId,
+      realId: deriveCelechronRealId(exam.courseId),
+      courseCode: null,
+      courseName: exam.courseName,
+      teachers: [],
+      credit: 0,
+      academicYearStart: term?.academicYearStart ?? null,
+      season: seasonForTerm(term?.termNumber ?? null),
+      semesterLabel: term?.academicYearStart && term.termNumber
+        ? `${term.academicYearStart}-${term.academicYearStart + 1} ${seasonForTerm(term.termNumber)}`
+        : null,
+      courseCategory: null,
+      gradeSourceId: null,
+      examSourceIds: [],
+      sessions: []
+    };
+    if (!existing.examSourceIds.includes(exam.sourceId)) {
+      existing.examSourceIds.push(exam.sourceId);
+    }
+    byKey.set(existingKey, existing);
+    sourceToKey.set(exam.courseId, existingKey);
+  }
+
+  return {
+    courses: [...byKey.values()].sort((left, right) =>
+      (right.academicYearStart ?? -1) - (left.academicYearStart ?? -1) ||
+      left.courseName.localeCompare(right.courseName, "zh-CN")
+    )
+  };
+};
+
+const parseDateValue = (value: unknown): string | null => {
+  const text = asString(value)?.trim();
+  if (!text) return null;
+
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compact) {
+    const year = Number.parseInt(compact[1], 10);
+    const month = Number.parseInt(compact[2], 10);
+    const day = Number.parseInt(compact[3], 10);
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+    if (
+      candidate.getUTCFullYear() !== year ||
+      candidate.getUTCMonth() !== month - 1 ||
+      candidate.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return candidate.toISOString();
+  }
+
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+};
+
+const parsePracticeNumber = (value: unknown, fallback = 0): number => {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return fallback;
+  }
+  const parsed = asNumber(value);
+  if (parsed === null || !Number.isFinite(parsed)) {
+    throw new Error("Practice score field is not a finite number.");
+  }
+  return parsed;
+};
+
+const practiceCategory = (value: Record<string, unknown>): { id: number; name: string } => {
+  const category = asRecord(value.xmfl) ?? {};
+  const actualName = asString(category.mc)?.trim() ?? "";
+  const actualNameId = actualName === "\u7b2c\u4e8c\u8bfe\u5802"
+    ? 1
+    : actualName === "\u7b2c\u4e09\u8bfe\u5802"
+      ? 2
+      : actualName === "\u7b2c\u56db\u8bfe\u5802"
+        ? 3
+        : null;
+  if (asInteger(category.id) === null && actualNameId !== null) {
+    return { id: actualNameId, name: actualName };
+  }
+  const name = asString(category.mc)?.trim() ?? "未分类课堂";
+  const id = asInteger(category.id) ??
+    (name === "第二课堂" ? 1 : name === "第三课堂" ? 2 : name === "第四课堂" ? 3 : 0);
+  return { id, name: name === "未分类课堂" && id > 0 ? `${["", "第二", "第三", "第四"][id]}课堂` : name };
+};
+
+export const parsePracticeRecordsResponse = (body: string): AcademicPracticeRecord[] => {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch (error) {
+    throw new Error("素质拓展实践记录响应不是有效 JSON。", { cause: error });
+  }
+  const record = asRecord(payload);
+  const values = Array.isArray(record?.data)
+    ? record.data
+    : Array.isArray(payload)
+      ? payload
+      : null;
+  if (!values) throw new Error("素质拓展实践记录响应缺少 data 数组。");
+
+  const records = new Map<string, AcademicPracticeRecord>();
+  for (const value of values) {
+    const item = asRecord(value);
+    if (!item) continue;
+    const numericId = asInteger(item.id);
+    if (numericId === null) continue;
+    const id = String(numericId);
+    const project = asRecord(item.xm) ?? {};
+    const category = practiceCategory(project);
+    const projectType = asRecord(project.xmlb);
+    const qualityType = asRecord(project.xmlx);
+    const status = asRecord(item.cyrshzt) ?? {};
+    const currentState = asRecord(item.currentState) ?? {};
+    const statusValue = asInteger(status.value);
+    const statusLabel = asString(status.label)?.trim() ??
+      asString(currentState.name)?.trim() ?? "状态未知";
+    try {
+      const record: AcademicPracticeRecord = {
+      sourceId: id,
+      categoryId: category.id,
+      categoryName: category.name,
+      projectName: asString(project.mc)?.trim() ?? "未命名项目",
+      projectType: asString(projectType?.mc)?.trim() ?? "未填写",
+      qualityType: asString(qualityType?.mc)?.trim() ?? "未填写",
+      score: parsePracticeNumber(item.jd, -1),
+      statusValue,
+      statusLabel,
+      approved: statusValue === 5 || statusLabel === "审核通过",
+      deleted: item.sfsc === true || item.sfsc === 1 || asString(item.sfsc) === "1",
+      role: asString(item.hdjjygrcdgz)?.trim() || null,
+      remark: asString(item.qksm)?.trim() || null,
+      activityStart: parseDateValue(item.hdsj),
+      activityEnd: parseDateValue(item.hdjssj),
+      updatedAt: parseDateValue(item.gxsj)
+      };
+      // Celechron parseSztzItems uses putIfAbsent: the first valid record wins.
+      if (!record.deleted && !records.has(id)) records.set(id, record);
+    } catch {
+      // A malformed item must not invalidate the rest of the practice list.
+    }
+  }
+  return [...records.values()];
+};
+
+const parsePracticeBoolean = (value: unknown): boolean | null => {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+    throw new Error("Practice passed field has an invalid numeric value.");
+  }
+  const text = String(value).trim().toLowerCase();
+  if (!text) return null;
+  if (new Set([
+    "true", "1", "1.0", "yes", "y",
+    "\u662f", "\u901a\u8fc7", "\u5df2\u901a\u8fc7", "\u8fbe\u6807", "\u5408\u683c"
+  ]).has(text)) return true;
+  if (new Set([
+    "false", "0", "0.0", "no", "n",
+    "\u5426", "\u672a\u901a\u8fc7", "\u4e0d\u901a\u8fc7", "\u672a\u8fbe\u6807", "\u4e0d\u8fbe\u6807", "\u4e0d\u5408\u683c"
+  ]).has(text)) return false;
+  if (value === 1 || value === "1" || value === "true" || value === "通过" || value === "合格") return true;
+  if (value === 0 || value === "0" || value === "false" || value === "未通过" || value === "不合格") return false;
+  throw new Error("Practice passed field is not recognized.");
+};
+
+export const parsePracticeSummaryResponse = (
+  body: string,
+  updatedAt: string,
+  source: AcademicPracticeSummarySource = "networkMyInfo"
+): AcademicPracticeSummary => {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch (error) {
+    throw new Error("素质拓展 getMyInfo 响应不是有效 JSON。", { cause: error });
+  }
+  const envelope = asRecord(payload);
+  const extend = asRecord(envelope?.extend);
+  const info = asRecord(extend?.myInfo) ?? asRecord(envelope?.myInfo) ?? envelope;
+  if (!info) throw new Error("素质拓展 getMyInfo 响应缺少 myInfo 对象。");
+  const hasPoint = ["dektJf", "dsktJf", "dsiktJf"].some((field) => Object.hasOwn(info, field));
+  if (!hasPoint) throw new Error("素质拓展 getMyInfo 响应缺少记点字段。");
+  const secondClassPoints = parsePracticeNumber(info.dektJf);
+  const thirdClassPoints = parsePracticeNumber(info.dsktJf);
+  const fourthClassPoints = parsePracticeNumber(info.dsiktJf);
+  return {
+    secondClassPoints,
+    thirdClassPoints,
+    fourthClassPoints,
+    totalPoints: secondClassPoints + thirdClassPoints + fourthClassPoints,
+    myPassed: parsePracticeBoolean(info.myTg),
+    lastYearPassed: parsePracticeBoolean(info.lyTg),
+    source,
+    updatedAt,
+    stale: source !== "networkMyInfo"
+  };
+};
+
+export const calculatePracticeSummary = (
+  records: readonly AcademicPracticeRecord[],
+  updatedAt: string,
+  stale: boolean
+): AcademicPracticeSummary => {
+  const totals = [0, 0, 0, 0];
+  for (const record of records) {
+    if (record.approved && !record.deleted && record.categoryId >= 1 && record.categoryId <= 3 &&
+      Number.isFinite(record.score) && record.score >= 0) {
+      totals[record.categoryId] += record.score;
+    }
+  }
+  return {
+    secondClassPoints: totals[1],
+    thirdClassPoints: totals[2],
+    fourthClassPoints: totals[3],
+    totalPoints: totals[1] + totals[2] + totals[3],
+    myPassed: null,
+    lastYearPassed: null,
+    source: "calculatedFromRecords",
+    updatedAt,
+    stale
+  };
+};
+
+export const parsePracticeData = (
+  body: string,
+  summaryBody: string | undefined,
+  updatedAt: string
+): AcademicPracticeData => {
+  const records = parsePracticeRecordsResponse(body);
+  let summary: AcademicPracticeSummary;
+  try {
+    summary = parsePracticeSummaryResponse(summaryBody ?? "", updatedAt);
+  } catch {
+    summary = calculatePracticeSummary(records, updatedAt, false);
+  }
+  return { records, summary, detailsAvailable: true };
+};
+
 export const createZjuUndergraduateConnector = ({
   loadAcademicProfileProof,
   fetchTimetableTerms,
@@ -408,6 +795,9 @@ export const createZjuUndergraduateConnector = ({
   loadCachedExams,
   fetchGrades,
   loadCachedGrades,
+  fetchPractice,
+  loadCachedPractice,
+  loadCachedCourseCatalog,
   publish,
   registerRefreshJob,
   now = () => new Date()
@@ -415,7 +805,10 @@ export const createZjuUndergraduateConnector = ({
   const refreshExams = async (
     proof: AcademicProfileProof,
     updatedAt: string
-  ): Promise<"live" | "cache" | "unavailable"> => {
+  ): Promise<{
+    status: "live" | "cache" | "unavailable";
+    data: AcademicExamsData | null;
+  }> => {
     const result = await fetchExams().catch(
       (error: unknown): ExamsFetchResult => ({
         ok: false,
@@ -431,7 +824,7 @@ export const createZjuUndergraduateConnector = ({
           updatedAt,
           data: { exams: parseExamsResponse(result.body) }
         });
-        return "live";
+        return { status: "live", data: { exams: parseExamsResponse(result.body) } };
       } catch {
         // A malformed live response must not overwrite the last valid record.
       }
@@ -447,7 +840,7 @@ export const createZjuUndergraduateConnector = ({
         data: cached,
         message: "实时考试安排不可用，继续使用上次成功数据。"
       });
-      return "cache";
+      return { status: "cache", data: cached };
     }
 
     await publish({
@@ -458,13 +851,16 @@ export const createZjuUndergraduateConnector = ({
       data: null,
       message: result.ok ? "考试响应无法解析。" : result.message
     });
-    return "unavailable";
+    return { status: "unavailable", data: null };
   };
 
   const refreshGrades = async (
     proof: AcademicProfileProof,
     updatedAt: string
-  ): Promise<"live" | "cache" | "unavailable"> => {
+  ): Promise<{
+    status: "live" | "cache" | "unavailable";
+    data: AcademicGradesData | null;
+  }> => {
     const result = await fetchGrades().catch(
       (error: unknown): GradesFetchResult => ({
         ok: false,
@@ -476,14 +872,15 @@ export const createZjuUndergraduateConnector = ({
         // Celechron: lib/http/ugrs_spider.dart:667-702, 792-795 fetches the
         // transcript and dedicated major transcript, then projects xkkh IDs.
         const majorCourseIds = parseMajorCourseIdsResponse(result.majorBody);
+        const data = parseGradesResponse(result.body, majorCourseIds);
         await publish({
           capability: "academic.grades@1",
           accountId: proof.studentId,
           state: "live",
           updatedAt,
-          data: parseGradesResponse(result.body, majorCourseIds)
+          data
         });
-        return "live";
+        return { status: "live", data };
       } catch {
         // Malformed live data must not overwrite the last valid publication.
       }
@@ -499,7 +896,7 @@ export const createZjuUndergraduateConnector = ({
         data: cached,
         message: "实时成绩不可用，继续使用上次成功数据。"
       });
-      return "cache";
+      return { status: "cache", data: cached };
     }
 
     await publish({
@@ -510,7 +907,95 @@ export const createZjuUndergraduateConnector = ({
       data: null,
       message: result.ok ? "成绩响应无法解析。" : result.message
     });
-    return "unavailable";
+    return { status: "unavailable", data: null };
+  };
+
+  const refreshPractice = async (
+    proof: AcademicProfileProof,
+    updatedAt: string
+  ): Promise<{ status: "live" | "cache" | "fallback" | "unavailable"; data: AcademicPracticeData | null }> => {
+    if (!fetchPractice) return { status: "unavailable", data: null };
+    const cached = (await loadCachedPractice?.(proof.studentId)) ?? null;
+    const result = await fetchPractice().catch(
+      (error: unknown): PracticeFetchResult => ({
+        ok: false,
+        message: error instanceof Error ? error.message : "素质拓展实践记录请求失败。"
+      })
+    );
+    if (result.ok) {
+      let records: AcademicPracticeRecord[] | null = null;
+      let summary: AcademicPracticeSummary | null = null;
+      let detailsLive = false;
+      let summaryLive = false;
+
+      if (result.body !== undefined) {
+        try {
+          records = parsePracticeRecordsResponse(result.body);
+          detailsLive = true;
+        } catch {
+          records = null;
+        }
+      }
+      if (result.summaryBody !== undefined) {
+        try {
+          summary = parsePracticeSummaryResponse(result.summaryBody, updatedAt);
+          summaryLive = true;
+        } catch {
+          summary = null;
+        }
+      }
+      if (!summary && cached?.summary) {
+        summary = { ...cached.summary, source: "cachedMyInfo", stale: true };
+      }
+      if (!summary && records) {
+        summary = calculatePracticeSummary(records, updatedAt, !detailsLive);
+      }
+
+      const data = records
+        ? { records, summary, detailsAvailable: true }
+        : cached
+          ? { ...cached, summary }
+          : summary
+            ? { records: [], summary, detailsAvailable: false }
+            : null;
+      if (data) {
+        const state: "live" | "fallback" | "cache" = detailsLive && summaryLive
+          ? "live"
+          : detailsLive || summaryLive
+            ? "fallback"
+            : "cache";
+        await publish({
+          capability: "practice.records@1",
+          accountId: proof.studentId,
+          state,
+          updatedAt,
+          data
+        });
+        return { status: state, data };
+      }
+    }
+
+    if (cached) {
+      await publish({
+        capability: "practice.records@1",
+        accountId: proof.studentId,
+        state: "cache",
+        updatedAt,
+        data: cached,
+        message: "实时素拓数据不可用，继续使用上次成功数据。"
+      });
+      return { status: "cache", data: cached };
+    }
+
+    await publish({
+      capability: "practice.records@1",
+      accountId: proof.studentId,
+      state: "unavailable",
+      updatedAt,
+      data: null,
+      message: result.ok ? "素质拓展响应无法解析。" : result.message
+    });
+    return { status: "unavailable", data: null };
   };
 
   const refresh = async (): Promise<ConnectorRefreshResult> => {
@@ -551,6 +1036,22 @@ export const createZjuUndergraduateConnector = ({
         data: null,
         message: "尚未配置并验证浙大统一身份认证账号。"
       });
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: null,
+        state: "unavailable",
+        updatedAt,
+        data: null,
+        message: "未配置并验证浙江大学统一身份认证账号。"
+      });
+      await publish({
+        capability: "practice.records@1",
+        accountId: null,
+        state: "unavailable",
+        updatedAt,
+        data: null,
+        message: "未配置并验证浙江大学统一身份认证账号。"
+      });
       return {
         sourceId: manifest.id,
         status: "unavailable",
@@ -571,8 +1072,8 @@ export const createZjuUndergraduateConnector = ({
         verifiedService: proof.verifiedService
       }
     });
-    const examsStatus = await refreshExams(proof, updatedAt);
-    const gradesStatus = await refreshGrades(proof, updatedAt);
+    const examsResult = await refreshExams(proof, updatedAt);
+    const gradesResult = await refreshGrades(proof, updatedAt);
 
     const queries = createTimetableQueries(refreshedAt);
     let results: TimetableTermFetchResult[];
@@ -591,7 +1092,7 @@ export const createZjuUndergraduateConnector = ({
         result
       ])
     );
-    const terms = queries.map((query) => {
+    const terms: AcademicTimetableTermData[] = queries.map((query) => {
       const result = resultByQuery.get(
         `${query.academicYearStart}:${query.season}`
       );
@@ -620,17 +1121,37 @@ export const createZjuUndergraduateConnector = ({
       }
     });
     const hasLiveTerm = terms.some((term) => term.state === "live");
-    let timetableStatus: "live" | "cache" | "unavailable";
+    let effectiveTerms = terms;
+    let timetableStatus: "live" | "cache" | "fallback" | "unavailable";
     let timetableMessage: string | undefined;
     if (hasLiveTerm) {
+      const hasUnavailableTerm = terms.some((term) => term.state === "unavailable");
+      const cached = hasUnavailableTerm ? await loadCachedTimetable(proof.studentId) : null;
+      effectiveTerms = terms.map((term) => {
+        if (term.state === "live") return term;
+        const cachedTerm = cached?.terms.find((candidate) =>
+          candidate.academicYearStart === term.academicYearStart &&
+          candidate.season === term.season
+        );
+        return cachedTerm
+          ? { ...cachedTerm, state: "cache" as const }
+          : term;
+      });
+      const hasAvailableTerm = effectiveTerms.some((term) =>
+        term.state === "live" || term.state === "cache"
+      );
+      timetableStatus = effectiveTerms.every((term) => term.state === "live")
+        ? "live"
+        : hasAvailableTerm
+          ? (hasLiveTerm ? "fallback" : "cache")
+          : "unavailable";
       await publish({
         capability: "academic.timetable@1",
         accountId: proof.studentId,
-        state: "live",
+        state: timetableStatus,
         updatedAt,
-        data: { terms }
+        data: { terms: effectiveTerms }
       });
-      timetableStatus = "live";
     } else {
       const cached = await loadCachedTimetable(proof.studentId);
       const failures = terms.flatMap((term) =>
@@ -639,6 +1160,7 @@ export const createZjuUndergraduateConnector = ({
           : []
       ).join("；");
       if (cached) {
+        effectiveTerms = cached.terms;
         await publish({
           capability: "academic.timetable@1",
           accountId: proof.studentId,
@@ -666,12 +1188,53 @@ export const createZjuUndergraduateConnector = ({
       }
     }
 
-    const moduleStates = [timetableStatus, examsStatus, gradesStatus];
+    const catalog = buildCourseCatalog({
+      terms: effectiveTerms,
+      exams: examsResult.data?.exams ?? [],
+      grades: gradesResult.data?.grades ?? []
+    });
+    let catalogStatus: "live" | "cache" | "fallback" | "unavailable" = "unavailable";
+    if (catalog.courses.length > 0) {
+      const sourceStates = [timetableStatus, examsResult.status, gradesResult.status];
+      const hasLiveSource = sourceStates.some((state) => state === "live" || state === "fallback");
+      catalogStatus = sourceStates.every((state) => state === "live")
+        ? "live"
+        : hasLiveSource
+          ? "fallback"
+          : "cache";
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: proof.studentId,
+        state: catalogStatus,
+        updatedAt,
+        data: catalog
+      });
+    } else {
+      const cached = (await loadCachedCourseCatalog?.(proof.studentId)) ?? null;
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: proof.studentId,
+        state: cached ? "cache" : "unavailable",
+        updatedAt,
+        data: cached,
+        ...(cached ? { message: "实时课程目录不可用，继续使用上次成功数据。" } : {})
+      });
+      catalogStatus = cached ? "cache" : "unavailable";
+    }
+
+    const practiceResult = await refreshPractice(proof, updatedAt);
+    const moduleStates = [
+      timetableStatus,
+      examsResult.status,
+      gradesResult.status,
+      catalogStatus,
+      ...(fetchPractice ? [practiceResult.status] : [])
+    ];
     const status = moduleStates.every((state) => state === "live")
       ? "live"
       : moduleStates.every((state) => state === "unavailable")
         ? "unavailable"
-        : moduleStates.includes("live")
+        : moduleStates.some((state) => state === "live" || state === "fallback")
           ? "fallback"
           : "cache";
     const message = status === "fallback"

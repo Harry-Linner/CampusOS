@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld("campusos", {
     loadScheduleState: () =>
       ipcRenderer.invoke("campusos:reminders:schedule-state:load")
   },
+  academic: {
+    loadGpaWeights: () => ipcRenderer.invoke("campusos:academic:gpa-weights:load"),
+    saveGpaWeights: (weights: Record<string, number>) =>
+      ipcRenderer.invoke("campusos:academic:gpa-weights:save", weights)
+  },
   downloads: {
     list: () => ipcRenderer.invoke("campusos:downloads:list"),
     enqueue: (input: {
@@ -118,5 +123,19 @@ contextBridge.exposeInMainWorld("campusos", {
     load: () => ipcRenderer.invoke("campusos:diagnostics:load"),
     clear: () => ipcRenderer.invoke("campusos:diagnostics:clear"),
     exportTxt: () => ipcRenderer.invoke("campusos:diagnostics:export")
+  },
+  updates: {
+    getAppInfo: () => ipcRenderer.invoke("campusos:app:info"),
+    getStatus: () => ipcRenderer.invoke("campusos:updater:status"),
+    check: () => ipcRenderer.invoke("campusos:updater:check"),
+    download: () => ipcRenderer.invoke("campusos:updater:download"),
+    install: () => ipcRenderer.invoke("campusos:updater:install"),
+    subscribe: (listener: (status: unknown) => void) => {
+      const channel = "campusos:updater:changed";
+      const handler = (_event: Electron.IpcRendererEvent, status: unknown) =>
+        listener(status);
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
   }
 });

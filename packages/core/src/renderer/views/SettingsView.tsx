@@ -4,6 +4,10 @@ import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useReminderSettings } from "../hooks/useReminderSettings";
 import { useTheme, type ThemeMode } from "../hooks/useTheme";
 import type { DiagnosticSnapshot } from "../../shared/diagnosticBridge";
+import type {
+  CampusAppInfo,
+  UpdateStatus
+} from "../../shared/updateBridge";
 import {
   clearDiagnostics,
   exportDiagnostics,
@@ -26,6 +30,14 @@ const formatVerificationTime = (value: string): string =>
 
 const formatPoints = (value: number): string =>
   new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(value);
+
+const mitLicenseText = `MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`;
 
 export const SettingsView = ({
   onRefresh,
@@ -50,6 +62,8 @@ export const SettingsView = ({
     "idle" | "loading" | "exported" | "error"
   >("idle");
   const [diagnosticMessage, setDiagnosticMessage] = useState("");
+  const [appInfo, setAppInfo] = useState<CampusAppInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "idle" });
   const authenticatedProfile =
     academicCredential.record?.verificationState === "verified" &&
     academicCredential.record.username === username.trim() &&
@@ -91,6 +105,69 @@ export const SettingsView = ({
   useEffect(() => {
     void reloadDiagnostics();
   }, []);
+
+  useEffect(() => {
+    const bridge = window.campusos?.updates;
+    if (!bridge) {
+      setUpdateStatus({ state: "unavailable" });
+      return;
+    }
+
+    let active = true;
+    void Promise.all([bridge.getAppInfo(), bridge.getStatus()]).then(
+      ([info, status]) => {
+        if (!active) return;
+        setAppInfo(info);
+        setUpdateStatus(status);
+      },
+      () => {
+        if (active) {
+          setUpdateStatus({ state: "error", error: "无法读取更新状态。" });
+        }
+      }
+    );
+    const unsubscribe = bridge.subscribe((status) => {
+      if (active) setUpdateStatus(status);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const runUpdateAction = async (): Promise<void> => {
+    const bridge = window.campusos?.updates;
+    if (!bridge) return;
+    if (updateStatus.state === "available") {
+      setUpdateStatus(await bridge.download());
+      return;
+    }
+    if (updateStatus.state === "ready") {
+      await bridge.install();
+      return;
+    }
+    setUpdateStatus(await bridge.check());
+  };
+
+  const updateAction = (() => {
+    switch (updateStatus.state) {
+      case "checking":
+        return { label: "正在检查", disabled: true };
+      case "available":
+        return { label: "下载更新", disabled: false };
+      case "downloading":
+        return {
+          label: `下载中 ${Math.round(updateStatus.progress ?? 0)}%`,
+          disabled: true
+        };
+      case "ready":
+        return { label: "重启并安装", disabled: false };
+      case "unavailable":
+        return { label: "开发版本不检查更新", disabled: true };
+      default:
+        return { label: "检查更新", disabled: false };
+    }
+  })();
 
   const refreshData = async (): Promise<void> => {
     setRefreshState("refreshing");
@@ -282,6 +359,63 @@ export const SettingsView = ({
           ) : diagnosticState !== "loading" ? (
             <div className="quiet-empty-state quiet-empty-compact">暂无刷新日志</div>
           ) : null}
+        </section>
+
+        <section className="settings-section" aria-labelledby="update-heading">
+          <header className="settings-section-heading">
+            <h2 id="update-heading">更新</h2>
+            <span className="diagnostic-count">
+              {appInfo ? `v${appInfo.version}` : "正在读取版本"}
+            </span>
+          </header>
+          <p className="page-copy">
+            {updateStatus.state === "available"
+              ? `发现新版本 v${updateStatus.version ?? ""}`
+              : updateStatus.state === "ready"
+                ? `v${updateStatus.version ?? "新版本"} 已准备好安装`
+                : updateStatus.state === "up-to-date"
+                  ? "当前已是最新版本"
+                  : "通过 GitHub Releases 检查并安装 CampusOS 更新。"}
+          </p>
+          <div className="settings-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={updateAction.disabled}
+              onClick={() => void runUpdateAction()}
+            >
+              {updateAction.label}
+            </button>
+          </div>
+          {updateStatus.state === "error" ? (
+            <p className="error-copy" role="alert">
+              {updateStatus.error ?? "更新操作失败，请稍后重试。"}
+            </p>
+          ) : null}
+        </section>
+
+        <section className="settings-section" aria-labelledby="about-heading">
+          <header className="settings-section-heading">
+            <h2 id="about-heading">关于</h2>
+          </header>
+          <dl className="about-data">
+            <div>
+              <dt>应用</dt>
+              <dd>{appInfo?.name ?? "CampusOS"}</dd>
+            </div>
+            <div>
+              <dt>版本</dt>
+              <dd>{appInfo ? appInfo.version : "正在读取"}</dd>
+            </div>
+            <div>
+              <dt>许可证</dt>
+              <dd>{appInfo?.licenseName ?? "MIT"}</dd>
+            </div>
+          </dl>
+          <details className="license-disclosure">
+            <summary>查看 MIT 许可证</summary>
+            <pre>{`${appInfo?.copyright ?? "Copyright (c) 2026 Harry-Linner"}\n\n${mitLicenseText}`}</pre>
+          </details>
         </section>
 
         {showDevelopmentTools && onRestartOnboarding ? (

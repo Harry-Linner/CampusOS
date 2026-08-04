@@ -19,6 +19,7 @@ export const manifest: PluginManifestV2 = {
   releaseStage: "ready",
   provides: [
     "academic.profile@1",
+    "academic.course-catalog@1",
     "academic.timetable@1",
     "academic.exams@1",
     "academic.grades@1"

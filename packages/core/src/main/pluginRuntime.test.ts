@@ -115,7 +115,7 @@ describe("resolvePluginRuntime", () => {
       displayName: "本科教务连接器",
       kind: "connector",
       permissions: [],
-      provides: ["academic.course-catalog@1"],
+      provides: ["planner.schedule@1"],
       requires: [],
       contributes: {}
     });
@@ -125,7 +125,7 @@ describe("resolvePluginRuntime", () => {
       displayName: "研究生教务连接器",
       kind: "connector",
       permissions: [],
-      provides: ["academic.course-catalog@1"],
+      provides: ["planner.schedule@1"],
       requires: [],
       contributes: {}
     });
@@ -134,7 +134,7 @@ describe("resolvePluginRuntime", () => {
       name: "academic-timetable",
       displayName: "课表",
       permissions: [],
-      requires: ["academic.course-catalog@1"]
+      requires: ["planner.schedule@1"]
     });
 
     const snapshot = resolvePluginRuntime({
@@ -151,7 +151,7 @@ describe("resolvePluginRuntime", () => {
     expect(snapshot.plugins.find((plugin) => plugin.id === timetable.id)).toEqual(
       expect.objectContaining({
         status: "blocked",
-        issues: ["能力提供者冲突：academic.course-catalog@1"]
+        issues: ["能力提供者冲突：planner.schedule@1"]
       })
     );
   });

@@ -23,7 +23,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(3);
+      expect(database.schemaVersion).toBe(4);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -87,6 +87,16 @@ describe("database service", () => {
         schedule: { valid: true, segments: [] },
         savedAt: "2026-07-20T08:04:00.000Z"
       });
+      database.saveAcademicGpaWeights(
+        "account-a",
+        { "course-a": 1.25, "course-b": 0 },
+        "2026-07-20T08:05:00.000Z"
+      );
+      expect(database.loadAcademicGpaWeights("account-a")).toEqual({
+        weights: { "course-a": 1.25, "course-b": 0 },
+        savedAt: "2026-07-20T08:05:00.000Z"
+      });
+      expect(database.loadAcademicGpaWeights("account-b")).toBeNull();
     } finally {
       database.close();
     }

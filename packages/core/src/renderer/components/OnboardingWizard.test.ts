@@ -243,6 +243,20 @@ const installBridge = (
         storagePath: "C:/diagnostics/refresh-log.json"
       })),
       exportTxt: vi.fn(async () => ({ canceled: true, path: null }))
+    },
+    updates: {
+      getAppInfo: vi.fn(async () => ({
+        name: "CampusOS",
+        version: "0.1.0",
+        packaged: false,
+        licenseName: "MIT" as const,
+        copyright: "Copyright (c) 2026 Harry-Linner"
+      })),
+      getStatus: vi.fn(async () => ({ state: "unavailable" as const })),
+      check: vi.fn(async () => ({ state: "unavailable" as const })),
+      download: vi.fn(async () => ({ state: "unavailable" as const })),
+      install: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined)
     }
   };
 };
@@ -412,7 +426,7 @@ describe("OnboardingWizard", () => {
     expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
       pluginId: "org.campusos.academic",
       enabled: true,
-      grantedPermissions: []
+      grantedPermissions: ["storage:local"]
     });
     expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
       pluginId: "org.campusos.schedule",

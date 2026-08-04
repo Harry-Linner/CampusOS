@@ -1,9 +1,12 @@
 import type {
   AcademicExamRecord,
   AcademicExamsData,
+  AcademicCourseCatalogData,
+  AcademicCourseRecord,
   AcademicGradeRecord,
   AcademicGradesData,
   AcademicTimetableData,
+  AcademicTimetableTermData,
   AcademicTimetableSeason,
   AcademicTimetableSession,
   CapabilityPublication,
@@ -73,6 +76,7 @@ export interface ZjuGraduateConnectorDependencies {
   loadCachedExams: (accountId: string) => Promise<AcademicExamsData | null>;
   fetchGrades: () => Promise<FetchResult>;
   loadCachedGrades: (accountId: string) => Promise<AcademicGradesData | null>;
+  loadCachedCourseCatalog?: (accountId: string) => Promise<AcademicCourseCatalogData | null>;
   publish: <T>(publication: CapabilityPublication<T>) => Promise<void>;
   registerRefreshJob: (
     sourceId: string,
@@ -102,6 +106,13 @@ const asNumber = (value: unknown): number | null => {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+};
+
+// Celechron lib/model/grade.dart:28-34. The raw source id remains available
+// for provenance; realId is the stable course key shown to the user.
+export const deriveCelechronRealId = (id: string): string => {
+  const match = id.match(/(\(.*\)-.*?)-.*/);
+  return match?.[1] ?? (id.length < 22 ? id : id.slice(0, 22));
 };
 
 const parseBody = (body: string, context: string): Record<string, unknown> => {
@@ -321,18 +332,139 @@ export const parseGraduateGradesResponse = (body: string): AcademicGradesData =>
     const period = parseAcademicPeriod(sourceId);
     return [{
       sourceId,
+      realId: deriveCelechronRealId(sourceId),
       courseCode: asString(item.kcbh) ?? asString(item.kcdm),
       courseName,
       credit: asNumber(item.xf) ?? 0,
       originalScore: asString(item.zf) ?? "",
-      gradePoint: asNumber(item.jd),
+      // Celechron lib/http/zjuServices/grs_new.dart:276-286 sets graduate
+      // fivePoint to 0 and gpaIncluded to false regardless of jd payload.
+      gradePoint: null,
       isMajorCourse: true,
       courseCategory: null,
+      gpaIncluded: false,
+      creditIncluded: true,
       ...period
     }];
   });
   return {
     grades: [...new Map(grades.map((grade) => [grade.sourceId, grade])).values()]
+  };
+};
+
+export const buildGraduateCourseCatalog = ({
+  terms,
+  exams,
+  grades
+}: {
+  terms: readonly AcademicTimetableTermData[];
+  exams: readonly AcademicExamRecord[];
+  grades: readonly AcademicGradeRecord[];
+}): AcademicCourseCatalogData => {
+  const byKey = new Map<string, AcademicCourseRecord>();
+  const sourceToKey = new Map<string, string>();
+  for (const grade of grades) {
+    const key = `${grade.academicYearStart ?? "unknown"}:${grade.termNumber ?? "unknown"}:${grade.courseName}`;
+    sourceToKey.set(grade.sourceId, key);
+    byKey.set(key, {
+      sourceId: grade.sourceId,
+      realId: grade.realId ?? deriveCelechronRealId(grade.sourceId),
+      courseCode: grade.courseCode,
+      courseName: grade.courseName,
+      teachers: [],
+      credit: grade.credit,
+      academicYearStart: grade.academicYearStart,
+      season: grade.termNumber === 1 ? "1|秋" : grade.termNumber === 2 ? "2|春" : null,
+      semesterLabel: grade.academicYearStart === null || grade.termNumber === null
+        ? null
+        : `${grade.academicYearStart}-${grade.academicYearStart + 1} ${grade.termNumber === 1 ? "1|秋" : "2|春"}`,
+      courseCategory: grade.courseCategory,
+      gradeSourceId: grade.sourceId,
+      examSourceIds: [],
+      sessions: []
+    });
+  }
+  for (const term of terms) {
+    for (const session of term.sessions) {
+      const termNumber = term.season.startsWith("1|") ? 1 : 2;
+      const key = `${term.academicYearStart}:${termNumber}:${session.courseName}`;
+      const existing = byKey.get(key) ?? {
+        sourceId: session.sourceId,
+        realId: null,
+        courseCode: null,
+        courseName: session.courseName,
+        teachers: [],
+        credit: 0,
+        academicYearStart: term.academicYearStart,
+        season: term.season,
+        semesterLabel: `${term.academicYearStart}-${term.academicYearStart + 1} ${term.season}`,
+        courseCategory: null,
+        gradeSourceId: null,
+        examSourceIds: [],
+        sessions: []
+      };
+      if (!existing.teachers.includes(session.teacher)) existing.teachers.push(session.teacher);
+      const firstPeriod = session.periods[0];
+      const duplicate = existing.sessions.find((candidate) =>
+        candidate.dayOfWeek === session.dayOfWeek &&
+        candidate.weekPattern === session.weekPattern &&
+        candidate.location === session.location &&
+        candidate.periods.includes(firstPeriod)
+      );
+      if (duplicate) {
+        duplicate.firstHalf ||= session.firstHalf;
+        duplicate.secondHalf ||= session.secondHalf;
+      } else {
+        const adjacent = existing.sessions.find((candidate) =>
+          candidate.dayOfWeek === session.dayOfWeek &&
+          candidate.weekPattern === session.weekPattern &&
+          candidate.location === session.location &&
+          candidate.periods.at(-1)! + 1 === firstPeriod
+        );
+        if (adjacent) {
+          adjacent.periods.push(...session.periods);
+          adjacent.firstHalf ||= session.firstHalf;
+          adjacent.secondHalf ||= session.secondHalf;
+        } else {
+          existing.sessions.push({
+            ...session,
+            periods: [...session.periods],
+            ...(session.weeks ? { weeks: [...session.weeks] } : {})
+          });
+        }
+      }
+      byKey.set(key, existing);
+    }
+  }
+  for (const exam of exams) {
+    const existingKey = sourceToKey.get(exam.courseId) ??
+      [...byKey.entries()].find(([, course]) => course.courseCode === exam.courseId)?.[0] ??
+      [...byKey.entries()].find(([, course]) => course.courseName === exam.courseName)?.[0] ??
+      `unknown:unknown:${exam.courseName}`;
+    const existing = byKey.get(existingKey) ?? {
+      sourceId: exam.courseId,
+      realId: deriveCelechronRealId(exam.courseId),
+      courseCode: exam.courseId,
+      courseName: exam.courseName,
+      teachers: [],
+      credit: 0,
+      academicYearStart: null,
+      season: null,
+      semesterLabel: null,
+      courseCategory: null,
+      gradeSourceId: null,
+      examSourceIds: [],
+      sessions: []
+    };
+    if (!existing.examSourceIds.includes(exam.sourceId)) existing.examSourceIds.push(exam.sourceId);
+    byKey.set(existingKey, existing);
+    sourceToKey.set(exam.courseId, existingKey);
+  }
+  return {
+    courses: [...byKey.values()].sort((left, right) =>
+      (right.academicYearStart ?? -1) - (left.academicYearStart ?? -1) ||
+      left.courseName.localeCompare(right.courseName, "zh-CN")
+    )
   };
 };
 
@@ -377,6 +509,7 @@ export const createZjuGraduateConnector = ({
   loadCachedExams,
   fetchGrades,
   loadCachedGrades,
+  loadCachedCourseCatalog,
   publish,
   registerRefreshJob,
   now = () => new Date()
@@ -409,7 +542,7 @@ export const createZjuGraduateConnector = ({
       }))
     ]);
 
-    const terms = timetableQueries.map((query) => {
+    const terms: AcademicTimetableTermData[] = timetableQueries.map((query) => {
       const result = timetableResults.find((candidate) =>
         candidate.query.academicYearStart === query.academicYearStart && candidate.query.term === query.term
       );
@@ -423,13 +556,14 @@ export const createZjuGraduateConnector = ({
       }
     });
     const hasLiveTimetable = terms.some((term) => term.state === "live");
+    let effectiveTerms = terms;
     let timetableState: "live" | "cache" | "fallback" | "unavailable";
     if (hasLiveTimetable) {
       const hasUnavailableTerm = terms.some((term) => term.state === "unavailable");
       const cached = hasUnavailableTerm
         ? await loadCachedTimetable(proof.studentId)
         : null;
-      const mergedTerms = terms.map((term) => {
+      effectiveTerms = terms.map((term) => {
         if (term.state === "live") return term;
         const cachedTerm = cached?.terms.find((candidate) =>
           candidate.academicYearStart === term.academicYearStart &&
@@ -449,13 +583,14 @@ export const createZjuGraduateConnector = ({
         accountId: proof.studentId,
         state: timetableState,
         updatedAt,
-        data: { terms: mergedTerms },
+        data: { terms: effectiveTerms },
         ...(hasUnavailableTerm
           ? { message: "研究生课表部分学季已刷新，其余学季使用缓存或当前不可用。" }
           : {})
       });
     } else {
       const cached = await loadCachedTimetable(proof.studentId);
+      effectiveTerms = cached?.terms ?? terms;
       await publish({ capability: "academic.timetable@1", accountId: proof.studentId, state: cached ? "cache" : "unavailable", updatedAt, data: cached, message: cached ? "实时研究生课表不可用，继续使用上次成功数据。" : "研究生院课表当前不可用。" });
       timetableState = cached ? "cache" : "unavailable";
     }
@@ -472,6 +607,7 @@ export const createZjuGraduateConnector = ({
       }
     });
     const parsedExams = parsedExamResults.flatMap((result) => result.exams);
+    let effectiveExams = parsedExams;
     const parsedExamQueryCount = parsedExamResults.filter((result) => result.ok).length;
     const hasLiveExams = parsedExamQueryCount > 0;
     let examsState: "live" | "cache" | "fallback" | "unavailable";
@@ -482,6 +618,7 @@ export const createZjuGraduateConnector = ({
         ...(cached?.exams ?? []),
         ...parsedExams
       ];
+      effectiveExams = [...new Map(mergedExams.map((exam) => [exam.sourceId, exam])).values()];
       examsState = complete ? "live" : "fallback";
       await publish({
         capability: "academic.exams@1",
@@ -489,7 +626,7 @@ export const createZjuGraduateConnector = ({
         state: examsState,
         updatedAt,
         data: {
-          exams: [...new Map(mergedExams.map((exam) => [exam.sourceId, exam])).values()]
+          exams: effectiveExams
         },
         ...(!complete
           ? { message: "研究生考试部分学期已刷新，其余记录保留缓存。" }
@@ -497,27 +634,66 @@ export const createZjuGraduateConnector = ({
       });
     } else {
       const cached = await loadCachedExams(proof.studentId);
+      effectiveExams = cached?.exams ?? [];
       await publish({ capability: "academic.exams@1", accountId: proof.studentId, state: cached ? "cache" : "unavailable", updatedAt, data: cached, message: cached ? "实时研究生考试不可用，继续使用上次成功数据。" : "研究生院考试当前不可用。" });
       examsState = cached ? "cache" : "unavailable";
     }
 
     let gradesState: "live" | "cache" | "unavailable";
+    let gradesData: AcademicGradesData | null = null;
     if (gradeResult.ok) {
       try {
-        await publish({ capability: "academic.grades@1", accountId: proof.studentId, state: "live", updatedAt, data: parseGraduateGradesResponse(gradeResult.body) });
+        gradesData = parseGraduateGradesResponse(gradeResult.body);
+        await publish({ capability: "academic.grades@1", accountId: proof.studentId, state: "live", updatedAt, data: gradesData });
         gradesState = "live";
       } catch {
         const cached = await loadCachedGrades(proof.studentId);
+        gradesData = cached;
         await publish({ capability: "academic.grades@1", accountId: proof.studentId, state: cached ? "cache" : "unavailable", updatedAt, data: cached, message: cached ? "研究生成绩响应异常，继续使用上次成功数据。" : "研究生成绩响应无法解析。" });
         gradesState = cached ? "cache" : "unavailable";
       }
     } else {
       const cached = await loadCachedGrades(proof.studentId);
+      gradesData = cached;
       await publish({ capability: "academic.grades@1", accountId: proof.studentId, state: cached ? "cache" : "unavailable", updatedAt, data: cached, message: cached ? "实时研究生成绩不可用，继续使用上次成功数据。" : gradeResult.message });
       gradesState = cached ? "cache" : "unavailable";
     }
 
-    const hasLiveGraduateData = [timetableState, examsState, gradesState]
+    const courseCatalog = buildGraduateCourseCatalog({
+      terms: effectiveTerms,
+      exams: effectiveExams,
+      grades: gradesData?.grades ?? []
+    });
+    let courseCatalogState: "live" | "cache" | "fallback" | "unavailable" = "unavailable";
+    if (courseCatalog.courses.length > 0) {
+      const sourceStates = [timetableState, examsState, gradesState];
+      const hasLiveSource = sourceStates.some((state) => state === "live" || state === "fallback");
+      courseCatalogState = sourceStates.every((state) => state === "live")
+        ? "live"
+        : hasLiveSource
+          ? "fallback"
+          : "cache";
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: proof.studentId,
+        state: courseCatalogState,
+        updatedAt,
+        data: courseCatalog
+      });
+    } else {
+      const cached = (await loadCachedCourseCatalog?.(proof.studentId)) ?? null;
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: proof.studentId,
+        state: cached ? "cache" : "unavailable",
+        updatedAt,
+        data: cached,
+        ...(cached ? { message: "课程目录实时数据不可用，继续使用上次成功数据。" } : {})
+      });
+      courseCatalogState = cached ? "cache" : "unavailable";
+    }
+
+    const hasLiveGraduateData = [timetableState, examsState, gradesState, courseCatalogState]
       .some((state) => state === "live" || state === "fallback");
     await publish({
       capability: "academic.profile@1",
@@ -533,7 +709,7 @@ export const createZjuGraduateConnector = ({
       ...(!hasLiveGraduateData ? { message: "研究生院业务身份尚未得到实时数据确认。" } : {})
     });
 
-    const status = aggregateStatus([timetableState, examsState, gradesState]);
+    const status = aggregateStatus([timetableState, examsState, gradesState, courseCatalogState]);
     return {
       sourceId: manifest.id,
       status,

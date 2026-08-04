@@ -22,6 +22,8 @@ import {
   type ZjuLearningServiceRequest,
   type ZjuLearningServiceResponse,
   type ZjuLearningDownloadRequest,
+  type ZjuQualityDevelopmentServiceRequest,
+  type ZjuQualityDevelopmentServiceResponse,
   type ZjuUndergraduateServiceRequest,
   type ZjuUndergraduateServiceResponse
 } from "./zjuUnifiedAuth";
@@ -173,6 +175,20 @@ export const requestZjuLearningDownload = async (
   }
 
   return zjuUnifiedAuth.requestLearningDownload(secret, request);
+};
+
+export const requestZjuQualityDevelopmentService = async (
+  request: ZjuQualityDevelopmentServiceRequest
+): Promise<ZjuQualityDevelopmentServiceResponse> => {
+  const secret = await readAcademicCredentialSecret();
+  if (!secret) {
+    throw new AcademicCredentialServiceError(
+      "invalid-input",
+      "尚未保存经过验证的统一身份认证账号。"
+    );
+  }
+
+  return zjuUnifiedAuth.requestQualityDevelopmentService(secret, request);
 };
 
 export const requestGraduateAcademicService = async (

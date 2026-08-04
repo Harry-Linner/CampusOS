@@ -12,6 +12,7 @@ import type {
 } from "./pluginCapabilities";
 
 export * from "./campus";
+export * from "./academicSemester";
 export * from "./pluginCapabilities";
 
 export type CampusPermission =
@@ -30,9 +31,11 @@ export type PluginCapabilityBinding = string | readonly string[];
 
 export const collectionCapabilities = [
   "academic.profile@1",
+  "academic.course-catalog@1",
   "academic.timetable@1",
   "academic.exams@1",
   "academic.grades@1",
+  "practice.records@1",
   "calendar.events@1"
 ] as const satisfies readonly PluginCapability[];
 

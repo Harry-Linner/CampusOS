@@ -61,6 +61,7 @@ export const createLiveWorkspaceSnapshot = ({
     courses: [],
     todayCourses: [],
     deadlines: [],
+    materialCourses: [],
     materials: [],
     downloads: [],
     reminders: [],
@@ -98,6 +99,17 @@ export const mergeLearningMaterialsIntoWorkspace = (
   snapshot: CampusWorkspaceSnapshot,
   record: CapabilityRecord<LearningMaterialsData> | null
 ): CampusWorkspaceSnapshot => {
+  const materialCourses = record?.data?.courses
+    .filter(
+      (course) =>
+        course.semesterName !== null &&
+        isDevelopmentCoursewareSemester(course.semesterName)
+    )
+    .map((course) => ({
+      id: course.sourceId,
+      name: course.name,
+      semester: course.semesterName!
+    })) ?? [];
   const materials = record?.data?.materials
     .filter((material) => isDevelopmentCoursewareSemester(material.semesterName))
     .map((material) => ({
@@ -113,6 +125,7 @@ export const mergeLearningMaterialsIntoWorkspace = (
     })) ?? [];
   return {
     ...snapshot,
+    materialCourses,
     materials,
     summary: {
       ...snapshot.summary,

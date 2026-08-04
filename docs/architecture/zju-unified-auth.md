@@ -2,9 +2,9 @@
 
 **状态：** 已实现核心登录、不可导出本科教务/研究生教务/学在浙大业务会话、素拓认证后数据回执与真实课表/考试/成绩/作业/课件目录请求链
 
-**更新日期：** 2026-07-28
+**更新日期：** 2026-08-04
 
-**范围：** 本科/研究生账号连接、CAS 登录、按培养层次验证业务数据、本科教务与素拓 Session、研究生 token、学在浙大独立 Session、最小业务回执、安全存储、课表/考试/成绩/作业/课件目录请求与解析、认证下载、Core 刷新协调、provenance、受控 renderer capability 读取、官方学季边界和脱敏诊断；私有课件实体下载、多设备和完整成绩口径仍待验收
+**范围：** 本科/研究生账号连接、CAS 登录、按培养层次验证业务数据、本科教务与素拓 Session、研究生 token、学在浙大独立 Session、最小业务回执、安全存储、课表/考试/成绩/作业/课件目录请求与解析、认证下载、Core 刷新协调、provenance、受控 renderer capability 读取、官方学季边界和脱敏诊断；本科私有课件实体下载和完整成绩口径已验收，多设备与研究生真实账号仍待验收
 
 ## 当前结论
 
@@ -70,7 +70,7 @@ CampusOS 的差异仅是 TypeScript transport、Electron 内存会话、结构�
 - 主进程对 IPC payload 再做运行时类型和长度校验，不信任 TypeScript 类型。
 - Windows 当前使用 Electron `safeStorage` 同步 API；其密钥由 Windows DPAPI 保护。磁盘文件保存 base64 加密密码 blob，以及账号、验证时间和三项素拓汇总等本地回执元数据，不保存明文密码、Cookie、Session、ticket 或原始响应。
 - 写入使用同目录、权限收紧的唯一临时文件，再原子替换正式文件。认证失败、加密失败或写入失败均保留旧文件。
-- 只有 `dataVersion: 3` 且包含账号匹配、结构有效的认证后回执才加载为 `verified`；旧版仅验证过登录态的文件降级为 `unverified`，不会被 workspace 当作完整连接。
+- `dataVersion: 3` 的既有本科回执和带明确培养层次的 `dataVersion: 4` 回执，只有在账号匹配且认证后结构有效时才加载为 `verified`；更旧的仅登录态记录降级为 `unverified`，不会被 workspace 当作完整连接。
 - IPC 连接结果是显式 success/failure envelope。失败只返回稳定 error code 与脱敏中文信息，不返回 cause、stack、响应正文或敏感 URL。
 
 Electron 官方说明 `safeStorage` 使用操作系统提供的加密系统，Windows 同步 API 由 DPAPI 保护；当前 Electron 版本升级后应评估迁移到非阻塞异步 API：[Electron safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)。
@@ -103,15 +103,19 @@ Electron 官方说明 `safeStorage` 使用操作系统提供的加密系统，Wi
 
 自动化测试只替换外部 HTTP 或 IPC 边界，覆盖成功链路、RSA 密文、Cookie 连续性、凭据拒绝、验证码、协议变化、业务 Session 不完整、匿名 ctx、账号串号、超时中止、旧格式降级、安全存储不可用、写盘失败和设置页真实回执/失败行为。
 
+## Current implementation acceptance (2026-08-04)
+
+The earlier grade-panel limitation is superseded: undergraduate transcript and dedicated-major responses are joined by xkkh, Celechron GPA/credit rules are applied for deferred, pending, dropped, invalid, pass/fail, and ordinary failed records, and the renderer has default privacy masking without internal source-status panels. The course catalog and quality-development capability preserve partial success and account-isolated cache provenance. The 2026-08-04 authorized undergraduate run closed the timetable, exam, grade, assignment, complete materials catalog, and authenticated download-byte gates against the ignored private baselines. Graduate still has no real-account closed-loop evidence.
+
 ## 已实现边界与待验收
 
 - 本科课表与考试真实协议链已经实现：核心从安全存储读取凭据、建立并复用 `JSESSIONID`/`route`、会话失效时重新认证，连接器查询当前与下一学年并逐条解析课表和考试。自动化测试使用外部 HTTP fixture；真实账号端点验收需运行 `pnpm verify:zju-auth`。
 - 学在浙大作业真实协议链已经实现：核心使用 SSO 登录态完整跟随 `courses.zju.edu.cn`、`identity.zju.edu.cn` 和 `zjuam.zju.edu.cn` 的受信任跳转及 200 meta-refresh，只有目标业务域签发可访问 `/api/todos` 的 `session` 才成功；连接器只收到固定操作正文并发布 `learning.assignments@1`。无截止时间或无法可靠解析时间的作业不进入日历。
-- 学在浙大课件目录真实协议链已经实现：连接器发布 `learning.materials@1`，且只有学期、全部课程分页和逐课 activities/uploads 全部成功时才替换实时快照；目录分支失败不回滚本轮作业成功，反之亦然。下载使用主进程业务 Session、reference → preview、一次受控重认证、5 次指数退避、固定 URL 校验、Range 和最终大小校验。自动化协议通过，私有课件实体下载待手动验收。
+- 学在浙大课件目录真实协议链已经实现：连接器发布 `learning.materials@1`，且只有学期、全部课程分页和逐课 activities/uploads 全部成功时才替换实时快照；目录分支失败不回滚本轮作业成功，反之亦然。下载使用主进程业务 Session、reference → preview、一次受控重认证、5 次指数退避、固定 URL 校验、Range 和最终大小校验。2026-08-04 的本科真实链路已完成私有目录、开发期目标学期投影、认证下载和最终字节校验。
 - 课表当前保存为抽象学年、学季、周几、节次和单双周 capability。官方 HTTPS 校历 capability 已提供学季边界和开课日，并由内置紫金港节次配置展开课程事件；节假日调补尚未完整结构化，因此不能把它宣称为完整校方日历事实。
-- 当前技术包 `org.campusos.zju-undergraduate` 将迁入 Core 本科教务连接器，并继续发布 `academic.profile@1`、`academic.timetable@1`、`academic.exams@1` 和 `academic.grades@1`；它不会访问密钥存储中的密码。成绩解析保留接口原始成绩和明确返回的绩点，不自行转换文字等级。学业模块只读取当前已验证账号、已绑定 provider 的 capability record，不能命中其他账号缓存。
-- 当前技术包 `org.campusos.zju-graduate` 将迁入 Core 研究生教务连接器，并继续发布同版本的 profile、课表、考试和成绩能力；这些原始学业能力注册为 collection，可与本科 provider 同时存在。解析器保留精确周次与原始成绩，考试缺少有效日期或完整起止钟点时保持时间为空，不用 08:00、22:00 或全天事件伪造。部分研究生端点失败时只回退对应缓存，不覆盖其他实时成功数据。
+- Core 本科教务连接器使用稳定 provenance ID `org.campusos.zju-undergraduate`，发布 `academic.profile@1`、`academic.course-catalog@1`、`academic.timetable@1`、`academic.exams@1` 和 `academic.grades@1`；它不会访问密钥存储中的密码。成绩解析保留接口原始成绩和明确返回的绩点，学业模块只读取当前已验证账号、已绑定 provider 的 capability record。
+- Core 研究生教务连接器使用稳定 provenance ID `org.campusos.zju-graduate`，发布同版本的 profile、课程、课表、考试和成绩 collection 能力，可与本科 provider 同时存在。解析器保留精确周次与原始成绩，考试缺少有效日期或完整起止钟点时保持时间为空，不用兜底钟点或全天事件伪造；部分端点失败时只回退对应缓存。该实现尚未获得研究生真实账号闭环证据。
 - SSO Cookie 不持久化；本科教务、研究生教务与学在浙大业务会话只在主进程内存复用，用户重新连接或清除凭据时立即销毁。只有 Core 连接器收到固定课表/考试/成绩/作业/课件目录操作的 `{status, body}`，用户插件只读解析、脱敏并持久化后的 capability；下载引擎只收到经固定 host/path/ID 校验后的响应流，不会收到 Cookie、token、请求头或通用网络句柄。
-- 核心已经具备刷新作业注册、同来源 single-flight、分源错误隔离、带账号哈希的 provenance 存储和脱敏诊断页；多 provider `calendar.events@1` 已承载跨来源考试与 DDL，诊断记录来自真实刷新协调器并持久化，支持清空和脱敏 TXT 导出。完整多级回退和更细的重试/重登阶段记录仍按 [Celechron 1.3.0 接入基线](../references/celechron-1.3.0-ingestion-baseline.md)推进。
-- 成绩首个纵向切片已完成，但接口尚未提供或当前解析尚未覆盖“是否计入 GPA”、主修课程标记和多套绩点算法；页面也尚未加入隐私遮罩。因此当前看板只展示原始成绩和基于明确 `gradePoint × credit` 的单一加权结果，不能替代学校正式成绩单或完整学业分析。
+- 核心已经具备刷新作业注册、同来源 single-flight、分源错误隔离、带账号哈希的 provenance 存储和脱敏诊断页；多 provider `calendar.events@1` 已承载跨来源考试与 DDL，诊断记录来自真实刷新协调器并持久化，支持清空和脱敏 TXT 导出。认证失效只允许一次受控重建，学在浙大临时网络错误与课件实体下载分别按对照实现的次数和退避顺序重试，最终失败保持结构化并进入来源状态。
+- 成绩链路已按 Celechron 1.3.0 完成：独立主修响应通过 `xkkh` 认定主修，缓考/待录/弃修/无效、及格不及格制、普通不及格和重修记录按参考规则进入学分与 GPA；页面默认遮罩原始成绩、单科绩点和汇总绩点，自定义权重按已验证账号隔离持久化，保存失败立即回滚到最后一次持久化值。
 - 脱敏现场测试代码已覆盖本科和研究生分支，但本轮没有注入真实研究生账号执行；真实账号成功、错误密码、账号锁定、校外网络和服务维护场景仍需在自有账号和 5–10 台内测设备上验收。测试材料不得进入仓库或日志。

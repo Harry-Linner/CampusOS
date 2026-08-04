@@ -38,9 +38,9 @@
 - `zju-undergraduate` 已通过核心不透明业务 Session 发布脱敏身份、真实课表和真实考试 capability；明确日期时间的考试进入工作台，相对考试周记录只保留原始语义，不强制换算日期。密码、Cookie、Session 和 ticket 不进入插件。
 - `zju-graduate` 已通过独立 CAS service、一次性 ticket 和主进程内存 token broker 发布研究生 profile、课表、考试和成绩 capability；固定业务操作、精确周次解析、单条容错和缓存局部回退已由外部 HTTP fixture 覆盖，缺少明确钟点的考试不会被补成全天或任意时段。
 - `zju-calendar-config` 已从浙江大学官方 HTTPS 页面读取学季边界和开课日，并动态驱动当前/下一学季状态；已内置 ZJU 紫金港标准节次时间表（14 节）作为默认配置数据，供课程日历事件展开使用。
-- 当前技术包 `academic-timetable-events` 是待迁入 Core 的事件投影服务：读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
+- `academic-timetable-events` 保留稳定源码包与 provenance ID，由内部 runtime 作为始终启用、不可配置的 Core 事件投影模块装载：读取课表与校历配置能力，按校历只选择当前完整学期（秋+冬或春+夏），休课期选择下一完整学期。投影已对齐 Celechron 的单一 `Semester`：先按课程和安排去重/合并秋冬或春夏响应，再按上下半学期各自的开课日、结束日、单双周和节次钟点展开，不再为每个学季独立生成 16 周。当前以真实 `2026-2027 秋冬` 本地基线验证。
 - 设置页”诊断与测试”已连接真实刷新协调器和主进程持久化日志，支持查看、清空与自动脱敏 TXT 导出。
-- `calendar.events@1` 已实现多 provider collection contract；当前技术包 `academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 将迁入 Core 事件投影服务，继续按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。`日程`模块只消费事件 feed，不再 import 具体连接器；未验证账号不能命中旧账号事件缓存。
+- `calendar.events@1` 已实现多 provider collection contract；`academic-exams`、`deadline-assistant` 与 `academic-timetable-events` 保留稳定源码包与 provenance ID，由内部 runtime 作为 Core 事件投影模块装载，按显式刷新依赖把可信考试、DDL 和课程转换为统一事件。`日程`模块只消费事件 feed，不 import 具体连接器；未验证账号不能命中旧账号事件缓存。
 - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；`academic-grades` 通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
@@ -52,9 +52,9 @@
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。
 - 日历冲突检测：`detectCalendarConflicts` 扫描课程与待办时间轴重叠，标记 overlapping/double-booked 两种严重度。
 - 下载引擎：正式 IPC → preload → 工作区快照 → 材料面板调用链已接通；FIFO 队列、并发控制、HTTP Range 断点续传、暂停/恢复/取消、状态广播、预期大小校验和按大小变化重下已用协议边界测试覆盖。学在浙大 URL 仅接受固定 HTTPS host/path/正整数 ID，并由主进程注入业务 Session；renderer 和下载队列不能取得 Cookie。正式队列存储为 SQLite，旧 JSON 仅在首次读取时迁移。
-- 自动更新：electron-updater 集成，GitHub Releases 源，检查/下载/安装 IPC。
+- 自动更新：electron-updater 集成，GitHub Releases 源，检查/下载进度/就绪/安装事件通过受信任 IPC 进入设置页；开发版明确显示不可检查更新。
 - electron-builder 配置：NSIS Windows 安装包，asar 打包，GitHub 发布。
-- 当前考试倒计时视图消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记"临近"；该视图后续并入 `academic` 插件，不保留独立官方插件。
+- 考试倒计时视图已作为 `academic` 插件的“考试”页签消费 `calendar.events@1`，渲染距下一场考试的天数与小时数，<3 天自动标记“临近”；`exam-countdown` 仅保留稳定内部实现，不再注册为独立用户插件。
 - 插件开发文档：`docs/plugin-development.md` 覆盖 manifest v2、权限、能力、沙箱、签名模型。
 - Windows CI 覆盖 install、typecheck、lint、test、build、Electron native rebuild 和 Playwright；每次推送必须用 `gh` 等待当前 HEAD 的 Actions run 完成并处理失败日志。2026-07-29 本科 `verify:zju-auth` 通过本地忽略的环境文件注入真实账号，已验证 ZJUAM SSO、本科教务 Session、素拓 ctx/profile、全部课表学期、考试、成绩、`/api/todos`、学期、全部课程分页及每门课程 activities 结构，以及一份授权私有课件的认证下载和实际字节校验，敏感输出为 0。剩余未完成：多设备现场流程、全新 Windows 安装和 GitHub Release/分发验收。
 
@@ -282,7 +282,7 @@ flowchart TD
 - [x] 日历周视图 + 冲突检测
 - [x] 桌面通知 + 提醒调度
 - [x] 抓取容错（缓存兜底 + 手动重试）
-- [ ] Playwright E2E 测试通过
+- [x] Playwright E2E 测试通过（2026-08-04：首次引导与工作区 3/3，通过 1440px 和 820px 视口）
 
 ---
 
@@ -470,6 +470,11 @@ flowchart TD
 _Changelog_
 
 ### Verification update (2026-08-04)
+
+- The current implementation also closes the academic course catalog join, practice detail/summary partial-success fallback, Celechron GPA/major rules, and account-isolated custom GPA IPC. New tests cover concurrent quality-development session reuse, GPA input boundaries, academic tabs/search/term refresh, and connector partial success.
+- The user plugin boundary remains exactly three left-navigation modules: Academic, Schedule, and Materials. Campus Card is not a desktop module.
+- Materials course browsing/batch queue, Core global search, updater/About/MIT surfaces, GPA weight rollback, and desktop/narrow Electron E2E are complete.
+- Real-account status remains bounded: the authorized undergraduate 2026-08-04 run passed the private timetable/materials/download oracle; graduate real-account closure, multi-device use, clean Windows installation, desktop notification, and Release distribution are still pending and must not be described as passed.
 
 日程闭环已通过正式 IPC、SQLite v3、Celechron 任务/排程测试；系统日历采用 RFC 5545 文件交接，参见 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
 - 2026-06-17: initial draft — incorporating Lisa's phase breakdown + metrics framework + kill criteria

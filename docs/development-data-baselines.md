@@ -16,8 +16,9 @@
 
 - `.tmp/development-baselines/timetable-2026-2027-autumn-winter.json`
 - `.tmp/development-baselines/courseware-2025-2026-spring-summer.json`
+- `.tmp/development-baselines/timetable-oracle.json`（仅在本机同时提供 `CAMPUSOS_REQUIRED_TIMETABLE_COURSE` 与 `CAMPUSOS_FORBIDDEN_TIMETABLE_COURSE_TOKEN` 时生成）
 
-文件使用显式 schema 版本、捕获时间、provider、已哈希账号 key、选择器和源数据哈希。可以在同一忽略目录下存放用户明确授权抓取的课件实体，但不得为了验证目录抓取而无条件批量下载。
+文件使用显式 schema 版本、捕获时间、provider、已哈希账号 key、选择器和源数据哈希。课表 oracle 只保存本机输入的必需课程/禁止片段哈希和禁止片段长度，受跟踪测试只读取该文件，不得在源码中固化这些指纹。可以在同一忽略目录下存放用户明确授权抓取的课件实体，但不得为了验证目录抓取而无条件批量下载。
 
 ## 安全边界
 

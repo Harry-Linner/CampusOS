@@ -1,4 +1,5 @@
-import { stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -18,6 +19,56 @@ import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 const liveVerificationRequested =
   process.env.npm_lifecycle_event === "verify:zju-auth";
 const liveIt = liveVerificationRequested ? it : it.skip;
+const developmentBaselineRoot = resolve(
+  process.cwd(),
+  "..",
+  "..",
+  ".tmp",
+  "development-baselines"
+);
+
+interface TimetableOracle {
+  requiredCourseHash: string;
+  forbiddenCourseTokenHash: string;
+  forbiddenTokenLength: number;
+}
+
+const loadTimetableOracle = async (): Promise<TimetableOracle> => {
+  const value = JSON.parse(
+    await readFile(resolve(developmentBaselineRoot, "timetable-oracle.json"), "utf8")
+  ) as unknown;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("本地课表 oracle 格式无效。");
+  }
+  const record = value as Record<string, unknown>;
+  const hashPattern = /^[a-f0-9]{64}$/;
+  if (
+    record.schemaVersion !== 1 ||
+    typeof record.requiredCourseHash !== "string" ||
+    !hashPattern.test(record.requiredCourseHash) ||
+    typeof record.forbiddenCourseTokenHash !== "string" ||
+    !hashPattern.test(record.forbiddenCourseTokenHash) ||
+    !Number.isSafeInteger(record.forbiddenTokenLength) ||
+    Number(record.forbiddenTokenLength) < 1
+  ) {
+    throw new Error("本地课表 oracle 缺少有效校验字段。");
+  }
+  return {
+    requiredCourseHash: record.requiredCourseHash,
+    forbiddenCourseTokenHash: record.forbiddenCourseTokenHash,
+    forbiddenTokenLength: Number(record.forbiddenTokenLength)
+  };
+};
+const hashPrivateLabel = (value: string): string =>
+  createHash("sha256").update(value.trim(), "utf8").digest("hex");
+const containsHashedToken = (
+  value: string,
+  tokenLength: number,
+  expectedHash: string
+): boolean => Array.from(value.trim()).some((_character, index, characters) =>
+  index + tokenLength <= characters.length &&
+  hashPrivateLabel(characters.slice(index, index + tokenLength).join("")) === expectedHash
+);
 
 describe("ZJU unified authentication live verification", () => {
   liveIt(
@@ -139,6 +190,7 @@ describe("ZJU unified authentication live verification", () => {
           ].every(Number.isFinite);
 
         expect(valid).toBe(true);
+        const timetableOracle = await loadTimetableOracle();
         const timetableQueries = createTimetableQueries(new Date());
         const futureAcademicYearStart = Math.max(
           ...timetableQueries.map((query) => query.academicYearStart)
@@ -216,56 +268,38 @@ describe("ZJU unified authentication live verification", () => {
           Array.isArray(majorGradesPayload.items);
         expect(majorGradesStructureValid).toBe(true);
 
-        if (process.env.CAMPUSOS_TIMETABLE_ORACLE === "1") {
-          const forbiddenCourse = Buffer.from(
-            process.env.CAMPUSOS_TIMETABLE_FORBIDDEN_B64 ?? "",
-            "base64"
-          ).toString("utf8");
-          const requiredCourse = Buffer.from(
-            process.env.CAMPUSOS_TIMETABLE_REQUIRED_B64 ?? "",
-            "base64"
-          ).toString("utf8");
-          if (!forbiddenCourse || !requiredCourse) {
-            throw new Error("课表真实验收缺少本地判据。");
-          }
-          const sameTermExamCourses = new Set(
-            parseExamsResponse(examsResponse.body)
-              .filter((exam) =>
-                exam.courseId.startsWith(
-                  `(${futureAcademicYearStart}-${futureAcademicYearStart + 1}-1)`
-                )
-              )
-              .map((exam) => exam.courseName)
-          );
-          const allSameTermExamCoursesPresent = [...sameTermExamCourses].every(
-            (courseName) => futureFirstSemesterCourseNames.has(courseName)
-          );
-          const matchingExamExists = parseExamsResponse(examsResponse.body).some(
-            (exam) =>
-              exam.courseName === requiredCourse &&
-              exam.courseId.startsWith(
-                `(${futureAcademicYearStart}-${futureAcademicYearStart + 1}-1)`
-              )
-          );
-          const forbiddenCourseExists = [
-            ...futureFirstSemesterCourseNames
-          ].some((courseName) => courseName.includes(forbiddenCourse));
-          process.stdout.write(
-            `[TIMETABLE-ORACLE] exam=${matchingExamExists}; all_exam_courses=${allSameTermExamCoursesPresent}; forbidden=${forbiddenCourseExists}; required=${futureFirstSemesterCourseNames.has(requiredCourse)}\n`
-          );
-          expect(matchingExamExists).toBe(true);
-          expect(allSameTermExamCoursesPresent).toBe(true);
-          expect(forbiddenCourseExists).toBe(false);
-          expect(futureFirstSemesterCourseNames.has(requiredCourse)).toBe(true);
-          process.stdout.write(
-            [
-              "[PASS] 下一学年第一学期课表通过本地课程判据",
-              "[PASS] 同期考试课程与课表一致",
-              "[PASS] 敏感字段输出：0"
-            ].join("\n") + "\n"
-          );
-          return;
-        }
+        currentStage = "undergraduate-timetable-oracle";
+        const sameTermExams = parseExamsResponse(examsResponse.body).filter(
+          (exam) => exam.courseId.startsWith(
+            `(${futureAcademicYearStart}-${futureAcademicYearStart + 1}-1)`
+          )
+        );
+        const allSameTermExamCoursesPresent = sameTermExams.every(
+          (exam) => futureFirstSemesterCourseNames.has(exam.courseName)
+        );
+        const matchingExamExists = sameTermExams.some(
+          (exam) =>
+            hashPrivateLabel(exam.courseName) === timetableOracle.requiredCourseHash
+        );
+        const requiredCourseExists = [...futureFirstSemesterCourseNames].some(
+          (courseName) =>
+            hashPrivateLabel(courseName) === timetableOracle.requiredCourseHash
+        );
+        const forbiddenCourseExists = [...futureFirstSemesterCourseNames].some(
+          (courseName) => containsHashedToken(
+            courseName,
+            timetableOracle.forbiddenTokenLength,
+            timetableOracle.forbiddenCourseTokenHash
+          )
+        );
+        process.stdout.write(
+          `[TIMETABLE-ORACLE] exam=${matchingExamExists}; all_exam_courses=${allSameTermExamCoursesPresent}; forbidden=${forbiddenCourseExists}; required=${requiredCourseExists}\n`
+        );
+        expect(futureFirstSemesterCourseNames.size).toBeGreaterThan(0);
+        expect(matchingExamExists).toBe(true);
+        expect(allSameTermExamCoursesPresent).toBe(true);
+        expect(forbiddenCourseExists).toBe(false);
+        expect(requiredCourseExists).toBe(true);
         currentStage = "learning-todos";
         const learningResponse = await client.requestLearningService(
           { username, password },
@@ -430,14 +464,7 @@ describe("ZJU unified authentication live verification", () => {
         expect(downloadCandidate).not.toBeNull();
         currentStage = "learning-private-download";
         const candidate = downloadCandidate!;
-        const baselineRoot = resolve(
-          process.cwd(),
-          "..",
-          "..",
-          ".tmp",
-          "development-baselines",
-          "downloads"
-        );
+        const baselineRoot = resolve(developmentBaselineRoot, "downloads");
         let authenticatedResponseBytes: number | null = null;
         let downloadResponseStatus: number | null = null;
         const downloadEngine = new DownloadEngine({

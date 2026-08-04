@@ -20,7 +20,30 @@ const snapshot: CampusWorkspaceSnapshot = {
   courses: [],
   todayCourses: [],
   deadlines: [],
-  materials: [],
+  materials: [
+    {
+      id: "material-a",
+      title: "资料 A.pdf",
+      courseName: "课程 A",
+      semester: "2025-2026春夏",
+      sourceId: "learning-platform",
+      updatedAt: "2026-07-20T08:00:00.000Z",
+      sizeBytes: 1024,
+      downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
+      downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/10/blob"
+    },
+    {
+      id: "material-b",
+      title: "资料 B.pdf",
+      courseName: "课程 B",
+      semester: "2025-2026春",
+      sourceId: "learning-platform",
+      updatedAt: "2026-07-21T08:00:00.000Z",
+      sizeBytes: 2048,
+      downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/200/blob",
+      downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/20/blob"
+    }
+  ],
   downloads: [
     {
       id: "failed-download",
@@ -47,13 +70,48 @@ const snapshot: CampusWorkspaceSnapshot = {
     readySources: 0,
     totalSources: 0,
     downloadsInFlight: 2,
-    materialsReady: 0,
+    materialsReady: 2,
     remindersQueued: 0,
     deadlinesDueSoon: 0
   }
 };
 
 describe("MaterialsView", () => {
+  it("browses the target semester by course and enqueues selected files", async () => {
+    const enqueue = vi.fn(async () => undefined);
+    const onRefresh = vi.fn(async () => undefined);
+
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue,
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined)
+      },
+      loading: false,
+      onRefresh,
+      snapshot
+    }));
+
+    expect(screen.getByRole("button", { name: /课程 A/ })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /课程 B/ }));
+    expect(screen.getByText("资料 B.pdf")).toBeDefined();
+    expect(screen.queryByText("资料 A.pdf")).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择资料 B.pdf" }));
+    fireEvent.click(screen.getByRole("button", { name: /^下载选中/ }));
+
+    await waitFor(() => {
+      expect(enqueue).toHaveBeenCalledTimes(1);
+      expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+        title: "资料 B.pdf",
+        courseName: "课程 B"
+      }));
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("shows a failed reason and retries through the download bridge", async () => {
     const resume = vi.fn(async () => undefined);
     const onRefresh = vi.fn(async () => undefined);
@@ -74,6 +132,7 @@ describe("MaterialsView", () => {
       snapshot
     }));
 
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
     expect(screen.getByRole("alert").textContent).toBe("下载失败：HTTP 503");
     expect(screen.getByRole("button", { name: "继续" })).toBeDefined();
 

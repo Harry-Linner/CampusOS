@@ -85,6 +85,12 @@ export interface CampusMaterialRecord {
   downloadFallbackUrl?: string;
 }
 
+export interface CampusMaterialCourse {
+  id: string;
+  name: string;
+  semester: string;
+}
+
 export interface CampusDownloadTask {
   id: string;
   title: string;
@@ -145,6 +151,8 @@ export interface CampusWorkspaceSnapshot {
   courses: CampusCourseSession[];
   todayCourses: CampusCourseSession[];
   deadlines: CampusDeadline[];
+  /** Filtered learning-platform catalog used by the Materials workspace. */
+  materialCourses?: CampusMaterialCourse[];
   materials: CampusMaterialRecord[];
   downloads: CampusDownloadTask[];
   reminders: CampusReminder[];

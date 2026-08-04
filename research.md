@@ -52,7 +52,7 @@ Plugin Runtime v2 纵向切片曾以“核心基础设施 + 无头连接器包 +
 
 研究生纵向切片已按 Celechron 1.3.0 的协议证据实现独立 CAS service、ticket 回调校验、`validateLogin` token 交换和固定课表/考试/成绩操作。token 只在主进程内存中作为 `X-Access-Token` 使用，连接器拿不到凭据或请求头；精确周次、单双周和不完整记录按字段容错，考试只有在日期与起止钟点都有效时才生成绝对时间。设置页由用户明确选择本科或研究生，避免服务临时故障造成自动误判；研究生路径必须验证认证后成绩结构才保存凭据，IPC 只返回记录数而不返回正文。自动化 fixture、v3 到 v4 兼容、UI 和缓存局部回退已经通过，真实研究生账号验收尚未完成。
 
-课表已可通过日期日历展示。当前技术包 `zju-calendar-config` 从浙江大学官方 HTTPS 校历页 `https://www.zju.edu.cn/english/19600/list.htm` 提取学季边界和开课日，并以 capability 驱动当前周或下一学季状态；待迁入 Core 的 `academic-timetable-events` 先按校历选择唯一的当前完整学期，休课期选择下一完整学期，再使用 Core 事件投影服务内置、可配置的紫金港标准 14 节节次表按学季、周次、单双周和节次生成课程事件。该边界避免当前/下一学年课程同时进入工作区。节假日调补尚无稳定机器源，真实账号与校历交叉验收前不得把该配置宣称为校方完整日历事实。
+课表已可通过日期日历展示。当前技术包 `zju-calendar-config` 从浙江大学官方 HTTPS 校历页 `https://www.zju.edu.cn/english/19600/list.htm` 提取学季边界和开课日，并以 capability 驱动当前周或下一学季状态；`academic-timetable-events` 保留稳定源码包与 provenance ID，由内部 runtime 作为始终启用、不可配置的 Core 事件投影模块装载，先按校历选择唯一的当前完整学期，休课期选择下一完整学期，再使用内置、可配置的紫金港标准 14 节节次表按学季、周次、单双周和节次生成课程事件。该边界避免当前/下一学年课程同时进入工作区。节假日调补尚无稳定机器源，真实账号与校历交叉验收前不得把该配置宣称为校方完整日历事实。
 
 ### Verification update (2026-07-29)
 
@@ -74,7 +74,7 @@ Celechron 1.3.0 的桌面端可迁移范围包括本科/研究生课表、课程
 
 2026-08-03 的产品边界进一步确认：插件必须是左侧栏中用户可启停的完整模块，官方插件仅保留“学业、日程、资料”三个。数据源协议适配改为 Core 托管连接器，事件投影、排程、搜索、通知和导出改为内部服务；它们继续使用版本化 capability contract，但不再作为插件向用户展示。该结论取代“每个 connector/feature 都是独立插件”的早期分类，不改变已验证的认证、请求、缓存、降级和解析流程。
 
-当前代码仍以 headless connector/feature 包承载部分内置实现，这是待迁移的技术现状，不是目标产品分类。第三方包已支持安全检查、安装、注册、卸载和受限 renderer sandbox v1；目标形态只允许恰好一个完整活动视图的插件。完整模块清单、能力契约、依赖图、实施阶段和测试矩阵见 [Celechron 对照的模块设计](docs/design/celechron-inspired-plugin-suite.md)。
+连接器和事件投影仍保留稳定的独立源码包与 provenance ID，但运行时已将它们注册为始终启用、不可配置且不会出现在扩展列表或左侧栏的 Core 模块；这只是代码和缓存边界，不再是用户插件分类。第三方包已支持安全检查、安装、注册、卸载和受限 renderer sandbox v1，且只接受恰好一个完整活动视图。完整模块清单、能力契约、依赖图、实施状态和测试矩阵见 [Celechron 对照的模块设计](docs/design/celechron-inspired-plugin-suite.md)。
 
 ---
 
@@ -369,6 +369,8 @@ Things we couldn't resolve in this pass but that would change the plan.
 _Changelog_
 
 ### Verification update (2026-08-04)
+
+The latest review confirms the Celechron-overlap work is implemented: quality-development sessions are single-flight per account and getSqjl uses the reference Accept and 12-second timeout; academic catalog/practice/GPA/major behavior, task recurrence/planning, and materials download behavior have formal tests. The authorized undergraduate 2026-08-04 run passed the ignored private 2026-2027 timetable and 2025-2026 materials/authenticated-download oracle without emitting private content. Graduate real-account, multi-device, clean Windows installation, desktop notification, and Release distribution remain separate gates.
 
 日程闭环已按 Celechron 1.3.0 的 task/arrange/flow 逻辑迁入 Core：任务和排程写入 SQLite v3，renderer 只通过正式 schedule IPC 读写；Windows 系统日历采用 RFC 5545 `.ics` 文件和默认文件关联交接，`shell.openPath` 失败会沿 IPC 返回错误，不伪造原生日历写入成功。边界记录在 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
 - 2026-06-17: initial draft — 8 WebSearches, 0 WebFetches (competitor pages were stale/non-functional); 28 sources cited

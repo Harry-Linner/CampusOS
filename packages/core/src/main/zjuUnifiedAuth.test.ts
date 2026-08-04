@@ -439,15 +439,18 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(learningLoginAttempts).toBe(2);
   });
 
-  it("uses the zju-learning-assistant 30 second timeout for learning API data", async () => {
+  it("retries a timed-out learning API request after the zju-learning-assistant backoff", async () => {
     vi.useFakeTimers();
     try {
       const routed = createAuthenticatedUndergraduateTransport();
-      let apiSignal: AbortSignal | null = null;
+      const apiSignals: AbortSignal[] = [];
       const transport: ZjuAuthTransport = async (request) => {
         if (new URL(request.url).pathname === "/api/todos") {
-          apiSignal = request.signal;
-          return new Promise<ZjuAuthHttpResponse>(() => undefined);
+          apiSignals.push(request.signal);
+          if (apiSignals.length === 1) {
+            return new Promise<ZjuAuthHttpResponse>(() => undefined);
+          }
+          return response(200, '{"todo_list":[]}');
         }
         return routed.transport(request);
       };
@@ -455,17 +458,22 @@ describe("ZjuUnifiedAuthClient", () => {
       const operation = client.requestLearningService(
         { username: "3240100001", password: "real password" },
         { operation: "todos" }
-      ).then(
-        () => null,
-        (error: unknown) => error
       );
 
       await vi.advanceTimersByTimeAsync(10);
-      expect(apiSignal).not.toBeNull();
-      expect(apiSignal!.aborted).toBe(false);
+      expect(apiSignals).toHaveLength(1);
+      expect(apiSignals[0].aborted).toBe(false);
       await vi.advanceTimersByTimeAsync(29_990);
-      await expect(operation).resolves.toMatchObject({ code: "timeout" });
-      expect(apiSignal!.aborted).toBe(true);
+      expect(apiSignals[0].aborted).toBe(true);
+      expect(apiSignals).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(99);
+      expect(apiSignals).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(operation).resolves.toEqual({
+        status: 200,
+        body: '{"todo_list":[]}'
+      });
+      expect(apiSignals).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
@@ -790,6 +798,44 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(serviceRequests.every((request) => request.headers.Cookie?.includes("iPlanetDirectoryPro=sso-value"))).toBe(true);
     const qualityRequests = requests.filter((request) => new URL(request.url).hostname === "sztz.zju.edu.cn");
     expect(qualityRequests.filter((request) => new URL(request.url).pathname !== "/dekt/").every((request) => request.headers.Cookie?.includes("SESSION=quality-session"))).toBe(true);
+  });
+
+  it("single-flights concurrent quality-development practice and summary sessions", async () => {
+    const routed = createAuthenticatedUndergraduateTransport();
+    const practiceAccept =
+      "text/html,application/xhtml+xml,application/xml;q=0.9," +
+      "image/avif,image/webp,image/apng,*/*;q=0.8," +
+      "application/signed-exchange;v=b3;q=0.7";
+    const transport: ZjuAuthTransport = async (request) => {
+      const target = new URL(request.url);
+      if (target.pathname === "/dekt/student/home/getSqjl") {
+        expect(request.headers.Accept).toBe(practiceAccept);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return response(200, "practice-data");
+      }
+      return routed.transport(request);
+    };
+    const client = createZjuUnifiedAuthClient({ transport });
+
+    const [practice, summary] = await Promise.all([
+      client.requestQualityDevelopmentService(
+        { username: "3240100001", password: "real password" },
+        { operation: "practice" }
+      ),
+      client.requestQualityDevelopmentService(
+        { username: "3240100001", password: "real password" },
+        { operation: "summary" }
+      )
+    ]);
+
+    expect(practice.body).toBe("practice-data");
+    expect(summary.body).toContain("myInfo");
+    const qualityServiceLogins = routed.requests.filter((request) => {
+      const target = new URL(request.url);
+      return target.pathname === "/cas/login" &&
+        target.searchParams.get("service") === "https://sztz.zju.edu.cn/dekt/";
+    });
+    expect(qualityServiceLogins).toHaveLength(1);
   });
 
   it("classifies a rejected login without attempting a service callback", async () => {

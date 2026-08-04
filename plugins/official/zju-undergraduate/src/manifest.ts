@@ -12,16 +12,20 @@ export const manifest: PluginManifestV2 = {
   permissions: [
     "data:account:academic-profile",
     "auth:service:https://zdbk.zju.edu.cn",
+    "auth:service:https://sztz.zju.edu.cn",
     "network:https://zdbk.zju.edu.cn",
+    "network:https://sztz.zju.edu.cn",
     "storage:domain:academic"
   ],
   sourceScope: ["浙大统一身份认证", "浙大本科教务网"],
   releaseStage: "ready",
   provides: [
     "academic.profile@1",
+    "academic.course-catalog@1",
     "academic.timetable@1",
     "academic.exams@1",
-    "academic.grades@1"
+    "academic.grades@1",
+    "practice.records@1"
   ],
   requires: [
     "core.auth.zju-verification@1",

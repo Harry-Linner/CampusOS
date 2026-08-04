@@ -6,6 +6,7 @@ export type AppIconName =
   | "grades"
   | "materials"
   | "overview"
+  | "search"
   | "settings";
 
 interface AppIconProps {
@@ -71,6 +72,15 @@ export const AppIcon = ({ name, size = 20 }: AppIconProps): JSX.Element => {
       <svg {...commonProps}>
         <circle cx="12" cy="12" r="3" />
         <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.64 5.64l1.42 1.42M16.94 16.94l1.42 1.42M18.36 5.64l-1.42 1.42M7.06 16.94l-1.42 1.42" />
+      </svg>
+    );
+  }
+
+  if (name === "search") {
+    return (
+      <svg {...commonProps}>
+        <circle cx="10.75" cy="10.75" r="5.75" />
+        <path d="m15 15 4 4" />
       </svg>
     );
   }

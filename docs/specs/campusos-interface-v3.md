@@ -73,6 +73,13 @@ The grades view does not expose connector source-state badges. Major labels are 
 - Reminder section: desktop notification toggle, lead-time choices, and save action.
 - Do not display encryption internals, file paths, scheduler state, Cookie/ticket details, or raw diagnostics. The authenticated-data receipt is an explicit user-verifiable exception: its source and whitelisted returned values are product evidence, not a fabricated connection status.
 - “诊断与测试” is a secondary support surface backed by the main-process refresh log, not renderer fixtures. It shows per-source status, duration, error category and sanitized message, and supports reload, clear and redacted TXT export. Retry/relogin stage detail can expand later without exposing credentials or raw responses. It follows the [Celechron 1.3.0 ingestion baseline](../references/celechron-1.3.0-ingestion-baseline.md).
+- Update section consumes the main-process `electron-updater` state machine. Development builds report update checks as unavailable; packaged builds expose check, download progress, ready, and restart-to-install states without returning raw updater errors.
+- About shows the runtime application version, copyright, and the complete MIT license text.
+
+### Core global search
+
+- Search is a Core command surface, not an installable plugin or first-level destination. It opens from the shell or `Ctrl/Cmd+K` and closes with `Esc`.
+- An empty query returns no results, matching the Celechron search controller. Non-empty queries filter the current formal workspace projection across deduplicated courses, deadlines, and materials; selecting a result navigates to its owning module.
 
 ## Visual system
 
@@ -100,6 +107,10 @@ The grades view does not expose connector source-state badges. Major labels are 
 - All interactive controls have visible keyboard focus and do not rely on hover alone.
 - Settings retain existing credential and reminder persistence behavior; test builds expose a working data refresh action with visible result feedback.
 - Settings diagnostics reload persisted refresh records, clear them through IPC, and export a sanitized TXT without exposing account IDs, passwords, Cookie, Session, ticket, token or sensitive URL parameters.
+
+## Current implementation acceptance (2026-08-04)
+
+The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar still contains only the three official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
 
 ## Future-term timetable integrity (2026-08-03)
 

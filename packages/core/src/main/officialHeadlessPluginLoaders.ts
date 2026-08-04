@@ -14,8 +14,10 @@ import { createAcademicTimetableEventsFeature } from "@campusos/plugin-academic-
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
 import type {
   AcademicCalendarConfigData,
+  AcademicCourseCatalogData,
   AcademicExamsData,
   AcademicGradesData,
+  AcademicPracticeData,
   AcademicTimetableData,
   CalendarEventsData,
   CapabilityRecord,
@@ -26,6 +28,7 @@ import {
   readAcademicCredentialRecord,
   requestGraduateAcademicService,
   requestUndergraduateAcademicService,
+  requestZjuQualityDevelopmentService,
   requestZjuLearningService
 } from "./academicCredentialStore";
 import { ZjuUnifiedAuthError } from "./zjuUnifiedAuth";
@@ -403,6 +406,16 @@ export const createOfficialHeadlessPluginLoaders = ({
         );
         return record?.data ?? null;
       },
+      loadCachedCourseCatalog: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicCourseCatalogData>(
+          "academic.course-catalog@1"
+        );
+        const record = records.find((candidate) =>
+          candidate.providerId === zjuGraduateManifest.id &&
+          candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
       publish: async (publication) => {
         await capabilityRepository.publish(
           zjuGraduateManifest.id,
@@ -524,6 +537,51 @@ export const createOfficialHeadlessPluginLoaders = ({
             candidate.providerId === zjuUndergraduateManifest.id &&
             candidate.accountId === accountId &&
             candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchPractice: async () => {
+        try {
+          const [practice, summary] = await Promise.allSettled([
+            requestZjuQualityDevelopmentService({ operation: "practice" }),
+            requestZjuQualityDevelopmentService({ operation: "summary" })
+          ]);
+          if (practice.status === "rejected" && summary.status === "rejected") {
+            throw practice.reason;
+          }
+          return {
+            ok: true as const,
+            ...(practice.status === "fulfilled" ? { body: practice.value.body } : {
+              detailsMessage: "Practice detail request failed."
+            }),
+            ...(summary.status === "fulfilled" ? { summaryBody: summary.value.body } : {
+              summaryMessage: "Practice summary request failed."
+            })
+          };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error ? error.message : "素质拓展实践请求失败。"
+          };
+        }
+      },
+      loadCachedPractice: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicPracticeData>(
+          "practice.records@1"
+        );
+        const record = records.find(
+          (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      loadCachedCourseCatalog: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicCourseCatalogData>(
+          "academic.course-catalog@1"
+        );
+        const record = records.find(
+          (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId && candidate.data !== null
         );
         return record?.data ?? null;
       },

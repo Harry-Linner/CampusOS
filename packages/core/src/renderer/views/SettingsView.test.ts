@@ -159,6 +159,20 @@ const installBridge = (
         storagePath: "C:/diagnostics/refresh-log.json"
       })),
       exportTxt: vi.fn(async () => ({ canceled: true, path: null }))
+    },
+    updates: {
+      getAppInfo: vi.fn(async () => ({
+        name: "CampusOS",
+        version: "0.1.0",
+        packaged: false,
+        licenseName: "MIT" as const,
+        copyright: "Copyright (c) 2026 Harry-Linner"
+      })),
+      getStatus: vi.fn(async () => ({ state: "unavailable" as const })),
+      check: vi.fn(async () => ({ state: "unavailable" as const })),
+      download: vi.fn(async () => ({ state: "unavailable" as const })),
+      install: vi.fn(async () => undefined),
+      subscribe: vi.fn(() => () => undefined)
     }
   };
 };
@@ -169,6 +183,24 @@ afterEach(() => {
 });
 
 describe("SettingsView", () => {
+  it("shows app version, update availability, and the MIT license", async () => {
+    installBridge(vi.fn(async () => connectedRecord));
+
+    render(createElement(SettingsView, {
+      onRefresh: vi.fn().mockResolvedValue(undefined)
+    }));
+
+    expect(await screen.findByText("v0.1.0")).toBeDefined();
+    expect(
+      (screen.getByRole("button", {
+        name: "开发版本不检查更新"
+      }) as HTMLButtonElement).disabled
+    ).toBe(true);
+    expect(screen.getByText("MIT")).toBeDefined();
+    fireEvent.click(screen.getByText("查看 MIT 许可证"));
+    expect(screen.getByText(/Permission is hereby granted/)).toBeDefined();
+  });
+
   it("refreshes workspace data from an explicit settings action", async () => {
     installBridge(vi.fn(async () => connectedRecord));
     const onRefresh = vi.fn().mockResolvedValue(undefined);

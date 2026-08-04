@@ -1,6 +1,6 @@
 # Celechron 1.3.0 对照的 CampusOS 模块设计
 
-**状态：** 已接受，迁移中
+**状态：** 已实现并完成代码与本地 E2E 验收
 
 **日期：** 2026-08-03
 
@@ -184,15 +184,15 @@ Celechron 对照功能收敛为三个官方插件：
 | 当前包/规划包 | 处理 |
 | --- | --- |
 | `academic-scraper` | 删除；禁止继续扩张旧流程 |
-| `zju-undergraduate`、`zju-graduate`、`zju-learning`、`zju-calendar-config` | 从官方插件目录迁为 Core 托管连接器模块 |
-| `academic-grades`、`academic-exams`、`exam-countdown`、`academic-timetable-events` | 迁入 `academic` 插件的内部页面或 Core 事件投影 |
+| `zju-undergraduate`、`zju-graduate`、`zju-learning`、`zju-calendar-config` | 保留稳定源码包与 provenance ID，由内部 runtime 作为始终启用、不可配置的 Core 连接器装载，不进入用户插件快照 |
+| `academic-grades`、`academic-exams`、`exam-countdown`、`academic-timetable-events` | 页面能力并入 `academic`，事件投影作为始终启用的 Core 模块装载；旧用户插件注册通过 legacy ID 迁移并从快照移除 |
 | `zju-practice`、`practice-portfolio`、`academic-overview` | 分别迁为素拓连接器和 `academic` 内部页面，不创建独立插件 |
 | `calendar`、`deadline-assistant`、`task-manager`、`auto-scheduler`、`calendar-bridge` | 合并为 `schedule` 插件和对应 Core 服务 |
 | `materials` | 保留为第三个官方插件，继续消费正式 capability |
 | `universal-search` | 迁为 Core 全局搜索，不创建左侧栏插件 |
 | `dingtalk-entry` | 不属于 Celechron 迁移；没有完整一级工作区前不作为默认插件显示 |
 
-迁移时必须先删除与 Celechron 冲突的旧业务流程，再按 Celechron 模块顺序迁入。不得让旧包和新模块同时维护等价业务逻辑。
+迁移时必须先删除与 Celechron 冲突的旧业务流程，再按 Celechron 模块顺序迁入。源码包名可以为缓存/provenance 兼容保留，但不得把它注册为用户插件，也不得让旧包和新模块同时维护等价业务逻辑。
 
 ## 9. 实施顺序
 
@@ -229,6 +229,10 @@ Celechron 对照功能收敛为三个官方插件：
 - 日历导出：按学期选择、幂等更新和删除。
 - 真实链路：以授权账号的真实输入、实际请求、脱敏上游反馈和用户可见结果闭环验收。
 - 许可证：构建产物不得包含 `.tmp/celechron-1.3.0` 或 Celechron 源文件。
+
+## Current implementation acceptance (2026-08-04)
+
+The three user modules are the only left-navigation products. Academic owns timetable, course catalog, exams, grades, and practice as internal tabs; Schedule owns the unified event/task projection; Materials owns course browsing, batch selection, and the download queue. Core-owned connectors are never listed as installable modules, and Campus Card is excluded from the desktop scope. Core now also owns global search, update state, About, and MIT license presentation. On 2026-08-04 the authorized undergraduate live path and private baselines closed the 2026-2027 autumn-winter timetable and 2025-2026 spring-summer materials gates, including authenticated download byte validation. Graduate real-account closure is not claimed.
 
 ## 11. 完成定义
 

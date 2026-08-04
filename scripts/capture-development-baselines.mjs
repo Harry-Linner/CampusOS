@@ -33,6 +33,8 @@ const parsePayload = (row) => {
 };
 const stableHash = (value) =>
   createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+const privateLabelHash = (value) =>
+  createHash("sha256").update(value.trim(), "utf8").digest("hex");
 const isSpringSummer = (semester) =>
   /^2025-2026(?:学年)?(?:春|夏|春夏)(?:学期)?$/.test(
     String(semester ?? "").trim().replaceAll("–", "-").replaceAll("—", "-").replace(/\s+/g, "")
@@ -45,6 +47,15 @@ const writePrivateBaseline = (fileName, value) => {
     mode: 0o600
   });
 };
+const requiredTimetableCourse =
+  process.env.CAMPUSOS_REQUIRED_TIMETABLE_COURSE?.trim() ?? "";
+const forbiddenTimetableCourseToken =
+  process.env.CAMPUSOS_FORBIDDEN_TIMETABLE_COURSE_TOKEN?.trim() ?? "";
+if (Boolean(requiredTimetableCourse) !== Boolean(forbiddenTimetableCourseToken)) {
+  throw new Error(
+    "Both private timetable oracle environment variables must be provided together."
+  );
+}
 
 const records = rows.map((row) => ({ ...row, payload: parsePayload(row) }));
 const targetTimetableTerms = (record) => (record.payload.data?.terms ?? []).filter(
@@ -111,6 +122,18 @@ writePrivateBaseline("courseware-2025-2026-spring-summer.json", {
   courses,
   materials
 });
+
+if (requiredTimetableCourse && forbiddenTimetableCourseToken) {
+  writePrivateBaseline("timetable-oracle.json", {
+    schemaVersion: 1,
+    kind: "academic-timetable-oracle",
+    capturedAt,
+    requiredCourseHash: privateLabelHash(requiredTimetableCourse),
+    forbiddenCourseTokenHash: privateLabelHash(forbiddenTimetableCourseToken),
+    forbiddenTokenLength: Array.from(forbiddenTimetableCourseToken).length
+  });
+  console.log("Captured private timetable oracle.");
+}
 
 console.log(`Captured private timetable baseline: ${timetableTerms.length} terms.`);
 console.log(`Captured private courseware baseline: ${courses.length} courses, ${materials.length} materials.`);

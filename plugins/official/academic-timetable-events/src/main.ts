@@ -1,8 +1,10 @@
 import type {
   AcademicCalendarConfigData,
   AcademicCalendarQuarter,
+  AcademicSemesterWindow,
   AcademicTimetableData,
   AcademicTimetableSession,
+  AcademicTimetableSessionContext,
   CalendarEventRecord,
   CalendarEventsData,
   CapabilityDataState,
@@ -12,6 +14,11 @@ import type {
   PeriodTimeRecord,
   PluginCapability,
   PluginCapabilityBinding
+} from "@campusos/shared";
+import {
+  academicSemesterNumberForSeason,
+  mergeAcademicTimetableSessions,
+  selectAcademicSemesterWindow
 } from "@campusos/shared";
 import { manifest } from "./manifest";
 
@@ -47,71 +54,6 @@ interface FeatureActivationContext {
   grantedPermissions: readonly CampusPermission[];
   bindings: Readonly<Partial<Record<PluginCapability, PluginCapabilityBinding>>>;
 }
-
-const semesterNumberForSeason = (season: string): 1 | 2 | null => {
-  const seasonName = season.split("|").at(-1);
-  if (seasonName === "秋" || seasonName === "冬") return 1;
-  if (seasonName === "春" || seasonName === "夏") return 2;
-  return null;
-};
-
-const formatShanghaiDate = (dateTime: string): string => {
-  const values = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Shanghai",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    })
-      .formatToParts(new Date(dateTime))
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value])
-  );
-  return `${values.year}-${values.month}-${values.day}`;
-};
-
-interface SemesterWindow {
-  academicYearStart: number;
-  semesterNumber: 1 | 2;
-  startDate: string;
-  endDate: string;
-}
-
-const selectSemesterWindow = (
-  quarters: readonly AcademicCalendarQuarter[],
-  generatedAt: string
-): SemesterWindow | null => {
-  const bySemester = new Map<string, SemesterWindow>();
-  for (const quarter of quarters) {
-    const semesterNumber = semesterNumberForSeason(quarter.season);
-    if (semesterNumber === null) continue;
-    const key = `${quarter.academicYearStart}:${semesterNumber}`;
-    const existing = bySemester.get(key);
-    bySemester.set(key, {
-      academicYearStart: quarter.academicYearStart,
-      semesterNumber,
-      startDate: existing && existing.startDate < quarter.startDate
-        ? existing.startDate
-        : quarter.startDate,
-      endDate: existing && existing.endDate > quarter.endDate
-        ? existing.endDate
-        : quarter.endDate
-    });
-  }
-
-  const windows = [...bySemester.values()].sort((left, right) =>
-    left.startDate.localeCompare(right.startDate)
-  );
-  if (windows.length === 0) return null;
-  const today = formatShanghaiDate(generatedAt);
-
-  // Celechron lib/model/scholar.dart:97-110 and scholar_controller.dart:96-110
-  // expose one Semester. CampusOS mechanically groups ZJU's two quarter
-  // records into that Semester because the capability stores 秋/冬 and 春/夏 separately.
-  return windows.find(
-    (window) => window.startDate <= today && today <= window.endDate
-  ) ?? windows.find((window) => window.startDate > today) ?? windows.at(-1) ?? null;
-};
 
 const resolvePeriodTime = (
   period: number,
@@ -153,7 +95,7 @@ interface HalfWindow {
 
 const buildHalfWindows = (
   quarters: readonly AcademicCalendarQuarter[],
-  selectedSemester: SemesterWindow
+  selectedSemester: AcademicSemesterWindow
 ): HalfWindow[] => {
   const seasons = selectedSemester.semesterNumber === 1
     ? (["1|秋", "1|冬"] as const)
@@ -254,63 +196,6 @@ const sessionDates = (
   });
 };
 
-const sameRepeatPattern = (
-  left: AcademicTimetableSession,
-  right: AcademicTimetableSession
-): boolean =>
-  left.dayOfWeek === right.dayOfWeek &&
-  left.weekPattern === right.weekPattern &&
-  left.location === right.location;
-
-const mergeCourseSessions = (
-  entries: readonly ExpandedSession[]
-): ExpandedSession[] => {
-  // Celechron lib/model/semester.dart:384-403 and course.dart:109-157.
-  // CampusOS only adapts the mutable Dart model to immutable capability records.
-  const courses = new Map<string, ExpandedSession[]>();
-  for (const entry of entries) {
-    const courseKey = [
-      entry.providerId,
-      entry.academicYearStart,
-      entry.semesterNumber,
-      entry.session.courseName
-    ].join(":");
-    const sessions = courses.get(courseKey) ?? [];
-    const firstPeriod = entry.session.periods[0];
-    const duplicate = sessions.find(
-      (current) =>
-        sameRepeatPattern(current.session, entry.session) &&
-        current.session.periods.includes(firstPeriod)
-    );
-    if (duplicate) {
-      duplicate.session.firstHalf ||= entry.session.firstHalf;
-      duplicate.session.secondHalf ||= entry.session.secondHalf;
-      continue;
-    }
-
-    const adjacent = sessions.find(
-      (current) =>
-        sameRepeatPattern(current.session, entry.session) &&
-        current.session.periods.at(-1)! + 1 === firstPeriod
-    );
-    if (adjacent) {
-      adjacent.session.periods.push(...entry.session.periods);
-      continue;
-    }
-
-    sessions.push({
-      ...entry,
-      session: {
-        ...entry.session,
-        periods: [...entry.session.periods],
-        ...(entry.session.weeks ? { weeks: [...entry.session.weeks] } : {})
-      }
-    });
-    courses.set(courseKey, sessions);
-  }
-  return [...courses.values()].flat();
-};
-
 const sessionToEvent = (
   session: AcademicTimetableSession,
   providerId: string,
@@ -353,13 +238,6 @@ const weekPatternAllows = (
   return true;
 };
 
-interface ExpandedSession {
-  session: AcademicTimetableSession;
-  providerId: string;
-  academicYearStart: number;
-  semesterNumber: 1 | 2;
-}
-
 export const deriveTimetableCalendarEvents = (
   timetableRecords: readonly CapabilityRecord<AcademicTimetableData>[],
   calendarConfig: AcademicCalendarConfigData | null,
@@ -398,17 +276,17 @@ export const deriveTimetableCalendarEvents = (
     events: []
   };
 
-  const selectedSemester = selectSemesterWindow(
+  const selectedSemester = selectAcademicSemesterWindow(
     calendarConfig.quarters,
     generatedAt
   );
 
   // Flatten the selected semester's sessions with their provider context.
-  const expanded: ExpandedSession[] = [];
+  const expanded: AcademicTimetableSessionContext[] = [];
   for (const record of timetableRecords) {
     const terms = record.data?.terms ?? [];
     for (const term of terms) {
-      const semesterNumber = semesterNumberForSeason(term.season);
+      const semesterNumber = academicSemesterNumberForSeason(term.season);
       if (
         selectedSemester === null ||
         term.academicYearStart !== selectedSemester.academicYearStart ||
@@ -430,7 +308,7 @@ export const deriveTimetableCalendarEvents = (
   const halfWindows = selectedSemester
     ? buildHalfWindows(calendarConfig.quarters, selectedSemester)
     : [];
-  const merged = mergeCourseSessions(expanded);
+  const merged = mergeAcademicTimetableSessions(expanded);
   const events: CalendarEventRecord[] = [];
   let totalAttempted = 0;
   for (const { session, providerId } of merged) {

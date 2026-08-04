@@ -60,6 +60,32 @@ export interface AcademicTimetableData {
   terms: AcademicTimetableTermData[];
 }
 
+/**
+ * The normalized course projection shared by the academic and materials
+ * workspaces. A course keeps its source term and the related grade/exam IDs
+ * so consumers can open one record without scraping a second endpoint.
+ */
+export interface AcademicCourseRecord {
+  sourceId: string;
+  /** Celechron Course.realId display key, when the source provides an id. */
+  realId?: string | null;
+  courseCode: string | null;
+  courseName: string;
+  teachers: string[];
+  credit: number;
+  academicYearStart: number | null;
+  season: AcademicTimetableSeason | null;
+  semesterLabel: string | null;
+  courseCategory: string | null;
+  gradeSourceId: string | null;
+  examSourceIds: string[];
+  sessions: AcademicTimetableSession[];
+}
+
+export interface AcademicCourseCatalogData {
+  courses: AcademicCourseRecord[];
+}
+
 export interface AcademicCalendarQuarter {
   academicYearStart: number;
   season: AcademicTimetableSeason;
@@ -100,6 +126,8 @@ export interface AcademicExamsData {
 
 export interface AcademicGradeRecord {
   sourceId: string;
+  /** Celechron Grade.realId display key, when the source provides an id. */
+  realId?: string | null;
   courseCode: string | null;
   courseName: string;
   credit: number;
@@ -109,12 +137,58 @@ export interface AcademicGradeRecord {
   termNumber: 1 | 2 | null;
   isMajorCourse: boolean;
   courseCategory: string | null;
+  /** Explicit source flags override the derived undergraduate rules. */
+  gpaIncluded?: boolean;
+  creditIncluded?: boolean;
 }
 
 export type GpaScale = "4.0" | "4.3" | "5.0";
 
 export interface AcademicGradesData {
   grades: AcademicGradeRecord[];
+}
+
+export interface AcademicPracticeRecord {
+  sourceId: string;
+  categoryId: number;
+  categoryName: string;
+  projectName: string;
+  projectType: string;
+  qualityType: string;
+  score: number;
+  statusValue: number | null;
+  statusLabel: string;
+  approved: boolean;
+  deleted: boolean;
+  role: string | null;
+  remark: string | null;
+  activityStart: string | null;
+  activityEnd: string | null;
+  updatedAt: string | null;
+}
+
+export type AcademicPracticeSummarySource =
+  | "networkMyInfo"
+  | "cachedMyInfo"
+  | "calculatedFromRecords"
+  | "unavailable";
+
+export interface AcademicPracticeSummary {
+  secondClassPoints: number;
+  thirdClassPoints: number;
+  fourthClassPoints: number;
+  totalPoints: number;
+  myPassed: boolean | null;
+  lastYearPassed: boolean | null;
+  source: AcademicPracticeSummarySource;
+  updatedAt: string;
+  stale: boolean;
+}
+
+export interface AcademicPracticeData {
+  records: AcademicPracticeRecord[];
+  summary: AcademicPracticeSummary | null;
+  detailsAvailable: boolean;
 }
 
 export interface LearningAssignmentRecord {

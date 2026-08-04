@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { AcademicGradeRecord } from "@campusos/shared";
-import { summarizeAcademicGrades } from "@campusos/plugin-academic-grades/model";
+import {
+  calculateAcademicGpa,
+  summarizeAcademicGrades
+} from "@campusos/plugin-academic-grades/model";
 
 describe("academic grades feature", () => {
-  it("weights only explicit grade points and keeps unknown terms separate", () => {
+  it("matches Celechron's four GPA projections and keeps unknown terms separate", () => {
     const grades: AcademicGradeRecord[] = [
       {
         sourceId: "grade-1",
@@ -47,14 +50,33 @@ describe("academic grades feature", () => {
 
     expect(summary.courseCount).toBe(3);
     expect(summary.totalCredits).toBe(8);
-    expect(summary.gradedCredits).toBe(8);
+    expect(summary.gradedCredits).toBe(9);
     expect(summary.majorGradedCredits).toBe(8);
-    expect(summary.weightedGradePoint).toBeCloseTo(3.8875);
-    expect(summary.majorWeightedGradePoint).toBeCloseTo(3.8875);
+    expect(summary.weightedGradePoint).toBeCloseTo(3.4556, 3);
+    expect(summary.majorWeightedGradePoint).toBeCloseTo(3.8875, 3);
+    expect(summary.fourPointGpa).toBeCloseTo(3.3889, 3);
+    expect(summary.fourPointLegacyGpa).toBeCloseTo(3.3889, 3);
+    expect(summary.hundredPointGpa).toBeCloseTo(87.8889, 3);
+    expect(summary.majorFourPointGpa).toBeCloseTo(3.8125, 3);
+    expect(summary.majorFourPointLegacyGpa).toBeCloseTo(3.8125, 3);
+    expect(summary.majorHundredPointGpa).toBeCloseTo(87.625, 3);
     expect(summary.terms.map((term) => term.label)).toEqual([
       "2025-2026 学年 第 1 学期",
       "学期信息待确认"
     ]);
+  });
+});
+
+describe("Celechron GPA conversion and custom weights", () => {
+  it("uses exact 5-to-4.3 mappings and keeps credits unchanged when weighted", () => {
+    const grades: AcademicGradeRecord[] = [
+      { sourceId: "a", courseCode: null, courseName: "a", credit: 3, originalScore: "95", gradePoint: 5, academicYearStart: 2025, termNumber: 1, isMajorCourse: true, courseCategory: null },
+      { sourceId: "b", courseCode: null, courseName: "b", credit: 1, originalScore: "90", gradePoint: 4.5, academicYearStart: 2025, termNumber: 1, isMajorCourse: false, courseCategory: null }
+    ];
+    const weighted = calculateAcademicGpa(grades, new Map([["a", 2]]));
+    expect(weighted.fivePoint).toBeCloseTo(34.5 / 4);
+    expect(weighted.fourPoint).toBeCloseTo((4.3 * 2 * 3 + 4.1) / 4);
+    expect(weighted.earnedCredits).toBe(4);
   });
 });
 
