@@ -294,6 +294,42 @@ describe("academic timetable events", () => {
     expect(result.events[1].startAt).toBe("2026-09-28T08:00:00+08:00");
   });
 
+  it("continues Celechron custom repeats after week 16", () => {
+    const extendedCalendar: AcademicCalendarConfigData = {
+      ...calendarConfig,
+      quarters: calendarConfig.quarters.map((quarter) =>
+        quarter.season === "1|冬"
+          ? { ...quarter, endDate: "2027-01-03" }
+          : quarter
+      )
+    };
+    const customWeekRecord: CapabilityRecord<AcademicTimetableData> = {
+      ...timetableRecord,
+      data: {
+        terms: [{
+          academicYearStart: 2026,
+          season: "1|秋",
+          state: "live",
+          sessions: [{
+            ...timetableRecord.data!.terms[0].sessions[0],
+            sourceId: "custom-week-17",
+            weeks: [17]
+          }]
+        }]
+      }
+    };
+
+    const result = deriveTimetableCalendarEvents(
+      [customWeekRecord],
+      extendedCalendar,
+      "2026-07-19T12:00:00.000Z"
+    );
+
+    expect(result.events.map((event) => event.startAt)).toEqual([
+      "2027-01-04T08:00:00+08:00"
+    ]);
+  });
+
   it("omits sessions with no matching period times", () => {
     const noPeriodRecord: CapabilityRecord<AcademicTimetableData> = {
       ...timetableRecord,

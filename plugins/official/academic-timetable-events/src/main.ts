@@ -161,6 +161,19 @@ const dateForExactWeek = (
   dayOfWeek: number
 ): string | null => {
   if (!Number.isInteger(week) || week < 1) return null;
+  const target = dayOfWeekToNumber(dayOfWeek);
+  if (week > 16) {
+    // Celechron lib/model/semester.dart:323-335 continues custom repeats
+    // after the normal 16-week calendar from the eighth Sunday's anchor.
+    const secondStart = parseDateOnly(windows[1]?.startDate ?? "");
+    if (!secondStart) return null;
+    const firstSundayOffset = (7 - (secondStart.getUTCDay() || 7) + 7) % 7;
+    const anchor = new Date(secondStart);
+    anchor.setUTCDate(anchor.getUTCDate() + firstSundayOffset + 49);
+    anchor.setUTCDate(anchor.getUTCDate() + (week - 17) * 7 + target);
+    return toDateOnly(anchor.toISOString());
+  }
+
   const halfIndex = week <= 8 ? 0 : 1;
   const window = windows[halfIndex];
   if (!window) return null;
@@ -171,7 +184,7 @@ const dateForExactWeek = (
   const date = new Date(start);
   date.setUTCDate(
     date.getUTCDate() +
-      ((dayOfWeekToNumber(dayOfWeek) - startDay + 7) % 7) +
+      ((target - startDay + 7) % 7) +
       (weekInHalf - 1) * 7
   );
   const result = toDateOnly(date.toISOString());
