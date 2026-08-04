@@ -144,6 +144,16 @@ export interface AcademicGradeRecord {
   creditIncluded?: boolean;
 }
 
+export interface AcademicMajorGradeSummary {
+  fivePointGpa: number | null;
+  fourPointGpa: number | null;
+  fourPointLegacyGpa: number | null;
+  hundredPointGpa: number | null;
+  /** GPA denominator credits from the dedicated major response. */
+  gpaCredits: number;
+  earnedCredits: number;
+}
+
 /** Celechron-compatible strategy for selecting a repeated course attempt. */
 export type AcademicGpaStrategy = "best" | "first";
 
@@ -151,6 +161,8 @@ export type GpaScale = "4.0" | "4.3" | "5.0";
 
 export interface AcademicGradesData {
   grades: AcademicGradeRecord[];
+  /** Independent getMajorGrade projection from Celechron's undergraduate flow. */
+  majorSummary?: AcademicMajorGradeSummary;
 }
 
 export interface AcademicPracticeRecord {

@@ -499,3 +499,9 @@ _Changelog_
 - [x] Support the Celechron `best` (default) and `first` strategies and calculate GPA/earned credits from the selected attempt only.
 - [x] Persist the strategy per verified account through SQLite, preload IPC, Settings, and the grades view.
 - [x] Cover repeated attempts, provider isolation, strategy validation, migration, and Settings persistence with tests.
+
+### Academic major summary acceptance (2026-08-04)
+
+- [x] Preserve Celechron's independent `getMajorGrade` GPA and earned-credit projection in the formal grades capability.
+- [x] Use the source major projection by default and switch to the explicit user-weighted calculation only when custom weights are present.
+- [x] Cover source-summary publication, empty course-id grouping fallback, and renderer consumption with tests.

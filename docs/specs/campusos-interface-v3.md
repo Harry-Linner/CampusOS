@@ -115,3 +115,7 @@ The Academic first-level module exposes five internal tabs (timetable, course ca
 ## Future-term timetable integrity (2026-08-03)
 
 When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.
+
+## Academic major summary integrity (2026-08-04)
+
+The undergraduate connector carries the dedicated Celechron `getMajorGrade` GPA and earned-credit projection alongside transcript records. The renderer uses that projection by default, while an explicitly saved custom-weight map enables the local weighted view. The source projection and `xkkh` major labels remain account-scoped capability data.

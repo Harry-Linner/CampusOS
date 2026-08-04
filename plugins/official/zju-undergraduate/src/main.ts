@@ -5,6 +5,7 @@ import type {
   AcademicCourseRecord,
   AcademicGradeRecord,
   AcademicGradesData,
+  AcademicMajorGradeSummary,
   AcademicPracticeData,
   AcademicPracticeRecord,
   AcademicPracticeSummary,
@@ -48,7 +49,7 @@ export type ExamsFetchResult =
   | { ok: false; message: string };
 
 export type GradesFetchResult =
-  | { ok: true; body: string; majorBody: string }
+  | { ok: true; body: string; majorBody?: string; majorMessage?: string }
   | { ok: false; message: string };
 
 export type PracticeFetchResult =
@@ -409,6 +410,66 @@ export const parseMajorCourseIdsResponse = (body: string): Set<string> => {
       .map((value) => asString(asRecord(value)?.xkkh)?.trim())
       .filter((sourceId): sourceId is string => Boolean(sourceId))
   );
+};
+
+const majorGradeGpaIncluded = (grade: AcademicGradeRecord): boolean =>
+  !["弃修", "待录", "缓考", "无效", "合格", "不合格"].includes(grade.originalScore) &&
+  !grade.sourceId.includes("xtwkc");
+
+const majorGradeCreditIncluded = (grade: AcademicGradeRecord): boolean =>
+  !["弃修", "待录", "缓考", "无效"].includes(grade.originalScore);
+
+const majorGradeHundredPoint = (grade: AcademicGradeRecord): number => {
+  const labels: Record<string, number> = {
+    "A+": 95, A: 90, "A-": 87, "B+": 83, B: 80, "B-": 77,
+    "C+": 73, C: 70, "C-": 67, D: 60, F: 0, 优秀: 90, 良好: 80,
+    中等: 70, 及格: 60, 不及格: 0, 合格: 75, 不合格: 0,
+    弃修: 0, 缺考: 0, 缓考: 0, 待录: 0, 无效: 0
+  };
+  return labels[grade.originalScore] ?? Number.parseInt(grade.originalScore.match(/\d+/)?.[0] ?? "0", 10);
+};
+
+/** Mirrors Celechron lib/http/zjuServices/zdbk.dart:getMajorGrade. */
+export const parseMajorGradeSummaryResponse = (body: string): AcademicMajorGradeSummary => {
+  const payload = JSON.parse(body) as { items?: unknown };
+  if (!Array.isArray(payload.items)) {
+    throw new Error("教务网主修成绩响应缺少 items 数组。");
+  }
+  const majorIds = new Set(
+    payload.items
+      .map((value) => asString(asRecord(value)?.xkkh)?.trim())
+      .filter((sourceId): sourceId is string => Boolean(sourceId))
+  );
+  const grades = parseGradesResponse(body, majorIds).grades;
+  const gpaGrades = grades.filter(majorGradeGpaIncluded);
+  const credits = gpaGrades.reduce((sum, grade) => sum + Math.max(0, grade.credit), 0);
+  const earnedCredits = grades.reduce(
+    (sum, grade) => sum + (majorGradeCreditIncluded(grade) && ((grade.gradePoint ?? 0) !== 0 || grade.sourceId.includes("xtwkc")) ? Math.max(0, grade.credit) : 0),
+    0
+  );
+  if (credits === 0) {
+    return { fivePointGpa: null, fourPointGpa: null, fourPointLegacyGpa: null, hundredPointGpa: null, gpaCredits: credits, earnedCredits };
+  }
+  const totals = gpaGrades.reduce(
+    (sum, grade) => {
+      const five = grade.gradePoint ?? 0;
+      const four = five > 4 ? ({ 5: 4.3, 4.8: 4.2, 4.5: 4.1, 4.2: 4 }[five] ?? 4) : five;
+      sum.five += five * grade.credit;
+      sum.four += four * grade.credit;
+      sum.legacy += (five > 4 ? 4 : five) * grade.credit;
+      sum.hundred += majorGradeHundredPoint(grade) * grade.credit;
+      return sum;
+    },
+    { five: 0, four: 0, legacy: 0, hundred: 0 }
+  );
+  return {
+    fivePointGpa: totals.five / credits,
+    fourPointGpa: totals.four / credits,
+    fourPointLegacyGpa: totals.legacy / credits,
+    hundredPointGpa: totals.hundred / credits,
+    gpaCredits: credits,
+    earnedCredits
+  };
 };
 
 export const parseGradesResponse = (
@@ -894,14 +955,27 @@ export const createZjuUndergraduateConnector = ({
       try {
         // Celechron: lib/http/ugrs_spider.dart:667-702, 792-795 fetches the
         // transcript and dedicated major transcript, then projects xkkh IDs.
-        const majorCourseIds = parseMajorCourseIdsResponse(result.majorBody);
-        const data = parseGradesResponse(result.body, majorCourseIds);
+        let data: AcademicGradesData = parseGradesResponse(
+          result.body,
+          result.majorBody ? parseMajorCourseIdsResponse(result.majorBody) : new Set()
+        );
+        if (result.majorBody) {
+          data = {
+            ...data,
+            majorSummary: parseMajorGradeSummaryResponse(result.majorBody)
+          };
+        } else {
+          const cached = await loadCachedGrades(proof.studentId);
+          const cachedSummary = cached?.majorSummary;
+          if (cachedSummary) data = { ...data, majorSummary: cachedSummary };
+        }
         await publish({
           capability: "academic.grades@1",
           accountId: proof.studentId,
           state: "live",
           updatedAt,
-          data
+          data,
+          ...(result.majorMessage ? { message: `主修成绩接口暂不可用，已保留最近一次主修汇总。${result.majorMessage}` } : {})
         });
         return { status: "live", data };
       } catch {

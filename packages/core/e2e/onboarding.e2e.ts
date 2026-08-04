@@ -35,6 +35,8 @@ test("renders the first-run onboarding with its stylesheet in Electron", async (
       });
       throw error;
     }
+    page.setDefaultTimeout(15_000);
+    await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("button", { name: "开始配置" })).toBeVisible();
     await expect(page.getByText("把校园事务放回一个清晰的工作台。"))
       .toBeVisible();
@@ -71,6 +73,8 @@ test("takes a fixture-backed onboarding through the schedule module using real E
 
   try {
     const page = await app.firstWindow({ timeout: 10_000 });
+    page.setDefaultTimeout(15_000);
+    await page.waitForLoadState("domcontentloaded");
     await page.getByRole("button", { name: "开始配置" }).click();
     await page.getByRole("button", { name: "开发模式跳过认证" }).click();
     await page.getByRole("button", { name: "开始同步" }).click();

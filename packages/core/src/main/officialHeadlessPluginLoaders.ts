@@ -511,22 +511,27 @@ export const createOfficialHeadlessPluginLoaders = ({
         return record?.data ?? null;
       },
       fetchGrades: async () => {
-        try {
-          const [transcript, major] = await Promise.all([
-            requestUndergraduateAcademicService({ operation: "grades" }),
-            requestUndergraduateAcademicService({ operation: "major-grades" })
-          ]);
-          return {
-            ok: true as const,
-            body: transcript.body,
-            majorBody: major.body
-          };
-        } catch (error) {
+        const [transcript, major] = await Promise.allSettled([
+          requestUndergraduateAcademicService({ operation: "grades" }),
+          requestUndergraduateAcademicService({ operation: "major-grades" })
+        ]);
+        if (transcript.status === "rejected") {
+          const error = transcript.reason;
           return {
             ok: false as const,
             message: error instanceof Error ? error.message : "教务网成绩请求失败。"
           };
         }
+        return {
+          ok: true as const,
+          body: transcript.value.body,
+          ...(major.status === "fulfilled"
+            ? { majorBody: major.value.body }
+            : {
+                majorMessage:
+                  major.reason instanceof Error ? major.reason.message : "主修成绩请求失败。"
+              })
+        };
       },
       loadCachedGrades: async (accountId) => {
         const records = await capabilityRepository.read<AcademicGradesData>(

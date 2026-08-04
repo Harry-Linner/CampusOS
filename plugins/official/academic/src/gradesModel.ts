@@ -1,6 +1,7 @@
 import type {
   AcademicGpaStrategy,
   AcademicGradeRecord,
+  AcademicMajorGradeSummary,
   GpaScale
 } from "@campusos/shared";
 
@@ -164,9 +165,9 @@ const repeatedCourseKey = (grade: AcademicGradeRecord): string => {
   // Celechron lib/model/scholar.dart:557-574 groups normal repeats by course
   // code and keeps PPAE/401 physical-education registrations term-specific.
   const match = sourceId.match(/(\(.*\)-(.*?))-.*/);
-  let key = match?.[2] ?? grade.realId?.trim() ?? grade.courseCode?.trim() ?? sourceId;
+  let key = match?.[2] || grade.realId?.trim() || grade.courseCode?.trim() || sourceId;
   if (key.startsWith("PPAE") || key.startsWith("401")) {
-    key = match?.[1] ?? grade.realId?.trim() ?? sourceId;
+    key = match?.[1] || grade.realId?.trim() || sourceId;
   }
   return provider ? `${provider}:${key}` : key;
 };
@@ -261,7 +262,8 @@ export const calculateAcademicGpa = (
 export const summarizeAcademicGrades = (
   grades: readonly AcademicGradeRecord[],
   weightMap: ReadonlyMap<string, number> = new Map(),
-  strategy: AcademicGpaStrategy = "best"
+  strategy: AcademicGpaStrategy = "best",
+  sourceMajorSummary?: AcademicMajorGradeSummary
 ): AcademicGradeSummary => {
   const terms = new Map<string, AcademicGradeTermSummary>();
   const selectedGrades = selectAcademicGpaGrades(grades, strategy);
@@ -290,23 +292,33 @@ export const summarizeAcademicGrades = (
     weightMap,
     strategy
   );
+  const majorProjection = weightMap.size === 0 && sourceMajorSummary
+    ? sourceMajorSummary
+    : {
+        fivePointGpa: major.fivePoint,
+        fourPointGpa: major.fourPoint,
+        fourPointLegacyGpa: major.fourPointLegacy,
+        hundredPointGpa: major.hundredPoint,
+        gpaCredits: major.credits,
+        earnedCredits: major.earnedCredits
+      };
   const sourceScale = inferGpaScale(selectedGrades);
 
   return {
     courseCount: grades.length,
     totalCredits: overall.earnedCredits,
     gradedCredits: overall.credits,
-    majorGradedCredits: major.credits,
+    majorGradedCredits: majorProjection.gpaCredits,
     weightedGradePoint: overall[sourceScale === "5.0" ? "fivePoint" : sourceScale === "4.3" ? "fourPoint" : "fourPointLegacy"],
-    majorWeightedGradePoint: major[sourceScale === "5.0" ? "fivePoint" : sourceScale === "4.3" ? "fourPoint" : "fourPointLegacy"],
+    majorWeightedGradePoint: sourceScale === "5.0" ? majorProjection.fivePointGpa : sourceScale === "4.3" ? majorProjection.fourPointGpa : majorProjection.fourPointLegacyGpa,
     fivePointGpa: overall.fivePoint,
     fourPointGpa: overall.fourPoint,
     fourPointLegacyGpa: overall.fourPointLegacy,
     hundredPointGpa: overall.hundredPoint,
-    majorFivePointGpa: major.fivePoint,
-    majorFourPointGpa: major.fourPoint,
-    majorFourPointLegacyGpa: major.fourPointLegacy,
-    majorHundredPointGpa: major.hundredPoint,
+    majorFivePointGpa: majorProjection.fivePointGpa,
+    majorFourPointGpa: majorProjection.fourPointGpa,
+    majorFourPointLegacyGpa: majorProjection.fourPointLegacyGpa,
+    majorHundredPointGpa: majorProjection.hundredPointGpa,
     weighted: weightMap.size > 0,
     terms: [...terms.values()].sort(compareTerms)
   };

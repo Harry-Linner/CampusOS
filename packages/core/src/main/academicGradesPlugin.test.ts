@@ -212,4 +212,25 @@ describe("Celechron repeated-course GPA strategies", () => {
 
     expect(selected.totalCredits).toBe(6);
   });
+
+  it("falls back from an empty realId and accepts Celechron's independent major summary", () => {
+    const grades: AcademicGradeRecord[] = [
+      { ...repeatedGrades[0], sourceId: "empty-real-id", realId: "", courseCode: "CS201" },
+      { ...repeatedGrades[1], sourceId: "empty-real-id-2", realId: "", courseCode: "CS201" }
+    ];
+    const summary = summarizeAcademicGrades(grades, new Map(), "best", {
+      fivePointGpa: 4.5,
+      fourPointGpa: 4.1,
+      fourPointLegacyGpa: 4,
+      hundredPointGpa: 90,
+      gpaCredits: 3,
+      earnedCredits: 3
+    });
+
+    expect(summary.courseCount).toBe(2);
+    expect(summary.totalCredits).toBe(3);
+    expect(summary.majorFivePointGpa).toBe(4.5);
+    expect(summary.majorWeightedGradePoint).toBe(4);
+    expect(summary.majorGradedCredits).toBe(3);
+  });
 });

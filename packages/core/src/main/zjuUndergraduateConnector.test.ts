@@ -86,7 +86,14 @@ describe("zju undergraduate connector", () => {
           ]
         }),
         majorBody: JSON.stringify({
-          items: [{ xkkh: "(2025-2026-2)-SE1001-001-1" }]
+          items: [{
+            xkkh: "(2025-2026-2)-SE1001-001-1",
+            kch: "SE1001",
+            kcmc: "软件工程(甲)",
+            xf: "3.5",
+            cj: "优秀",
+            jd: 4.5
+          }]
         })
       })),
       loadCachedGrades: vi.fn(async () => null),
@@ -163,7 +170,15 @@ describe("zju undergraduate connector", () => {
               isMajorCourse: true,
               courseCategory: null
             }
-          ]
+          ],
+          majorSummary: {
+            fivePointGpa: 4.5,
+            fourPointGpa: 4.1,
+            fourPointLegacyGpa: 4,
+            hundredPointGpa: 90,
+            gpaCredits: 3.5,
+            earnedCredits: 3.5
+          }
         }
       })
     );
@@ -200,6 +215,47 @@ describe("zju undergraduate connector", () => {
 
     await activation.deactivate();
     expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a live transcript when the independent major endpoint fails", async () => {
+    let refreshJob: (() => Promise<unknown>) | undefined;
+    const publish = vi.fn(async () => undefined);
+    const connector = createZjuUndergraduateConnector({
+      loadAcademicProfileProof: vi.fn(async () => ({
+        studentId: "3240100001",
+        verifiedAt: "2026-07-18T08:00:00.000Z",
+        verifiedService: "undergraduate-academic-affairs"
+      })),
+      fetchTimetableTerms: vi.fn(async () => []),
+      loadCachedTimetable: vi.fn(async () => null),
+      fetchExams: vi.fn(async () => ({ ok: false as const, message: "skip" })),
+      loadCachedExams: vi.fn(async () => null),
+      fetchGrades: vi.fn(async () => ({
+        ok: true as const,
+        body: JSON.stringify({ items: [{ xkkh: "(2025-2026-2)-CS-1", xf: 3, cj: "90", jd: 4 }] }),
+        majorMessage: "主修接口超时"
+      })),
+      loadCachedGrades: vi.fn(async () => ({
+        grades: [],
+        majorSummary: { fivePointGpa: 3, fourPointGpa: 3, fourPointLegacyGpa: 3, hundredPointGpa: 80, gpaCredits: 2, earnedCredits: 2 }
+      })),
+      publish,
+      registerRefreshJob: (_sourceId, job) => {
+        refreshJob = job;
+        return vi.fn();
+      },
+      now: () => new Date("2026-07-19T04:00:00.000Z")
+    });
+    await connector.activate({ pluginId: connector.manifest.id, grantedPermissions: connector.manifest.permissions, bindings: {} });
+    await refreshJob?.();
+    expect(publish).toHaveBeenCalledWith(expect.objectContaining({
+      capability: "academic.grades@1",
+      state: "live",
+      data: expect.objectContaining({
+        grades: [expect.objectContaining({ sourceId: "(2025-2026-2)-CS-1" })],
+        majorSummary: expect.objectContaining({ fivePointGpa: 3 })
+      })
+    }));
   });
 
   it("derives current and next academic years from the runtime clock", () => {

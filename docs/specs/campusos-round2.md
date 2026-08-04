@@ -28,6 +28,7 @@ Core destinations remain dashboard, extensions, and settings. Connectors, event 
 - Refreshing a source replaces its capability feed totals instead of accumulating them across refreshes.
 - iCal export consumes canonical events. `includeExams` filters canonical and legacy exam records, and `includeTasks` filters canonical and local task records.
 - The academic module follows the Celechron 1.3.0 rules for major-course classification, GPA calculation, deferred exams, and failed grades. CampusOS only adapts transport, IPC, secure storage, and types.
+- The grades capability preserves Celechron's independent `getMajorGrade` GPA/earned-credit projection. Major labels still come from `xkkh` matching; custom GPA weights are applied only as an explicit user override.
 
 ## Implementation Status
 

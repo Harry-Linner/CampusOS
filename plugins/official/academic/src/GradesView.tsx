@@ -88,10 +88,17 @@ export const Component = ({
       sourceId: `${record.providerId}:${grade.sourceId}`
     }))
   );
+  const availableProviders = new Set(
+    records.filter((record) => record.data !== null).map((record) => record.providerId)
+  );
+  const sourceMajorSummary = availableProviders.size === 1
+    ? records.find((record) => record.data?.majorSummary)?.data?.majorSummary
+    : undefined;
   const summary = summarizeAcademicGrades(
     grades,
     new Map(Object.entries(weights)),
-    gpaStrategy
+    gpaStrategy,
+    sourceMajorSummary
   );
   const gpaScale = inferGpaScale(grades);
   const busy = !loaded || workspaceLoading || refreshing;
