@@ -45,61 +45,135 @@ interface TaskFormState {
   blocksPlanning: boolean;
 }
 
+const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+
 const pad = (value: number): string => String(value).padStart(2, "0");
 
-const toDateInput = (value: Date): string =>
-  `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+const getShanghaiDateParts = (value: Date): Record<string, string> => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHANGHAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(value);
+  return Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+  );
+};
 
-const toDateTimeInput = (value: Date): string =>
-  `${toDateInput(value)}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+const fromShanghaiParts = (
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0
+): Date => new Date(
+  Date.UTC(year, month - 1, day, hour, minute) - SHANGHAI_OFFSET_MS
+);
+
+const toDateInput = (value: Date): string => {
+  const parts = getShanghaiDateParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
+const toDateTimeInput = (value: Date): string => {
+  const parts = getShanghaiDateParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+};
 
 const fromDateTimeInput = (value: string): string => {
-  const date = new Date(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) throw new Error("时间格式无效。");
+  const date = fromShanghaiParts(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5])
+  );
   if (!Number.isFinite(date.getTime())) throw new Error("时间格式无效。");
   return date.toISOString();
 };
 
-const startOfDay = (value: Date): Date =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate());
+const startOfDay = (value: Date): Date => {
+  const parts = getShanghaiDateParts(value);
+  return fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day));
+};
 
 const addDays = (value: Date, days: number): Date =>
   new Date(value.getTime() + days * 24 * 60 * 60 * 1000);
 
-const addMonths = (value: Date, months: number): Date =>
-  new Date(value.getFullYear(), value.getMonth() + months, 1);
+const addMonths = (value: Date, months: number): Date => {
+  const parts = getShanghaiDateParts(value);
+  return fromShanghaiParts(Number(parts.year), Number(parts.month) + months, 1);
+};
+
+const getShanghaiWeekday = (value: Date): number => {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: SHANGHAI_TIME_ZONE,
+    weekday: "short"
+  }).format(value);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday);
+};
 
 const startOfWeek = (value: Date): Date => {
-  const day = value.getDay();
+  const day = getShanghaiWeekday(value);
   return addDays(startOfDay(value), day === 0 ? -6 : 1 - day);
 };
 
 const dayKey = (value: Date | string): string => {
   const date = typeof value === "string" ? new Date(value) : value;
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return toDateInput(date);
 };
+
+const monthKey = (value: Date | string): string => dayKey(value).slice(0, 7);
+
+const dateFromDayKey = (value: string): Date => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) throw new Error("日期格式无效。");
+  return fromShanghaiParts(Number(match[1]), Number(match[2]), Number(match[3]));
+};
+
+const getShanghaiHour = (value: string): number => Number(getShanghaiDateParts(new Date(value)).hour);
 
 const weekdayLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 const formatMonth = (value: Date): string =>
-  new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(value);
+  new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", timeZone: SHANGHAI_TIME_ZONE }).format(value);
 
-const formatDay = (value: Date): string =>
-  `${value.getMonth() + 1}月${value.getDate()}日 ${weekdayLabels[(value.getDay() + 6) % 7]}`;
+const formatDay = (value: Date): string => {
+  const parts = getShanghaiDateParts(value);
+  return `${Number(parts.month)}月${Number(parts.day)}日 ${weekdayLabels[(getShanghaiWeekday(value) + 6) % 7]}`;
+};
 
 const formatWeek = (value: Date): string => {
   const first = startOfWeek(value);
   const last = addDays(first, 6);
-  return `${first.getMonth() + 1}月${first.getDate()}日 - ${last.getMonth() + 1}月${last.getDate()}日`;
+  const firstParts = getShanghaiDateParts(first);
+  const lastParts = getShanghaiDateParts(last);
+  return `${Number(firstParts.month)}月${Number(firstParts.day)}日 - ${Number(lastParts.month)}月${Number(lastParts.day)}日`;
 };
 
 const buildMonthDays = (month: Date): Date[] => {
-  const first = startOfWeek(new Date(month.getFullYear(), month.getMonth(), 1));
+  const parts = getShanghaiDateParts(month);
+  const first = startOfWeek(fromShanghaiParts(Number(parts.year), Number(parts.month), 1));
   return Array.from({ length: 42 }, (_, index) => addDays(first, index));
 };
 
 const defaultTaskForm = (date = new Date()): TaskFormState => {
-  const start = new Date(date);
-  start.setMinutes(0, 0, 0);
+  const parts = getShanghaiDateParts(date);
+  const start = fromShanghaiParts(
+    Number(parts.year),
+    Number(parts.month),
+    Number(parts.day),
+    Number(parts.hour),
+    0
+  );
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   return {
     title: "",
@@ -225,10 +299,16 @@ const eventClassName = (event: ScheduleEvent): string =>
 
 const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Date } => {
   if (mode === "month" || mode === "agenda") {
+    const parts = getShanghaiDateParts(date);
     const first = mode === "month"
-      ? startOfWeek(new Date(date.getFullYear(), date.getMonth(), 1))
-      : new Date(date.getFullYear(), date.getMonth(), 1);
-    return { start: first, end: mode === "month" ? addDays(first, 42) : new Date(date.getFullYear(), date.getMonth() + 1, 1) };
+      ? startOfWeek(fromShanghaiParts(Number(parts.year), Number(parts.month), 1))
+      : fromShanghaiParts(Number(parts.year), Number(parts.month), 1);
+    return {
+      start: first,
+      end: mode === "month"
+        ? addDays(first, 42)
+        : fromShanghaiParts(Number(parts.year), Number(parts.month) + 1, 1)
+    };
   }
   if (mode === "week") {
     const first = startOfWeek(date);
@@ -532,7 +612,7 @@ export const ScheduleView = ({
               {weekdayLabels.map((label) => <span className="schedule-weekday" key={label}>{label}</span>)}
               {monthDays.map((day) => {
                 const items = eventsByDay.get(dayKey(day)) ?? [];
-                const outside = day.getMonth() !== selectedDate.getMonth();
+                const outside = monthKey(day) !== monthKey(selectedDate);
                 return (
                   <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)}>
                     <time dateTime={day.toISOString()}>{day.getDate()}</time>
@@ -559,9 +639,9 @@ export const ScheduleView = ({
 
           {viewMode === "agenda" ? (
             <div className="schedule-agenda-list">
-              {Array.from(eventsByDay.entries()).filter(([key]) => new Date(`${key}T00:00:00`).getMonth() === selectedDate.getMonth()).map(([key, items]) => (
+              {Array.from(eventsByDay.entries()).filter(([key]) => monthKey(key) === monthKey(selectedDate)).map(([key, items]) => (
                 <section className="schedule-agenda-day" key={key}>
-                  <header><strong>{new Date(`${key}T00:00:00`).getDate()}</strong><span>{weekdayLabels[(new Date(`${key}T00:00:00`).getDay() + 6) % 7]}</span></header>
+                  <header><strong>{Number(key.slice(8, 10))}</strong><span>{weekdayLabels[(getShanghaiWeekday(dateFromDayKey(key)) + 6) % 7]}</span></header>
                   <div className="schedule-event-list">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}{event.location ? ` · ${event.location}` : ""}</small></button>)}</div>
                 </section>
               ))}
@@ -572,7 +652,7 @@ export const ScheduleView = ({
           {viewMode === "day" ? (
             <div className="schedule-day-timeline">
               {Array.from({ length: 24 }, (_, hour) => {
-                const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => new Date(event.startAt).getHours() === hour);
+                const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => getShanghaiHour(event.startAt) === hour);
                 return <section className="schedule-hour" key={hour}><time>{pad(hour)}:00</time><div className="schedule-hour-events">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div></section>;
               })}
             </div>

@@ -16,6 +16,7 @@ import type {
 const MINUTE_MS = 60_000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
+const SHANGHAI_OFFSET_MS = 8 * 60 * MINUTE_MS;
 
 export interface TaskPeriod {
   id: string;
@@ -77,16 +78,53 @@ const parseDate = (value: string, field: string): Date => {
 const toIso = (value: Date | number): string =>
   new Date(value).toISOString();
 
-const startOfDay = (value: Date): Date =>
-  new Date(value.getFullYear(), value.getMonth(), value.getDate());
+const getShanghaiDateParts = (value: Date): Record<string, string> => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHANGHAI_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(value);
+  return Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+  );
+};
+
+const fromShanghaiParts = (
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millisecond = 0
+): Date => new Date(
+  Date.UTC(year, month - 1, day, hour, minute, second, millisecond) - SHANGHAI_OFFSET_MS
+);
+
+const startOfDay = (value: Date): Date => {
+  const parts = getShanghaiDateParts(value);
+  return fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day));
+};
+
+const dateAtShanghaiHour = (day: Date, hour: number): Date => {
+  const parts = getShanghaiDateParts(day);
+  return fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour);
+};
 
 const dateOnly = (value: Date): Date => startOfDay(value);
 
-const dateOnlyIso = (value: string, field: string): string =>
-  toIso(dateOnly(parseDate(value, field))).slice(0, 10);
+const dateOnlyIso = (value: string, field: string): string => {
+  const parts = getShanghaiDateParts(parseDate(value, field));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
 
 const daysInMonth = (year: number, month: number): number =>
-  new Date(year, month + 1, 0).getDate();
+  new Date(Date.UTC(year, month, 0)).getUTCDate();
 
 const addDays = (value: Date, days: number): Date =>
   new Date(value.getTime() + days * DAY_MS);
@@ -103,39 +141,48 @@ const addNextPeriod = (
   }
 
   if (repeatType === "month") {
-    let year = start.getFullYear();
-    let month = start.getMonth() + 1;
-    while (daysInMonth(year, month) < start.getDate()) {
+    const parts = getShanghaiDateParts(start);
+    let year = Number(parts.year);
+    let month = Number(parts.month) + 1;
+    if (month > 12) {
+      month = 1;
+      year += 1;
+    }
+    const day = Number(parts.day);
+    while (daysInMonth(year, month) < day) {
       month += 1;
-      if (month > 11) {
-        month = 0;
+      if (month > 12) {
+        month = 1;
         year += 1;
       }
     }
-    const nextStart = new Date(
+    const nextStart = fromShanghaiParts(
       year,
       month,
-      start.getDate(),
-      start.getHours(),
-      start.getMinutes(),
-      start.getSeconds(),
-      start.getMilliseconds()
+      day,
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+      start.getUTCMilliseconds()
     );
     const delta = nextStart.getTime() - start.getTime();
     return { start: nextStart, end: new Date(end.getTime() + delta) };
   }
 
   if (repeatType === "year") {
-    let year = start.getFullYear() + 1;
-    while (daysInMonth(year, start.getMonth()) < start.getDate()) year += 1;
-    const nextStart = new Date(
+    const parts = getShanghaiDateParts(start);
+    let year = Number(parts.year) + 1;
+    const month = Number(parts.month);
+    const day = Number(parts.day);
+    while (daysInMonth(year, month) < day) year += 1;
+    const nextStart = fromShanghaiParts(
       year,
-      start.getMonth(),
-      start.getDate(),
-      start.getHours(),
-      start.getMinutes(),
-      start.getSeconds(),
-      start.getMilliseconds()
+      month,
+      day,
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+      start.getUTCMilliseconds()
     );
     const delta = nextStart.getTime() - start.getTime();
     return { start: nextStart, end: new Date(end.getTime() + delta) };
@@ -426,8 +473,8 @@ const buildAvailablePeriods = (
 
   for (let offset = 0; offset < horizon; offset += 1) {
     const day = addDays(startOfDay(now), offset);
-    const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate(), startHour).getTime();
-    const dayEnd = new Date(day.getFullYear(), day.getMonth(), day.getDate(), endHour).getTime();
+    const dayStart = dateAtShanghaiHour(day, startHour).getTime();
+    const dayEnd = dateAtShanghaiHour(day, endHour).getTime();
     const availableStart = Math.max(dayStart, offset === 0 ? now.getTime() : dayStart);
     const blocked: Array<{ start: number; end: number }> = [];
     for (const course of snapshot.courses) {
@@ -575,22 +622,8 @@ export const generatePlannerSchedule = (
   };
 };
 
-const shanghaiDateParts = (value: Date): Record<string, string> => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: SHANGHAI_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23"
-  }).formatToParts(value);
-  return Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
-};
-
 const toIcalLocal = (value: Date): string => {
-  const parts = shanghaiDateParts(value);
+  const parts = getShanghaiDateParts(value);
   return `${parts.year}${parts.month}${parts.day}T${parts.hour}${parts.minute}${parts.second}`;
 };
 
