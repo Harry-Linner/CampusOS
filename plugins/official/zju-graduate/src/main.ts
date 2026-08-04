@@ -264,6 +264,13 @@ const toShanghaiDateTime = (
   clock: { hour: number; minute: number }
 ): string => `${date}T${String(clock.hour).padStart(2, "0")}:${String(clock.minute).padStart(2, "0")}:00+08:00`;
 
+const normalizeExamDateLabel = (value: string): string => {
+  const normalized = value.replace(/第\s*(\d+)\s*天/, (_, day: string) =>
+    `第 ${Number.parseInt(day, 10)} 天`
+  );
+  return normalized.startsWith("第") ? `考试周${normalized}` : normalized;
+};
+
 export const parseGraduateExamsResponse = (
   academicYearStart: number,
   body: string
@@ -291,16 +298,22 @@ export const parseGraduateExamsResponse = (
     const startAt = date && startClock ? toShanghaiDateTime(date, startClock) : null;
     const endAt = date && endClock ? toShanghaiDateTime(date, endClock) : null;
     const validRange = startAt && endAt && Date.parse(endAt) > Date.parse(startAt);
+    const scheduleText = [asString(item.rq), asString(item.ksTime)]
+      .filter(Boolean)
+      .join(" ") || "时间待确认";
+    const dateLabel = date
+      ? null
+      : normalizeExamDateLabel(scheduleText);
     const sourceId = asString(item.id) ?? `${courseId}:${date ?? "undated"}:${index}`;
     return [{
       sourceId,
       courseId,
       courseName,
       kind: "final",
-      scheduleText: [asString(item.rq), asString(item.ksTime)].filter(Boolean).join(" ") || "时间待确认",
+      scheduleText,
       startAt: validRange ? startAt : null,
       endAt: validRange ? endAt : null,
-      dateLabel: date,
+      dateLabel,
       location: asString(item.mc) ?? asString(item.ksdd),
       seat: asString(item.zwh)
     }];

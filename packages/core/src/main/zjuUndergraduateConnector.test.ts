@@ -5,6 +5,7 @@ import {
   createTimetableQueries,
   createZjuUndergraduateConnector,
   parseGradesResponse,
+  parseExamsResponse,
   parseMajorCourseIdsResponse,
   parsePracticeData,
   parsePracticeRecordsResponse,
@@ -13,6 +14,25 @@ import {
 } from "@campusos/plugin-zju-undergraduate/main";
 
 describe("zju undergraduate connector", () => {
+  it("normalizes undated exam-week labels like Celechron", () => {
+    const exams = parseExamsResponse(JSON.stringify({
+      items: [{
+        xkkh: "(2025-2026-2)-TEST-1",
+        kcmc: "待定课程",
+        kssj: "第3天（14:00-16:00）"
+      }]
+    }));
+
+    expect(exams).toEqual([
+      expect.objectContaining({
+        kind: "final",
+        startAt: null,
+        endAt: null,
+        dateLabel: "考试周第 3 天"
+      })
+    ]);
+  });
+
   it("publishes verified profile, timetable, exams and grades through one refresh job", async () => {
     let refreshJob: (() => Promise<unknown>) | undefined;
     let registeredSourceId: string | null = null;

@@ -293,6 +293,13 @@ const toZjuDateTime = (
 ): string =>
   `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${time}:00+08:00`;
 
+const normalizeExamDateLabel = (value: string): string => {
+  const normalized = value.replace(/第\s*(\d+)\s*天/, (_, day: string) =>
+    `第 ${Number.parseInt(day, 10)} 天`
+  );
+  return normalized.startsWith("第") ? `考试周${normalized}` : normalized;
+};
+
 const parseExamRecord = (
   item: Record<string, unknown>,
   kind: "midterm" | "final"
@@ -321,10 +328,13 @@ const parseExamRecord = (
   }
   const dateLabel =
     startAt === null
-      ? scheduleText
-          .slice(0, timeMatch?.index ?? scheduleText.length)
-          .replace(/[（(\s]+$/, "")
-          .trim() || null
+      ? (() => {
+          const label = scheduleText
+            .slice(0, timeMatch?.index ?? scheduleText.length)
+            .replace(/[（(\s]+$/, "")
+            .trim();
+          return label ? normalizeExamDateLabel(label) : null;
+        })()
       : null;
   const location = asString(
     kind === "midterm" ? item.qzjsmc : item.jsmc

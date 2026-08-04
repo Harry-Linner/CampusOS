@@ -116,12 +116,14 @@ describe("zju graduate connector", () => {
       expect.objectContaining({
         sourceId: "graduate-exam-1",
         startAt: "2026-07-20T09:00:00+08:00",
-        endAt: "2026-07-20T11:00:00+08:00"
+        endAt: "2026-07-20T11:00:00+08:00",
+        dateLabel: null
       }),
       expect.objectContaining({
         sourceId: "graduate-exam-undated",
         startAt: null,
-        endAt: null
+        endAt: null,
+        dateLabel: "考试周待定 待定"
       })
     ]);
     expect(parseGraduateGradesResponse(gradesBody)).toEqual({
