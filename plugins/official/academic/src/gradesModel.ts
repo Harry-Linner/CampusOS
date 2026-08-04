@@ -1,5 +1,4 @@
 import type {
-  AcademicGpaStrategy,
   AcademicGradeRecord,
   AcademicMajorGradeSummary,
   GpaScale
@@ -172,8 +171,7 @@ const repeatedCourseKey = (grade: AcademicGradeRecord): string => {
 };
 
 export const selectAcademicGpaGrades = (
-  grades: readonly AcademicGradeRecord[],
-  strategy: AcademicGpaStrategy = "first"
+  grades: readonly AcademicGradeRecord[]
 ): AcademicGradeRecord[] => {
   const groups = new Map<string, AcademicGradeRecord[]>();
   for (const grade of grades) {
@@ -181,14 +179,10 @@ export const selectAcademicGpaGrades = (
     groups.set(key, [...(groups.get(key) ?? []), grade]);
   }
 
-  // Celechron lib/model/scholar.dart:576-589 uses the first response item for
-  // "first" and the highest hundred-point projection for "best".
-  return [...groups.values()].map((attempts) => {
-    if (strategy === "first") return attempts[0];
-    return attempts.reduce((best, attempt) =>
-      hundredPoint(attempt) > hundredPoint(best) ? attempt : best
-    );
-  });
+  // Celechron lib/model/scholar.dart:576-589 uses the first response item
+  // for the academic GPA projection. Its highest-score aboard projection is a
+  // separate value and is not exposed as a CampusOS GPA setting.
+  return [...groups.values()].map((attempts) => attempts[0]);
 };
 
 const earnedCredit = (grade: AcademicGradeRecord): number => {
@@ -223,10 +217,9 @@ export const inferGpaScale = (
 };
 
 export const calculateAcademicGpa = (
-  grades: readonly AcademicGradeRecord[],
-  strategy: AcademicGpaStrategy = "first"
+  grades: readonly AcademicGradeRecord[]
 ): AcademicGpaResult => {
-  const selected = selectAcademicGpaGrades(grades, strategy);
+  const selected = selectAcademicGpaGrades(grades);
   const included = selected.filter(gpaIncluded);
   const credits = included.reduce((total, grade) => total + validCredit(grade), 0);
   const earnedCredits = selected.reduce((total, grade) => total + earnedCredit(grade), 0);
@@ -258,11 +251,10 @@ export const calculateAcademicGpa = (
 
 export const summarizeAcademicGrades = (
   grades: readonly AcademicGradeRecord[],
-  strategy: AcademicGpaStrategy = "first",
   sourceMajorSummary?: AcademicMajorGradeSummary
 ): AcademicGradeSummary => {
   const terms = new Map<string, AcademicGradeTermSummary>();
-  const selectedGrades = selectAcademicGpaGrades(grades, strategy);
+  const selectedGrades = selectAcademicGpaGrades(grades);
   const selectedGradeSet = new Set(selectedGrades);
 
   for (const grade of grades) {
@@ -282,10 +274,9 @@ export const summarizeAcademicGrades = (
     terms.set(key, term);
   }
 
-  const overall = calculateAcademicGpa(selectedGrades, strategy);
+  const overall = calculateAcademicGpa(selectedGrades);
   const major = calculateAcademicGpa(
-    selectedGrades.filter((grade) => grade.isMajorCourse),
-    strategy
+    selectedGrades.filter((grade) => grade.isMajorCourse)
   );
   const majorProjection = sourceMajorSummary
     ? sourceMajorSummary

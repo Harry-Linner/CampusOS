@@ -353,7 +353,7 @@ describe("grade change notifications", () => {
     }
   });
 
-  it("uses the account's Celechron repeated-course strategy for the GPA baseline", async () => {
+  it("uses Celechron's first repeated-course attempt for the GPA baseline", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-grade-notification-"));
     temporaryDirectories.push(storageRoot);
     const database = createDatabaseService({
@@ -361,11 +361,6 @@ describe("grade change notifications", () => {
     });
 
     try {
-      database.saveAcademicGpaStrategy(
-        "account-a",
-        "first",
-        "2026-08-05T08:00:00.000Z"
-      );
       await processGradeChangeNotification({
         accountId: "account-a",
         connectorStatus: "live",

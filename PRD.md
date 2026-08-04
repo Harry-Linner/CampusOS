@@ -247,7 +247,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 ### Academic repeat-course strategy update (2026-08-04)
 
-Repeated grades now follow Celechron 1.3.0 `Scholar.recalculateGpa`: records are grouped by normalized course identity, the default `first` strategy selects the first returned attempt for the academic GPA, and Settings can explicitly switch to `best` for the separate highest-score projection. Only the selected attempt contributes GPA and earned credits. The strategy is persisted per verified academic account through the main-process SQLite boundary.
+Repeated grades now follow Celechron 1.3.0 `Scholar.recalculateGpa`: records are grouped by normalized course identity and the first returned attempt is used for the academic GPA. The highest-score projection is a separate Celechron concern and is not exposed as a CampusOS setting. Only the selected attempt contributes GPA and earned credits.
 
 The undergraduate grades capability also carries the independent `getMajorGrade` GPA/credit projection. The grades view uses that source projection for major GPA and does not expose a CampusOS-only GPA weighting rule.
 

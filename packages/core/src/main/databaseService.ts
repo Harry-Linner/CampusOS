@@ -2,7 +2,10 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import type { AcademicGpaStrategy } from "@campusos/shared";
+
+// Legacy schema compatibility only. New academic GPA business logic follows
+// Celechron's first returned attempt and never reads or writes this table.
+type LegacyAcademicGpaStrategy = "best" | "first";
 
 export interface StoredWorkspaceSnapshot {
   snapshot: unknown;
@@ -31,7 +34,7 @@ export interface StoredPlannerSchedule {
 }
 
 export interface StoredAcademicGpaStrategy {
-  strategy: AcademicGpaStrategy;
+  strategy: LegacyAcademicGpaStrategy;
   savedAt: string;
 }
 
@@ -63,7 +66,7 @@ export interface DatabaseService {
   loadPlannerSchedule: () => StoredPlannerSchedule | null;
   saveAcademicGpaStrategy: (
     accountId: string,
-    strategy: AcademicGpaStrategy,
+    strategy: LegacyAcademicGpaStrategy,
     savedAt: string
   ) => void;
   loadAcademicGpaStrategy: (accountId: string) => StoredAcademicGpaStrategy | null;

@@ -154,9 +154,6 @@ export interface AcademicMajorGradeSummary {
   earnedCredits: number;
 }
 
-/** Celechron-compatible strategy for selecting a repeated course attempt. */
-export type AcademicGpaStrategy = "best" | "first";
-
 export type GpaScale = "4.0" | "4.3" | "5.0";
 
 export interface AcademicGradesData {

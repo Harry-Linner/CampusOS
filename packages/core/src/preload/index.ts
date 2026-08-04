@@ -35,11 +35,7 @@ contextBridge.exposeInMainWorld("campusos", {
     loadScheduleState: () =>
       ipcRenderer.invoke("campusos:reminders:schedule-state:load")
   },
-  academic: {
-    loadGpaStrategy: () => ipcRenderer.invoke("campusos:academic:gpa-strategy:load"),
-    saveGpaStrategy: (strategy: "best" | "first") =>
-      ipcRenderer.invoke("campusos:academic:gpa-strategy:save", strategy)
-  },
+  academic: {},
   downloads: {
     list: () => ipcRenderer.invoke("campusos:downloads:list"),
     enqueue: (input: {

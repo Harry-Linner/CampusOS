@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type {
-  AcademicGpaStrategy,
   AcademicGradesData,
   CapabilityRecord,
   PluginComponentProps
@@ -25,24 +24,15 @@ export const Component = ({
   const [refreshing, setRefreshing] = useState(false);
   const [refreshRequest, setRefreshRequest] = useState(0);
   const [privacyMask, setPrivacyMask] = useState(true);
-  const [gpaStrategy, setGpaStrategy] = useState<AcademicGpaStrategy>("first");
 
   useEffect(() => {
     let active = true;
     setLoaded(false);
 
-    const academicBridge = window.campusos?.academic;
-    const strategyPromise = academicBridge?.loadGpaStrategy
-      ? academicBridge.loadGpaStrategy().catch(() => ({ strategy: "first" as const, savedAt: null }))
-      : Promise.resolve({ strategy: "first" as const, savedAt: null });
-    void Promise.all([
-      capabilities.read<AcademicGradesData>("academic.grades@1"),
-      strategyPromise
-    ])
-      .then(([nextRecords, nextStrategy]) => {
+    void capabilities.read<AcademicGradesData>("academic.grades@1")
+      .then((nextRecords) => {
         if (!active) return;
         setRecords(nextRecords);
-        setGpaStrategy(nextStrategy.strategy);
         setError(null);
       })
       .catch((nextError: unknown) => {
@@ -88,7 +78,6 @@ export const Component = ({
     : undefined;
   const summary = summarizeAcademicGrades(
     grades,
-    gpaStrategy,
     sourceMajorSummary
   );
   const gpaScale = inferGpaScale(grades);
@@ -103,7 +92,6 @@ export const Component = ({
           <h1>学业成绩</h1>
         </div>
         <div className="grade-header-actions">
-          <span className="save-note">GPA {gpaStrategy === "best" ? "取最高" : "取首次"}</span>
           <label className="setting-switch" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>
             <input
               type="checkbox"

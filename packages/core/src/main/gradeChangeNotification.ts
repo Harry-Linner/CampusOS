@@ -70,11 +70,7 @@ export const processGradeChangeNotification = async ({
   // Celechron lib/worker/background_app_refresh.dart:98-153 compares
   // Scholar.gpa[0] and Scholar.gradedCourseCount after a non-degraded refresh.
   // CampusOS adapts the secure-storage fuse to its account-keyed SQLite store.
-  const strategy = database.loadAcademicGpaStrategy(accountId)?.strategy ?? "first";
-  const summary = summarizeAcademicGrades(
-    gradeRecord.data.grades,
-    strategy
-  );
+  const summary = summarizeAcademicGrades(gradeRecord.data.grades);
   const nextBaseline = {
     fivePointGpa: summary.fivePointGpa ?? 0,
     gradedCourseCount: gradeRecord.data.grades.length,

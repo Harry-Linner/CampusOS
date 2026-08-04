@@ -176,7 +176,7 @@ describe("Celechron grade inclusion rules", () => {
   });
 });
 
-describe("Celechron repeated-course GPA strategies", () => {
+describe("Celechron repeated-course GPA projection", () => {
   const repeatedGrades: AcademicGradeRecord[] = [
     {
       sourceId: "attempt-1",
@@ -218,21 +218,10 @@ describe("Celechron repeated-course GPA strategies", () => {
     }
   ];
 
-  it("selects the first or highest attempt without double-counting credits", () => {
-    const first = summarizeAcademicGrades(repeatedGrades, "first");
-    const best = summarizeAcademicGrades(repeatedGrades, "best");
-
-    expect(first.totalCredits).toBe(5);
-    expect(first.weightedGradePoint).toBeCloseTo((1 * 3 + 3 * 2) / 5);
-    expect(best.totalCredits).toBe(5);
-    expect(best.weightedGradePoint).toBeCloseTo((4 * 3 + 3 * 2) / 5);
-    expect(best.majorWeightedGradePoint).toBe(4);
-    expect(best.terms.find((term) => term.key === "2024:1")?.credits).toBe(0);
-  });
-
-  it("uses Celechron's first-attempt GPA strategy by default", () => {
+  it("uses Celechron's first attempt without double-counting credits", () => {
     const summary = summarizeAcademicGrades(repeatedGrades);
 
+    expect(summary.totalCredits).toBe(5);
     expect(summary.weightedGradePoint).toBeCloseTo((1 * 3 + 3 * 2) / 5);
     expect(summary.terms.find((term) => term.key === "2024:1")?.credits).toBe(3);
   });
@@ -241,7 +230,7 @@ describe("Celechron repeated-course GPA strategies", () => {
     const selected = summarizeAcademicGrades([
       { ...repeatedGrades[0], sourceId: "provider-a:attempt-1" },
       { ...repeatedGrades[1], sourceId: "provider-b:attempt-2" }
-    ], "best");
+    ]);
 
     expect(selected.totalCredits).toBe(6);
   });
@@ -251,7 +240,7 @@ describe("Celechron repeated-course GPA strategies", () => {
       { ...repeatedGrades[0], sourceId: "empty-real-id", realId: "", courseCode: "CS201" },
       { ...repeatedGrades[1], sourceId: "empty-real-id-2", realId: "", courseCode: "CS201" }
     ];
-    const summary = summarizeAcademicGrades(grades, "best", {
+    const summary = summarizeAcademicGrades(grades, {
       fivePointGpa: 4.5,
       fourPointGpa: 4.1,
       fourPointLegacyGpa: 4,

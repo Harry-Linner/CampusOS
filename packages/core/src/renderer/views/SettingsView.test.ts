@@ -333,29 +333,14 @@ describe("SettingsView", () => {
     });
   });
 
-  it("persists the Celechron repeated-course GPA strategy", async () => {
+  it("does not expose a GPA strategy control", async () => {
     installBridge(vi.fn(async () => connectedRecord));
-    const saveGpaStrategy = vi.fn(async (strategy: "best" | "first") => ({
-      strategy,
-      savedAt: "2026-08-04T00:00:00.000Z"
-    }));
-    if (!window.campusos) {
-      throw new Error("CampusOS bridge is not installed");
-    }
-    Object.assign(window.campusos, {
-      academic: {
-        loadGpaStrategy: vi.fn(async () => ({ strategy: "best" as const, savedAt: null })),
-        saveGpaStrategy
-      }
-    });
 
     render(createElement(SettingsView, { onRefresh: vi.fn().mockResolvedValue(undefined) }));
-    const first = await screen.findByRole("radio", { name: /取首次/ });
-    fireEvent.click(first);
-    fireEvent.click(screen.getByRole("button", { name: "保存 GPA 设置" }));
+    await screen.findByRole("button", { name: "保存提醒" });
 
-    expect(saveGpaStrategy).toHaveBeenCalledWith("first");
-    expect(await screen.findByText("已保存")).toBeDefined();
+    expect(screen.queryByText(/GPA/)).toBeNull();
+    expect(screen.queryByRole("radio", { name: /取首次|取最高/ })).toBeNull();
   });
 
   it("saves reminder settings without requiring a remote workspace refresh", async () => {
