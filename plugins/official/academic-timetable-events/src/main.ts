@@ -196,6 +196,7 @@ const sessionDates = (
   windows: readonly HalfWindow[]
 ): string[] => {
   if (session.weeks && session.weeks.length > 0) {
+    if (session.weeks.length < 3) return [];
     return session.weeks.flatMap((week) => {
       const date = dateForExactWeek(windows, week, session.dayOfWeek);
       return date ? [date] : [];
@@ -325,6 +326,7 @@ export const deriveTimetableCalendarEvents = (
   const events: CalendarEventRecord[] = [];
   let totalAttempted = 0;
   for (const { session, providerId } of merged) {
+    if (!session.confirmed) continue;
     const dates = sessionDates(session, halfWindows);
     totalAttempted += dates.length;
     for (const date of dates) {

@@ -313,7 +313,7 @@ describe("academic timetable events", () => {
           sessions: [{
             ...timetableRecord.data!.terms[0].sessions[0],
             sourceId: "custom-week-17",
-            weeks: [17]
+            weeks: [17, 18, 19]
           }]
         }]
       }
@@ -326,8 +326,31 @@ describe("academic timetable events", () => {
     );
 
     expect(result.events.map((event) => event.startAt)).toEqual([
-      "2027-01-04T08:00:00+08:00"
+      "2027-01-04T08:00:00+08:00",
+      "2027-01-11T08:00:00+08:00",
+      "2027-01-18T08:00:00+08:00"
     ]);
+  });
+
+  it("omits unconfirmed sessions and short custom repeats like Celechron", () => {
+    const result = deriveTimetableCalendarEvents(
+      [{
+        ...timetableRecord,
+        data: {
+          terms: [{
+            ...timetableRecord.data!.terms[0],
+            sessions: [
+              { ...timetableRecord.data!.terms[0].sessions[0], confirmed: false },
+              { ...timetableRecord.data!.terms[0].sessions[0], sourceId: "short-custom", weeks: [1, 2] }
+            ]
+          }]
+        }
+      }],
+      calendarConfig,
+      "2026-07-19T12:00:00.000Z"
+    );
+
+    expect(result.events).toHaveLength(0);
   });
 
   it("omits sessions with no matching period times", () => {
