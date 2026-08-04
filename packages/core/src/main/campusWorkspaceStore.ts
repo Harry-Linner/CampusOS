@@ -11,6 +11,10 @@ import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/m
 import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
 import { manifest as zjuLearningManifest } from "@campusos/plugin-zju-learning/manifest";
 import type { CampusWorkspaceRecord } from "../shared/campusBridge";
+import type {
+  ReminderSchedulerState,
+  ReminderSettingsRecord
+} from "../shared/reminderBridge";
 import {
   createDefaultCampusAdapterContext,
   loadCampusWorkspace
@@ -225,6 +229,27 @@ export const hydrateCampusWorkspace =
 
 export const syncCampusWorkspace =
   async (): Promise<CampusWorkspaceRecord> => buildGeneratedRecord("synced");
+
+export const rescheduleCampusWorkspaceReminders = async (
+  settings: ReminderSettingsRecord,
+  now = new Date()
+): Promise<ReminderSchedulerState> => {
+  const snapshotStore = getWorkspaceSnapshotStore();
+  const stored = await snapshotStore.load();
+  if (!stored) return scheduleWorkspaceReminders(null, settings, now);
+
+  const snapshot = pruneWorkspaceDeadlinesBeforeToday(
+    stored.snapshot,
+    now.toISOString(),
+    settings.leadMinutes
+  );
+  if (snapshot !== stored.snapshot) {
+    await snapshotStore.save(snapshot);
+    notifyCampusWorkspaceChanged();
+  }
+
+  return scheduleWorkspaceReminders(snapshot, settings, now);
+};
 
 export const registerCampusWorkspaceHandlers = (): void => {
   ipcMain.handle("campusos:workspace:hydrate", async () =>

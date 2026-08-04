@@ -95,13 +95,23 @@ export const saveReminderSettingsRecord = async (
 export const loadReminderSchedulerState =
   async (): Promise<ReminderSchedulerState> => getReminderSchedulerState();
 
-export const registerReminderSettingsHandlers = (): void => {
+interface ReminderSettingsHandlerOptions {
+  onSettingsSaved?: (record: ReminderSettingsRecord) => Promise<void> | void;
+}
+
+export const registerReminderSettingsHandlers = ({
+  onSettingsSaved
+}: ReminderSettingsHandlerOptions = {}): void => {
   ipcMain.handle("campusos:reminders:settings:load", async () =>
     readReminderSettingsRecord()
   );
   ipcMain.handle(
     "campusos:reminders:settings:save",
-    async (_event, input: ReminderSettingsInput) => saveReminderSettingsRecord(input)
+    async (_event, input: ReminderSettingsInput) => {
+      const record = await saveReminderSettingsRecord(input);
+      await onSettingsSaved?.(record);
+      return record;
+    }
   );
   ipcMain.handle("campusos:reminders:schedule-state:load", async () =>
     loadReminderSchedulerState()

@@ -5,6 +5,7 @@ import { registerAcademicCredentialHandlers } from "./academicCredentialStore";
 import {
   notifyCampusWorkspaceChanged,
   registerCampusWorkspaceHandlers,
+  rescheduleCampusWorkspaceReminders,
   syncCampusWorkspace
 } from "./campusWorkspaceStore";
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
@@ -81,7 +82,11 @@ app.whenReady().then(async () => {
   initSentryMain();
   registerCampusmodRendererProtocol();
   registerAcademicCredentialHandlers();
-  registerReminderSettingsHandlers();
+  registerReminderSettingsHandlers({
+    onSettingsSaved: async (settings) => {
+      await rescheduleCampusWorkspaceReminders(settings);
+    }
+  });
   registerDownloadHandlers();
   registerScheduleHandlers();
   registerAcademicGpaHandlers();

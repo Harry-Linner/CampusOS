@@ -779,13 +779,11 @@ export const SettingsView = ({
               }
               onClick={() => {
                 void (async () => {
-                  await reminderSettings.save({
+                  const saved = await reminderSettings.save({
                     enabled: reminderEnabled,
                     leadMinutes: selectedLeadMinutes
                   });
-                  await onRefresh();
-                  await reminderSettings.load();
-                  setReminderSaved(true);
+                  setReminderSaved(saved);
                 })();
               }}
             >

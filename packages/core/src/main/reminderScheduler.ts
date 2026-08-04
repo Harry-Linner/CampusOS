@@ -45,11 +45,11 @@ const getNextFireAt = (): string | null => {
 const buildReminderBody = (reminder: CampusReminder): string => {
   if (reminder.kind === "course") {
     return reminder.location
-      ? `Course starts in ${reminder.leadMinutes} minutes at ${reminder.location}`
-      : `Course starts in ${reminder.leadMinutes} minutes`;
+      ? `课程将在 ${reminder.leadMinutes} 分钟后开始，地点：${reminder.location}`
+      : `课程将在 ${reminder.leadMinutes} 分钟后开始`;
   }
 
-  return `Deadline closes in ${reminder.leadMinutes} minutes`;
+  return `将在 ${reminder.leadMinutes} 分钟后截止`;
 };
 
 const showReminderNotification = (reminder: CampusReminder): void => {
@@ -81,7 +81,7 @@ const scheduleReminder = (reminder: CampusReminder, nowMs: number): boolean => {
   const fireAtMs = new Date(reminder.fireAt).getTime();
   const delayMs = fireAtMs - nowMs;
 
-  if (delayMs <= 0 || delayMs > MAX_TIMEOUT_MS) {
+  if (!Number.isFinite(fireAtMs) || delayMs <= 0 || delayMs > MAX_TIMEOUT_MS) {
     return false;
   }
 
@@ -105,7 +105,7 @@ export const getReminderSchedulerState = (): ReminderSchedulerState =>
   schedulerState;
 
 export const scheduleWorkspaceReminders = (
-  snapshot: CampusWorkspaceSnapshot,
+  snapshot: CampusWorkspaceSnapshot | null,
   settings: ReminderSettingsRecord,
   now = new Date()
 ): ReminderSchedulerState => {
@@ -124,7 +124,7 @@ export const scheduleWorkspaceReminders = (
     });
   }
 
-  const sortedReminders = [...snapshot.reminders].sort(
+  const sortedReminders = [...(snapshot?.reminders ?? [])].sort(
     (left, right) =>
       new Date(left.fireAt).getTime() - new Date(right.fireAt).getTime()
   );

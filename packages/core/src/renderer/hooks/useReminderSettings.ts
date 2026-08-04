@@ -16,7 +16,7 @@ interface ReminderSettingsState {
   schedulerState: ReminderSchedulerState | null;
   error: string | null;
   load: () => Promise<void>;
-  save: (input: ReminderSettingsInput) => Promise<void>;
+  save: (input: ReminderSettingsInput) => Promise<boolean>;
 }
 
 export const useReminderSettings = (): ReminderSettingsState => {
@@ -86,12 +86,14 @@ export const useReminderSettings = (): ReminderSettingsState => {
           setRecord(nextRecord);
           setSchedulerState(nextSchedulerState);
           setError(null);
+          return true;
         } catch (nextError) {
           setError(
             nextError instanceof Error
               ? nextError.message
               : "Failed to save reminder settings."
           );
+          return false;
         } finally {
           setLoading(false);
         }

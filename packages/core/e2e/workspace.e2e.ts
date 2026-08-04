@@ -103,6 +103,16 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await expect(page.getByRole("heading", { name: "更新" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "关于" })).toBeVisible();
     await expect(page.getByText("MIT", { exact: true })).toBeVisible();
+    await page.getByRole("checkbox", { name: "启用桌面通知" }).uncheck();
+    await page.getByRole("button", { name: "保存提醒" }).click();
+    await expect(page.getByText("已保存", { exact: true })).toBeVisible();
+    await expect.poll(async () => page.evaluate(async () =>
+      window.campusos?.reminders.loadScheduleState()
+    )).toMatchObject({
+      enabled: false,
+      scheduledCount: 0,
+      nextFireAt: null
+    });
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({

@@ -356,4 +356,21 @@ describe("SettingsView", () => {
     expect(saveGpaStrategy).toHaveBeenCalledWith("first");
     expect(await screen.findByRole("button", { name: /GPA/ })).toBeDefined();
   });
+
+  it("saves reminder settings without requiring a remote workspace refresh", async () => {
+    installBridge(vi.fn(async () => connectedRecord));
+    const onRefresh = vi.fn().mockRejectedValue(new Error("offline"));
+    render(createElement(SettingsView, { onRefresh }));
+    await screen.findByRole("button", { name: "保存提醒" });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "启用桌面通知" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存提醒" }));
+
+    expect(await screen.findByText("已保存")).toBeDefined();
+    expect(window.campusos?.reminders.saveSettings).toHaveBeenCalledWith({
+      enabled: false,
+      leadMinutes: [15, 120]
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
 });
