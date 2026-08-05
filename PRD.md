@@ -302,3 +302,15 @@ period as release-preparation work. Desktop reminder behavior is accepted in
 development with fixture event data through the formal workspace scheduler and
 an Electron `Notification` boundary mock; this evidence does not claim delivery
 on a real user's desktop.
+
+### AI Assistant MVP (2026-08-05)
+
+AI Assistant is a fourth user-facing module. The MVP accepts only message text
+explicitly pasted or submitted by the user, runs a local structured parser, and
+shows a reviewable task draft before calling the existing Schedule `saveTask`
+bridge. It must not read WeChat or DingTalk in the background, watch the
+clipboard continuously, invoke UI automation, upload raw messages, or create a
+second task database. The draft keeps the source text, extracted evidence,
+missing fields, and confidence in the current session; only an explicit user
+confirmation persists the supported task fields through the formal Schedule IPC.
+This MVP entry supersedes earlier three-module wording in this historical PRD; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

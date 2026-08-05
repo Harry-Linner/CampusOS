@@ -56,3 +56,5 @@ PHASE STATUS:
   - Cookie import (backup auth)
   - PostHog opt-in analytics
   Verification: WAU ≥ 500, D7 retention ≥ 30%
+
+AI Assistant MVP: DONE for the current development round. Explicit pasted-message parsing and confirmed Schedule IPC task creation are implemented; background chat capture and desktop pet remain deferred.

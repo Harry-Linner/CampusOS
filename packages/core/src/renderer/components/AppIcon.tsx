@@ -1,5 +1,6 @@
 export type AppIconName =
   | "calendar"
+  | "assistant"
   | "chevron-left"
   | "chevron-right"
   | "extensions"
@@ -37,6 +38,15 @@ export const AppIcon = ({ name, size = 20 }: AppIconProps): JSX.Element => {
       <svg {...commonProps}>
         <path d="M6.75 3.75v2.5M17.25 3.75v2.5M4.5 8.25h15M5.5 5.25h13a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1Z" />
         <path d="M8 11.5h2M14 11.5h2M8 15.5h2M14 15.5h2" />
+      </svg>
+    );
+  }
+
+  if (name === "assistant") {
+    return (
+      <svg {...commonProps}>
+        <path d="M5 6.5h14v10H9l-4 3v-13Z" />
+        <path d="M8 10h8M8 13h5" />
       </svg>
     );
   }

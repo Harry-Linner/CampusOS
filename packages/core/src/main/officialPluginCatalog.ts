@@ -13,11 +13,13 @@ import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/m
 import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
 import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
+import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
 
 /** User-selectable Modules. Each contributes exactly one activity entry. */
 export const officialUserPluginManifests: PluginManifestV2[] = [
   academicManifest,
   scheduleManifest,
+  assistantManifest,
   materialsManifest
 ];
 

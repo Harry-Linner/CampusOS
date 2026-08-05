@@ -120,6 +120,18 @@ effect. Multi-device, clean-Windows, graduate-account, GitHub Release, and CC98
 acceptance are explicitly post-development work; real desktop notification
 delivery is not claimed by the mock evidence.
 
+## AI Assistant MVP
+
+AI Assistant is a single optional activity module. Its first version accepts
+only text the user explicitly pastes, parses it into a task draft, and requires
+confirmation before calling the Schedule module's formal `saveTask` bridge.
+Drafts expose title, type, dates, duration, location, course match, confidence,
+missing fields, and source evidence. Background WeChat/DingTalk capture,
+continuous clipboard reads, OCR, desktop-pet windows, remote model providers,
+and bot/webhook integrations are later phases and are not represented as
+completed capabilities.
+This section supersedes the earlier three-destination baseline: the current four official destinations are Academic, Schedule, Materials, and AI Assistant.
+
 ## Future-term timetable integrity (2026-08-03)
 
 When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.

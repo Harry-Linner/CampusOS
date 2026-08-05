@@ -61,3 +61,9 @@ CampusOS 已将数据连接器、事件转换器、页面和小型工具分别�
 4. 验证每个活动插件恰好一个入口，连接器和内部服务没有入口。
 5. 验证禁用任一插件不会破坏 Core 导航或其他插件。
 6. 对 Celechron 重合业务继续执行真实账号脱敏闭环验收。
+
+## AI Assistant MVP (2026-08-05)
+
+The official user-facing module set now includes `org.campusos.ai-assistant` as a fourth sidebar module. Its first release accepts an explicitly pasted message, parses it locally into an editable task draft, and writes only user-confirmed drafts through the existing `schedule.saveTask` IPC. It does not read WeChat/DingTalk, monitor the clipboard, upload message text, or provide a desktop pet.
+
+This section is the authoritative current module count; earlier three-module references describe the pre-AI Assistant baseline.

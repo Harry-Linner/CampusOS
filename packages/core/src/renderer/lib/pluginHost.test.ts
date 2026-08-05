@@ -24,7 +24,7 @@ const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
   }));
 
 describe("loadPlugins", () => {
-  it("loads exactly the three official user Modules", async () => {
+  it("loads exactly the four official user Modules", async () => {
     const plugins = await loadPlugins(createOfficialUserRuntime());
 
     expect(plugins.map((plugin) => plugin.manifest.id).sort()).toEqual(
@@ -38,6 +38,7 @@ describe("loadPlugins", () => {
       "dashboard",
       "academic",
       "schedule",
+      "ai-assistant",
       "materials",
       "extensions",
       "settings"
@@ -58,6 +59,7 @@ describe("loadPlugins", () => {
     expect(buildActivityItems(plugins).map((item) => item.id)).toEqual([
       "dashboard",
       "academic",
+      "ai-assistant",
       "materials",
       "extensions",
       "settings"

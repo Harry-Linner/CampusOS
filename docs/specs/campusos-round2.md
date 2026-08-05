@@ -69,3 +69,7 @@ Compliance, local-first storage, capability provenance, the pnpm monorepo, modul
 ## Verification Gate
 
 Every independently verifiable change must pass the relevant local checks, be committed and pushed, and have the GitHub Actions run for the current HEAD inspected with `gh` until completion. A live business endpoint is reported as passed only when a real account request, redacted upstream response, and user-visible result have all been observed.
+
+## AI Assistant MVP scope (2026-08-05)
+
+The current development scope includes one `AI Assistant` user module. Version one supports explicit paste -> local deterministic parsing -> editable task draft -> confirmation through the Schedule task IPC. Background WeChat/DingTalk capture, clipboard monitoring, OCR, remote model calls, bots/webhooks, desktop pet, and task history are deferred. This section supersedes the earlier three-module Round 2 wording.

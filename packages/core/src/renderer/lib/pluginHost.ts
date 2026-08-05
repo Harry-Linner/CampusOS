@@ -12,6 +12,8 @@ import { Component as AcademicView } from "@campusos/plugin-academic";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
 import { Component as ScheduleView } from "@campusos/plugin-schedule";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
+import { Component as AssistantView } from "@campusos/plugin-ai-assistant";
+import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
 
 type PluginModule = {
   manifest: PluginManifestV2;
@@ -52,6 +54,10 @@ const pluginDefinitions: PluginDefinition[] = [
   {
     id: scheduleManifest.id,
     load: async () => ({ manifest: scheduleManifest, Component: ScheduleView })
+  },
+  {
+    id: assistantManifest.id,
+    load: async () => ({ manifest: assistantManifest, Component: AssistantView })
   },
   {
     id: "org.campusos.materials",

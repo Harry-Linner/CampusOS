@@ -419,3 +419,15 @@ Electron utility process with CPU, memory, stack, source, input, output, and
 one-shot protocol limits. Third-party headless lifecycle activation and network
 proxy permissions remain closed by policy; opening either requires a separate
 security decision and contract tests.
+
+### AI Assistant MVP research decision (2026-08-05)
+
+Personal WeChat and DingTalk desktop messages do not provide a stable,
+permission-safe read API for this product. The first version therefore uses an
+explicit user submission boundary: paste text into AI Assistant. A local
+structured parser produces a draft with evidence, missing fields, and a
+confidence score; saving is disabled until the user reviews the draft and the
+existing Schedule IPC accepts it. This keeps the feature useful without
+keylogging, window scraping, continuous clipboard monitoring, or unreviewed
+remote transfer of chat contents.
+This decision supersedes earlier three-module wording for the current product scope; AI Assistant is now the fourth official sidebar module.

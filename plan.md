@@ -540,3 +540,15 @@ _Changelog_
   as a post-development acceptance gate.
 - [ ] After development, complete the deferred release-preparation gates as a
   separate milestone.
+
+### AI Assistant MVP (2026-08-05)
+
+- [x] Add the `AI Assistant` user module to the left navigation.
+- [x] Accept explicitly pasted message text and parse common Chinese dates,
+  times, locations, course names, and task types into a reviewable draft.
+- [x] Require user confirmation before saving through the existing Schedule
+  IPC; do not write a second task store.
+- [x] Keep background WeChat/DingTalk capture, continuous clipboard watching,
+  OCR, desktop pet, remote model calls, and official bot integrations out of
+  the first version.
+This MVP entry supersedes earlier three-module wording in this historical plan; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

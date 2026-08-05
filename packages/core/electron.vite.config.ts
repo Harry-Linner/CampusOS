@@ -10,6 +10,7 @@ const workspaceRuntimeDependencies = [
   "@campusos/plugin-academic-exams",
   "@campusos/plugin-academic-timetable-events",
   "@campusos/plugin-deadline-assistant",
+  "@campusos/plugin-ai-assistant",
   "@campusos/plugin-materials",
   "@campusos/plugin-schedule",
   "@campusos/plugin-zju-calendar-config",
@@ -51,6 +52,10 @@ export default defineConfig({
         "@campusos/plugin-materials/manifest": resolve(
           rootDir,
           "../../plugins/official/materials/src/manifest.ts"
+        ),
+        "@campusos/plugin-ai-assistant/manifest": resolve(
+          rootDir,
+          "../../plugins/official/ai-assistant/src/manifest.ts"
         ),
         "@campusos/plugin-zju-undergraduate/manifest": resolve(
           rootDir,
@@ -164,6 +169,10 @@ export default defineConfig({
           rootDir,
           "../../plugins/official/materials/src/manifest.ts"
         ),
+        "@campusos/plugin-ai-assistant/manifest": resolve(
+          rootDir,
+          "../../plugins/official/ai-assistant/src/manifest.ts"
+        ),
         "@campusos/plugin-academic": resolve(
           rootDir,
           "../../plugins/official/academic/src/index.ts"
@@ -175,6 +184,10 @@ export default defineConfig({
         "@campusos/plugin-materials": resolve(
           rootDir,
           "../../plugins/official/materials/src/index.tsx"
+        ),
+        "@campusos/plugin-ai-assistant": resolve(
+          rootDir,
+          "../../plugins/official/ai-assistant/src/index.ts"
         ),
         "@campusos/plugin-academic-exams/manifest": resolve(
           rootDir,

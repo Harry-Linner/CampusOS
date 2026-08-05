@@ -32,7 +32,17 @@ Core 中不直接形成用户模块的实现，包括事件投影、任务存储
 
 ## Current implementation acceptance (2026-08-05)
 
-User-facing plugins are exactly Academic, Schedule, and Materials. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. Authorized undergraduate runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted live chain, including the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte gates, with zero sensitive output. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
+User-facing plugins are exactly Academic, Schedule, Materials, and AI Assistant. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue; AI Assistant owns explicit-message parsing and confirmed task creation. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. Authorized undergraduate runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted live chain, including the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte gates, with zero sensitive output. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
+
+### AI Assistant implementation update (2026-08-05)
+
+AI Assistant is now the fourth user-facing module. Its MVP accepts only text
+explicitly submitted by the user, creates a structured task draft with source
+evidence and missing-field warnings, and writes supported fields only after
+confirmation through the Schedule IPC. It does not capture WeChat or DingTalk
+in the background, watch the clipboard continuously, or create a second task
+store. The desktop pet, OCR, remote model providers, and official bot
+integrations remain future phases.
 
 ## 避免的旧称
 

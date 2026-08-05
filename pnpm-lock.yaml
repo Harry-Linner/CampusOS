@@ -42,6 +42,9 @@ importers:
       '@campusos/plugin-academic-timetable-events':
         specifier: workspace:*
         version: link:../../plugins/official/academic-timetable-events
+      '@campusos/plugin-ai-assistant':
+        specifier: workspace:*
+        version: link:../../plugins/official/ai-assistant
       '@campusos/plugin-deadline-assistant':
         specifier: workspace:*
         version: link:../../plugins/official/deadline-assistant
@@ -182,6 +185,22 @@ importers:
         version: 5.9.3
 
   plugins/official/academic-timetable-events: {}
+
+  plugins/official/ai-assistant:
+    dependencies:
+      '@campusos/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.31
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
 
   plugins/official/deadline-assistant:
     dependencies:

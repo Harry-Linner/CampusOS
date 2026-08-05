@@ -289,3 +289,7 @@ _Sources_
 - [《开源项目商业化是否违法？法律边界与合规路径解析》](https://www.baichequanshuo.com/20400.html)
 - [《资金二清、信息二清，哪个属于非法经营？》](https://www.163.com/dy/article/JARNPSEK0519S96U.html)
 - [《电商平台资金沉淀的合规问题》](https://global.lianlianpay.com/article_train/16-92492.html)
+
+## AI Assistant MVP boundary (2026-08-05)
+
+The first AI Assistant release processes only text the user explicitly pastes into CampusOS. Parsing is local and deterministic, the original text remains in the current page session for evidence, and no message content is uploaded or continuously collected. WeChat/DingTalk background capture, clipboard monitoring, OCR, remote AI providers, and official bot/webhook integrations are outside this release and require separate consent, security, and compliance review.
