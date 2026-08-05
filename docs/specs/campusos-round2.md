@@ -52,8 +52,15 @@ the completed local file.
 
 Not claimed as complete:
 
-- real graduate-account, multi-device, clean-Windows, desktop-notification, and release-package acceptance;
+- post-development graduate-account, multi-device, clean-Windows, real desktop
+  notification, GitHub Release, and CC98 publication acceptance;
 - any live upstream result based only on fixture, mock, build, or UI evidence.
+
+Development reminder tests use fixture-backed events with the formal scheduler
+and mock only the Electron notification side effect. The QuickJS/WASM and
+utility-process headless substrate is implemented and tested; third-party
+headless lifecycle activation and network proxy permissions remain disabled by
+the current security contract.
 
 ## Historical Decisions Retained
 

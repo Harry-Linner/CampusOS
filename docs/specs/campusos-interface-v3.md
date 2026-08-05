@@ -114,6 +114,12 @@ The Academic first-level module exposes five internal tabs (timetable, course ca
 
 Materials completion actions are also live: download change events merge the formal queue into the current snapshot, and ready rows offer `Open` and `Show in folder` through task-ID-only main-process IPC.
 
+The development gate uses fixture-backed calendar/deadline events to exercise the
+formal reminder scheduler and mocks only the Electron `Notification` side
+effect. Multi-device, clean-Windows, graduate-account, GitHub Release, and CC98
+acceptance are explicitly post-development work; real desktop notification
+delivery is not claimed by the mock evidence.
+
 ## Future-term timetable integrity (2026-08-03)
 
 When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.

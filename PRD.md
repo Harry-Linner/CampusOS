@@ -292,3 +292,13 @@ Release distribution remain open.
 ### Materials completion UX (2026-08-05)
 
 The Materials module now receives live download-queue updates without re-running upstream sync. Completed entries expose guarded `Open` and `Show in folder` actions through main-process IPC; only task IDs are accepted, and unfinished or unknown tasks are rejected.
+
+### Development-gate scope decision (2026-08-05)
+
+The current development gate does not wait for multi-device field onboarding,
+clean-Windows installation, graduate real-account verification, GitHub Release
+distribution, or CC98 publication. These are scheduled after the development
+period as release-preparation work. Desktop reminder behavior is accepted in
+development with fixture event data through the formal workspace scheduler and
+an Electron `Notification` boundary mock; this evidence does not claim delivery
+on a real user's desktop.

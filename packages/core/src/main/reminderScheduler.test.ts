@@ -113,6 +113,31 @@ describe("reminder scheduler", () => {
     });
   });
 
+  it("uses the same mocked Electron boundary for a course reminder fixture", () => {
+    const courseReminder = reminder({
+      id: "course-1-lead-15",
+      title: "数据结构",
+      kind: "course",
+      location: "教室 A"
+    });
+
+    scheduleWorkspaceReminders(snapshot([courseReminder]), {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+
+    vi.advanceTimersByTime(60_000);
+
+    expect(notificationState.options).toEqual([{
+      title: "数据结构",
+      body: "课程将在 15 分钟后开始，地点：教室 A",
+      silent: false
+    }]);
+    expect(notificationState.show).toHaveBeenCalledOnce();
+  });
+
   it("rejects an invalid fire time instead of scheduling an immediate notification", () => {
     const state = scheduleWorkspaceReminders(snapshot([
       reminder({ id: "invalid", fireAt: "not-a-date" })

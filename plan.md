@@ -529,3 +529,14 @@ _Changelog_
 
 - [x] Propagate download-engine change events into the current workspace snapshot through a lightweight queue read.
 - [x] Expose completed-file open/reveal actions through task-ID-only IPC and verify them with unit, renderer, and Electron E2E tests.
+
+### Development-gate scope decision (2026-08-05)
+
+- [x] Move multi-device onboarding, clean-Windows installation, graduate
+  real-account verification, GitHub Release distribution, and CC98 publication
+  out of the current development gate.
+- [x] Accept desktop reminder scheduling during development with fixture event
+  data and a mocked Electron `Notification` boundary; keep real-device delivery
+  as a post-development acceptance gate.
+- [ ] After development, complete the deferred release-preparation gates as a
+  separate milestone.

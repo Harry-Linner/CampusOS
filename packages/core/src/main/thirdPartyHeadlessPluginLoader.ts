@@ -14,6 +14,7 @@ export interface ThirdPartyHeadlessSyncJob {
 export interface ThirdPartyHeadlessPluginLoaderOptions {
   capabilityRepository: CapabilityRepository;
   utilityRunner: ThirdPartyHeadlessUtilityRunner;
+  readVerifiedAccountId: () => Promise<string | null>;
   sandboxLimits?: Partial<ThirdPartyHeadlessSandboxLimits>;
 }
 
@@ -34,6 +35,7 @@ export interface ThirdPartyHeadlessActivationResult {
 export const createThirdPartyHeadlessPluginLoader = ({
   capabilityRepository,
   utilityRunner,
+  readVerifiedAccountId,
   sandboxLimits
 }: ThirdPartyHeadlessPluginLoaderOptions) => {
   const activate = async (
@@ -43,11 +45,15 @@ export const createThirdPartyHeadlessPluginLoader = ({
 
     const loadCapabilities = async (): Promise<Record<string, unknown>> => {
       const caps: Record<string, unknown> = {};
+      const accountId = await readVerifiedAccountId();
       for (const cap of requiredCapabilities) {
         try {
           const records = await capabilityRepository.read(cap);
           caps[cap] = records
-            .filter((r) => r.data !== null)
+            .filter((record) =>
+              record.data !== null &&
+              (record.accountId === null || record.accountId === accountId)
+            )
             .map((r) => ({
               providerId: r.providerId,
               accountId: r.accountId,

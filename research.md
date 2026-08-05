@@ -403,3 +403,19 @@ CampusOS now ports Celechron 1.3.0's background grade fuse. It compares `gpa[0]`
 ### Materials completion UX update (2026-08-05)
 
 The renderer no longer hydrates a stale workspace snapshot when a download changes. It reads the formal download queue and merges only queue state, so a real completed download becomes visible without another upstream refresh. Opening or revealing a file is main-process-only and resolves the path from a completed task ID.
+
+### Development-gate scope decision update (2026-08-05)
+
+Multi-device use, clean-Windows installation, graduate real-account closure,
+GitHub Release distribution, and CC98 publication are deferred until after the
+development period. Development acceptance may use fixture-backed calendar and
+deadline events to drive the formal reminder scheduler while mocking only the
+Electron `Notification` side-effect boundary. This proves scheduling, payload
+construction, cancellation, and persistence behavior without claiming a real
+desktop delivery.
+
+The third-party headless substrate now includes a QuickJS/WASM isolate in an
+Electron utility process with CPU, memory, stack, source, input, output, and
+one-shot protocol limits. Third-party headless lifecycle activation and network
+proxy permissions remain closed by policy; opening either requires a separate
+security decision and contract tests.

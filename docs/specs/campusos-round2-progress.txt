@@ -13,10 +13,10 @@ PHASE STATUS:
   - [DONE] Electron + React + Vite + TypeScript skeleton
   - [DONE] Campus workspace UI (navigation + main area; current design intentionally has no status bar)
   - [DONE] Plugin loader (.campusmod ZIP + manifest/entrypoint validation + atomic install/uninstall)
-  - [PARTIAL] Renderer sandbox v1 is done; headless worker/isolate and resource limits remain
-  - [PARTIAL] Permission declaration + install review + local-storage sandbox checks; capability/network proxy remains
+  - [DONE] Renderer sandbox v1 plus QuickJS/WASM utility-process isolation and resource limits
+  - [PARTIAL] Permission declaration + install review + local-storage sandbox checks; third-party network proxy remains closed
   - SQLite + Drizzle ORM migration framework
-  - [PARTIAL] Host/protocol/iframe rendering path is tested; packaged hello-world E2E remains
+  - [PARTIAL] Host/protocol/iframe rendering path is tested; native package-picker/install E2E remains
   - Main process modular service layer (7 services)
   - Full CI/CD pipeline (typecheck+lint+test+E2E+build)
   - Vitest unit tests (>70% coverage)
@@ -32,7 +32,7 @@ PHASE STATUS:
   - Materials panel (folder tree + file list)
   - [DONE] Download engine (queue + resume)
   - [DONE] Notification system (by event type)
-  - [DONE] Desktop system notifications + scheduling
+  - [DONE] Desktop system notifications + scheduling (fixture-backed Electron Notification boundary test)
   - [DONE] Scraping fault tolerance (cache + retry)
   - Extension panel (installed + recommendations)
   - Playwright E2E tests
@@ -44,8 +44,8 @@ PHASE STATUS:
   - [DONE] Sentry crash reporting integration
   - [DONE] Plugin developer documentation
   - [DONE] 2 example plugins (hello-world + web scraper)
-  - Windows 10/11 VM verification
-  - GitHub Release v0.1.0
+  - [DEFERRED] Windows 10/11 VM verification (post-development)
+  - [DEFERRED] GitHub Release v0.1.0 and CC98 publication (post-development)
   Verification: npm run build
 
 [IN PROGRESS] Phase 4: V1 (weeks 8-20; selected vertical slices only)

@@ -15,7 +15,7 @@
     "test:e2e": "pnpm run rebuild:electron && electron-vite build --mode e2e && playwright test",
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "verify:zju-auth": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/zjuUnifiedAuth.live.test.ts --reporter=verbose",
-    "verify:headless-sandbox": "electron-vite build && electron ../../scripts/headless-sandbox-smoke",
+    "verify:headless-sandbox": "electron-vite build && node ../../scripts/run-headless-sandbox-smoke.mjs",
     "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials"
   },
   "dependencies": {

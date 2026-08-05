@@ -6,6 +6,16 @@
 **日期：** 2026-07-19  
 **关联决策：** [ADR-0001：能力驱动的 Plugin Runtime v2](../adr/0001-capability-driven-plugin-runtime.md)
 
+### Implementation status (2026-08-05)
+
+The headless security substrate described below is implemented as a QuickJS/WASM
+runtime hosted in an Electron utility process. CPU deadline, memory, stack,
+source, input, output, one-shot protocol, and child-process resident-set limits
+are covered by automated tests and the headless smoke verification. This does
+not open third-party headless lifecycle execution: user packages remain limited
+to the renderer sandbox v1 profile, and network proxy permissions remain closed
+until a separate security contract is accepted.
+
 ## 1. 当前能力边界
 
 `.campusmod` 是 ZIP 归档。当前版本支持通过扩展页文件选择器检查、确认、原子安装、升级、持久注册、损坏隔离和卸载。安装成功的第三方插件默认停用；只有符合 renderer sandbox v1 严格 profile、且用户明确授予 `storage:local` 的单活动视图插件可以安装和启用，不符合该 profile 的包会在检查阶段拒绝，主进程不会执行第三方 `main`，renderer 也不会直接 `import()` 其代码。
