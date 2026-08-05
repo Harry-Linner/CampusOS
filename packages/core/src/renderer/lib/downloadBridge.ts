@@ -8,6 +8,9 @@ const requireCampusosBridge = (): CampusosBridge => {
   return window.campusos;
 };
 
+export const listDownloads = async () =>
+  requireCampusosBridge().downloads.list();
+
 export const enqueueDownload = async (input: CampusDownloadRequest): Promise<void> => {
   await requireCampusosBridge().downloads.enqueue(input);
 };
@@ -22,6 +25,14 @@ export const resumeDownload = async (id: string): Promise<void> => {
 
 export const cancelDownload = async (id: string): Promise<void> => {
   await requireCampusosBridge().downloads.cancel(id);
+};
+
+export const openDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.open(id);
+};
+
+export const revealDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.reveal(id);
 };
 
 export const subscribeToDownloadChanges = (listener: () => void): (() => void) =>

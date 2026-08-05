@@ -210,6 +210,8 @@ const installBridge = (
       pause: vi.fn(async () => false),
       resume: vi.fn(async () => false),
       cancel: vi.fn(async () => false),
+      open: vi.fn(async () => undefined),
+      reveal: vi.fn(async () => undefined),
       subscribe: vi.fn(() => () => undefined)
     },
     plugins: {

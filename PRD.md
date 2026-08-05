@@ -288,3 +288,7 @@ validation with zero sensitive output. This closes the repeated time-separated
 undergraduate chain gate only. Multi-device field use, a clean Windows
 installation, a real desktop notification, graduate-account verification, and
 Release distribution remain open.
+
+### Materials completion UX (2026-08-05)
+
+The Materials module now receives live download-queue updates without re-running upstream sync. Completed entries expose guarded `Open` and `Show in folder` actions through main-process IPC; only task IDs are accepted, and unfinished or unknown tasks are rejected.

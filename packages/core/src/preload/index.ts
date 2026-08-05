@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld("campusos", {
     pause: (id: string) => ipcRenderer.invoke("campusos:downloads:pause", id),
     resume: (id: string) => ipcRenderer.invoke("campusos:downloads:resume", id),
     cancel: (id: string) => ipcRenderer.invoke("campusos:downloads:cancel", id),
+    open: (id: string) => ipcRenderer.invoke("campusos:downloads:open", id),
+    reveal: (id: string) => ipcRenderer.invoke("campusos:downloads:reveal", id),
     subscribe: (listener: () => void) => {
       const channel = "campusos:downloads:changed";
       const handler = () => listener();

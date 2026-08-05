@@ -46,6 +46,10 @@ Completed in the current implementation:
   traversal, authenticated download, byte validation, and zero sensitive
   output.
 
+The Materials acceptance path additionally covers a real Electron download
+completion event reaching the queue UI, with guarded open/reveal actions for
+the completed local file.
+
 Not claimed as complete:
 
 - real graduate-account, multi-device, clean-Windows, desktop-notification, and release-package acceptance;

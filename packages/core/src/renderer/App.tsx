@@ -16,7 +16,9 @@ import { SettingsView } from "./views/SettingsView";
 import {
   cancelDownload,
   enqueueDownload,
+  openDownload,
   pauseDownload,
+  revealDownload,
   resumeDownload,
   subscribeToDownloadChanges
 } from "./lib/downloadBridge";
@@ -45,7 +47,7 @@ export const App = (): JSX.Element => {
   }, []);
 
   useEffect(() => subscribeToDownloadChanges(() => {
-    void workspace.load();
+    void workspace.refreshDownloads();
   }), []);
 
   useEffect(() => {
@@ -154,7 +156,9 @@ export const App = (): JSX.Element => {
           enqueue: enqueueDownload,
           pause: pauseDownload,
           resume: resumeDownload,
-          cancel: cancelDownload
+          cancel: cancelDownload,
+          open: openDownload,
+          reveal: revealDownload
         }}
         schedule={window.campusos?.schedule}
       />

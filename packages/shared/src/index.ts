@@ -149,6 +149,8 @@ export interface PluginComponentProps {
     pause: (id: string) => Promise<void>;
     resume: (id: string) => Promise<void>;
     cancel: (id: string) => Promise<void>;
+    open: (id: string) => Promise<void>;
+    reveal: (id: string) => Promise<void>;
   };
   schedule?: {
     loadTasks: () => Promise<LocalTasksData>;

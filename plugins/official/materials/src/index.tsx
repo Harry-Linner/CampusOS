@@ -193,6 +193,22 @@ export const Component = ({
     }
   };
 
+  const runFileAction = async (
+    id: string,
+    action: () => Promise<void>
+  ): Promise<void> => {
+    setBusyId(id);
+    setActionError(null);
+    setNotice(null);
+    try {
+      await action();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "File action failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const enqueueSelected = async (): Promise<void> => {
     if (!downloads || selectedMaterials.length === 0) return;
     setBusyId("selected");
@@ -488,7 +504,34 @@ export const Component = ({
                       {download.progress}%
                     </progress>
                   </div>
-                  {downloads && download.status !== "ready" ? (
+                  {downloads && download.status === "ready" ? (
+                    <div className="inline-actions">
+                      <button
+                        className="text-button"
+                        type="button"
+                        disabled={busyId === download.id}
+                        onClick={() =>
+                          void runFileAction(download.id, () =>
+                            downloads.open(download.id)
+                          )
+                        }
+                      >
+                        打开
+                      </button>
+                      <button
+                        className="text-button"
+                        type="button"
+                        disabled={busyId === download.id}
+                        onClick={() =>
+                          void runFileAction(download.id, () =>
+                            downloads.reveal(download.id)
+                          )
+                        }
+                      >
+                        在文件夹中显示
+                      </button>
+                    </div>
+                  ) : downloads ? (
                     <div className="inline-actions">
                       {download.status === "paused" || download.status === "failed" ? (
                         <button

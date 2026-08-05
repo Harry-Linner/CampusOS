@@ -524,3 +524,8 @@ _Changelog_
   one real desktop course/deadline notification before Release preparation.
 - [ ] Complete the graduate real-account path separately; undergraduate
   evidence does not satisfy that gate.
+
+### Materials completion UX (2026-08-05)
+
+- [x] Propagate download-engine change events into the current workspace snapshot through a lightweight queue read.
+- [x] Expose completed-file open/reveal actions through task-ID-only IPC and verify them with unit, renderer, and Electron E2E tests.

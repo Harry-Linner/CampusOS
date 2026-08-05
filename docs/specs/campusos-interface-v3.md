@@ -112,6 +112,8 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar still contains only the three official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
 
+Materials completion actions are also live: download change events merge the formal queue into the current snapshot, and ready rows offer `Open` and `Show in folder` through task-ID-only main-process IPC.
+
 ## Future-term timetable integrity (2026-08-03)
 
 When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.

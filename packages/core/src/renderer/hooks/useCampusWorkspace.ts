@@ -5,6 +5,7 @@ import {
   hydrateCampusWorkspaceRecord,
   syncCampusWorkspaceRecord
 } from "../lib/campusBridge";
+import { listDownloads } from "../lib/downloadBridge";
 
 interface CampusWorkspaceState {
   ready: boolean;
@@ -16,6 +17,7 @@ interface CampusWorkspaceState {
   storagePath: string | null;
   load: () => Promise<void>;
   sync: () => Promise<void>;
+  refreshDownloads: () => Promise<void>;
 }
 
 export const useCampusWorkspace = (): CampusWorkspaceState => {
@@ -82,6 +84,31 @@ export const useCampusWorkspace = (): CampusWorkspaceState => {
           throw nextError;
         } finally {
           setLoading(false);
+        }
+      },
+      refreshDownloads: async () => {
+        try {
+          const downloads = await listDownloads();
+          startTransition(() => {
+            setSnapshot((current) => current
+              ? {
+                  ...current,
+                  downloads,
+                  summary: {
+                    ...current.summary,
+                    downloadsInFlight: downloads.filter(
+                      (item) => item.status !== "ready"
+                    ).length
+                  }
+                }
+              : current);
+          });
+        } catch (nextError) {
+          setError(
+            nextError instanceof Error
+              ? nextError.message
+              : "Download queue refresh failed."
+          );
         }
       }
     }),

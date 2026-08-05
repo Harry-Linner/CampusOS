@@ -1,5 +1,6 @@
 import { expect, test, _electron as electron, type Page } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,6 +42,22 @@ const settleView = async (page: Page): Promise<void> => {
 test("validates the complete fixture-backed workspace at desktop and narrow widths", async ({ browserName: _browserName }, testInfo) => {
   void _browserName;
   const userDataPath = await mkdtemp(join(tmpdir(), "campusos-workspace-e2e-"));
+  const downloadPayload = Buffer.from("CampusOS E2E completed download", "utf8");
+  const downloadServer = createServer((_request, response) => {
+    response.writeHead(200, {
+      "content-length": String(downloadPayload.byteLength),
+      "content-type": "application/pdf"
+    });
+    response.end(downloadPayload);
+  });
+  await new Promise<void>((resolveListen) =>
+    downloadServer.listen(0, "127.0.0.1", resolveListen)
+  );
+  const downloadAddress = downloadServer.address();
+  if (!downloadAddress || typeof downloadAddress === "string") {
+    throw new Error("Download fixture server did not expose an address.");
+  }
+  const downloadUrl = `http://127.0.0.1:${downloadAddress.port}/completed.pdf`;
   const app = await electron.launch({
     args: [
       join(packageRoot, "out/main/main.js"),
@@ -88,6 +105,23 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.getByLabel("主导航").getByRole("button", { name: "资料" }).click();
     await expect(page.getByRole("button", { name: "课程资料", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "下载队列", exact: true })).toBeVisible();
+    await page.evaluate(async (url) => {
+      await window.campusos?.downloads.enqueue({
+        url,
+        expectedBytes: 31,
+        title: "e2e-completed.pdf",
+        courseName: "E2E Course",
+        sourceId: "academic-affairs",
+        semester: "2025-2026 spring"
+      });
+    }, downloadUrl);
+    await expect.poll(async () => page.evaluate(async () =>
+      (await window.campusos?.downloads.list())?.[0]?.status
+    )).toBe("ready");
+    await page.getByRole("button", { name: /^下载队列/ }).click();
+    await expect(page.getByText("e2e-completed.pdf", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "在文件夹中显示" })).toBeVisible();
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({
@@ -158,6 +192,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     });
   } finally {
     await app.close();
+    await new Promise<void>((resolveClose, rejectClose) =>
+      downloadServer.close((error) => error ? rejectClose(error) : resolveClose())
+    );
     await rm(userDataPath, { recursive: true, force: true });
   }
 });

@@ -399,3 +399,7 @@ The independent major endpoint projection is now retained as `majorSummary` in `
 ### Grade-change notification update (2026-08-05)
 
 CampusOS now ports Celechron 1.3.0's background grade fuse. It compares `gpa[0]` semantics through the formal grades model and the raw graded-record count, persists only an account-keyed baseline in SQLite, and skips non-live or degraded refreshes. The setting is independent from course/deadline reminders and legacy reminder JSON defaults it to enabled.
+
+### Materials completion UX update (2026-08-05)
+
+The renderer no longer hydrates a stale workspace snapshot when a download changes. It reads the formal download queue and merges only queue state, so a real completed download becomes visible without another upstream refresh. Opening or revealing a file is main-process-only and resolves the path from a completed task ID.

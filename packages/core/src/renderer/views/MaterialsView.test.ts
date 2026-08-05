@@ -46,6 +46,15 @@ const snapshot: CampusWorkspaceSnapshot = {
   ],
   downloads: [
     {
+      id: "ready-download",
+      title: "已下载资料",
+      courseName: "测试课程",
+      sourceId: "learning-platform",
+      progress: 100,
+      status: "ready",
+      targetPath: "downloads/ready-file"
+    },
+    {
       id: "failed-download",
       title: "失败资料",
       courseName: "测试课程",
@@ -87,7 +96,9 @@ describe("MaterialsView", () => {
         enqueue,
         pause: vi.fn(async () => undefined),
         resume: vi.fn(async () => undefined),
-        cancel: vi.fn(async () => undefined)
+        cancel: vi.fn(async () => undefined),
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
       },
       loading: false,
       onRefresh,
@@ -125,7 +136,9 @@ describe("MaterialsView", () => {
         enqueue: vi.fn(async () => undefined),
         pause: vi.fn(async () => undefined),
         resume,
-        cancel: vi.fn(async () => undefined)
+        cancel: vi.fn(async () => undefined),
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
       },
       loading: false,
       onRefresh,
@@ -141,6 +154,37 @@ describe("MaterialsView", () => {
     await waitFor(() => {
       expect(resume).toHaveBeenCalledWith("failed-download");
       expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("opens or reveals only completed downloads through the bridge", async () => {
+    const open = vi.fn(async () => undefined);
+    const reveal = vi.fn(async () => undefined);
+    const onRefresh = vi.fn(async () => undefined);
+
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue: vi.fn(async () => undefined),
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined),
+        open,
+        reveal
+      },
+      loading: false,
+      onRefresh,
+      snapshot
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    fireEvent.click(screen.getByRole("button", { name: "打开" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("ready-download"));
+
+    fireEvent.click(screen.getByRole("button", { name: "在文件夹中显示" }));
+    await waitFor(() => {
+      expect(reveal).toHaveBeenCalledWith("ready-download");
+      expect(onRefresh).not.toHaveBeenCalled();
     });
   });
 });
