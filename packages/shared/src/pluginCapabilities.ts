@@ -275,6 +275,40 @@ export interface CalendarEventsData {
   events: CalendarEventRecord[];
 }
 
+export interface AiAssistantSettingsRecord {
+  configured: boolean;
+  model: string;
+  savedAt: string | null;
+  encrypted: boolean;
+}
+
+export interface AiAssistantSettingsInput {
+  apiKey: string;
+  model: string;
+}
+
+export interface AiAssistantParseInput {
+  text: string;
+  courseNames: string[];
+  now: string;
+}
+
+export interface AiAssistantDraft {
+  sourceText: string;
+  title: string;
+  description: string;
+  type: "deadline" | "fixed";
+  startAt: string | null;
+  endAt: string | null;
+  timeNeededMinutes: number;
+  location: string;
+  courseName: string;
+  confidence: "high" | "medium" | "low";
+  missingFields: string[];
+  warnings: string[];
+  evidence: string[];
+}
+
 export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
 export type LocalTaskStatus =
   | "running"

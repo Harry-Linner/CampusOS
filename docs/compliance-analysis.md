@@ -290,6 +290,6 @@ _Sources_
 - [《资金二清、信息二清，哪个属于非法经营？》](https://www.163.com/dy/article/JARNPSEK0519S96U.html)
 - [《电商平台资金沉淀的合规问题》](https://global.lianlianpay.com/article_train/16-92492.html)
 
-## AI Assistant MVP boundary (2026-08-05)
+## AI Assistant MVP boundary (2026-08-07)
 
-The first AI Assistant release processes only text the user explicitly pastes into CampusOS. Parsing is local and deterministic, the original text remains in the current page session for evidence, and no message content is uploaded or continuously collected. WeChat/DingTalk background capture, clipboard monitoring, OCR, remote AI providers, and official bot/webhook integrations are outside this release and require separate consent, security, and compliance review.
+The first AI Assistant release processes only text the user explicitly pastes into CampusOS. The configuration view states that clicking the parse action sends the current message and workspace course-name candidates to OpenAI; no upload happens merely from pasting or typing. The user supplies the API Key, Electron `safeStorage` encrypts it at rest, and only the main process decrypts it for the request. The renderer receives configuration metadata but never the Key. Requests set `store: false`; CampusOS does not log the Key or raw model response. The original submitted text remains in the current page session as draft evidence. WeChat/DingTalk background capture, continuous clipboard monitoring, OCR, desktop-pet behavior, and official bot/webhook integrations remain outside this release and require separate consent, security, and compliance review.

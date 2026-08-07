@@ -62,8 +62,8 @@ CampusOS 已将数据连接器、事件转换器、页面和小型工具分别�
 5. 验证禁用任一插件不会破坏 Core 导航或其他插件。
 6. 对 Celechron 重合业务继续执行真实账号脱敏闭环验收。
 
-## AI Assistant MVP (2026-08-05)
+## AI Assistant MVP (2026-08-07)
 
-The official user-facing module set now includes `org.campusos.ai-assistant` as a fourth sidebar module. Its first release accepts an explicitly pasted message, parses it locally into an editable task draft, and writes only user-confirmed drafts through the existing `schedule.saveTask` IPC. It does not read WeChat/DingTalk, monitor the clipboard, upload message text, or provide a desktop pet.
+The official user-facing module set includes `org.campusos.ai-assistant` as a fourth sidebar module. Its first release accepts an explicitly pasted message and, only after the user clicks the parse action, sends that message, the current Shanghai time, and workspace course-name candidates to the OpenAI Responses API. The user-configured API Key is encrypted by Electron `safeStorage` and only decrypted in the main process. Strict structured output becomes an editable task draft; only user-confirmed drafts are written through the existing `schedule.saveTask` IPC. The module has no regex parser fallback and does not read WeChat/DingTalk in the background, monitor the clipboard, provide OCR or a desktop pet, or integrate bots/webhooks.
 
 This section is the authoritative current module count; earlier three-module references describe the pre-AI Assistant baseline.

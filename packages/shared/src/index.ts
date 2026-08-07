@@ -1,5 +1,9 @@
 import type { CampusDownloadRequest, CampusWorkspaceSnapshot } from "./campus";
 import type {
+  AiAssistantDraft,
+  AiAssistantParseInput,
+  AiAssistantSettingsInput,
+  AiAssistantSettingsRecord,
   CalendarExportInput,
   CalendarExportResult,
   LocalTaskInput,
@@ -161,6 +165,12 @@ export interface PluginComponentProps {
     loadPlan: () => Promise<PlannerScheduleData | null>;
     exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
     subscribe: (listener: () => void) => () => void;
+  };
+  assistant?: {
+    loadSettings: () => Promise<AiAssistantSettingsRecord>;
+    saveSettings: (input: AiAssistantSettingsInput) => Promise<AiAssistantSettingsRecord>;
+    clearSettings: () => Promise<AiAssistantSettingsRecord>;
+    parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantDraft>;
   };
 }
 

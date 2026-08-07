@@ -303,14 +303,18 @@ development with fixture event data through the formal workspace scheduler and
 an Electron `Notification` boundary mock; this evidence does not claim delivery
 on a real user's desktop.
 
-### AI Assistant MVP (2026-08-05)
+### AI Assistant MVP (2026-08-07)
 
-AI Assistant is a fourth user-facing module. The MVP accepts only message text
-explicitly pasted or submitted by the user, runs a local structured parser, and
-shows a reviewable task draft before calling the existing Schedule `saveTask`
-bridge. It must not read WeChat or DingTalk in the background, watch the
-clipboard continuously, invoke UI automation, upload raw messages, or create a
-second task database. The draft keeps the source text, extracted evidence,
-missing fields, and confidence in the current session; only an explicit user
-confirmation persists the supported task fields through the formal Schedule IPC.
+AI Assistant is a fourth user-facing module. The first release accepts only
+message text explicitly pasted or submitted by the user. After the user clicks
+the parse action, CampusOS sends that message, the current Shanghai time, and
+workspace course-name candidates to the OpenAI Responses API using the model
+configured inside the module. The API Key is encrypted with Electron
+`safeStorage`, used only in the main process, and never returned to renderer
+code. A strict JSON Schema response becomes a reviewable task draft before the
+existing Schedule `saveTask` bridge is called. The draft preserves source
+evidence, warnings, missing fields, and confidence in the current session; only
+explicit confirmation persists supported task fields. There is no regex
+fallback, background WeChat/DingTalk read, continuous clipboard watch, second
+task store, OCR, desktop pet, or bot/webhook integration.
 This MVP entry supersedes earlier three-module wording in this historical PRD; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

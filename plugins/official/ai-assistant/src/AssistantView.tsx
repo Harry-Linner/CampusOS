@@ -1,6 +1,14 @@
-import { useMemo, useState } from "react";
-import type { LocalTaskInput, PluginComponentProps } from "@campusos/shared";
-import { parseAssistantMessage, type AssistantDraft } from "./assistantParser";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  AiAssistantDraft,
+  AiAssistantSettingsRecord,
+  LocalTaskInput,
+  PluginComponentProps
+} from "@campusos/shared";
+import { AI_ASSISTANT_DEFAULT_MODEL } from "./prompt";
+
+type AssistantSection = "message" | "settings";
+type BusyAction = "load-settings" | "save-settings" | "clear-settings" | "parse" | "save-task" | null;
 
 const shanghaiParts = (value: Date): Record<string, string> => Object.fromEntries(
   new Intl.DateTimeFormat("en-CA", {
@@ -25,15 +33,18 @@ const toDateTimeInput = (value: string | null): string => {
 };
 
 const fromDateTimeInput = (value: string): string => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) throw new Error("请补充有效的日期和时间。");
-  return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00+08:00`).toISOString();
+  if (value.length !== 16 || value[4] !== "-" || value[7] !== "-" || value[10] !== "T" || value[13] !== ":") {
+    throw new Error("请补充有效的日期和时间。");
+  }
+  const parsed = new Date(`${value}:00+08:00`);
+  if (!Number.isFinite(parsed.getTime())) throw new Error("请补充有效的日期和时间。");
+  return parsed.toISOString();
 };
 
 interface EditableDraft {
   title: string;
   description: string;
-  type: AssistantDraft["type"];
+  type: AiAssistantDraft["type"];
   startAt: string;
   endAt: string;
   timeNeededMinutes: string;
@@ -41,7 +52,7 @@ interface EditableDraft {
   courseName: string;
 }
 
-const toEditable = (draft: AssistantDraft): EditableDraft => ({
+const toEditable = (draft: AiAssistantDraft): EditableDraft => ({
   title: draft.title,
   description: draft.description,
   type: draft.type,
@@ -52,11 +63,15 @@ const toEditable = (draft: AssistantDraft): EditableDraft => ({
   courseName: draft.courseName
 });
 
-export const AssistantView = ({ snapshot, schedule }: PluginComponentProps): JSX.Element => {
+export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponentProps): JSX.Element => {
+  const [section, setSection] = useState<AssistantSection>("message");
   const [message, setMessage] = useState("");
-  const [draft, setDraft] = useState<AssistantDraft | null>(null);
+  const [draft, setDraft] = useState<AiAssistantDraft | null>(null);
   const [editable, setEditable] = useState<EditableDraft | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [settings, setSettings] = useState<AiAssistantSettingsRecord | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState(AI_ASSISTANT_DEFAULT_MODEL);
+  const [busy, setBusy] = useState<BusyAction>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const courseNames = useMemo(() => [
@@ -64,21 +79,92 @@ export const AssistantView = ({ snapshot, schedule }: PluginComponentProps): JSX
     ...(snapshot?.deadlines.map((deadline) => deadline.courseName ?? "") ?? [])
   ].filter(Boolean), [snapshot]);
 
-  const parse = (): void => {
+  useEffect(() => {
+    if (!assistant) return;
+    let active = true;
+    setBusy("load-settings");
+    void assistant.loadSettings()
+      .then((record) => {
+        if (!active) return;
+        setSettings(record);
+        setModel(record.model);
+        setError(null);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : "无法读取 AI 助手配置。");
+      })
+      .finally(() => {
+        if (active) setBusy(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [assistant]);
+
+  const parse = async (): Promise<void> => {
+    if (!assistant) return;
+    setBusy("parse");
     setError(null);
     setNotice(null);
-    const next = parseAssistantMessage({ text: message, courseNames });
-    setDraft(next);
-    setEditable(toEditable(next));
+    try {
+      const next = await assistant.parseMessage({
+        text: message,
+        courseNames,
+        now: new Date().toISOString()
+      });
+      setDraft(next);
+      setEditable(toEditable(next));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "AI 解析失败。");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveSettings = async (): Promise<void> => {
+    if (!assistant) return;
+    setBusy("save-settings");
+    setError(null);
+    setNotice(null);
+    try {
+      const record = await assistant.saveSettings({ apiKey, model });
+      setSettings(record);
+      setApiKey("");
+      setNotice("AI 助手配置已安全保存。");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "AI 助手配置保存失败。");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const clearSettings = async (): Promise<void> => {
+    if (!assistant) return;
+    setBusy("clear-settings");
+    setError(null);
+    setNotice(null);
+    try {
+      const record = await assistant.clearSettings();
+      setSettings(record);
+      setModel(record.model);
+      setApiKey("");
+      setDraft(null);
+      setEditable(null);
+      setNotice("已清除 API Key。");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "API Key 清除失败。");
+    } finally {
+      setBusy(null);
+    }
   };
 
   const update = <K extends keyof EditableDraft>(key: K, value: EditableDraft[K]): void => {
     setEditable((current) => current ? { ...current, [key]: value } : current);
   };
 
-  const save = async (): Promise<void> => {
+  const saveTask = async (): Promise<void> => {
     if (!schedule || !editable) return;
-    setBusy(true);
+    setBusy("save-task");
     setError(null);
     setNotice(null);
     try {
@@ -110,7 +196,7 @@ export const AssistantView = ({ snapshot, schedule }: PluginComponentProps): JSX
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "任务保存失败。");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -120,98 +206,116 @@ export const AssistantView = ({ snapshot, schedule }: PluginComponentProps): JSX
         <div>
           <p className="eyebrow">Task message</p>
           <h1>AI 助手</h1>
-          <p>把一段任务消息整理成可确认的日程草稿。</p>
+          <p>把群聊消息整理成可确认的日程草稿。</p>
         </div>
+        <nav className="module-tabs" aria-label="AI 助手视图">
+          <button type="button" className={section === "message" ? "is-active" : undefined} aria-pressed={section === "message"} onClick={() => setSection("message")}>消息</button>
+          <button type="button" className={section === "settings" ? "is-active" : undefined} aria-pressed={section === "settings"} onClick={() => setSection("settings")}>配置</button>
+        </nav>
       </header>
 
-      <div className="assistant-layout">
-        <section className="assistant-input-panel" aria-label="消息输入">
-          <label className="assistant-label" htmlFor="assistant-message">粘贴消息</label>
-          <textarea
-            id="assistant-message"
-            className="assistant-message-input"
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder="例如：绩效管理作业请于 2026年8月10日晚上八点前提交，地点：管理学院"
-          />
-          <div className="assistant-actions">
-            <button className="primary-button" type="button" disabled={!message.trim()} onClick={parse}>
-              解析消息
-            </button>
-            <span className="meta-line">仅处理本次主动粘贴的文本</span>
-          </div>
-        </section>
+      {error ? <p className="workspace-error-banner" role="alert">{error}</p> : null}
+      {notice ? <p className="schedule-notice" role="status">{notice}</p> : null}
 
-        <section className="assistant-draft-panel" aria-label="任务草稿">
+      {section === "settings" ? (
+        <section className="assistant-settings" aria-label="AI 助手配置">
           <header className="section-heading">
             <div>
-              <p className="eyebrow">Draft</p>
-              <h2>任务草稿</h2>
+              <p className="eyebrow">OpenAI</p>
+              <h2>模型配置</h2>
             </div>
-            {draft ? <span className={`assistant-confidence is-${draft.confidence}`}>{draft.confidence === "high" ? "高置信度" : draft.confidence === "medium" ? "中置信度" : "需补充"}</span> : null}
+            <span className={`assistant-config-state ${settings?.configured ? "is-configured" : ""}`}>
+              {busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}
+            </span>
           </header>
-
-          {error ? <p className="workspace-error-banner" role="alert">{error}</p> : null}
-          {notice ? <p className="schedule-notice" role="status">{notice}</p> : null}
-          {!editable || !draft ? (
-            <div className="quiet-empty-state">解析结果会显示在这里，确认后才会写入日程。</div>
-          ) : (
-            <form className="assistant-draft-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-              <label>
-                <span>标题</span>
-                <input value={editable.title} onChange={(event) => update("title", event.target.value)} />
-              </label>
-              <div className="assistant-form-grid">
-                <label>
-                  <span>类型</span>
-                  <select value={editable.type} onChange={(event) => update("type", event.target.value as EditableDraft["type"])}>
-                    <option value="deadline">截止事项</option>
-                    <option value="fixed">固定安排</option>
-                  </select>
-                </label>
-                <label>
-                  <span>预计耗时（分钟）</span>
-                  <input type="number" min="1" value={editable.timeNeededMinutes} onChange={(event) => update("timeNeededMinutes", event.target.value)} />
-                </label>
-              </div>
-              <div className="assistant-form-grid">
-                <label>
-                  <span>开始时间</span>
-                  <input type="datetime-local" value={editable.startAt} onChange={(event) => update("startAt", event.target.value)} />
-                </label>
-                <label>
-                  <span>结束时间</span>
-                  <input type="datetime-local" value={editable.endAt} onChange={(event) => update("endAt", event.target.value)} />
-                </label>
-              </div>
-              <div className="assistant-form-grid">
-                <label>
-                  <span>地点</span>
-                  <input value={editable.location} onChange={(event) => update("location", event.target.value)} />
-                </label>
-                <label>
-                  <span>课程</span>
-                  <input value={editable.courseName} onChange={(event) => update("courseName", event.target.value)} />
-                </label>
-              </div>
-              <label>
-                <span>描述</span>
-                <textarea value={editable.description} onChange={(event) => update("description", event.target.value)} />
-              </label>
-
-              {draft.missingFields.length > 0 ? <p className="assistant-warning">缺少：{draft.missingFields.join("、")}</p> : null}
-              {draft.warnings.map((warning) => <p className="assistant-warning" key={warning}>{warning}</p>)}
-              {draft.evidence.length > 0 ? <p className="assistant-evidence">识别依据：{draft.evidence.join(" · ")}</p> : null}
-              <div className="assistant-actions assistant-save-actions">
-                <button className="primary-button" type="submit" disabled={!schedule || !editable.startAt || !editable.endAt || busy}>
-                  {busy ? "正在写入" : "确认并写入日程"}
+          <form className="assistant-settings-form" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
+            <label>
+              <span>API Key</span>
+              <input
+                type="password"
+                autoComplete="off"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder={settings?.configured ? "留空以保留已保存的密钥" : "输入 OpenAI API Key"}
+              />
+            </label>
+            <label>
+              <span>模型</span>
+              <input value={model} onChange={(event) => setModel(event.target.value)} />
+            </label>
+            <p className="assistant-privacy-copy">API Key 使用系统安全存储加密。只有点击“交给 AI 解析”时，当前消息和课程候选会发送给 OpenAI。</p>
+            <div className="assistant-actions">
+              <button className="primary-button" type="submit" disabled={!assistant || !model.trim() || busy !== null}>
+                {busy === "save-settings" ? "正在保存" : "保存配置"}
+              </button>
+              {settings?.configured ? (
+                <button className="text-button is-danger" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>
+                  {busy === "clear-settings" ? "正在清除" : "清除 API Key"}
                 </button>
-                {!schedule ? <span className="meta-line">日程服务暂不可用</span> : null}
-              </div>
-            </form>
-          )}
+              ) : null}
+            </div>
+          </form>
         </section>
-      </div>
+      ) : (
+        <div className="assistant-layout">
+          <section className="assistant-input-panel" aria-label="消息输入">
+            <label className="assistant-label" htmlFor="assistant-message">粘贴消息</label>
+            <textarea
+              id="assistant-message"
+              className="assistant-message-input"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="粘贴需要安排到日程的群聊消息"
+            />
+            <div className="assistant-actions">
+              <button className="primary-button" type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>
+                {busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}
+              </button>
+              {!settings?.configured ? <button className="text-button" type="button" onClick={() => setSection("settings")}>先配置 API Key</button> : null}
+            </div>
+          </section>
+
+          <section className="assistant-draft-panel" aria-label="任务草稿">
+            <header className="section-heading">
+              <div>
+                <p className="eyebrow">Draft</p>
+                <h2>任务草稿</h2>
+              </div>
+              {draft ? <span className={`assistant-confidence is-${draft.confidence}`}>{draft.confidence === "high" ? "高置信度" : draft.confidence === "medium" ? "中置信度" : "需补充"}</span> : null}
+            </header>
+
+            {!editable || !draft ? (
+              <div className="quiet-empty-state">AI 返回的草稿会显示在这里，确认后才会写入日程。</div>
+            ) : (
+              <form className="assistant-draft-form" onSubmit={(event) => { event.preventDefault(); void saveTask(); }}>
+                <label><span>标题</span><input value={editable.title} onChange={(event) => update("title", event.target.value)} /></label>
+                <div className="assistant-form-grid">
+                  <label><span>类型</span><select value={editable.type} onChange={(event) => update("type", event.target.value as EditableDraft["type"])}><option value="deadline">截止事项</option><option value="fixed">固定安排</option></select></label>
+                  <label><span>预计耗时（分钟）</span><input type="number" min="1" value={editable.timeNeededMinutes} onChange={(event) => update("timeNeededMinutes", event.target.value)} /></label>
+                </div>
+                <div className="assistant-form-grid">
+                  <label><span>开始时间</span><input type="datetime-local" value={editable.startAt} onChange={(event) => update("startAt", event.target.value)} /></label>
+                  <label><span>结束时间</span><input type="datetime-local" value={editable.endAt} onChange={(event) => update("endAt", event.target.value)} /></label>
+                </div>
+                <div className="assistant-form-grid">
+                  <label><span>地点</span><input value={editable.location} onChange={(event) => update("location", event.target.value)} /></label>
+                  <label><span>课程</span><input value={editable.courseName} onChange={(event) => update("courseName", event.target.value)} /></label>
+                </div>
+                <label><span>描述</span><textarea value={editable.description} onChange={(event) => update("description", event.target.value)} /></label>
+                {draft.missingFields.length > 0 ? <p className="assistant-warning">缺少：{draft.missingFields.join("、")}</p> : null}
+                {draft.warnings.map((warning) => <p className="assistant-warning" key={warning}>{warning}</p>)}
+                {draft.evidence.length > 0 ? <p className="assistant-evidence">识别依据：{draft.evidence.join(" · ")}</p> : null}
+                <div className="assistant-actions assistant-save-actions">
+                  <button className="primary-button" type="submit" disabled={!schedule || !editable.startAt || !editable.endAt || busy !== null}>
+                    {busy === "save-task" ? "正在写入" : "确认并写入日程"}
+                  </button>
+                  {!editable.startAt || !editable.endAt ? <span className="meta-line">请补全具体时间后再保存</span> : null}
+                </div>
+              </form>
+            )}
+          </section>
+        </div>
+      )}
     </section>
   );
 };

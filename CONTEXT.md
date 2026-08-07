@@ -34,15 +34,18 @@ Core 中不直接形成用户模块的实现，包括事件投影、任务存储
 
 User-facing plugins are exactly Academic, Schedule, Materials, and AI Assistant. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue; AI Assistant owns explicit-message parsing and confirmed task creation. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. Authorized undergraduate runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted live chain, including the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte gates, with zero sensitive output. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
 
-### AI Assistant implementation update (2026-08-05)
+### AI Assistant implementation update (2026-08-07)
 
-AI Assistant is now the fourth user-facing module. Its MVP accepts only text
-explicitly submitted by the user, creates a structured task draft with source
-evidence and missing-field warnings, and writes supported fields only after
-confirmation through the Schedule IPC. It does not capture WeChat or DingTalk
-in the background, watch the clipboard continuously, or create a second task
-store. The desktop pet, OCR, remote model providers, and official bot
-integrations remain future phases.
+AI Assistant is the fourth user-facing module. Its first release accepts only
+text explicitly submitted by the user and sends that message, the current
+Shanghai time, and the workspace course-name candidates to the OpenAI Responses
+API after the user clicks the parse action. The user's API Key is encrypted by
+Electron `safeStorage`, remains in the main process, and is never returned to the
+renderer. Strict structured output becomes an editable task draft with evidence
+and missing-field warnings; only explicit confirmation writes supported fields
+through the Schedule IPC. There is no regex parsing fallback, second task store,
+background WeChat/DingTalk capture, continuous clipboard watch, OCR, desktop
+pet, or bot/webhook integration.
 
 ## 避免的旧称
 

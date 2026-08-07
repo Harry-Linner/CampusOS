@@ -4210,7 +4210,59 @@ input:focus-visible {
 }
 
 .assistant-heading {
-  align-items: flex-start;
+  align-items: center;
+}
+
+.assistant-settings {
+  width: min(680px, 100%);
+  border-top: 1px solid var(--line-strong);
+  padding-top: 20px;
+}
+
+.assistant-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.assistant-settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.assistant-settings-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.assistant-config-state {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  padding: 4px 7px;
+  font-size: 0.72rem;
+}
+
+.assistant-config-state.is-configured {
+  border-color: #a8cbb6;
+  color: var(--success);
+}
+
+.assistant-privacy-copy {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+  line-height: 1.55;
 }
 
 .assistant-layout {

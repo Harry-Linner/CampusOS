@@ -122,14 +122,17 @@ delivery is not claimed by the mock evidence.
 
 ## AI Assistant MVP
 
-AI Assistant is a single optional activity module. Its first version accepts
-only text the user explicitly pastes, parses it into a task draft, and requires
-confirmation before calling the Schedule module's formal `saveTask` bridge.
-Drafts expose title, type, dates, duration, location, course match, confidence,
-missing fields, and source evidence. Background WeChat/DingTalk capture,
-continuous clipboard reads, OCR, desktop-pet windows, remote model providers,
-and bot/webhook integrations are later phases and are not represented as
-completed capabilities.
+AI Assistant is a single optional activity module. Its first version includes a
+module-local API Key and model configuration view. Electron `safeStorage`
+encrypts the Key and only the main process can decrypt it. When the user clicks
+the parse action, CampusOS sends the explicitly pasted text, current Shanghai
+time, and workspace course-name candidates to the OpenAI Responses API. Strict
+JSON Schema output is validated by the main process before becoming a task
+draft; there is no regex fallback. Drafts expose title, type, dates, duration,
+location, course match, confidence, missing fields, and source evidence, and
+require confirmation before calling Schedule's formal `saveTask` bridge.
+Background WeChat/DingTalk capture, continuous clipboard reads, OCR,
+desktop-pet windows, and bot/webhook integrations remain later phases.
 This section supersedes the earlier three-destination baseline: the current four official destinations are Academic, Schedule, Materials, and AI Assistant.
 
 ## Future-term timetable integrity (2026-08-03)

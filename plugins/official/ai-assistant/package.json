@@ -6,7 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./manifest": "./src/manifest.ts",
-    "./parser": "./src/assistantParser.ts"
+    "./prompt": "./src/prompt.ts"
   },
   "dependencies": {
     "@campusos/shared": "workspace:*",

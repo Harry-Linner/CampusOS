@@ -3,7 +3,11 @@
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PluginCapabilityClient, PluginComponentProps } from "@campusos/shared";
+import type {
+  AiAssistantDraft,
+  PluginCapabilityClient,
+  PluginComponentProps
+} from "@campusos/shared";
 import { AssistantView } from "../../../../../plugins/official/ai-assistant/src/AssistantView";
 
 afterEach(cleanup);
@@ -15,11 +19,54 @@ const baseProps: PluginComponentProps = {
   snapshot: null
 };
 
+const draft: AiAssistantDraft = {
+  sourceText: "明天晚上八点提交读书报告",
+  title: "提交读书报告",
+  description: "完成并提交读书报告",
+  type: "deadline",
+  startAt: "2026-08-06T11:00:00.000Z",
+  endAt: "2026-08-06T12:00:00.000Z",
+  timeNeededMinutes: 60,
+  location: "",
+  courseName: "",
+  confidence: "high",
+  missingFields: [],
+  warnings: [],
+  evidence: ["明天晚上八点"]
+};
+
+const createAssistantBridge = (
+  overrides: Partial<NonNullable<PluginComponentProps["assistant"]>> = {}
+): NonNullable<PluginComponentProps["assistant"]> => ({
+  loadSettings: vi.fn(async () => ({
+    configured: true,
+    model: "gpt-5.6-terra",
+    savedAt: "2026-08-05T00:00:00.000Z",
+    encrypted: true
+  })),
+  saveSettings: vi.fn(async (input) => ({
+    configured: true,
+    model: input.model,
+    savedAt: "2026-08-05T00:00:00.000Z",
+    encrypted: true
+  })),
+  clearSettings: vi.fn(async () => ({
+    configured: false,
+    model: "gpt-5.6-terra",
+    savedAt: null,
+    encrypted: true
+  })),
+  parseMessage: vi.fn(async () => draft),
+  ...overrides
+});
+
 describe("AssistantView", () => {
-  it("parses an explicitly pasted message, allows edits, and saves through Schedule", async () => {
+  it("sends an explicit message to the AI bridge, allows edits, and saves through Schedule", async () => {
+    const assistant = createAssistantBridge();
     const saveTask = vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-05T00:00:00.000Z" }));
     render(createElement(AssistantView, {
       ...baseProps,
+      assistant,
       schedule: {
         saveTask,
         loadTasks: vi.fn(async () => ({ tasks: [], updatedAt: "" })),
@@ -32,11 +79,16 @@ describe("AssistantView", () => {
       }
     }));
 
+    await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText("粘贴消息"), {
       target: { value: "明天晚上八点提交读书报告" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "解析消息" }));
-    const title = screen.getByLabelText("标题");
+    fireEvent.click(screen.getByRole("button", { name: "交给 AI 解析" }));
+    await waitFor(() => expect(assistant.parseMessage).toHaveBeenCalledWith(expect.objectContaining({
+      text: "明天晚上八点提交读书报告",
+      courseNames: []
+    })));
+    const title = await screen.findByLabelText("标题");
     fireEvent.change(title, { target: { value: "已编辑读书报告" } });
     fireEvent.click(screen.getByRole("button", { name: "确认并写入日程" }));
 
@@ -48,12 +100,39 @@ describe("AssistantView", () => {
     })));
   });
 
-  it("keeps save unavailable when the message has no date", () => {
-    const saveTask = vi.fn(async () => ({ tasks: [], updatedAt: "" }));
-    render(createElement(AssistantView, { ...baseProps, schedule: { ...({} as NonNullable<PluginComponentProps["schedule"]>), saveTask } }));
-    fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: "请完成课程作业" } });
-    fireEvent.click(screen.getByRole("button", { name: "解析消息" }));
-    expect((screen.getByRole("button", { name: "确认并写入日程" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(saveTask).not.toHaveBeenCalled();
+  it("configures and clears the encrypted API key through the assistant bridge", async () => {
+    const assistant = createAssistantBridge({
+      loadSettings: vi.fn(async () => ({
+        configured: false,
+        model: "gpt-5.6-terra",
+        savedAt: null,
+        encrypted: true
+      }))
+    });
+    render(createElement(AssistantView, { ...baseProps, assistant }));
+
+    fireEvent.click(screen.getByRole("button", { name: "配置" }));
+    await waitFor(() => expect(screen.getByText("未配置")).toBeDefined());
+    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "mock-key" } });
+    fireEvent.change(screen.getByLabelText("模型"), { target: { value: "gpt-5.6" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    await waitFor(() => expect(assistant.saveSettings).toHaveBeenCalledWith({
+      apiKey: "mock-key",
+      model: "gpt-5.6"
+    }));
+    expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "清除 API Key" }));
+    await waitFor(() => expect(assistant.clearSettings).toHaveBeenCalled());
+  });
+
+  it("keeps parsing disabled until an API key is configured", async () => {
+    const assistant = createAssistantBridge({
+      loadSettings: vi.fn(async () => ({ configured: false, model: "gpt-5.6-terra", savedAt: null, encrypted: true }))
+    });
+    render(createElement(AssistantView, { ...baseProps, assistant }));
+    fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: "请安排这条消息" } });
+    await waitFor(() => expect((screen.getByRole("button", { name: "交给 AI 解析" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(screen.getByRole("button", { name: "先配置 API Key" })).toBeDefined();
   });
 });

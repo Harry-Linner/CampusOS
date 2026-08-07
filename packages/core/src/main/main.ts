@@ -24,6 +24,7 @@ import { registerPluginHotReloadHandlers } from "./pluginHotReload";
 import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
+import { registerAiAssistantHandlers } from "./aiAssistantIpc";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
@@ -88,6 +89,7 @@ app.whenReady().then(async () => {
   });
   registerDownloadHandlers();
   registerScheduleHandlers();
+  registerAiAssistantHandlers();
   registerCampusWorkspaceHandlers();
   registerPluginRuntimeHandlers();
   registerDiagnosticHandlers();

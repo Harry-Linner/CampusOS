@@ -103,6 +103,14 @@ contextBridge.exposeInMainWorld("campusos", {
       return () => ipcRenderer.removeListener(channel, handler);
     }
   },
+  assistant: {
+    loadSettings: () => ipcRenderer.invoke("campusos:assistant:settings:load"),
+    saveSettings: (input: { apiKey: string; model: string }) =>
+      ipcRenderer.invoke("campusos:assistant:settings:save", input),
+    clearSettings: () => ipcRenderer.invoke("campusos:assistant:settings:clear"),
+    parseMessage: (input: { text: string; courseNames: string[]; now: string }) =>
+      ipcRenderer.invoke("campusos:assistant:parse", input)
+  },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),
     configure: (input: {
