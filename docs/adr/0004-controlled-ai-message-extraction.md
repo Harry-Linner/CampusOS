@@ -107,8 +107,9 @@ tasks include a source fingerprint and structured course reference when known.
 
 ## Validation Criteria
 
-- OpenAI, DeepSeek, and custom OpenAI-compatible fixture adapters send requests
-  to their configured hosts and parse their documented envelopes.
+- OpenAI Responses, OpenAI-compatible/DeepSeek Chat Completions, Anthropic
+  Messages, and Gemini Generate Content fixture adapters send requests to their
+  configured hosts and parse their documented envelopes.
 - A connection test proves the selected model returns the required structured
   envelope, not merely arbitrary text.
 - Multi-intent, missing-time, relative-time, ungrounded-evidence, duplicate, and

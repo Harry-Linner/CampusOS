@@ -89,3 +89,8 @@ OpenAI-only model control with provider-specific presets, optional discovery,
 custom model entry, and a structured-capability test for the exact connection.
 Cached runtime state is never used to authorize execution; fresh validation
 remains authoritative.
+
+The current implementation covers OpenAI Responses, OpenAI-compatible/DeepSeek
+Chat Completions, Anthropic Messages, and Gemini Generate Content. Provider,
+protocol, and normalized Base URL form the credential scope; changing any of
+them requires the matching Key to be entered again.

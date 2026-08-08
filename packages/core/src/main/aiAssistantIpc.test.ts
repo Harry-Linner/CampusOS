@@ -64,18 +64,25 @@ afterEach(async () => {
 });
 
 describe("AI Assistant IPC", () => {
-  it("registers only the five formal channels and keeps the API key out of renderer results and disk plaintext", async () => {
+  it("registers only the six formal channels and keeps the API key out of renderer results and disk plaintext", async () => {
     expect([...electronState.handlers.keys()]).toEqual([
       "campusos:assistant:settings:load",
       "campusos:assistant:settings:save",
       "campusos:assistant:settings:clear",
       "campusos:assistant:test-connection",
-      "campusos:assistant:parse"
+      "campusos:assistant:parse",
+      "campusos:assistant:models:discover"
     ]);
 
     const record = await invoke<Record<string, unknown>>(
       "campusos:assistant:settings:save",
-      { apiKey: "mock-api-key", model: "gpt-4o-mini" }
+      {
+        apiKey: "mock-api-key",
+        provider: "openai",
+        protocol: "openai-responses",
+        baseUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini"
+      }
     );
     const file = await readFile(
       join(electronState.userDataPath, "secure", "ai-assistant.json"),

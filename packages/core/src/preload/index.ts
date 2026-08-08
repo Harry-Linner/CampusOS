@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld("campusos", {
       repeatPeriod: number;
       repeatEndsOn: string;
       blocksPlanning: boolean;
+      courseName?: string | null;
+      source?: { kind: "ai-assistant"; fingerprint: string; provider: string; model: string; importedAt: string } | null;
     }) => ipcRenderer.invoke("campusos:schedule:task:save", input),
     mutateTask: (input: {
       id: string;
@@ -105,13 +107,15 @@ contextBridge.exposeInMainWorld("campusos", {
   },
   assistant: {
     loadSettings: () => ipcRenderer.invoke("campusos:assistant:settings:load"),
-    saveSettings: (input: { apiKey: string; model: string }) =>
+    saveSettings: (input: { apiKey: string; provider: string; protocol: string; baseUrl: string; model: string }) =>
       ipcRenderer.invoke("campusos:assistant:settings:save", input),
     clearSettings: () => ipcRenderer.invoke("campusos:assistant:settings:clear"),
-    testConnection: (input: { apiKey: string; model: string }) =>
+    testConnection: (input: { apiKey: string; provider: string; protocol: string; baseUrl: string; model: string }) =>
       ipcRenderer.invoke("campusos:assistant:test-connection", input),
-    parseMessage: (input: { text: string; courseNames: string[]; now: string }) =>
-      ipcRenderer.invoke("campusos:assistant:parse", input)
+    parseMessage: (input: { text: string; courseNames: string[]; now: string; source?: { app: string; conversationId?: string | null; messageId?: string | null; sender?: string | null; sentAt?: string | null } }) =>
+      ipcRenderer.invoke("campusos:assistant:parse", input),
+    discoverModels: (input: { apiKey: string; provider: string; protocol: string; baseUrl: string }) =>
+      ipcRenderer.invoke("campusos:assistant:models:discover", input)
   },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),

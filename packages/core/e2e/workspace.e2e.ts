@@ -7,6 +7,50 @@ import { fileURLToPath } from "node:url";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
+const extractedField = <T,>(value: T, evidenceText: string | null) => ({
+  value,
+  confidence: "high",
+  source: "explicit",
+  evidenceText,
+  needsConfirmation: false
+});
+
+const assistantExtractionFixture = {
+  intents: [
+    {
+      intent: "create",
+      kind: "deadline",
+      title: extractedField("Submit report", "Submit report"),
+      description: extractedField("Submit the final report", "Submit report"),
+      deadlineAt: extractedField("2026-08-20T12:00:00.000Z", "Aug 20 at 20:00"),
+      startAt: extractedField(null, null),
+      endAt: extractedField(null, null),
+      durationMinutes: extractedField(null, null),
+      location: extractedField(null, null),
+      courseName: extractedField(null, null),
+      confidence: "high",
+      missingFields: ["durationMinutes"],
+      warnings: []
+    },
+    {
+      intent: "create",
+      kind: "event",
+      title: extractedField("Review meeting", "Review meeting"),
+      description: extractedField("Review meeting", "Review meeting"),
+      deadlineAt: extractedField(null, null),
+      startAt: extractedField("2026-08-21T02:00:00.000Z", "Aug 21 from 10:00"),
+      endAt: extractedField("2026-08-21T03:00:00.000Z", "11:00"),
+      durationMinutes: extractedField(60, "10:00 to 11:00"),
+      location: extractedField("Room 101", "Room 101"),
+      courseName: extractedField(null, null),
+      confidence: "high",
+      missingFields: [],
+      warnings: []
+    }
+  ],
+  unresolvedQuestions: []
+};
+
 const completeOnboarding = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "开始配置" }).click();
   await page.getByRole("button", { name: "开发模式跳过认证" }).click();
@@ -58,6 +102,36 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     throw new Error("Download fixture server did not expose an address.");
   }
   const downloadUrl = `http://127.0.0.1:${downloadAddress.port}/completed.pdf`;
+  const assistantServer = createServer((request, response) => {
+    if (request.method === "GET" && request.url === "/v1/models") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ data: [{ id: "fixture-model" }] }));
+      return;
+    }
+    if (request.method !== "POST" || request.url !== "/v1/chat/completions") {
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: { message: "fixture route not found" } }));
+      return;
+    }
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      const requestBody = Buffer.concat(chunks).toString("utf8");
+      const result = requestBody.includes("structured capability check")
+        ? { intents: [], unresolvedQuestions: [] }
+        : assistantExtractionFixture;
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify(result) } }] }));
+    });
+  });
+  await new Promise<void>((resolveListen) =>
+    assistantServer.listen(0, "127.0.0.1", resolveListen)
+  );
+  const assistantAddress = assistantServer.address();
+  if (!assistantAddress || typeof assistantAddress === "string") {
+    throw new Error("Assistant fixture server did not expose an address.");
+  }
+  const assistantBaseUrl = `http://127.0.0.1:${assistantAddress.port}/v1`;
   const app = await electron.launch({
     args: [
       join(packageRoot, "out/main/main.js"),
@@ -83,8 +157,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
         return 0;
       }
     }).toBeGreaterThan(0);
-    const assistantSetup = page.getByRole("dialog", { name: "先配置 API Key" });
+    const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
     await expect(assistantSetup).toBeVisible();
+    await expect(assistantSetup.getByLabel("协议")).toBeDisabled();
     await page.screenshot({
       path: testInfo.outputPath("assistant-setup-desktop.png"),
       fullPage: true
@@ -96,13 +171,47 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
       fullPage: true
     });
     await page.setViewportSize({ width: 1440, height: 960 });
-    await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
+    await assistantSetup.getByLabel("服务商").selectOption("openai-compatible");
+    await expect(assistantSetup.getByLabel("协议")).toBeEnabled();
+    await assistantSetup.getByLabel("API Key").fill("fixture-key");
+    await assistantSetup.getByLabel("API 地址").fill(assistantBaseUrl);
+    await assistantSetup.locator('select:has(option[value="__custom__"])').selectOption("__custom__");
+    await assistantSetup.getByLabel("自定义模型名称").fill("fixture-model");
+    await assistantSetup.getByRole("button", { name: "测试结构化能力" }).click();
+    await expect(assistantSetup.getByText(/结构化能力可用/)).toBeVisible();
+    await assistantSetup.getByRole("button", { name: "保存并开始使用" }).click();
+
+    await expect(page.getByRole("heading", { name: "AI 助手" })).toBeVisible();
+    const assistantMessage = "Submit report by Aug 20 at 20:00. Review meeting Aug 21 from 10:00 to 11:00 in Room 101.";
+    await page.getByLabel("粘贴消息").fill(assistantMessage);
+    await page.getByRole("button", { name: "交给 AI 解析" }).click();
+    await expect(page.getByText("2 个候选 · Schema 2")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Submit report" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Review meeting" })).toBeVisible();
+    await expect(page.getByText(/原文证据/).first()).toBeVisible();
+    await settleView(page);
+    await expectNoRootOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("assistant-candidates-desktop.png"),
+      fullPage: true
+    });
+    await page.setViewportSize({ width: 820, height: 900 });
+    await settleView(page);
+    await expectNoRootOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("assistant-candidates-narrow.png"),
+      fullPage: true
+    });
+    await page.setViewportSize({ width: 1440, height: 960 });
 
     await page.getByLabel("主导航").getByRole("button", { name: "AI 助手" }).click();
-    await page.getByRole("button", { name: "配置", exact: true }).click();
-    await expect(page.getByLabel("模型")).toHaveValue("gpt-4o-mini");
+    await page.getByRole("button", { name: "连接", exact: true }).click();
+    await expect(page.locator('select:has(option[value="__custom__"])')).toHaveValue("__custom__");
+    await expect(page.getByLabel("自定义模型名称")).toHaveValue("fixture-model");
     await expect(page.getByRole("option", { name: /其他模型/ })).toBeAttached();
-    await expect(page.getByRole("button", { name: "测试连接" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "测试结构化能力" })).toBeEnabled();
+    await page.getByRole("button", { name: "获取模型列表" }).click();
+    await expect(page.getByText(/已发现 1 个模型/)).toBeVisible();
     await expectNoRootOverflow(page);
 
     await page.getByLabel("主导航").getByRole("button", { name: "学业" }).click();
@@ -225,6 +334,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await app.close();
     await new Promise<void>((resolveClose, rejectClose) =>
       downloadServer.close((error) => error ? rejectClose(error) : resolveClose())
+    );
+    await new Promise<void>((resolveClose, rejectClose) =>
+      assistantServer.close((error) => error ? rejectClose(error) : resolveClose())
     );
     await rm(userDataPath, { recursive: true, force: true });
   }

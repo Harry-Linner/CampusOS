@@ -10,7 +10,7 @@ export const manifest: PluginManifestV2 = {
   description: "使用用户配置的 AI 服务将主动粘贴的消息解析为可编辑草稿，并确认写入日程。",
   icon: "Assistant",
   permissions: [],
-  sourceScope: ["workspace:assistant", "workspace:calendar", "service:openai-responses"],
+  sourceScope: ["workspace:assistant", "workspace:calendar", "service:user-configured-ai"],
   releaseStage: "ready",
   provides: [],
   requires: ["core.workspace-snapshot@1"],

@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { app, ipcMain, safeStorage } from "electron";
 import type {
   AiAssistantConnectionTestInput,
+  AiAssistantModelDiscoveryInput,
   AiAssistantParseInput,
   AiAssistantSettingsInput
 } from "@campusos/shared";
@@ -87,5 +88,9 @@ export const registerAiAssistantHandlers = (): void => {
   ipcMain.handle("campusos:assistant:parse", async (event, input: AiAssistantParseInput) => {
     assertTrustedRenderer(event);
     return createService().parseMessage(input);
+  });
+  ipcMain.handle("campusos:assistant:models:discover", async (event, input: AiAssistantModelDiscoveryInput) => {
+    assertTrustedRenderer(event);
+    return createService().discoverModels(input);
   });
 };

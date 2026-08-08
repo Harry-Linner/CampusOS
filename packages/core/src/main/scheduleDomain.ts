@@ -245,7 +245,17 @@ export const normalizeTaskRecord = (
     repeatPeriod: Math.max(1, Math.round(finiteNumber(value.repeatPeriod, 1))),
     repeatEndsOn: dateOnlyIso(value.repeatEndsOn, "重复结束日期"),
     blocksPlanning: value.blocksPlanning !== false,
-    fromId: typeof value.fromId === "string" ? value.fromId : null
+    fromId: typeof value.fromId === "string" ? value.fromId : null,
+    courseName: typeof value.courseName === "string" ? value.courseName : null,
+    source: value.source && typeof value.source === "object" && value.source.kind === "ai-assistant" && typeof value.source.fingerprint === "string"
+      ? {
+        kind: "ai-assistant",
+        fingerprint: value.source.fingerprint,
+        provider: value.source.provider,
+        model: value.source.model,
+        importedAt: value.source.importedAt
+      }
+      : null
   };
 };
 

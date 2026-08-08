@@ -113,7 +113,7 @@ test("renders an installed campusmod through the real Electron sandbox origin", 
     await page.locator(".onboarding-actions .primary-button").click();
     await page.locator(".onboarding-actions .primary-button").click();
     await page.locator(".onboarding-enter-button").click();
-    const assistantSetup = page.getByRole("dialog", { name: "先配置 API Key" });
+    const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
     await expect(assistantSetup).toBeVisible();
     await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
     await page.locator('[data-activity-id="extensions"]').click();

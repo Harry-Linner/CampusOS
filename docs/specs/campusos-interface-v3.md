@@ -131,6 +131,10 @@ candidates through the selected provider adapter. Strict structured output is
 validated and grounded to exact source spans before becoming zero or more
 create/update/cancel candidates; there is no regex fallback.
 
+The current adapter set is OpenAI Responses, OpenAI-compatible/DeepSeek Chat
+Completions, Anthropic Messages, and Gemini Generate Content. A saved Key is
+reusable only while provider, protocol, and normalized Base URL remain the same.
+
 The review surface presents one compact editor per candidate, highlights source
 evidence, marks inferred or ungrounded fields, and lists unresolved questions.
 Unknown duration is not replaced by model output. A deterministic commit layer

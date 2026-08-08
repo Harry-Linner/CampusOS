@@ -309,7 +309,8 @@ AI Assistant is a fourth user-facing module. It accepts only message text
 explicitly submitted by the user. A versioned provider profile contains the
 provider, protocol, Base URL, encrypted API Key, and model; changing a model
 name never silently changes the destination host. The first V2 adapters cover
-OpenAI, DeepSeek, and custom OpenAI-compatible endpoints. Model discovery is
+OpenAI Responses, DeepSeek and custom OpenAI-compatible Chat Completions,
+Anthropic Messages, and Gemini Generate Content. Model discovery is
 optional and separate from inference availability.
 
 The structured response is a versioned extraction envelope containing zero or

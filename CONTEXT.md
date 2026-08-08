@@ -6,11 +6,12 @@
 
 ## 官方插件
 
-CampusOS 随应用维护的三个用户模块：
+CampusOS 随应用维护的四个用户模块：
 
 - **学业：** 课表、课程、考试、成绩/GPA 和素拓实践。
 - **日程：** 日历、DDL、任务、自动排程、系统日历和 iCal。
 - **资料：** 课程资料与下载队列。
+- **AI 助手：** 将用户明确提交的消息提取为可确认的日程候选。
 
 ## 数据连接器
 
@@ -72,8 +73,16 @@ the existing Schedule service after user confirmation. Raw source messages stay
 session-only. See
 [ADR-0004](docs/adr/0004-controlled-ai-message-extraction.md).
 
+The V2 implementation is complete for the current development scope. Core has
+separate OpenAI Responses, OpenAI-compatible/DeepSeek Chat Completions,
+Anthropic Messages, and Gemini Generate Content adapters. A stored Key can be
+reused only for the same provider, protocol, and normalized Base URL; changing
+that credential scope requires a new Key. Provider contract, ambiguity,
+prompt-injection, evidence, duplicate, update/cancel, and desktop/narrow
+Electron tests cover the controlled path.
+
 ## 避免的旧称
 
 - 不再使用“连接器插件”称呼 Core 数据连接器。
 - 不再使用“无头功能插件”称呼事件投影或算法服务。
-- 不把考试、成绩、DDL、倒计时、任务或搜索分别称为插件；它们属于上面的三个用户模块或 Core。
+- 不把考试、成绩、DDL、倒计时、任务或搜索分别称为插件；它们属于上面的四个用户模块或 Core。

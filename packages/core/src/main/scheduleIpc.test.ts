@@ -1,7 +1,7 @@
 import { readFile, readdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
+import type { CampusWorkspaceSnapshot, LocalTaskInput, LocalTaskRecord, LocalTasksData } from "@campusos/shared";
 import { createDatabaseService, type DatabaseService } from "./databaseService";
 
 const electronState = vi.hoisted(() => ({
@@ -96,6 +96,30 @@ const task: LocalTaskRecord = {
   fromId: null
 };
 
+const assistantTaskInput: LocalTaskInput = {
+  title: "Review project brief",
+  description: "Prepare the review notes",
+  timeSpentMinutes: 0,
+  timeNeededMinutes: 60,
+  startAt: "2026-08-20T08:00:00.000Z",
+  endAt: "2026-08-20T09:00:00.000Z",
+  location: "",
+  breakable: true,
+  type: "deadline",
+  repeatType: "norepeat",
+  repeatPeriod: 1,
+  repeatEndsOn: "2026-08-20",
+  blocksPlanning: true,
+  courseName: "Sample Course",
+  source: {
+    kind: "ai-assistant",
+    fingerprint: "assistant-fingerprint-1",
+    provider: "deepseek",
+    model: "deepseek-chat",
+    importedAt: "2026-08-08T00:00:00.000Z"
+  }
+};
+
 const trustedEvent = (): { senderFrame: { url: string }; sender: { mainFrame: unknown } } => {
   const frame = { url: "http://localhost:5173/" };
   return { senderFrame: frame, sender: { mainFrame: frame } };
@@ -174,5 +198,26 @@ describe("schedule IPC", () => {
       includeTasks: false
     });
     expect(result.eventCount).toBe(0);
+  });
+
+  it("creates, deduplicates, updates, and cancels AI tasks through the authoritative IPC path", async () => {
+    const created = await invoke<LocalTasksData>("campusos:schedule:task:save", assistantTaskInput);
+    const taskId = created.operation?.taskId;
+    expect(created.operation).toEqual({ kind: "created", taskId });
+    expect(taskId).toBeTruthy();
+    expect(created.tasks).toHaveLength(1);
+    expect(created.tasks[0].source).toMatchObject({ fingerprint: "assistant-fingerprint-1", provider: "deepseek" });
+
+    const duplicate = await invoke<LocalTasksData>("campusos:schedule:task:save", assistantTaskInput);
+    expect(duplicate.operation).toEqual({ kind: "deduplicated", taskId });
+    expect(duplicate.tasks).toHaveLength(1);
+
+    const updated = await invoke<LocalTasksData>("campusos:schedule:task:save", { ...assistantTaskInput, id: taskId, title: "Review updated project brief" });
+    expect(updated.operation).toEqual({ kind: "updated", taskId });
+    expect(updated.tasks).toHaveLength(1);
+    expect(updated.tasks[0].title).toBe("Review updated project brief");
+
+    const cancelled = await invoke<LocalTasksData>("campusos:schedule:task:mutate", { id: taskId, status: "deleted" });
+    expect(cancelled.tasks).toEqual([]);
   });
 });

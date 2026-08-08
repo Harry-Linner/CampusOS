@@ -311,6 +311,11 @@ response content to the renderer. Only capability, provider/model, timestamp,
 and measured latency are returned. Model discovery is a separate explicit
 request and its failure does not authorize a fabricated model list.
 
+A stored Key is reused only when provider, protocol, and normalized Base URL
+still match the saved credential scope. Destination changes require the user to
+enter the corresponding Key again. Gemini credentials are carried in the
+`x-goog-api-key` request header rather than a URL query parameter.
+
 WeChat/DingTalk background capture, continuous clipboard monitoring, OCR,
 desktop-pet behavior, and official bot/webhook integrations remain outside this
 release and require separate consent, security, platform-policy, and data

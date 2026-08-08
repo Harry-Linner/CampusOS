@@ -567,23 +567,24 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 
 ### AI Assistant V2 controlled extraction (2026-08-08)
 
-- [ ] Replace the hard-coded OpenAI transport with versioned provider profiles
-  and adapters for OpenAI, DeepSeek, and custom OpenAI-compatible endpoints.
-- [ ] Migrate the existing encrypted OpenAI setting without exposing or
+- [x] Replace the hard-coded OpenAI transport with versioned provider profiles
+  and adapters for OpenAI, DeepSeek, custom OpenAI-compatible, Anthropic, and
+  Gemini endpoints.
+- [x] Migrate the existing encrypted OpenAI setting without exposing or
   rewriting the Key in the renderer.
-- [ ] Add optional model discovery and test the selected connection with the
+- [x] Add optional model discovery and test the selected connection with the
   same structured-output capability used by parsing.
-- [ ] Replace the single draft with a versioned multi-intent extraction envelope
+- [x] Replace the single draft with a versioned multi-intent extraction envelope
   supporting create, update, and cancel candidates.
-- [ ] Ground field evidence to exact source spans; record field confidence,
+- [x] Ground field evidence to exact source spans; record field confidence,
   origin, and confirmation state; preserve unknown duration as `null`.
-- [ ] Resolve relative dates against source-message time when supplied and mark
+- [x] Resolve relative dates against source-message time when supplied and mark
   parse-time fallback as confirmation-required.
-- [ ] Add a deterministic confirmation/commit boundary with local fingerprints,
+- [x] Add a deterministic confirmation/commit boundary with local fingerprints,
   duplicate prevention, course resolution, and Schedule-only persistence.
-- [ ] Add a multiple-candidate review UI with source highlighting, unresolved
+- [x] Add a multiple-candidate review UI with source highlighting, unresolved
   questions, per-candidate confirmation, and actionable provider errors.
-- [ ] Add provider contracts and extraction-quality fixtures for multi-item,
+- [x] Add provider contracts and extraction-quality fixtures for multi-item,
   ambiguous-time, duplicate, update, cancellation, and prompt-injection cases.
-- [ ] Keep desktop pet, OCR, continuous clipboard reads, and direct
+- [x] Keep desktop pet, OCR, continuous clipboard reads, and direct
   WeChat/DingTalk access deferred until separate permission and compliance work.

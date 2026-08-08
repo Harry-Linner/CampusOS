@@ -86,7 +86,7 @@ test("takes a fixture-backed onboarding through the schedule module using real E
     await expect(page.getByRole("heading", { name: "一切就绪" })).toBeVisible();
 
     await page.getByRole("button", { name: "进入 CampusOS" }).click();
-    const assistantSetup = page.getByRole("dialog", { name: "先配置 API Key" });
+    const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
     await expect(assistantSetup).toBeVisible();
     await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
     await page.getByRole("button", { name: "日程" }).click();

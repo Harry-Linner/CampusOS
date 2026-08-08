@@ -277,48 +277,118 @@ export interface CalendarEventsData {
 
 export interface AiAssistantSettingsRecord {
   configured: boolean;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
   model: string;
   savedAt: string | null;
   encrypted: boolean;
 }
 
+export type AiAssistantProvider = "openai" | "deepseek" | "anthropic" | "gemini" | "openai-compatible";
+export type AiAssistantProtocol = "openai-responses" | "openai-chat-completions" | "anthropic-messages" | "gemini-generate-content";
+
 export interface AiAssistantSettingsInput {
   apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
   model: string;
 }
 
 export interface AiAssistantConnectionTestInput {
   apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
   model: string;
 }
 
 export interface AiAssistantConnectionTestResult {
   ok: true;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
   model: string;
   checkedAt: string;
   latencyMs: number;
+  structuredOutput: true;
+  modelListingSupported: boolean;
+}
+
+export interface AiAssistantModelDiscoveryInput {
+  apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
+}
+
+export interface AiAssistantModelDiscoveryResult {
+  provider: AiAssistantProvider;
+  models: string[];
+  checkedAt: string;
+  latencyMs: number;
+}
+
+export interface AiAssistantMessageSource {
+  app: "manual" | "wechat" | "dingtalk";
+  conversationId?: string | null;
+  messageId?: string | null;
+  sender?: string | null;
+  sentAt?: string | null;
 }
 
 export interface AiAssistantParseInput {
   text: string;
   courseNames: string[];
   now: string;
+  source?: AiAssistantMessageSource;
 }
 
-export interface AiAssistantDraft {
-  sourceText: string;
-  title: string;
-  description: string;
-  type: "deadline" | "fixed";
-  startAt: string | null;
-  endAt: string | null;
-  timeNeededMinutes: number;
-  location: string;
-  courseName: string;
-  confidence: "high" | "medium" | "low";
+export type AiAssistantConfidence = "high" | "medium" | "low";
+export type AiAssistantFieldOrigin = "explicit" | "inferred" | "default";
+
+export interface AiAssistantEvidenceSpan {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface AiAssistantExtractedField<T> {
+  value: T;
+  confidence: AiAssistantConfidence;
+  source: AiAssistantFieldOrigin;
+  evidence: AiAssistantEvidenceSpan | null;
+  needsConfirmation: boolean;
+}
+
+export type AiAssistantIntent = "create" | "update" | "cancel";
+export type AiAssistantIntentKind = "task" | "deadline" | "event" | "reminder";
+
+export interface AiAssistantExtractionIntent {
+  id: string;
+  intent: AiAssistantIntent;
+  kind: AiAssistantIntentKind;
+  title: AiAssistantExtractedField<string>;
+  description: AiAssistantExtractedField<string>;
+  deadlineAt: AiAssistantExtractedField<string | null>;
+  startAt: AiAssistantExtractedField<string | null>;
+  endAt: AiAssistantExtractedField<string | null>;
+  durationMinutes: AiAssistantExtractedField<number | null>;
+  location: AiAssistantExtractedField<string | null>;
+  courseName: AiAssistantExtractedField<string | null>;
+  confidence: AiAssistantConfidence;
   missingFields: string[];
   warnings: string[];
-  evidence: string[];
+  fingerprint: string;
+}
+
+export interface AiAssistantExtractionResult {
+  sourceText: string;
+  source: AiAssistantMessageSource;
+  schemaVersion: 2;
+  promptVersion: string;
+  intents: AiAssistantExtractionIntent[];
+  unresolvedQuestions: string[];
 }
 
 export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
@@ -348,6 +418,16 @@ export interface LocalTaskRecord {
   repeatEndsOn: string;
   blocksPlanning: boolean;
   fromId: string | null;
+  courseName?: string | null;
+  source?: LocalTaskSource | null;
+}
+
+export interface LocalTaskSource {
+  kind: "ai-assistant";
+  fingerprint: string;
+  provider: AiAssistantProvider;
+  model: string;
+  importedAt: string;
 }
 
 export interface LocalTaskInput {
@@ -365,6 +445,8 @@ export interface LocalTaskInput {
   repeatPeriod: number;
   repeatEndsOn: string;
   blocksPlanning: boolean;
+  courseName?: string | null;
+  source?: LocalTaskSource | null;
 }
 
 export interface LocalTaskMutation {
@@ -376,6 +458,10 @@ export interface LocalTaskMutation {
 export interface LocalTasksData {
   tasks: LocalTaskRecord[];
   updatedAt: string;
+  operation?: {
+    kind: "created" | "updated" | "deduplicated";
+    taskId?: string;
+  };
 }
 
 export interface LocalTaskPeriod {

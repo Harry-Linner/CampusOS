@@ -475,3 +475,12 @@ This design is recorded in
 drag/drop remains a later explicit-input surface; background chat capture, OCR,
 clipboard monitoring, and bot integrations still require separate consent,
 security, and platform-policy review.
+
+The implemented development slice now includes OpenAI Responses,
+OpenAI-compatible/DeepSeek Chat Completions, Anthropic Messages, and Gemini
+Generate Content adapters. Stored credentials are scoped to provider, protocol,
+and normalized Base URL, so changing the destination cannot silently reuse a
+saved Key; Gemini authentication stays in the request header rather than the
+URL. Contract tests and a local-provider Electron flow cover structured
+capability testing, discovery, multi-intent review, exact evidence, ambiguity,
+prompt injection, duplicate prevention, and deterministic update/cancel.

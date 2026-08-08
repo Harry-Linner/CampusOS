@@ -72,6 +72,17 @@ const loadPeriods = (input: { startAt: string; endAt: string }): LocalTaskPeriod
 
 const saveTask = (input: LocalTaskInput): LocalTasksData => {
   const source = readStoredTasks();
+  if (!input.id && input.source?.kind === "ai-assistant") {
+    const duplicate = source.find((task) => task.source?.kind === "ai-assistant" && task.source.fingerprint === input.source?.fingerprint);
+    if (duplicate) {
+      const stored = getOfficialDatabaseService().loadLocalTasks();
+      return {
+        tasks: source,
+        updatedAt: stored?.savedAt ?? nowIso(),
+        operation: { kind: "deduplicated", taskId: duplicate.id }
+      };
+    }
+  }
   const next = createTaskRecord(input);
   const existingIndex = input.id
     ? source.findIndex((task) => task.id === input.id)
@@ -99,6 +110,7 @@ const saveTask = (input: LocalTaskInput): LocalTasksData => {
   }
   const refreshed = refreshLocalTasks(source, new Date());
   const result = persistTasks(refreshed.tasks);
+  result.operation = { kind: existingIndex >= 0 ? "updated" : "created", taskId: next.id };
   notifyScheduleChanged();
   return result;
 };

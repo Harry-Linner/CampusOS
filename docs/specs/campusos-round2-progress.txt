@@ -3,7 +3,7 @@ CampusOS Round 2 — Implementation Progress
 
 Spec: docs/specs/campusos-round2.md
 Base Spec: docs/specs/ideazjuermodapp.md
-Updated: 2026-08-04
+Updated: 2026-08-08
 Interview Rounds: 2
 
 PHASE STATUS:
@@ -59,4 +59,4 @@ PHASE STATUS:
 
 AI Assistant MVP: DONE for the current development round. User-configured OpenAI Responses API parsing, safeStorage-encrypted API Key handling, strict structured-output validation, editable drafts, and confirmed Schedule IPC task creation are implemented with no regex fallback; background chat capture, continuous clipboard monitoring, OCR, bots/webhooks, and desktop pet remain deferred.
 AI Assistant setup refinement: DONE. Missing-Key first-use dialog, curated/custom model selection, Key-model connection testing, and plugin runtime cache-first startup with background reconciliation are implemented.
-AI Assistant V2 controlled extraction: IN PROGRESS. ADR-0004 requires provider-bound connections, same-path structured capability testing, multi-intent grounded extraction, explicit confirmation, and local duplicate prevention. Desktop pet, OCR, background chat capture, and continuous clipboard access remain deferred.
+AI Assistant V2 controlled extraction: DONE for the current development round. Provider-bound OpenAI Responses, OpenAI-compatible/DeepSeek Chat Completions, Anthropic Messages, and Gemini Generate Content adapters; V1 settings migration; same-path structured capability testing; model discovery; multi-intent grounded extraction; explicit create/update/cancel confirmation; credential-scope enforcement; and Schedule-authoritative duplicate prevention are implemented. Unit, SQLite integration, and local-provider Electron tests cover desktop and narrow layouts. Desktop pet, OCR, background chat capture, and continuous clipboard access remain deferred.
