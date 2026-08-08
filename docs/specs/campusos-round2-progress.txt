@@ -59,3 +59,4 @@ PHASE STATUS:
 
 AI Assistant MVP: DONE for the current development round. User-configured OpenAI Responses API parsing, safeStorage-encrypted API Key handling, strict structured-output validation, editable drafts, and confirmed Schedule IPC task creation are implemented with no regex fallback; background chat capture, continuous clipboard monitoring, OCR, bots/webhooks, and desktop pet remain deferred.
 AI Assistant setup refinement: DONE. Missing-Key first-use dialog, curated/custom model selection, Key-model connection testing, and plugin runtime cache-first startup with background reconciliation are implemented.
+AI Assistant V2 controlled extraction: IN PROGRESS. ADR-0004 requires provider-bound connections, same-path structured capability testing, multi-intent grounded extraction, explicit confirmation, and local duplicate prevention. Desktop pet, OCR, background chat capture, and continuous clipboard access remain deferred.

@@ -72,6 +72,20 @@ Every independently verifiable change must pass the relevant local checks, be co
 
 ## AI Assistant MVP scope (2026-08-07)
 
-The current development scope includes one `AI Assistant` user module. Version one supports module-local API Key/model configuration -> Electron `safeStorage` encryption -> explicit paste and user-triggered OpenAI Responses API call -> strict structured-output validation -> editable task draft -> confirmation through the Schedule task IPC. There is no regex parser fallback. Background WeChat/DingTalk capture, clipboard monitoring, OCR, bots/webhooks, desktop pet, and task history are deferred. This section supersedes the earlier three-module Round 2 wording.
+The current development scope includes one `AI Assistant` user module. V2 uses a
+versioned provider profile -> provider adapter -> explicit user submission ->
+versioned multi-intent structured extraction -> exact evidence grounding ->
+editable confirmation -> deterministic Schedule commit. The profile binds the
+provider, protocol, Base URL, encrypted Key, and model. Unknown fields stay
+unknown, relative time uses source-message time when available, and local
+fingerprints prevent duplicate commits without retaining raw private messages.
+There is no regex parser fallback. Background WeChat/DingTalk capture, clipboard
+monitoring, OCR, bots/webhooks, and desktop pet are deferred. This section
+supersedes the earlier three-module Round 2 wording.
 
-The completed startup/first-use refinement adds previous-runtime-snapshot rendering with background reconciliation, a missing-Key setup dialog, curated/custom OpenAI model selection, and an exact Key-model connection test. Cached runtime state is never used to authorize execution; fresh validation remains authoritative.
+The startup/first-use refinement retains previous-runtime-snapshot rendering
+with background reconciliation and a missing-Key setup dialog. V2 replaces the
+OpenAI-only model control with provider-specific presets, optional discovery,
+custom model entry, and a structured-capability test for the exact connection.
+Cached runtime state is never used to authorize execution; fresh validation
+remains authoritative.

@@ -122,21 +122,27 @@ delivery is not claimed by the mock evidence.
 
 ## AI Assistant MVP
 
-AI Assistant is a single optional activity module. Its first version includes a
-module-local API Key and model configuration view. Electron `safeStorage`
+AI Assistant is a single optional activity module. Its V2 configuration binds a
+provider, protocol, Base URL, API Key, and model. Electron `safeStorage`
 encrypts the Key and only the main process can decrypt it. When the user clicks
-the parse action, CampusOS sends the explicitly pasted text, current Shanghai
-time, and workspace course-name candidates to the OpenAI Responses API. Strict
-JSON Schema output is validated by the main process before becoming a task
-draft; there is no regex fallback. Drafts expose title, type, dates, duration,
-location, course match, confidence, missing fields, and source evidence, and
-require confirmation before calling Schedule's formal `saveTask` bridge.
+the parse action, CampusOS sends only the explicitly submitted text, source
+timestamp when available, current Shanghai time, and workspace course
+candidates through the selected provider adapter. Strict structured output is
+validated and grounded to exact source spans before becoming zero or more
+create/update/cancel candidates; there is no regex fallback.
+
+The review surface presents one compact editor per candidate, highlights source
+evidence, marks inferred or ungrounded fields, and lists unresolved questions.
+Unknown duration is not replaced by model output. A deterministic commit layer
+handles local duplicate fingerprints and calls Schedule only after explicit
+confirmation. Raw source text remains session-only.
 Background WeChat/DingTalk capture, continuous clipboard reads, OCR,
 desktop-pet windows, and bot/webhook integrations remain later phases.
 If the active module has no saved Key, a modal first-use setup appears after
-onboarding. It supports curated model choices, `Other model`, secure save, and
-an explicit connection test that reports the selected model and request
-latency. Plugin navigation should appear from the last validated runtime cache
+onboarding. It supports provider-specific model choices, discovered models,
+`Other model`, secure save, and an explicit structured-capability test that
+reports the selected provider/model and request latency. Plugin navigation
+should appear from the last validated runtime cache
 without waiting for the fresh scan; the host applies the background refresh
 when the main process emits `campusos:plugins:changed`. Cached third-party
 modules remain non-executable until that fresh package integrity check passes.

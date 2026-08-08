@@ -303,27 +303,34 @@ development with fixture event data through the formal workspace scheduler and
 an Electron `Notification` boundary mock; this evidence does not claim delivery
 on a real user's desktop.
 
-### AI Assistant MVP (2026-08-07)
+### AI Assistant controlled extraction (2026-08-08)
 
-AI Assistant is a fourth user-facing module. The first release accepts only
-message text explicitly pasted or submitted by the user. After the user clicks
-the parse action, CampusOS sends that message, the current Shanghai time, and
-workspace course-name candidates to the OpenAI Responses API using the model
-configured inside the module. The API Key is encrypted with Electron
-`safeStorage`, used only in the main process, and never returned to renderer
-code. A strict JSON Schema response becomes a reviewable task draft before the
-existing Schedule `saveTask` bridge is called. The draft preserves source
-evidence, warnings, missing fields, and confidence in the current session; only
-explicit confirmation persists supported task fields. There is no regex
-fallback, background WeChat/DingTalk read, continuous clipboard watch, second
-task store, OCR, desktop pet, or bot/webhook integration.
+AI Assistant is a fourth user-facing module. It accepts only message text
+explicitly submitted by the user. A versioned provider profile contains the
+provider, protocol, Base URL, encrypted API Key, and model; changing a model
+name never silently changes the destination host. The first V2 adapters cover
+OpenAI, DeepSeek, and custom OpenAI-compatible endpoints. Model discovery is
+optional and separate from inference availability.
+
+The structured response is a versioned extraction envelope containing zero or
+more create/update/cancel candidates. Every important field records confidence,
+explicit/inferred/default origin, confirmation state, and an exact source span
+when grounded in the submitted text. Unknown duration remains unknown, relative
+time uses the source message timestamp when available, and ungrounded or
+parse-time-relative fields require review. Only a deterministic commit boundary
+may resolve courses, reject duplicates, and invoke Schedule after explicit user
+confirmation. Schedule remains the only task store.
 When the active module has no saved Key, the product must open a dismissible
 first-use configuration dialog rather than leave parsing silently disabled.
-Model configuration must offer maintained presets plus an `Other model` input.
-The same form must test the exact unsaved-or-saved Key and selected model with a
-minimal OpenAI Responses request, report latency, and avoid saving or exposing
+Model configuration must offer provider-specific maintained presets, discovered
+models when available, and an `Other model` input. The same form must test the
+exact provider/Base URL/Key/model combination with a fixed non-private structured
+extraction fixture, report latency and capability, and avoid saving or exposing
 the response body. Plugin navigation should render from the last successful
 runtime snapshot at startup and reconcile updates in the background. Cached
 third-party modules must remain non-executable until the current package
-integrity check succeeds.
+integrity check succeeds. There is no regex fallback, background WeChat/DingTalk
+read, continuous clipboard watch, second task store, OCR, desktop pet, or
+bot/webhook integration; those inputs require later consent and compliance
+decisions.
 This MVP entry supersedes earlier three-module wording in this historical PRD; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

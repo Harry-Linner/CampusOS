@@ -60,6 +60,18 @@ Assistant is active but has no Key, CampusOS opens a first-use setup dialog.
 Both that dialog and the module settings offer curated OpenAI model presets,
 an `Other model` path, and an explicit Key-plus-model connection test.
 
+### AI Assistant controlled-extraction update (2026-08-08)
+
+AI Assistant connections are provider profiles: provider, protocol, Base URL,
+encrypted Key, and model form one routing unit. Parsing produces a versioned
+set of create/update/cancel candidates rather than one task. Each field carries
+grounded source evidence, confidence, origin, and confirmation state. The model
+cannot write Schedule data or invent application defaults; a deterministic
+commit boundary resolves courses, rejects duplicate fingerprints, and invokes
+the existing Schedule service after user confirmation. Raw source messages stay
+session-only. See
+[ADR-0004](docs/adr/0004-controlled-ai-message-extraction.md).
+
 ## 避免的旧称
 
 - 不再使用“连接器插件”称呼 Core 数据连接器。

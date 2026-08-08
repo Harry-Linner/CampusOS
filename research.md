@@ -447,3 +447,31 @@ AI first-use setup now makes the remote-transfer boundary visible, offers
 curated and custom model names, and tests the exact Key-model pair with a
 minimal request before the user submits real message content.
 This decision supersedes earlier three-module wording for the current product scope; AI Assistant is now the fourth official sidebar module.
+
+### Controlled message-extraction research update (2026-08-08)
+
+The initial one-message-to-one-task implementation is an acceptable consent
+boundary but not a sufficient extraction architecture. Google LangExtract
+demonstrates exact source grounding and rejection of extractions that cannot be
+located in the source. Microsoft TypeChat validates schema instances and uses a
+bounded model repair pass. Vercel AI SDK, Open WebUI, and Chatbox demonstrate
+provider registries in which provider, protocol, Base URL, Key, and model form
+one connection rather than treating a model string as routing information.
+Slack Later, Todoist Quick Add, and Motion show the complementary product
+pattern: retain source context, expose recognized fields before saving, and let
+the task/planning system own the resulting lifecycle.
+
+CampusOS will therefore use a controlled pipeline: provider adapter ->
+versioned multi-intent extraction -> local schema validation -> exact evidence
+grounding -> editable confirmation -> deterministic Schedule commit. The model
+has no Schedule tool. Unknown values remain null, and application policy rather
+than the model supplies any planning default. Message timestamps are part of
+the source context because relative dates must not be resolved against a later
+paste time without an explicit warning. Local source fingerprints prevent
+duplicate imports without persisting raw private messages.
+
+This design is recorded in
+[ADR-0004](docs/adr/0004-controlled-ai-message-extraction.md). Desktop-pet
+drag/drop remains a later explicit-input surface; background chat capture, OCR,
+clipboard monitoring, and bot integrations still require separate consent,
+security, and platform-policy review.

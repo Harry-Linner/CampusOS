@@ -292,6 +292,26 @@ _Sources_
 
 ## AI Assistant MVP boundary (2026-08-07)
 
-The first AI Assistant release processes only text the user explicitly pastes into CampusOS. The configuration view states that clicking the parse action sends the current message and workspace course-name candidates to OpenAI; no upload happens merely from pasting or typing. The user supplies the API Key, Electron `safeStorage` encrypts it at rest, and only the main process decrypts it for the request. The renderer receives configuration metadata but never the Key. Requests set `store: false`; CampusOS does not log the Key or raw model response. The original submitted text remains in the current page session as draft evidence. WeChat/DingTalk background capture, continuous clipboard monitoring, OCR, desktop-pet behavior, and official bot/webhook integrations remain outside this release and require separate consent, security, and compliance review.
+The AI Assistant processes only text the user explicitly submits to CampusOS.
+The configuration and parse surfaces identify the selected provider and state
+that clicking parse sends the message, source timestamp when supplied, and
+workspace course candidates to that provider; typing or pasting alone performs
+no upload. The user supplies the API Key, Electron `safeStorage` encrypts it at
+rest, and only the main process decrypts it for the request. The renderer
+receives connection metadata but never the Key. CampusOS does not log the Key,
+raw model response, or raw source message. Source text and exact evidence spans
+remain in the current review session; persisted tasks receive only a local
+fingerprint and structured non-secret fields.
 
-The first-use dialog repeats this disclosure before configuration. `Test connection` sends the entered-or-stored Key with the selected model in a minimal `store: false` Responses request containing only a fixed health-check prompt; it does not upload a user message, persist the test response, or return response content to the renderer. Only success metadata, model name, timestamp, and measured latency are returned.
+The first-use dialog repeats this disclosure before configuration. `Test
+connection` sends the entered-or-stored Key to the selected provider with a
+fixed non-private extraction fixture using the same structured-generation path
+as parsing. It does not upload a user message, persist the response, or return
+response content to the renderer. Only capability, provider/model, timestamp,
+and measured latency are returned. Model discovery is a separate explicit
+request and its failure does not authorize a fabricated model list.
+
+WeChat/DingTalk background capture, continuous clipboard monitoring, OCR,
+desktop-pet behavior, and official bot/webhook integrations remain outside this
+release and require separate consent, security, platform-policy, and data
+minimization review.
