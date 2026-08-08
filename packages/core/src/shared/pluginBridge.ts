@@ -57,6 +57,7 @@ export interface PluginPackageMutationResult {
 
 export interface PluginRuntimeBridge {
   load: () => Promise<PluginRuntimeSnapshot>;
+  subscribe: (listener: (snapshot: PluginRuntimeSnapshot) => void) => () => void;
   configure: (
     input: PluginRuntimeConfigurationInput
   ) => Promise<PluginRuntimeSnapshot>;

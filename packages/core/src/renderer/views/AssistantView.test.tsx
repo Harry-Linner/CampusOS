@@ -9,6 +9,7 @@ import type {
   PluginComponentProps
 } from "@campusos/shared";
 import { AssistantView } from "../../../../../plugins/official/ai-assistant/src/AssistantView";
+import { AssistantSetupDialog } from "../../../../../plugins/official/ai-assistant/src/AssistantSetupDialog";
 
 afterEach(cleanup);
 
@@ -40,7 +41,7 @@ const createAssistantBridge = (
 ): NonNullable<PluginComponentProps["assistant"]> => ({
   loadSettings: vi.fn(async () => ({
     configured: true,
-    model: "gpt-5.6-terra",
+    model: "gpt-4o-mini",
     savedAt: "2026-08-05T00:00:00.000Z",
     encrypted: true
   })),
@@ -52,9 +53,15 @@ const createAssistantBridge = (
   })),
   clearSettings: vi.fn(async () => ({
     configured: false,
-    model: "gpt-5.6-terra",
+    model: "gpt-4o-mini",
     savedAt: null,
     encrypted: true
+  })),
+  testConnection: vi.fn(async () => ({
+    ok: true as const,
+    model: "gpt-4o-mini",
+    checkedAt: "2026-08-05T00:00:00.000Z",
+    latencyMs: 120
   })),
   parseMessage: vi.fn(async () => draft),
   ...overrides
@@ -104,7 +111,7 @@ describe("AssistantView", () => {
     const assistant = createAssistantBridge({
       loadSettings: vi.fn(async () => ({
         configured: false,
-        model: "gpt-5.6-terra",
+        model: "gpt-4o-mini",
         savedAt: null,
         encrypted: true
       }))
@@ -114,12 +121,12 @@ describe("AssistantView", () => {
     fireEvent.click(screen.getByRole("button", { name: "配置" }));
     await waitFor(() => expect(screen.getByText("未配置")).toBeDefined());
     fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "mock-key" } });
-    fireEvent.change(screen.getByLabelText("模型"), { target: { value: "gpt-5.6" } });
+    fireEvent.change(screen.getByLabelText("模型"), { target: { value: "gpt-4.1" } });
     fireEvent.click(screen.getByRole("button", { name: "保存配置" }));
 
     await waitFor(() => expect(assistant.saveSettings).toHaveBeenCalledWith({
       apiKey: "mock-key",
-      model: "gpt-5.6"
+      model: "gpt-4.1"
     }));
     expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "清除 API Key" }));
@@ -128,11 +135,46 @@ describe("AssistantView", () => {
 
   it("keeps parsing disabled until an API key is configured", async () => {
     const assistant = createAssistantBridge({
-      loadSettings: vi.fn(async () => ({ configured: false, model: "gpt-5.6-terra", savedAt: null, encrypted: true }))
+      loadSettings: vi.fn(async () => ({ configured: false, model: "gpt-4o-mini", savedAt: null, encrypted: true }))
     });
     render(createElement(AssistantView, { ...baseProps, assistant }));
     fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: "请安排这条消息" } });
     await waitFor(() => expect((screen.getByRole("button", { name: "交给 AI 解析" }) as HTMLButtonElement).disabled).toBe(true));
     expect(screen.getByRole("button", { name: "先配置 API Key" })).toBeDefined();
+  });
+
+  it("guides first-time setup, supports custom models, and tests the exact key-model pair", async () => {
+    const assistant = createAssistantBridge({
+      testConnection: vi.fn(async (input) => ({
+        ok: true as const,
+        model: input.model,
+        checkedAt: "2026-08-05T00:00:00.000Z",
+        latencyMs: 88
+      }))
+    });
+    const onConfigured = vi.fn();
+    render(createElement(AssistantSetupDialog, {
+      assistant,
+      onConfigured,
+      onDismiss: vi.fn()
+    }));
+
+    expect(screen.getByRole("dialog", { name: "先配置 API Key" })).toBeDefined();
+    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "mock-key" } });
+    fireEvent.change(screen.getByLabelText("模型"), { target: { value: "__custom__" } });
+    fireEvent.change(screen.getByLabelText("自定义模型名称"), { target: { value: "custom-model" } });
+    fireEvent.click(screen.getByRole("button", { name: "测试连接" }));
+
+    await waitFor(() => expect(assistant.testConnection).toHaveBeenCalledWith({
+      apiKey: "mock-key",
+      model: "custom-model"
+    }));
+    expect(await screen.findByText("连接成功 · 88 ms")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "保存并开始使用" }));
+    await waitFor(() => expect(assistant.saveSettings).toHaveBeenCalledWith({
+      apiKey: "mock-key",
+      model: "custom-model"
+    }));
+    expect(onConfigured).toHaveBeenCalled();
   });
 });

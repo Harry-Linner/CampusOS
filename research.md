@@ -433,4 +433,17 @@ IPC accepts it. The user supplies the API Key, which Electron `safeStorage`
 encrypts and only the main process decrypts. This avoids keylogging, window
 scraping, continuous clipboard monitoring, unreviewed background transfer, and
 the maintenance and ambiguity of a regex parser.
+
+The 2026-08-08 startup review found that persisted enablement existed but the
+renderer still waited for a complete manifest/package load and lifecycle
+reconciliation before showing plugins. The adopted two-phase path treats the
+last successfully validated user-runtime snapshot as presentation cache only:
+it renders immediately, while the main process revalidates package state,
+dependency bindings, and headless activations before publishing a fresh event.
+Bundled official modules can render from that cache, but third-party modules
+remain non-executable until the current package integrity check succeeds. This
+preserves startup continuity without treating cached state as authority.
+AI first-use setup now makes the remote-transfer boundary visible, offers
+curated and custom model names, and tests the exact Key-model pair with a
+minimal request before the user submits real message content.
 This decision supersedes earlier three-module wording for the current product scope; AI Assistant is now the fourth official sidebar module.

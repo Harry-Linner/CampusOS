@@ -4235,7 +4235,8 @@ input:focus-visible {
   font-size: 0.76rem;
 }
 
-.assistant-settings-form input {
+.assistant-settings-form input,
+.assistant-settings-form select {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line-strong);
@@ -4243,6 +4244,109 @@ input:focus-visible {
   background: var(--paper);
   color: var(--ink);
   padding: 8px 10px;
+}
+
+.secondary-button {
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 13px;
+  font-weight: 650;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.assistant-setup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(24 28 31 / 46%);
+}
+
+.assistant-setup-dialog {
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: 0 24px 64px rgb(20 24 27 / 22%);
+  padding: 24px;
+}
+
+.assistant-setup-dialog header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.assistant-setup-dialog h2,
+.assistant-setup-dialog header p {
+  margin: 0;
+}
+
+.assistant-setup-dialog header > p:last-child {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.assistant-setup-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.assistant-setup-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.assistant-setup-dialog input,
+.assistant-setup-dialog select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.assistant-connection-result {
+  margin: 0;
+  border-left: 2px solid currentColor;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.assistant-connection-result.is-success {
+  background: color-mix(in srgb, var(--success) 7%, var(--paper));
+  color: var(--success);
+}
+
+.assistant-connection-result.is-error {
+  background: color-mix(in srgb, var(--danger) 7%, var(--paper));
+  color: var(--danger);
 }
 
 .assistant-config-state {

@@ -108,11 +108,19 @@ contextBridge.exposeInMainWorld("campusos", {
     saveSettings: (input: { apiKey: string; model: string }) =>
       ipcRenderer.invoke("campusos:assistant:settings:save", input),
     clearSettings: () => ipcRenderer.invoke("campusos:assistant:settings:clear"),
+    testConnection: (input: { apiKey: string; model: string }) =>
+      ipcRenderer.invoke("campusos:assistant:test-connection", input),
     parseMessage: (input: { text: string; courseNames: string[]; now: string }) =>
       ipcRenderer.invoke("campusos:assistant:parse", input)
   },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),
+    subscribe: (listener: (snapshot: unknown) => void) => {
+      const channel = "campusos:plugins:changed";
+      const handler = (_event: Electron.IpcRendererEvent, snapshot: unknown) => listener(snapshot);
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    },
     configure: (input: {
       pluginId: string;
       enabled: boolean;

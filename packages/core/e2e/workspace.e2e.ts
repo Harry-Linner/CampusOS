@@ -1,5 +1,5 @@
 import { expect, test, _electron as electron, type Page } from "@playwright/test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -73,6 +73,37 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     const page = await app.firstWindow({ timeout: 10_000 });
     await page.setViewportSize({ width: 1440, height: 960 });
     await completeOnboarding(page);
+    await expect.poll(async () => {
+      try {
+        const cached = JSON.parse(
+          await readFile(join(userDataPath, "plugins", "runtime-cache.json"), "utf8")
+        ) as { plugins?: unknown[] };
+        return cached.plugins?.length ?? 0;
+      } catch {
+        return 0;
+      }
+    }).toBeGreaterThan(0);
+    const assistantSetup = page.getByRole("dialog", { name: "先配置 API Key" });
+    await expect(assistantSetup).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath("assistant-setup-desktop.png"),
+      fullPage: true
+    });
+    await page.setViewportSize({ width: 820, height: 900 });
+    await expectNoRootOverflow(page);
+    await page.screenshot({
+      path: testInfo.outputPath("assistant-setup-narrow.png"),
+      fullPage: true
+    });
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
+
+    await page.getByLabel("主导航").getByRole("button", { name: "AI 助手" }).click();
+    await page.getByRole("button", { name: "配置", exact: true }).click();
+    await expect(page.getByLabel("模型")).toHaveValue("gpt-4o-mini");
+    await expect(page.getByRole("option", { name: /其他模型/ })).toBeAttached();
+    await expect(page.getByRole("button", { name: "测试连接" })).toBeDisabled();
+    await expectNoRootOverflow(page);
 
     await page.getByLabel("主导航").getByRole("button", { name: "学业" }).click();
     for (const label of ["课表", "课程", "考试", "成绩", "素拓"]) {

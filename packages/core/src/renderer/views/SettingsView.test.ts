@@ -120,6 +120,7 @@ const installBridge = (
       load: vi.fn(async () => {
         throw new Error("not used");
       }),
+      subscribe: vi.fn(() => () => undefined),
       configure: vi.fn(async () => {
         throw new Error("not used");
       }),

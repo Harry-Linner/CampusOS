@@ -47,6 +47,19 @@ through the Schedule IPC. There is no regex parsing fallback, second task store,
 background WeChat/DingTalk capture, continuous clipboard watch, OCR, desktop
 pet, or bot/webhook integration.
 
+### Plugin startup and AI setup update (2026-08-08)
+
+The renderer now presents the last successfully validated user-plugin runtime
+snapshot at startup while the main process refreshes manifests, installed
+packages, dependency bindings, and headless activations in the background. A
+refresh event replaces the cached view when fresh state is ready; package and
+configuration mutations still use fresh runtime results directly. Bundled
+official modules may restore immediately, while cached third-party modules stay
+non-executable until the current package integrity check succeeds. When AI
+Assistant is active but has no Key, CampusOS opens a first-use setup dialog.
+Both that dialog and the module settings offer curated OpenAI model presets,
+an `Other model` path, and an explicit Key-plus-model connection test.
+
 ## 避免的旧称
 
 - 不再使用“连接器插件”称呼 Core 数据连接器。

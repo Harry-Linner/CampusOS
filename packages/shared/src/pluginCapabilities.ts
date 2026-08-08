@@ -287,6 +287,18 @@ export interface AiAssistantSettingsInput {
   model: string;
 }
 
+export interface AiAssistantConnectionTestInput {
+  apiKey: string;
+  model: string;
+}
+
+export interface AiAssistantConnectionTestResult {
+  ok: true;
+  model: string;
+  checkedAt: string;
+  latencyMs: number;
+}
+
 export interface AiAssistantParseInput {
   text: string;
   courseNames: string[];

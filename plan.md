@@ -554,4 +554,13 @@ _Changelog_
   IPC; do not write a second task store.
 - [x] Keep background WeChat/DingTalk capture, continuous clipboard watching,
   OCR, desktop pet, and official bot integrations out of the first version.
+- [x] Show a dismissible first-use API Key dialog when the active AI Assistant
+  has no configuration.
+- [x] Provide maintained OpenAI model presets, an `Other model` input, and a
+  Key-plus-model connection test with latency feedback.
+- [x] Render the previous validated plugin runtime snapshot at startup, then
+  reconcile fresh manifests/packages/activations in the background and notify
+  the renderer when the fresh snapshot is ready. Bundled official plugins may
+  restore immediately; third-party code remains blocked until the current
+  package integrity check succeeds.
 This MVP entry supersedes earlier three-module wording in this historical plan; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

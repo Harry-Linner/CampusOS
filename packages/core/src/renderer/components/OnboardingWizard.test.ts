@@ -216,6 +216,7 @@ const installBridge = (
     },
     plugins: {
       load: vi.fn(async () => runtimeSnapshot),
+      subscribe: vi.fn(() => () => undefined),
       configure: vi.fn(async () => runtimeSnapshot),
       selectPackage: vi.fn(async () => ({
         canceled: true as const,

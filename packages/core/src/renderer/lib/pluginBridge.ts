@@ -23,6 +23,11 @@ const resolvePluginRuntimeBridge = (): PluginRuntimeBridge => {
 export const loadPluginRuntimeSnapshot = async (): Promise<PluginRuntimeSnapshot> =>
   resolvePluginRuntimeBridge().load();
 
+export const subscribeToPluginRuntimeChanges = (
+  listener: (snapshot: PluginRuntimeSnapshot) => void
+): (() => void) =>
+  resolvePluginRuntimeBridge().subscribe(listener);
+
 export const configurePluginRuntime = async (
   input: PluginRuntimeConfigurationInput
 ): Promise<PluginRuntimeSnapshot> =>

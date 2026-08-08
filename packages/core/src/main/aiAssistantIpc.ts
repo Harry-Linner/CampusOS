@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { app, ipcMain, safeStorage } from "electron";
 import type {
+  AiAssistantConnectionTestInput,
   AiAssistantParseInput,
   AiAssistantSettingsInput
 } from "@campusos/shared";
@@ -78,6 +79,10 @@ export const registerAiAssistantHandlers = (): void => {
   ipcMain.handle("campusos:assistant:settings:clear", async (event) => {
     assertTrustedRenderer(event);
     return createService().clearSettings();
+  });
+  ipcMain.handle("campusos:assistant:test-connection", async (event, input: AiAssistantConnectionTestInput) => {
+    assertTrustedRenderer(event);
+    return createService().testConnection(input);
   });
   ipcMain.handle("campusos:assistant:parse", async (event, input: AiAssistantParseInput) => {
     assertTrustedRenderer(event);

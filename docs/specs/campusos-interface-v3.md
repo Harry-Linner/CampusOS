@@ -133,6 +133,13 @@ location, course match, confidence, missing fields, and source evidence, and
 require confirmation before calling Schedule's formal `saveTask` bridge.
 Background WeChat/DingTalk capture, continuous clipboard reads, OCR,
 desktop-pet windows, and bot/webhook integrations remain later phases.
+If the active module has no saved Key, a modal first-use setup appears after
+onboarding. It supports curated model choices, `Other model`, secure save, and
+an explicit connection test that reports the selected model and request
+latency. Plugin navigation should appear from the last validated runtime cache
+without waiting for the fresh scan; the host applies the background refresh
+when the main process emits `campusos:plugins:changed`. Cached third-party
+modules remain non-executable until that fresh package integrity check passes.
 This section supersedes the earlier three-destination baseline: the current four official destinations are Academic, Schedule, Materials, and AI Assistant.
 
 ## Future-term timetable integrity (2026-08-03)

@@ -1,10 +1,15 @@
 import { app } from "electron";
-import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type {
   PluginRuntimeConfigurationInput,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
-import { getSandboxedRendererExecutionIssue } from "@campusos/shared";
+import {
+  getSandboxedRendererExecutionIssue,
+  validateManifestV2
+} from "@campusos/shared";
 import {
   corePluginCapabilities,
   officialCoreModuleManifests,
@@ -22,6 +27,7 @@ import {
   type CampusmodRegistrySnapshot,
   type InstalledCampusmodPackage
 } from "./campusmodPackageRegistry";
+import { preparePluginRuntimeStartupCache } from "./pluginRuntimeCache";
 
 export interface PluginPackageMutationResult {
   installedPackage?: InstalledCampusmodPackage;
@@ -31,6 +37,7 @@ export interface PluginPackageMutationResult {
 
 export interface OfficialPluginRuntimeService {
   load: () => Promise<PluginRuntimeSnapshot>;
+  loadCached: () => Promise<PluginRuntimeSnapshot | null>;
   loadInternal: () => Promise<PluginRuntimeSnapshot>;
   configure: (
     input: PluginRuntimeConfigurationInput
@@ -49,11 +56,40 @@ export interface OfficialPluginRuntimeService {
 
 let service: OfficialPluginRuntimeService | null = null;
 
+const isMissingFileError = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "ENOENT";
+
+const isCachedRuntimeSnapshot = (value: unknown): value is PluginRuntimeSnapshot => {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<PluginRuntimeSnapshot>;
+  if (candidate.apiVersion !== 2 || typeof candidate.generatedAt !== "string" || !Array.isArray(candidate.plugins)) {
+    return false;
+  }
+  return candidate.plugins.every((plugin) => {
+    if (typeof plugin !== "object" || plugin === null) return false;
+    const record = plugin as PluginRuntimeSnapshot["plugins"][number];
+    return (
+      typeof record.id === "string" &&
+      (record.status === "active" || record.status === "blocked" || record.status === "disabled" || record.status === "placeholder") &&
+      validateManifestV2(record.manifest).ok &&
+      typeof record.enabled === "boolean" &&
+      Array.isArray(record.grantedPermissions) &&
+      Array.isArray(record.issues) &&
+      typeof record.bindings === "object" &&
+      record.bindings !== null
+    );
+  });
+};
+
 export const getOfficialPluginRuntimeService =
   (): OfficialPluginRuntimeService => {
     if (service) return service;
 
     const pluginRootPath = join(app.getPath("userData"), "plugins");
+    const runtimeCachePath = join(pluginRootPath, "runtime-cache.json");
     const officialRuntimeIds = new Set(
       officialRuntimeManifests.map((manifest) => manifest.id)
     );
@@ -96,21 +132,75 @@ export const getOfficialPluginRuntimeService =
       })
     });
 
+    const writeRuntimeCache = async (snapshot: PluginRuntimeSnapshot): Promise<void> => {
+      await mkdir(dirname(runtimeCachePath), { recursive: true });
+      const temporaryPath = `${runtimeCachePath}.${randomUUID()}.tmp`;
+      try {
+        const startupSnapshot = preparePluginRuntimeStartupCache(
+          snapshot,
+          officialRuntimeIds
+        );
+        await writeFile(temporaryPath, JSON.stringify(startupSnapshot, null, 2), {
+          encoding: "utf8",
+          flag: "wx"
+        });
+        await rm(runtimeCachePath, { force: true });
+        await rename(temporaryPath, runtimeCachePath);
+      } catch (error) {
+        await rm(temporaryPath, { force: true });
+        throw error;
+      }
+    };
+
+    const readRuntimeCache = async (): Promise<PluginRuntimeSnapshot | null> => {
+      try {
+        const parsed = JSON.parse(await readFile(runtimeCachePath, "utf8")) as unknown;
+        return isCachedRuntimeSnapshot(parsed)
+          ? preparePluginRuntimeStartupCache(parsed, officialRuntimeIds)
+          : null;
+      } catch (error) {
+        if (isMissingFileError(error)) return null;
+        return null;
+      }
+    };
+
     const loadInternal = async (): Promise<PluginRuntimeSnapshot> =>
       lifecycle.reconcile(await repository.load());
-    const load = async (): Promise<PluginRuntimeSnapshot> =>
-      toUserPluginSnapshot(await loadInternal());
+    const loadFresh = async (): Promise<PluginRuntimeSnapshot> => {
+      const snapshot = toUserPluginSnapshot(await loadInternal());
+      try {
+        await writeRuntimeCache(snapshot);
+      } catch {
+        // Cache failure must never prevent a fresh runtime snapshot from loading.
+      }
+      return snapshot;
+    };
+    let refreshPromise: Promise<PluginRuntimeSnapshot> | null = null;
+    const load = (): Promise<PluginRuntimeSnapshot> => {
+      if (!refreshPromise) {
+        refreshPromise = loadFresh().finally(() => {
+          refreshPromise = null;
+        });
+      }
+      return refreshPromise;
+    };
     service = {
       load,
+      loadCached: readRuntimeCache,
       loadInternal,
       configure: async (input) => {
         if (officialCoreModuleIds.has(input.pluginId)) {
           throw new Error("Core modules cannot be configured as plugins.");
         }
-        const snapshot = await lifecycle.reconcile(
+        const snapshot = toUserPluginSnapshot(await lifecycle.reconcile(
           await repository.configure(input)
-        );
-        return toUserPluginSnapshot(snapshot);
+        ));
+        try {
+          await writeRuntimeCache(snapshot);
+        } catch {
+          // Cache failure must never prevent a successful plugin configuration.
+        }
+        return snapshot;
       },
       inspectPackage: (sourcePath) => packageRegistry.inspect(sourcePath),
       discardPackageInspection: (token) => packageRegistry.discard(token),

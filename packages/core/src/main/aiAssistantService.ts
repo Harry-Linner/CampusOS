@@ -1,5 +1,7 @@
 import type {
   AiAssistantDraft,
+  AiAssistantConnectionTestInput,
+  AiAssistantConnectionTestResult,
   AiAssistantParseInput,
   AiAssistantSettingsInput,
   AiAssistantSettingsRecord
@@ -229,6 +231,59 @@ export const createAiAssistantService = ({
     clearSettings: async (): Promise<AiAssistantSettingsRecord> => {
       await vault.clear();
       return toSettingsRecord(null, vault.encrypted);
+    },
+
+    testConnection: async (
+      input: AiAssistantConnectionTestInput
+    ): Promise<AiAssistantConnectionTestResult> => {
+      if (typeof input !== "object" || input === null || !isValidModel(input.model.trim())) {
+        throw new AiAssistantServiceError("invalid-input", "模型名称格式无效。");
+      }
+      if (!vault.isEncryptionAvailable() && !input.apiKey.trim()) {
+        throw new AiAssistantServiceError("secure-storage-unavailable", "当前设备无法读取系统安全存储，请直接填写 API Key 后重试。");
+      }
+      const directApiKey = input.apiKey.trim();
+      const stored = directApiKey ? null : await loadStored();
+      const apiKey = directApiKey || (stored ? vault.decrypt(stored.encryptedApiKey) : "");
+      if (!apiKey) {
+        throw new AiAssistantServiceError("not-configured", "请先填写 API Key。");
+      }
+      if (apiKey.length > 512 || apiKey.includes("\n") || apiKey.includes("\r")) {
+        throw new AiAssistantServiceError("invalid-input", "API Key 格式无效。");
+      }
+      const startedAt = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let response: Response;
+      try {
+        response = await fetchFn(OPENAI_RESPONSES_URL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: input.model.trim(),
+            store: false,
+            input: "Reply with OK.",
+            max_output_tokens: 4
+          }),
+          signal: controller.signal
+        });
+      } catch (cause) {
+        throw new AiAssistantServiceError("network-error", "无法连接 AI 服务，请检查网络后重试。", { cause });
+      } finally {
+        clearTimeout(timeout);
+      }
+      if (!response.ok) {
+        throw new AiAssistantServiceError("upstream-error", `AI 服务连接失败（HTTP ${response.status}）。`);
+      }
+      return {
+        ok: true,
+        model: input.model.trim(),
+        checkedAt: now().toISOString(),
+        latencyMs: Math.max(0, Date.now() - startedAt)
+      };
     },
 
     parseMessage: async (input: AiAssistantParseInput): Promise<AiAssistantDraft> => {

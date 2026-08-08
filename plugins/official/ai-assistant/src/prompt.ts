@@ -1,4 +1,15 @@
-export const AI_ASSISTANT_DEFAULT_MODEL = "gpt-5.6-terra";
+export const AI_ASSISTANT_DEFAULT_MODEL = "gpt-4o-mini";
+
+export const AI_ASSISTANT_CUSTOM_MODEL = "__custom__";
+
+export const AI_ASSISTANT_MODEL_OPTIONS = [
+  { value: "gpt-4o-mini", label: "GPT-4o mini · 快速低成本" },
+  { value: "gpt-4o", label: "GPT-4o · 通用多模态" },
+  { value: "gpt-4.1-mini", label: "GPT-4.1 mini · 轻量任务" },
+  { value: "gpt-4.1", label: "GPT-4.1 · 复杂指令" },
+  { value: "o3-mini", label: "o3-mini · 轻量推理" },
+  { value: "o4-mini", label: "o4-mini · 推理任务" }
+] as const;
 
 export const AI_ASSISTANT_SYSTEM_PROMPT = `你是 CampusOS 的任务消息解析器。你的唯一工作是把用户主动提交的聊天消息转换成一个日程任务草稿。
 

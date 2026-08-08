@@ -26,6 +26,7 @@ interface PluginHostState {
   plugins: LoadedPlugin[];
   packageRegistry: PluginPackageRegistrySnapshot;
   load: () => Promise<void>;
+  applyRuntimeSnapshot: (snapshot: PluginRuntimeSnapshot) => Promise<void>;
   configure: (input: PluginRuntimeConfigurationInput) => Promise<void>;
   selectPackage: () => Promise<PluginPackageInspection | null>;
   discardPackage: (token: string) => Promise<void>;
@@ -60,15 +61,20 @@ export const usePluginHost = (): PluginHostState => {
       error,
       plugins,
       packageRegistry,
+      applyRuntimeSnapshot: applySnapshot,
       load: async () => {
         setLoading(true);
+        const registry = loadInstalledPluginPackages().then(
+          (snapshot) => startTransition(() => setPackageRegistry(snapshot)),
+          (nextError: unknown) => setError(
+            nextError instanceof Error
+              ? nextError.message
+              : "插件包注册表加载失败。"
+          )
+        );
         try {
-          const [runtime, registry] = await Promise.all([
-            loadPluginRuntimeSnapshot(),
-            loadInstalledPluginPackages()
-          ]);
-          await applySnapshot(runtime);
-          startTransition(() => setPackageRegistry(registry));
+          await applySnapshot(await loadPluginRuntimeSnapshot());
+          void registry;
         } catch (nextError) {
           setError(
             nextError instanceof Error

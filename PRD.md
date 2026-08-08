@@ -317,4 +317,13 @@ evidence, warnings, missing fields, and confidence in the current session; only
 explicit confirmation persists supported task fields. There is no regex
 fallback, background WeChat/DingTalk read, continuous clipboard watch, second
 task store, OCR, desktop pet, or bot/webhook integration.
+When the active module has no saved Key, the product must open a dismissible
+first-use configuration dialog rather than leave parsing silently disabled.
+Model configuration must offer maintained presets plus an `Other model` input.
+The same form must test the exact unsaved-or-saved Key and selected model with a
+minimal OpenAI Responses request, report latency, and avoid saving or exposing
+the response body. Plugin navigation should render from the last successful
+runtime snapshot at startup and reconcile updates in the background. Cached
+third-party modules must remain non-executable until the current package
+integrity check succeeds.
 This MVP entry supersedes earlier three-module wording in this historical PRD; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.

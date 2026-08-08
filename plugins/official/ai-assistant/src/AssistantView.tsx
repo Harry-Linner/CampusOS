@@ -6,9 +6,10 @@ import type {
   PluginComponentProps
 } from "@campusos/shared";
 import { AI_ASSISTANT_DEFAULT_MODEL } from "./prompt";
+import { AssistantModelFields } from "./AssistantModelFields";
 
 type AssistantSection = "message" | "settings";
-type BusyAction = "load-settings" | "save-settings" | "clear-settings" | "parse" | "save-task" | null;
+type BusyAction = "load-settings" | "save-settings" | "clear-settings" | "test-connection" | "parse" | "save-task" | null;
 
 const shanghaiParts = (value: Date): Record<string, string> => Object.fromEntries(
   new Intl.DateTimeFormat("en-CA", {
@@ -138,6 +139,21 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
     }
   };
 
+  const testConnection = async (): Promise<void> => {
+    if (!assistant) return;
+    setBusy("test-connection");
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await assistant.testConnection({ apiKey, model });
+      setNotice(`连接成功 · ${result.model} · ${result.latencyMs} ms`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "连接测试失败。");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const clearSettings = async (): Promise<void> => {
     if (!assistant) return;
     setBusy("clear-settings");
@@ -229,24 +245,25 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
             </span>
           </header>
           <form className="assistant-settings-form" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
-            <label>
-              <span>API Key</span>
-              <input
-                type="password"
-                autoComplete="off"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder={settings?.configured ? "留空以保留已保存的密钥" : "输入 OpenAI API Key"}
-              />
-            </label>
-            <label>
-              <span>模型</span>
-              <input value={model} onChange={(event) => setModel(event.target.value)} />
-            </label>
+            <AssistantModelFields
+              apiKey={apiKey}
+              configured={settings?.configured === true}
+              model={model}
+              onApiKeyChange={setApiKey}
+              onModelChange={setModel}
+            />
             <p className="assistant-privacy-copy">API Key 使用系统安全存储加密。只有点击“交给 AI 解析”时，当前消息和课程候选会发送给 OpenAI。</p>
             <div className="assistant-actions">
               <button className="primary-button" type="submit" disabled={!assistant || !model.trim() || busy !== null}>
                 {busy === "save-settings" ? "正在保存" : "保存配置"}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || busy !== null}
+                onClick={() => void testConnection()}
+              >
+                {busy === "test-connection" ? "正在测试" : "测试连接"}
               </button>
               {settings?.configured ? (
                 <button className="text-button is-danger" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>

@@ -1,7 +1,8 @@
-import { app, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import type {
   PluginCapability,
-  PluginRuntimeConfigurationInput
+  PluginRuntimeConfigurationInput,
+  PluginRuntimeSnapshot
 } from "@campusos/shared";
 import type { PluginCapabilityReadInput } from "../shared/pluginBridge";
 import { readAcademicCredentialRecord } from "./academicCredentialStore";
@@ -59,8 +60,25 @@ export const registerPluginRuntimeHandlers = (): void => {
     }
   });
 
+  const notifyRuntimeChanged = (snapshot: PluginRuntimeSnapshot): void => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send("campusos:plugins:changed", snapshot);
+      }
+    }
+  };
+  let initialCacheServed = false;
+
   ipcMain.handle("campusos:plugins:load", async (event) => {
     assertTrustedRenderer(event);
+    if (!initialCacheServed) {
+      initialCacheServed = true;
+      const cached = await runtime.loadCached();
+      if (cached) {
+        void runtime.load().then(notifyRuntimeChanged, () => undefined);
+        return cached;
+      }
+    }
     return runtime.load();
   });
 

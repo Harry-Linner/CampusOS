@@ -65,12 +65,22 @@ const pluginDefinitions: PluginDefinition[] = [
   }
 ];
 
+const pluginModuleCache = new Map<string, Promise<PluginModule>>();
+
+const loadPluginDefinition = (definition: PluginDefinition): Promise<PluginModule> => {
+  const cached = pluginModuleCache.get(definition.id);
+  if (cached) return cached;
+  const loading = definition.load();
+  pluginModuleCache.set(definition.id, loading);
+  return loading;
+};
+
 export const loadPlugins = async (
   runtimeSnapshot: PluginRuntimeSnapshot
 ): Promise<LoadedPlugin[]> => {
   const rendererModules = await Promise.all(
     pluginDefinitions.map(async (definition) => {
-      const mod = await definition.load();
+      const mod = await loadPluginDefinition(definition);
       const validation = validateManifestV2(mod.manifest);
 
       if (!validation.ok) {
