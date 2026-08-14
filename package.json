@@ -9,6 +9,7 @@
     "dist": "pnpm build && electron-builder --win --projectDir packages/core --config ../../electron-builder.yml",
     "typecheck": "pnpm --filter @campusos/shared typecheck && pnpm --filter @campusos/core typecheck",
     "test": "npm --prefix packages/core rebuild better-sqlite3 && pnpm --filter @campusos/core test",
+    "test:coverage": "npm --prefix packages/core rebuild better-sqlite3 && pnpm --filter @campusos/core test:coverage",
     "capture:development-baselines": "node scripts/capture-development-baselines.mjs",
     "verify:zju-auth": "node scripts/run-zju-auth-live.mjs",
     "lint": "pnpm --filter @campusos/core lint"

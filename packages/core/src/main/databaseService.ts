@@ -306,12 +306,12 @@ export const createDatabaseService = ({
       return row ? { schedule: JSON.parse(row.schedule_json) as unknown, savedAt: row.saved_at } : null;
     },
     saveAcademicGpaStrategy: (accountId, strategy, savedAt) => {
-      if (!accountId.trim()) throw new Error("GPA ç­–ç•¥è´¦æˆ·ä¸èƒ½ä¸ºç©ºã€‚");
+      if (!accountId.trim()) throw new Error("GPA 策略账户不能为空。");
       if (strategy !== "best" && strategy !== "first") {
-        throw new Error("GPA ç­–ç•¥å¿…é¡»æ˜¯ best æˆ– firstã€‚");
+        throw new Error("GPA 策略必须是 best 或 first。");
       }
       if (!Number.isFinite(Date.parse(savedAt))) {
-        throw new Error("GPA ç­–ç•¥ä¿å­˜æ—¶é—´æ— æ•ˆã€‚");
+        throw new Error("GPA 策略保存时间无效。");
       }
       database.prepare(`
         INSERT INTO academic_gpa_strategies (

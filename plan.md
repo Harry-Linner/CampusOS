@@ -23,10 +23,10 @@
 - Each installable plugin contributes exactly one first-level activity destination. Internal tabs do not become separate plugins.
 - Undergraduate/graduate academic affairs, ZJU Learning, quality-development records, and calendar configuration are Core-managed connectors rather than plugins.
 - Event projection, task persistence, automatic scheduling, global search, notifications, system-calendar write and iCal serialization are Core services.
-- The current `academic-scraper` package is removed during migration. Existing granular official packages are folded into the three modules or moved behind the Core boundary without changing their verified upstream request logic.
+- The current `academic-scraper` package is removed during migration. Existing granular official packages are folded into official user modules or moved behind the Core boundary without changing their verified upstream request logic.
 - Mobile-only functionality is outside the desktop roadmap.
 
-- **MVP:** Electron 桌面工作台 + Core 教务连接器 + 学业/日程/资料三个官方插件 → 可装可用的 Windows 安装包
+- **MVP:** Electron 桌面工作台 + Core 教务连接器 + 学业/日程/资料/AI 助手四个官方插件 → 可装可用的 Windows 安装包
 - **Platform:** Windows 桌面端 (Electron) — 所有竞品在手机端，桌面是空白；ZJU 工科生在桌边场景天然匹配
 - **Stack:** Electron + React 18 + TypeScript 5 + Vite + Zustand + SQLite (better-sqlite3) + Electron safeStorage + Vitest/Playwright
 - **Timeline to MVP:** ~8 周（Phase 1 地基 2 周 + Phase 2 核心 4 周 + Phase 3 交付 2 周）
@@ -72,9 +72,9 @@
 
 **Step 4 — Auto sync.** ⏳ "正在拉取课表..." → 进度条走完 → 预览显示："周一 08:00–09:35 高等数学 (紫金港东1A-301)、周一 10:00–11:35 线性代数 (紫金港西2-205)…"共 8 门课。小陈快速扫了一眼："看起来对吗？" → 点击"确认"。
 
-**Step 5 — Plugin recommendations.** 向导推荐安装三个官方模块：☑ 学业 ☑ 日程 ☑ 资料。小陈全选 → “安装选中插件” → 左侧栏出现对应三个入口。
+**Step 5 — Plugin recommendations.** 向导推荐安装四个官方模块：☑ 学业 ☑ 日程 ☑ 资料 ☑ AI 助手。小陈全选 → “安装选中插件” → 左侧栏出现对应四个入口。
 
-**Step 6 — Landing.** 进入主界面。固定导航提供总览、扩展和设置，已启用插件提供学业、日程和资料。默认总览以今日课程时间线和未过期待办清单为主体；休课期改为明确标注的下一学期同星期课程预览。日程模块统一展示课程、作业、考试、任务和计划段。不展示状态栏、同步指标或学期进度卡片。
+**Step 6 — Landing.** 进入主界面。固定导航提供总览、扩展和设置，已启用插件提供学业、日程、资料和 AI 助手。默认总览以今日课程时间线和未过期待办清单为主体；休课期改为明确标注的下一学期同星期课程预览。日程模块统一展示课程、作业、考试、任务和计划段。不展示状态栏、同步指标或学期进度卡片。
 
 **Step 7 — Daily use (Monday morning).** 07:45。距离高数课还有 15 分钟，桌面弹出系统通知："📚 高等数学 — 08:00–09:35 紫金港东1A-301"。小陈点击通知，CampusOS 切到前台，仪表盘和日历都能显示今天的安排。这还不是"不漏事"的完全体，但在桌面场景下已经能覆盖最常见的一半提醒需求。
 
@@ -472,7 +472,7 @@ _Changelog_
 ### Verification update (2026-08-04)
 
 - The current implementation also closes the academic course catalog join, practice detail/summary partial-success fallback, and Celechron GPA/major rules. New tests cover concurrent quality-development session reuse, GPA input boundaries, academic tabs/search/term refresh, and connector partial success.
-- The user plugin boundary remains exactly three left-navigation modules: Academic, Schedule, and Materials. Campus Card is not a desktop module.
+- The user plugin boundary contains four left-navigation modules: Academic, Schedule, Materials, and AI Assistant. Campus Card is not a desktop module.
 - Materials course browsing/batch queue, Core global search, updater/About/MIT surfaces, and desktop/narrow Electron E2E are complete.
 - Real-account status remains bounded: the authorized undergraduate 2026-08-04 run passed the private timetable/materials/download oracle; graduate real-account closure, multi-device use, clean Windows installation, desktop notification, and Release distribution are still pending and must not be described as passed.
 

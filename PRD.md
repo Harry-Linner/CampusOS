@@ -125,8 +125,8 @@ CampusOS 的插件是用户可在扩展页启用、禁用，并在左侧栏获�
 - SQLite 初始化 + migration 框架
 - 5 步首次引导向导
 - Electron `safeStorage` 凭据加密；Windows 使用 DPAPI 保护密钥
-- 首批 Core 数据连接器：本科/研究生教务、在线校历、学在浙大；首批官方插件固定为 `学业`、`日程`、`资料` 三个完整左侧栏模块
-- 首批接入源优先覆盖：教务处网站、学在浙大、计算机学院院网、云峰学院院网、ETA 三全育人平台
+- 首批 Core 数据连接器：本科/研究生教务、在线校历、学在浙大；首批官方插件固定为 `学业`、`日程`、`资料`、`AI 助手` 四个完整左侧栏模块
+- 当前已验证接入源：教务处网站、学在浙大。计算机学院院网、云峰学院院网和 ETA 三全育人平台须在单独的范围决策和实现验收后才可进入 MVP
 - 校内 adapter 通过 Celechron 1.3.0 接入稳定性验收矩阵；不得以单次 happy path 登录或整批失败式抓取替代
 - 课件下载引擎 (队列管理 + 断点续传)
 - 日历组件（月历、线性日程、单日时间线 + 课程/作业/考试统一展示 + 悬停详情）
@@ -144,7 +144,6 @@ CampusOS 的插件是用户可在扩展页启用、禁用，并在左侧栏获�
 - **商业化插件市场 / 付费插件体系** — V1 不做任何收费功能。社区插件先靠手动安装 `.campusmod` 文件（拖入/文件选择器/URL）；未来如需插件目录，也优先考虑开源、非商业分发。
 - **用户账户系统** — 没有自己的用户系统；教务账号仅用于抓取，不用于登录 CampusOS。避免"又一个要注册的 APP"。
 - **多校适配** — 插件框架设计上支持多校，但 MVP 只适配 ZJU。其他学校的教务系统接口各不相同，逐个适配是 V2 的工作。
-- **AI/LLM 集成** — AI 插件是明确的战略方向（见 research.md insights #6），但不是 MVP。MVP 先把"手动抓取 + 展示"做扎实。
 - **跨平台 (macOS/Linux)** — Windows 优先。Electron 使其理论可跨平台，但 MVP 不测试、不支持。等 Windows 稳定后再评估。
 - **社交/社区功能** — CampusOS 是工具，不是社交平台。CC98/朵朵已经是 ZJU 的社区；不需要再造一个。
 - **协作/共享功能** — 课表分享、课件共享链接等。V1 是单人工具。
@@ -166,7 +165,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 - ZJU 学生（尤其是工科生）熟悉 VS Code 工作台范式，安装 Desktop App 的意愿高于普通用户
 - 课件下载和本地归档是 ZJU 学生的高频需求
 - 首批 50–100 个种子用户可以从 CC98 论坛获取
-- 社区贡献者会在 `学业`、`日程`、`资料` 三个官方模块稳定之后出现（6–12 个月窗口）；后续扩展继续遵守“一个插件对应一个完整一级侧栏模块”
+- 社区贡献者会在 `学业`、`日程`、`资料`、`AI 助手` 四个官方模块稳定之后出现（6–12 个月窗口）；后续扩展继续遵守“一个插件对应一个完整一级侧栏模块”
 
 ---
 
@@ -227,7 +226,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 - [ ] [私有 Alpha 验收门槛](docs/alpha-acceptance.md) 全部通过：受控 fixture 的完整 Electron E2E、3 次真实本科认证、3 台 Windows 设备的首次引导、真实日历数据和至少一次桌面提醒
 - 6 个用户故事 (US-1 ~ US-6) 全部验收通过
-- `npm run test` 全绿，覆盖率 > 70%
+- `pnpm test` 与 `pnpm test:coverage` 全绿，语句和行覆盖率均 >= 70%
 - `npm run typecheck` TypeScript strict 零错误
 - `npm run lint` ESLint 零 warning
 - `npm run test:e2e` Playwright E2E 通过
@@ -264,7 +263,7 @@ This correction supersedes the earlier UI-only diagnosis in the acceptance recor
 
 - Academic now includes the joined timetable/exam/grade course catalog, practice detail and summary projection, Celechron GPA inclusion rules, dedicated-major xkkh matching, and deferred/failed/pass-fail handling.
 - The grades view no longer exposes internal source or fallback metrics; privacy masking remains the default renderer behavior.
-- User-visible official modules are exactly Academic, Schedule, and Materials. Connectors and event projections remain Core-owned; Campus Card is explicitly out of scope for the desktop product.
+- User-visible official modules are exactly Academic, Schedule, Materials, and AI Assistant. Connectors and event projections remain Core-owned; Campus Card is explicitly out of scope for the desktop product.
 - Materials now provides target-semester course browsing, per-course empty states, multi-select/batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification through formal IPC.
 - Core global search filters the current formal workspace projection; Settings consumes the updater state machine and displays runtime version and the complete MIT license.
 - The authorized undergraduate 2026-08-04 run passed the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte checks. Graduate real-account, multi-device, clean Windows installation, desktop-notification, and Release-distribution acceptance are not claimed.

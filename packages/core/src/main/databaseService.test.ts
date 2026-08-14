@@ -97,6 +97,20 @@ describe("database service", () => {
         savedAt: "2026-07-20T08:05:00.000Z"
       });
       expect(database.loadAcademicGpaStrategy("account-b")).toBeNull();
+
+      expect(() =>
+        database.saveAcademicGpaStrategy("", "first", "2026-07-20T08:05:00.000Z")
+      ).toThrow("GPA 策略账户不能为空。");
+      expect(() =>
+        database.saveAcademicGpaStrategy(
+          "account-a",
+          "invalid" as "first",
+          "2026-07-20T08:05:00.000Z"
+        )
+      ).toThrow("GPA 策略必须是 best 或 first。");
+      expect(() =>
+        database.saveAcademicGpaStrategy("account-a", "first", "not-a-date")
+      ).toThrow("GPA 策略保存时间无效。");
     } finally {
       database.close();
     }
