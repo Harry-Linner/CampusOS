@@ -30,8 +30,7 @@ export type CampusPermission =
   | "data:account:academic-profile"
   | "storage:local"
   | "notification"
-  | "credential"
-  | "dingtalk:entry";
+  | "credential";
 
 export type PluginCapability = `${string}@${number}`;
 

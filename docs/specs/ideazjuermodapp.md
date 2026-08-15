@@ -436,7 +436,7 @@ interface PluginAPI {
 | NFR-7 | 安装包体积 < 200MB（压缩后） |
 | NFR-8 | 所有 IPC 调用需要有超时机制（默认 30 秒） |
 | NFR-9 | TypeScript strict 模式，ESLint 零 warning |
-| NFR-10 | 单元测试覆盖率达标（CI 强制基线：语句/行 ≥ 68%、分支 ≥ 70%、函数 ≥ 75%） |
+| NFR-10 | 单元测试覆盖率达标（CI 强制基线：语句/行 ≥ 70%、分支 ≥ 70%、函数 ≥ 75%） |
 
 ---
 

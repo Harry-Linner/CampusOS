@@ -90,4 +90,31 @@ describe("zju official calendar connector", () => {
       })
     );
   });
+
+  it("publishes unavailable without inventing quarter boundaries when no cache exists", async () => {
+    const publish = vi.fn(async () => undefined);
+    const connector = createZjuCalendarConfigConnector({
+      fetchCalendarPage: async () => {
+        throw new Error("temporary failure");
+      },
+      loadCachedCalendar: async () => null,
+      publish,
+      registerRefreshJob: () => () => undefined,
+      now: () => new Date("2026-07-19T04:00:00.000Z")
+    });
+
+    await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: "academic.calendar-config@1",
+        state: "unavailable",
+        data: null
+      })
+    );
+  });
 });

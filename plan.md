@@ -193,7 +193,7 @@ flowchart TD
 **Journey steps covered:** Step 1 (launch App → 看到工作台) — 仅验证技术骨架
 
 **Success metrics:**
-- `npm run test` 全绿，覆盖率 > 70%（当前 CI 强制基线：语句/行 ≥ 68%、分支 ≥ 70%、函数 ≥ 75%，见 `packages/core/vitest.config.ts`）
+- `npm run test` 全绿，覆盖率 > 70%（CI 强制基线：语句/行 ≥ 70%、分支 ≥ 70%、函数 ≥ 75%，见 `packages/core/vitest.config.ts`）
 - `npm run typecheck` TypeScript strict 零错误
 - hello-world 插件恰好产生一个左侧栏入口，fixture source adapter 提供的能力可被消费者解析
 - 插件安装/卸载生命周期正常（load → activate → deactivate → unload）
@@ -447,12 +447,14 @@ flowchart TD
 
 ## 7. Open decisions (to make this week)
 
-- **JS 沙箱方案** — renderer 已选择 Electron OS sandbox + 独立 `campusmod://` origin iframe；headless 内层已选择 QuickJS/WASM 并完成 CPU/普通 JS 堆 POC，外层采用 utility process 的崩溃回收、外部内存限制与权限代理仍待落地
-- **插件注册表格式** — 选项: manifest.json 纯本地 / 远程 registry URL / 本地 + 远程 — 推荐: V1 纯本地 manifest.json（`.campusmod` 文件内嵌），因为 V1 没有后端
-- **日历组件选择** — 选项: FullCalendar / React Big Calendar / 自研 — 推荐: FullCalendar (React wrapper)，因为周视图/日视图/冲突检测都是内置功能，自研成本远高于集成
-- **图标方案** — 选项: VS Code Icons (Codicons) / Phosphor / Lucide / Font Awesome — 推荐: Phosphor，因为 MIT 许可 + React 原生支持 + 风格现代 + 包体积小
-- **首批信息源边界** — 选项: 全量校内站点 / 4 个核心源 / 仅教务 — 推荐: 4 个核心源（教务处、计院院网、云峰院网、ETA），因为能覆盖高价值又能避免工程面过宽
-- **钉钉登录/消息导入** — 选项: 当前实现 / 先做入口占位 / 暂不支持 — 推荐: 先做入口占位，等待后续参考现成软件方案
+> 以下决策已随实现落定并关闭，保留历史记录；新决策在此追加。
+
+- **JS 沙箱方案** — ✅ 已定（2026-07~08）：renderer 使用 Electron OS sandbox + 独立 `campusmod://` origin iframe（`campusmodRendererProtocol.ts`）；headless 内层使用 QuickJS/WASM（`quickjs-emscripten-core`），外层 utility process 的崩溃回收与权限代理保留为历史技术资产（`thirdPartyHeadlessUtilityRunner.ts`），不接入 `.campusmod` 生命周期。
+- **插件注册表格式** — ✅ 已定：V1 纯本地 `manifest.json`（`.campusmod` 文件内嵌），无后端；见 `docs/architecture/campusmod-package-format.md`。
+- **日历组件选择** — ✅ 已定：自研视图（月历/周视图/日程/日视图）而非 FullCalendar，由 Schedule 模块拥有；见 ADR-0003。
+- **图标方案** — ✅ 已定：自绘 `AppIcon` SVG 组件（`AppIcon.tsx`），未引入外部图标库。
+- **首批信息源边界** — ✅ 已收敛（2026-08-14）：MVP 仅覆盖教务处（本科/研究生教务、在线校历）与学在浙大；计算机学院院网、云峰学院院网、ETA 三全育人平台须在单独的范围决策与实现验收后才可进入 MVP（PRD "In scope for MVP"）。
+- **钉钉登录/消息导入** — ✅ 已定：MVP 暂不支持；`dingtalk-entry` 占位目录已清理，待 Phase 4 单独范围决策。
 
 ---
 

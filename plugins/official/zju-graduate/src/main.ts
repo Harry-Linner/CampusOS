@@ -297,6 +297,14 @@ export const parseGraduateExamsResponse = (
     const endClock = parseClock(item.jssj ?? combinedTimes[1]);
     const startAt = date && startClock ? toShanghaiDateTime(date, startClock) : null;
     const endAt = date && endClock ? toShanghaiDateTime(date, endClock) : null;
+    // Deviation from Celechron 1.3.0 lib/http/zjuServices/grs_new.dart:346-353,
+    // which falls back a missing start clock to 08:00 and a missing end clock to
+    // 22:00 (a full-day placeholder). CampusOS deliberately does NOT invent
+    // clocks: an exam without an explicit clock keeps startAt/endAt null and
+    // surfaces only the raw schedule text via dateLabel, so the UI never shows a
+    // fabricated all-day time. Covered by zjuGraduateConnector.test.ts records
+    // with startAt/endAt null. Impact: undated or clock-less exams appear in the
+    // exam list with "时间待确认" instead of a guessed time slot.
     const validRange = startAt && endAt && Date.parse(endAt) > Date.parse(startAt);
     const scheduleText = [asString(item.rq), asString(item.ksTime)]
       .filter(Boolean)

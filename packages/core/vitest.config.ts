@@ -70,10 +70,10 @@ export default defineConfig({
       exclude: ["src/**/*.test.{ts,tsx}", "test/**"],
       reporter: ["text", "json-summary"],
       thresholds: {
-        statements: 68,
+        statements: 70,
         branches: 70,
         functions: 75,
-        lines: 68
+        lines: 70
       }
     }
   }

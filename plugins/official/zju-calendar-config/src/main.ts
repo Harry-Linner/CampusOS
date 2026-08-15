@@ -265,6 +265,18 @@ export const createZjuCalendarConfigConnector = ({
       }
 
       const message = error instanceof Error ? error.message : "官网校历请求失败。";
+      // Deviation from Celechron 1.3.0 lib/http/time_config_service.dart:137-181,
+      // which falls back to a safe default calendar generated from the last valid
+      // configuration when both the online page and the exact-semester cache are
+      // missing. CampusOS deliberately stops at "unavailable" instead of
+      // inventing quarter boundaries from a previous term: fabricating start/end
+      // dates for an unknown semester could silently misproject every timetable
+      // event. The built-in ZJU_STANDARD_PERIOD_TIMES remain the static default
+      // period table, but quarter boundaries are never guessed. Covered by
+      // zjuCalendarConfigConnector.test.ts (cache branch) and the unavailable
+      // branch below. Impact: when the official page and cache are both missing,
+      // calendar-config is unavailable and event projection falls back to
+      // "current term unknown" instead of a guessed term.
       await publish({
         capability: "academic.calendar-config@1",
         accountId: null,

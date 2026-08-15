@@ -226,7 +226,7 @@ CampusOS 不与超级课程表比功能数量，不与今日校园比渠道覆�
 
 - [ ] [私有 Alpha 验收门槛](docs/alpha-acceptance.md) 全部通过：受控 fixture 的完整 Electron E2E、3 次真实本科认证、3 台 Windows 设备的首次引导、真实日历数据和至少一次桌面提醒
 - 6 个用户故事 (US-1 ~ US-6) 全部验收通过
-- `pnpm test` 与 `pnpm test:coverage` 全绿，覆盖率达到 CI 强制基线：语句/行 ≥ 68%、分支 ≥ 70%、函数 ≥ 75%（`packages/core/vitest.config.ts`）
+- `pnpm test` 与 `pnpm test:coverage` 全绿，覆盖率达到 CI 强制基线：语句/行 ≥ 70%、分支 ≥ 70%、函数 ≥ 75%（`packages/core/vitest.config.ts`）
 - `npm run typecheck` TypeScript strict 零错误
 - `npm run lint` ESLint 零 warning
 - `npm run test:e2e` Playwright E2E 通过
