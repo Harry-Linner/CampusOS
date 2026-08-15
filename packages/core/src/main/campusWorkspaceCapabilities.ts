@@ -13,6 +13,7 @@ import type {
   LearningMaterialsData
 } from "@campusos/shared";
 import { firstWaveSourceCatalog } from "@campusos/shared";
+import { SUMMER_TERM_FALLBACK_DAYS } from "@campusos/shared";
 import { buildReminderQueue } from "../shared/campusWorkspace";
 import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
@@ -299,6 +300,41 @@ export const mergeAcademicCalendarIntoWorkspace = (
   const upcoming = quarters.find(
     (quarter) => quarter.classesBeginDate > today
   );
+
+  // ZJU summer short-term (小学期) courses live in the 2|夏 quarter. When the
+  // spring-summer semester just ended (within SUMMER_TERM_FALLBACK_DAYS), keep
+  // presenting it as the current term so 小学期 courses remain visible instead
+  // of switching the workspace to the next autumn term. This mirrors Celechron
+  // lib/model/scholar.dart:97-110 thisSemester fallback semantics.
+  const recentSpringSummerEnd = quarters
+    .filter(
+      (quarter) =>
+        quarter.season.split("|").at(-1) === "夏" && quarter.endDate < today
+    )
+    .map((quarter) => dateOnlyTimestamp(quarter.endDate))
+    .sort((left, right) => right - left)[0];
+  const recentSpringSummerDays = Number.isFinite(recentSpringSummerEnd)
+    ? Math.floor((todayTimestamp - recentSpringSummerEnd) / DAY_IN_MS)
+    : Number.POSITIVE_INFINITY;
+  if (recentSpringSummerDays >= 0 && recentSpringSummerDays <= SUMMER_TERM_FALLBACK_DAYS) {
+    const summerQuarter = quarters.find(
+      (quarter) =>
+        quarter.season.split("|").at(-1) === "夏" &&
+        dateOnlyTimestamp(quarter.endDate) === recentSpringSummerEnd
+    );
+    if (summerQuarter) {
+      return {
+        ...snapshot,
+        term: {
+          label: formatSemesterLabel(summerQuarter, quarters),
+          phase: "active",
+          currentWeek: null,
+          progressPercent: 0
+        }
+      };
+    }
+  }
+
   if (upcoming) {
     return {
       ...snapshot,

@@ -590,3 +590,27 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
   ambiguous-time, duplicate, update, cancellation, and prompt-injection cases.
 - [x] Keep desktop pet, OCR, continuous clipboard reads, and direct
   WeChat/DingTalk access deferred until separate permission and compliance work.
+
+### Summer short-term (小学期) fallback (2026-08-15)
+
+- [x] ZJU 小学期（短学期）课程挂在教务系统 `xqm=2|夏` 学季（真实校历 4/27–7/05），
+  抓取层本就覆盖四季，但投影层在暑假会直接选下一学年秋冬而跳过它。
+- [x] `selectAcademicSemesterWindow` 增加 45 天回落窗口：春夏学期结束后 45 天内
+  优先投影刚结束的春夏学期（含 2|夏 小学期课程），之后才回落到下一学年秋冬；
+  语义对齐 Celechron `lib/model/scholar.dart:97-110` 的 thisSemester 回落。
+- [x] 工作区 term 派生同步回落（`mergeAcademicCalendarIntoWorkspace`），
+  暑假回落期内总览/学业默认显示春夏学期而非下学期预览。
+- [x] 覆盖：投影测试（回落内/外两场景）、term 派生测试、AcademicView 默认学期测试。
+
+### Desk calendar floating window (2026-08-15)
+
+- [x] 借鉴 DeskToDo（`https://github.com/ShawnXu01/DeskToDo`，MIT）的桌面悬浮形态：
+  独立无边框、半透明、置顶、跳过任务栏的 `BrowserWindow`，加载独立 renderer 入口
+  `desk-calendar.html`，深色半透明圆角面板。
+- [x] 月/周/日三视图：复用工作区正式快照（calendarEvents + courses + deadlines）
+  投影每日事件，悬浮窗内可切换视图、前后导航、回到今天；关闭即停用。
+- [x] 日程模块头部新增“桌面日历”控制：开启/关闭悬浮窗 + 选择月/周/日视图，
+  设置持久化到 `preferences/desk-calendar.json`；工作区刷新后向悬浮窗推送最新快照。
+- [x] 悬浮窗数据经受信 IPC（`campusos:desk-calendar:*`）读取，主窗口与悬浮窗
+  分离 preload，符合现有受信 renderer 边界。
+- [x] 覆盖：主进程窗口/IPC/持久化测试、renderer 悬浮窗组件测试、ScheduleView 控制测试。

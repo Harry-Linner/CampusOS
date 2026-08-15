@@ -235,13 +235,13 @@ const createCapabilities = (reads: string[]): PluginCapabilityClient => ({
 });
 
 describe("AcademicView", () => {
-  it("selects the next complete autumn-winter semester during summer", async () => {
+  it("selects the next complete autumn-winter semester after the summer fallback window", async () => {
     render(
       createElement(AcademicView, {
         capabilities: createCapabilities([]),
         loading: false,
         onRefresh: async () => undefined,
-        snapshot: { generatedAt: "2026-08-04T00:00:00.000Z" } as never
+        snapshot: { generatedAt: "2026-08-30T00:00:00.000Z" } as never
       })
     );
 
@@ -255,6 +255,25 @@ describe("AcademicView", () => {
     expect(screen.getByText("这个学期暂时没有课程安排。")).toBeDefined();
   });
 
+  it("prefers the spring-summer term (含小学期) inside the summer fallback window", async () => {
+    render(
+      createElement(AcademicView, {
+        capabilities: createCapabilities([]),
+        loading: false,
+        onRefresh: async () => undefined,
+        snapshot: { generatedAt: "2026-07-28T00:00:00.000Z" } as never
+      })
+    );
+
+    // 2026-07-28 is 23 days after the 2|夏 window ended (2026-07-05), so the
+    // 45-day fallback keeps the spring-summer term selected and 小学期 courses
+    // stay visible instead of jumping to the next autumn-winter term.
+    const semester = await screen.findByRole("combobox", { name: "学期" });
+    expect((semester as HTMLSelectElement).value).toBe("2025:2");
+    expect(screen.getByText("历史学期课程")).toBeDefined();
+    expect(screen.queryByText("目标学期课程")).toBeNull();
+  });
+
   it("exposes five internal tabs and reads the selected academic capabilities", async () => {
     const reads: string[] = [];
     const capabilities = createCapabilities(reads);
@@ -263,7 +282,7 @@ describe("AcademicView", () => {
         capabilities,
         loading: false,
         onRefresh: async () => undefined,
-        snapshot: { generatedAt: "2026-08-04T00:00:00.000Z" } as never
+        snapshot: { generatedAt: "2026-08-30T00:00:00.000Z" } as never
       })
     );
 
@@ -303,7 +322,7 @@ describe("AcademicView", () => {
         capabilities,
         loading: false,
         onRefresh: async () => undefined,
-        snapshot: { generatedAt: "2026-08-04T00:01:00.000Z" } as never
+        snapshot: { generatedAt: "2026-08-30T00:01:00.000Z" } as never
       })
     );
     await waitFor(() => expect(reads.length).toBeGreaterThan(beforeRefresh));

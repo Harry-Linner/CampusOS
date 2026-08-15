@@ -7,6 +7,7 @@ import type {
   PlannerSettings,
   PluginComponentProps
 } from "@campusos/shared";
+import type { DeskCalendarView } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
 
@@ -15,7 +16,6 @@ type ScheduleViewMode = "month" | "week" | "agenda" | "day";
 interface ScheduleViewProps extends PluginComponentProps {
   schedule?: PluginComponentProps["schedule"];
 }
-
 type ScheduleEvent = {
   id: string;
   title: string;
@@ -343,7 +343,8 @@ const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Dat
 export const ScheduleView = ({
   loading,
   snapshot,
-  schedule
+  schedule,
+  deskCalendar
 }: ScheduleViewProps): JSX.Element => {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -363,6 +364,59 @@ export const ScheduleView = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deskCalendarOpen, setDeskCalendarOpen] = useState(false);
+  const [deskCalendarEnabled, setDeskCalendarEnabledState] = useState(false);
+  const [deskCalendarView, setDeskCalendarViewState] = useState<DeskCalendarView>("month");
+  const [deskCalendarBusy, setDeskCalendarBusy] = useState(false);
+
+  const loadDeskCalendarState = useCallback(async (): Promise<void> => {
+    if (!deskCalendar) return;
+    try {
+      const record = await deskCalendar.loadSettings();
+      setDeskCalendarEnabledState(record.enabled);
+      setDeskCalendarViewState(record.view);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法读取桌面日历设置。");
+    }
+  }, [deskCalendar]);
+
+  useEffect(() => {
+    void loadDeskCalendarState();
+    if (!deskCalendar) return undefined;
+    return deskCalendar.subscribe(() => {
+      void loadDeskCalendarState();
+    });
+  }, [deskCalendar, loadDeskCalendarState]);
+
+  const toggleDeskCalendar = async (enabled: boolean): Promise<void> => {
+    if (!deskCalendar) return;
+    setDeskCalendarBusy(true);
+    setError(null);
+    try {
+      const record = await deskCalendar.setEnabled(enabled);
+      setDeskCalendarEnabledState(record.enabled);
+      setDeskCalendarViewState(record.view);
+      setNotice(enabled ? "桌面日历已开启" : "桌面日历已关闭");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "桌面日历设置保存失败。");
+    } finally {
+      setDeskCalendarBusy(false);
+    }
+  };
+
+  const changeDeskCalendarView = async (view: DeskCalendarView): Promise<void> => {
+    if (!deskCalendar) return;
+    setDeskCalendarBusy(true);
+    setError(null);
+    try {
+      const record = await deskCalendar.setView(view);
+      setDeskCalendarViewState(record.view);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "桌面日历视图切换失败。");
+    } finally {
+      setDeskCalendarBusy(false);
+    }
+  };
 
   const loadTasks = useCallback(async (): Promise<void> => {
     if (!schedule) return;
@@ -580,6 +634,49 @@ export const ScheduleView = ({
           <button className="text-button" type="button" disabled={busy || !schedule} onClick={() => void exportIcal()}>
             导出 iCal
           </button>
+          {deskCalendar ? (
+            <div className="desk-calendar-control">
+              <button
+                className={`text-button${deskCalendarEnabled ? " is-active" : ""}`}
+                type="button"
+                disabled={deskCalendarBusy}
+                aria-expanded={deskCalendarOpen}
+                onClick={() => setDeskCalendarOpen((open) => !open)}
+              >
+                桌面日历{deskCalendarEnabled ? "：开" : ""}
+              </button>
+              {deskCalendarOpen ? (
+                <div className="desk-calendar-menu" role="menu" aria-label="桌面日历设置">
+                  <button
+                    className="desk-calendar-menu-item"
+                    type="button"
+                    disabled={deskCalendarBusy}
+                    onClick={() => void toggleDeskCalendar(!deskCalendarEnabled)}
+                  >
+                    {deskCalendarEnabled ? "关闭桌面日历" : "开启桌面日历"}
+                  </button>
+                  <div className="desk-calendar-menu-label">悬浮窗视图</div>
+                  <div className="desk-calendar-view-options" role="group" aria-label="桌面日历视图">
+                    {(["month", "week", "day"] as const).map((view) => (
+                      <button
+                        className={deskCalendarView === view ? "is-active" : undefined}
+                        type="button"
+                        aria-pressed={deskCalendarView === view}
+                        key={view}
+                        disabled={deskCalendarBusy || !deskCalendarEnabled}
+                        onClick={() => void changeDeskCalendarView(view)}
+                      >
+                        {view === "month" ? "月视图" : view === "week" ? "周视图" : "日视图"}
+                      </button>
+                    ))}
+                  </div>
+                  {deskCalendarEnabled ? (
+                    <p className="desk-calendar-menu-hint">悬浮日历已显示在桌面上，可在悬浮窗内拖动与调整。</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </header>
 

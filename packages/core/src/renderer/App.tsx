@@ -191,6 +191,7 @@ export const App = (): JSX.Element => {
         }}
         schedule={window.campusos?.schedule}
         assistant={window.campusos?.assistant}
+        deskCalendar={window.campusos?.deskCalendar}
       />
     );
   } else {

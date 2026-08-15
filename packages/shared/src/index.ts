@@ -22,6 +22,7 @@ import type {
 export * from "./campus";
 export * from "./academicSemester";
 export * from "./pluginCapabilities";
+export * from "./deskCalendarBridge";
 
 export type CampusPermission =
   | `network:${string}`
@@ -176,6 +177,12 @@ export interface PluginComponentProps {
     testConnection: (input: AiAssistantConnectionTestInput) => Promise<AiAssistantConnectionTestResult>;
     parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantExtractionResult>;
     discoverModels: (input: AiAssistantModelDiscoveryInput) => Promise<AiAssistantModelDiscoveryResult>;
+  };
+  deskCalendar?: {
+    loadSettings: () => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
+    setEnabled: (enabled: boolean) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
+    setView: (view: import("./deskCalendarBridge").DeskCalendarView) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
+    subscribe: (listener: () => void) => () => void;
   };
 }
 

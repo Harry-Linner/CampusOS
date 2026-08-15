@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { createElement } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusWorkspaceSnapshot, LocalTaskPeriod, LocalTaskRecord, PluginComponentProps } from "@campusos/shared";
 import { getShanghaiDayNumber, groupEventsByDay, ScheduleView } from "@campusos/plugin-schedule";
@@ -110,6 +110,56 @@ describe("ScheduleView", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
 
     await waitFor(() => expect(schedule.saveTask).toHaveBeenCalledWith(expect.objectContaining({ title: "New task" })));
+  });
+
+  it("opens the desk calendar from the schedule actions and persists the view choice", async () => {
+    const schedule = createSchedule();
+    const deskCalendar = {
+      loadSettings: vi.fn(async () => ({
+        enabled: false,
+        view: "month" as const,
+        savedAt: "2026-08-15T00:00:00.000Z",
+        storagePath: "C:/settings/desk-calendar.json"
+      })),
+      setEnabled: vi.fn(async (enabled: boolean) => ({
+        enabled,
+        view: "month" as const,
+        savedAt: "2026-08-15T00:00:00.000Z",
+        storagePath: "C:/settings/desk-calendar.json"
+      })),
+      setView: vi.fn(async (view: "month" | "week" | "day") => ({
+        enabled: true,
+        view,
+        savedAt: "2026-08-15T00:00:00.000Z",
+        storagePath: "C:/settings/desk-calendar.json"
+      })),
+      subscribe: vi.fn(() => () => undefined)
+    };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule,
+      deskCalendar
+    }));
+
+    await waitFor(() => expect(deskCalendar.loadSettings).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "桌面日历" }));
+    const menu = screen.getByRole("menu", { name: "桌面日历设置" });
+    expect(menu).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "开启桌面日历" }));
+    await waitFor(() => expect(deskCalendar.setEnabled).toHaveBeenCalledWith(true));
+
+    // Wait until the enabled state propagates so view buttons become enabled.
+    const menuViewButton = within(menu).getByRole("button", { name: "周视图" });
+    await waitFor(() => {
+      expect((menuViewButton as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(menuViewButton);
+    await waitFor(() => expect(deskCalendar.setView).toHaveBeenCalledWith("week"));
+    expect((within(menu).getByRole("button", { name: "周视图" })).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("sends task status changes to the main-process bridge", async () => {

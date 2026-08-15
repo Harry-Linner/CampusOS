@@ -24,6 +24,10 @@ import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
 import { registerAiAssistantHandlers } from "./aiAssistantIpc";
+import {
+  notifyDeskCalendarWorkspaceChanged,
+  registerDeskCalendarHandlers
+} from "./deskCalendarWindow";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
@@ -31,6 +35,7 @@ const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
   refresh: async () => {
     const result = await syncCampusWorkspace({ notifyGradeChanges: true });
     notifyCampusWorkspaceChanged();
+    notifyDeskCalendarWorkspaceChanged();
     return result;
   }
 });
@@ -92,6 +97,7 @@ app.whenReady().then(async () => {
   registerCampusWorkspaceHandlers();
   registerPluginRuntimeHandlers();
   registerDiagnosticHandlers();
+  registerDeskCalendarHandlers();
   registerUpdateHandlers();
   await createMainWindow();
   // The updater is intentionally started after the first window exists so

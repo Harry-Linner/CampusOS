@@ -120,6 +120,10 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: ["@campusos/shared"] })],
     build: {
       rollupOptions: {
+        input: {
+          index: resolve(rootDir, "src/preload/index.ts"),
+          deskCalendar: resolve(rootDir, "src/preload/deskCalendar.ts")
+        },
         output: {
           entryFileNames: "[name].cjs",
           format: "cjs"
@@ -150,7 +154,10 @@ export default defineConfig({
     ],
     build: {
       rollupOptions: {
-        input: resolve(rootDir, "src/renderer/index.html")
+        input: {
+          index: resolve(rootDir, "src/renderer/index.html"),
+          "desk-calendar": resolve(rootDir, "src/renderer/desk-calendar.html")
+        }
       }
     },
     resolve: {

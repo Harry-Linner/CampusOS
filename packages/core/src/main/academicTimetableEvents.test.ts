@@ -142,11 +142,11 @@ describe("academic timetable events", () => {
     expect(week2Event.startAt).toBe("2026-09-21T08:00:00+08:00");
   });
 
-  it("projects only the next autumn-winter semester outside teaching periods", () => {
-    const historicalSession = {
+  it("falls back to the spring-summer term (including 小学期) during the summer break", () => {
+    const summerSession = {
       ...timetableRecord.data!.terms[0].sessions[0],
-      sourceId: "historical-session",
-      courseName: "历史学期课程"
+      sourceId: "summer-session",
+      courseName: "小学期课程"
     };
     const autumnSession = {
       ...timetableRecord.data!.terms[0].sessions[0],
@@ -166,7 +166,7 @@ describe("academic timetable events", () => {
             academicYearStart: 2025,
             season: "2|夏",
             state: "live",
-            sessions: [historicalSession]
+            sessions: [summerSession]
           },
           {
             academicYearStart: 2026,
@@ -188,6 +188,13 @@ describe("academic timetable events", () => {
       quarters: [
         {
           academicYearStart: 2025,
+          season: "2|春",
+          startDate: "2026-02-27",
+          classesBeginDate: "2026-02-27",
+          endDate: "2026-04-26"
+        },
+        {
+          academicYearStart: 2025,
           season: "2|夏",
           startDate: "2026-04-27",
           classesBeginDate: "2026-04-27",
@@ -197,14 +204,28 @@ describe("academic timetable events", () => {
       ]
     };
 
-    const result = deriveTimetableCalendarEvents(
+    // 2026-07-28 is 23 days after the summer term ended: still inside the
+    // 45-day fallback window, so the spring-summer term (with 小学期) stays
+    // selected instead of jumping to the next autumn-winter term.
+    const insideFallback = deriveTimetableCalendarEvents(
       [multiSemesterRecord],
       multiSemesterCalendar,
       "2026-07-28T04:00:00.000Z"
     );
-    const titles = new Set(result.events.map((event) => event.title));
+    expect(new Set(insideFallback.events.map((event) => event.title))).toEqual(
+      new Set(["小学期课程"])
+    );
 
-    expect(titles).toEqual(new Set(["秋学期课程", "冬学期课程"]));
+    // 2026-08-30 is 56 days after the summer term ended: outside the fallback
+    // window, so the workspace projects the next autumn-winter term again.
+    const outsideFallback = deriveTimetableCalendarEvents(
+      [multiSemesterRecord],
+      multiSemesterCalendar,
+      "2026-08-30T04:00:00.000Z"
+    );
+    expect(new Set(outsideFallback.events.map((event) => event.title))).toEqual(
+      new Set(["秋学期课程", "冬学期课程"])
+    );
   });
 
   it("deduplicates a full autumn-winter timetable and bounds each half by the calendar", () => {

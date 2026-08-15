@@ -267,6 +267,59 @@ describe("workspace capability integration", () => {
     ).toBe("2026-2027 \u79cb\u51ac\u5b66\u671f");
   });
 
+  it("keeps the spring-summer term active during the 小学期 fallback window", () => {
+    const calendarRecord = {
+      capability: "academic.calendar-config@1" as const,
+      providerId: "org.campusos.zju-calendar-config",
+      accountId: null,
+      state: "live" as const,
+      updatedAt: "2026-07-19T04:05:00.000Z",
+      data: {
+        timezone: "Asia/Shanghai" as const,
+        sourceUrl: "https://www.zju.edu.cn/english/19600/list.htm",
+        quarters: [
+          {
+            academicYearStart: 2025,
+            season: "2|夏" as const,
+            startDate: "2026-04-27",
+            classesBeginDate: "2026-04-27",
+            endDate: "2026-07-05"
+          },
+          {
+            academicYearStart: 2026,
+            season: "1|秋" as const,
+            startDate: "2026-09-11",
+            classesBeginDate: "2026-09-14",
+            endDate: "2026-11-15"
+          }
+        ],
+        periodTimes: [{ period: 1, start: "08:00", end: "08:45" }]
+      }
+    };
+
+    const insideFallback = createSnapshot();
+    insideFallback.generatedAt = "2026-07-28T04:00:00.000Z";
+    expect(
+      mergeAcademicCalendarIntoWorkspace(insideFallback, calendarRecord).term
+    ).toEqual({
+      label: "2025-2026 夏学期",
+      phase: "active",
+      currentWeek: null,
+      progressPercent: 0
+    });
+
+    const outsideFallback = createSnapshot();
+    outsideFallback.generatedAt = "2026-08-30T04:00:00.000Z";
+    expect(
+      mergeAcademicCalendarIntoWorkspace(outsideFallback, calendarRecord).term
+    ).toEqual({
+      label: "2026-2027 秋学期",
+      phase: "upcoming",
+      currentWeek: null,
+      progressPercent: 0
+    });
+  });
+
   it("selects one record per active provider without leaking another account", () => {
     expect(
       findCalendarEventRecords(

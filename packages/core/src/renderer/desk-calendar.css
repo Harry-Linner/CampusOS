@@ -1,0 +1,343 @@
+/* 桌面悬浮日历 — 深色半透明圆角面板，借鉴 DeskToDo 的贴底悬浮外观 */
+:root {
+  --desk-cal-panel: rgba(20, 20, 24, 0.92);
+  --desk-cal-text: #f2f0ea;
+  --desk-cal-muted: rgba(242, 240, 234, 0.55);
+  --desk-cal-border: rgba(255, 255, 255, 0.12);
+  --desk-cal-accent: #d9a441;
+  --desk-cal-radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--desk-cal-text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.desk-cal-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: var(--desk-cal-radius);
+  background: var(--desk-cal-panel);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+/* 顶部工具栏：视图切换 + 导航 + 关闭 */
+.desk-cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  -webkit-app-region: drag;
+}
+
+.desk-cal-toolbar button,
+.desk-cal-view-switcher {
+  -webkit-app-region: no-drag;
+}
+
+.desk-cal-view-switcher {
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.desk-cal-view-switcher button {
+  border: none;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.desk-cal-view-switcher button.is-active {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.desk-cal-controls strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-cal-icon {
+  border: none;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.desk-cal-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-today {
+  border: 1px solid var(--desk-cal-border);
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.desk-cal-today:hover {
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-close {
+  border: none;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.desk-cal-close:hover {
+  background: rgba(220, 80, 80, 0.25);
+  color: #ffffff;
+}
+
+/* 月视图 7x6 网格 */
+.desk-cal-month-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: auto repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  min-height: 0;
+}
+
+.desk-cal-weekday {
+  font-size: 11px;
+  text-align: center;
+  color: var(--desk-cal-muted);
+  padding: 2px 0;
+}
+
+.desk-cal-cell {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desk-cal-cell time {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--desk-cal-muted);
+}
+
+.desk-cal-cell.is-today time {
+  color: var(--desk-cal-accent);
+}
+
+.desk-cal-cell.is-today {
+  border-color: rgba(217, 164, 65, 0.55);
+}
+
+.desk-cal-cell.is-outside {
+  opacity: 0.4;
+}
+
+.desk-cal-cell-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 事件条 */
+.desk-cal-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  line-height: 1.2;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-event em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--desk-cal-muted);
+  flex: 0 0 auto;
+}
+
+.desk-cal-event strong {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desk-cal-event-course {
+  background: rgba(90, 120, 200, 0.28);
+}
+
+.desk-cal-event-exam {
+  background: rgba(200, 90, 90, 0.3);
+}
+
+.desk-cal-event-assignment {
+  background: rgba(180, 140, 60, 0.28);
+}
+
+.desk-cal-event-task {
+  background: rgba(80, 160, 120, 0.28);
+}
+
+.desk-cal-more {
+  font-size: 9px;
+  color: var(--desk-cal-muted);
+  padding-left: 2px;
+}
+
+/* 周视图 */
+.desk-cal-week-grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  min-height: 0;
+}
+
+.desk-cal-week-col {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 8px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desk-cal-week-col.is-today {
+  border-color: rgba(217, 164, 65, 0.55);
+}
+
+.desk-cal-week-col header {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.desk-cal-week-col header span {
+  color: var(--desk-cal-muted);
+}
+
+.desk-cal-week-col header strong {
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-week-col.is-today header strong {
+  color: var(--desk-cal-accent);
+}
+
+/* 日视图 */
+.desk-cal-day-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.desk-cal-day-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.desk-cal-day-row time {
+  font-size: 11px;
+  color: var(--desk-cal-muted);
+  flex: 0 0 auto;
+}
+
+.desk-cal-day-row strong {
+  font-size: 12px;
+}
+
+.desk-cal-day-row small {
+  display: block;
+  font-size: 10px;
+  color: var(--desk-cal-muted);
+  margin-top: 1px;
+}
+
+.desk-cal-empty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--desk-cal-muted);
+}
+
+.desk-cal-error {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #e08b8b;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(220, 80, 80, 0.15);
+}

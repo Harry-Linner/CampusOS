@@ -3739,6 +3739,78 @@ input:focus-visible {
   gap: 8px;
 }
 
+/* 桌面悬浮日历控制菜单 */
+.desk-calendar-control {
+  position: relative;
+}
+
+.desk-calendar-control .text-button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.desk-calendar-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 220px;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.desk-calendar-menu-item {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.desk-calendar-menu-item:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.desk-calendar-menu-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.desk-calendar-view-options {
+  display: flex;
+  gap: 6px;
+}
+
+.desk-calendar-view-options button {
+  flex: 1;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 6px 4px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.desk-calendar-view-options button.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.desk-calendar-menu-hint {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
 .schedule-notice {
   border-left: 3px solid var(--success);
   background: #e8f1eb;

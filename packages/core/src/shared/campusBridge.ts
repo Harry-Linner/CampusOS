@@ -1,4 +1,5 @@
 import type { CampusWorkspaceSnapshot } from "@campusos/shared";
+import type { DeskCalendarControlBridge } from "@campusos/shared";
 import type { AcademicCredentialBridge } from "./credentialBridge";
 import type { ReminderBridge } from "./reminderBridge";
 import type { PluginRuntimeBridge } from "./pluginBridge";
@@ -41,6 +42,7 @@ export interface CampusosBridge {
   academic?: AcademicBridge;
   schedule?: ScheduleBridge;
   assistant?: AiAssistantBridge;
+  deskCalendar?: DeskCalendarControlBridge;
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;
   updates: UpdateBridge;
