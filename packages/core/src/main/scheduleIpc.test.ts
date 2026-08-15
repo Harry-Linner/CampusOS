@@ -218,6 +218,13 @@ describe("schedule IPC", () => {
     expect(updated.tasks[0].title).toBe("Review updated project brief");
 
     const cancelled = await invoke<LocalTasksData>("campusos:schedule:task:mutate", { id: taskId, status: "deleted" });
-    expect(cancelled.tasks).toEqual([]);
+    expect(cancelled.tasks).toHaveLength(1);
+    expect(cancelled.tasks[0]).toMatchObject({ status: "deleted", title: "Review updated project brief" });
+
+    const restored = await invoke<LocalTasksData>("campusos:schedule:task:mutate", { id: cancelled.tasks[0].id, action: "restore" });
+    expect(restored.tasks[0]).toMatchObject({ status: "running" });
+
+    const removed = await invoke<LocalTasksData>("campusos:schedule:task:mutate", { id: restored.tasks[0].id, action: "purge" });
+    expect(removed.tasks).toEqual([]);
   });
 });

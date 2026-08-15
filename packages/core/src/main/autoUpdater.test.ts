@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => {
     },
     checkForUpdates: vi.fn(async () => undefined),
     downloadUpdate: vi.fn(async () => undefined),
+    cancelDownload: vi.fn(),
     quitAndInstall: vi.fn()
   };
   return { handlers, send, app, updater };
@@ -57,6 +58,7 @@ describe("auto updater", () => {
     mocks.send.mockClear();
     mocks.updater.checkForUpdates.mockReset();
     mocks.updater.downloadUpdate.mockReset();
+    mocks.updater.cancelDownload.mockReset();
     mocks.updater.quitAndInstall.mockReset();
   });
 
@@ -99,6 +101,7 @@ describe("auto updater", () => {
       "campusos:app:info",
       "campusos:updater:check",
       "campusos:updater:download",
+      "campusos:updater:cancel",
       "campusos:updater:install",
       "campusos:updater:status"
     ]);

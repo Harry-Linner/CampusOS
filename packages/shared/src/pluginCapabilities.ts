@@ -452,6 +452,7 @@ export interface LocalTaskInput {
 export interface LocalTaskMutation {
   id: string;
   status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
+  action?: "restore" | "purge";
   timeSpentMinutes?: number;
 }
 

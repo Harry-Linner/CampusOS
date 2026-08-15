@@ -144,6 +144,10 @@ export const SettingsView = ({
       setUpdateStatus(await bridge.download());
       return;
     }
+    if (updateStatus.state === "downloading") {
+      setUpdateStatus(await bridge.cancelDownload());
+      return;
+    }
     if (updateStatus.state === "ready") {
       await bridge.install();
       return;
@@ -159,8 +163,8 @@ export const SettingsView = ({
         return { label: "下载更新", disabled: false };
       case "downloading":
         return {
-          label: `下载中 ${Math.round(updateStatus.progress ?? 0)}%`,
-          disabled: true
+          label: `取消下载 ${Math.round(updateStatus.progress ?? 0)}%`,
+          disabled: false
         };
       case "ready":
         return { label: "重启并安装", disabled: false };
@@ -235,7 +239,6 @@ export const SettingsView = ({
           </header>
 
           <p className="page-copy">重新同步当前数据源，并更新日历中的测试数据。</p>
-
           <div className="settings-actions">
             <button
               className="primary-button"
@@ -270,7 +273,6 @@ export const SettingsView = ({
           <p className="page-copy">
             记录各连接器刷新状态、耗时与异常类别；不记录响应正文、密码、Cookie、Session 或 ticket。
           </p>
-
           <div className="settings-actions">
             <button
               className="text-button"
@@ -379,6 +381,14 @@ export const SettingsView = ({
                   ? "当前已是最新版本"
                   : "通过 GitHub Releases 检查并安装 CampusOS 更新。"}
           </p>
+          {updateStatus.releaseNotes?.length ? (
+            <details className="update-notes-disclosure">
+              <summary>查看更新内容</summary>
+              <ul className="update-notes-list">
+                {updateStatus.releaseNotes.slice(0, 5).map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
+              </ul>
+            </details>
+          ) : null}
           <div className="settings-actions">
             <button
               className="primary-button"
@@ -509,7 +519,6 @@ export const SettingsView = ({
               />
             </label>
           </div>
-
           <div className="settings-actions">
             <button
               className="primary-button"
@@ -693,7 +702,6 @@ export const SettingsView = ({
               })}
             </div>
           </fieldset>
-
           <div className="settings-actions">
             <button
               className="primary-button"

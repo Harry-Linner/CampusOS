@@ -12,6 +12,12 @@ let currentStatus: UpdateStatus = app.isPackaged
 let updater: typeof AutoUpdaterType | null = null;
 let updaterEventsBound = false;
 
+const normalizeReleaseNotes = (value: unknown): string[] => {
+  if (typeof value === "string") return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 20);
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => typeof entry === "string" ? entry : typeof entry === "object" && entry !== null && "note" in entry && typeof entry.note === "string" ? entry.note : "").filter(Boolean).slice(0, 20);
+};
+
 const sanitizeUpdateError = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error);
   if (/network|internet|ENOTFOUND|ECONN|timed?\s*out/i.test(message)) {
@@ -35,9 +41,10 @@ const bindUpdaterEvents = (instance: typeof AutoUpdaterType): void => {
   instance.autoDownload = false;
   instance.autoInstallOnAppQuit = true;
   instance.on("checking-for-update", () => emit({ state: "checking" }));
-  instance.on("update-available", (info) =>
-    emit({ state: "available", version: info.version })
-  );
+  instance.on("update-available", (info) => {
+    const releaseNotes = normalizeReleaseNotes(info.releaseNotes);
+    emit({ state: "available", version: info.version, ...(releaseNotes.length ? { releaseNotes } : {}) });
+  });
   instance.on("update-not-available", (info) =>
     emit({ state: "up-to-date", version: info.version })
   );
@@ -99,6 +106,19 @@ export const downloadUpdate = async (): Promise<UpdateStatus> => {
   return getUpdateStatus();
 };
 
+export const cancelDownload = async (): Promise<UpdateStatus> => {
+  if (currentStatus.state !== "downloading") return getUpdateStatus();
+  try {
+    const instance = await getAutoUpdater();
+    const cancellable = instance as typeof instance & { cancelDownload?: () => void };
+    if (typeof cancellable.cancelDownload === "function") cancellable.cancelDownload();
+    emit({ state: "available", version: currentStatus.version });
+  } catch (error) {
+    emit({ state: "error", error: sanitizeUpdateError(error) });
+  }
+  return getUpdateStatus();
+};
+
 export const quitAndInstall = async (): Promise<void> => {
   if (currentStatus.state !== "ready") return;
   (await getAutoUpdater()).quitAndInstall();
@@ -124,6 +144,10 @@ export const registerUpdateHandlers = (): void => {
   ipcMain.handle("campusos:updater:download", async (event) => {
     assertTrustedRenderer(event);
     return downloadUpdate();
+  });
+  ipcMain.handle("campusos:updater:cancel", async (event) => {
+    assertTrustedRenderer(event);
+    return cancelDownload();
   });
   ipcMain.handle("campusos:updater:install", async (event) => {
     assertTrustedRenderer(event);

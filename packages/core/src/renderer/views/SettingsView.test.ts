@@ -175,6 +175,7 @@ const installBridge = (
       getStatus: vi.fn(async () => ({ state: "unavailable" as const })),
       check: vi.fn(async () => ({ state: "unavailable" as const })),
       download: vi.fn(async () => ({ state: "unavailable" as const })),
+      cancelDownload: vi.fn(async () => ({ state: "unavailable" as const })),
       install: vi.fn(async () => undefined),
       subscribe: vi.fn(() => () => undefined)
     }

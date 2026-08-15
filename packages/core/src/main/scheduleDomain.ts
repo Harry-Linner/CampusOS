@@ -284,10 +284,18 @@ export const applyTaskMutation = (
   mutation: LocalTaskMutation
 ): LocalTaskRecord[] => {
   let found = false;
+  if (mutation.action === "purge") {
+    const retained = tasks.filter((task) => task.id !== mutation.id);
+    if (retained.length === tasks.length) throw new Error("任务不存在。");
+    return retained;
+  }
   const result = tasks.map((task) => {
     if (task.id !== mutation.id) return task;
     found = true;
     const next = { ...task };
+    if (mutation.action === "restore") {
+      next.status = next.type === "deadline" && Date.parse(next.endAt) < Date.now() ? "overdue" : "running";
+    }
     if (mutation.status) next.status = mutation.status;
     if (mutation.timeSpentMinutes !== undefined) {
       next.timeSpentMinutes = Math.min(
@@ -312,12 +320,12 @@ export const refreshLocalTasks = (
 ): TaskRefreshResult => {
   const idFactory = getIdFactory(options);
   const current = source
-    .filter((task) => task.status !== "deleted")
     .map((task) => normalizeTaskRecord(task, { ...options, idFactory }));
   const existingFixedIds = new Set<string>();
   const historical: LocalTaskRecord[] = [];
 
   for (const task of current) {
+    if (task.status === "deleted") continue;
     if (task.type === "deadline") {
       if (task.timeSpentMinutes >= task.timeNeededMinutes) {
         task.status = "completed";
@@ -441,7 +449,7 @@ export const getTaskCalendarPeriods = (
   tasks: LocalTaskRecord[],
   rangeStart: Date,
   rangeEnd: Date
-): TaskPeriod[] => tasks.flatMap((task) => buildTaskInstances(task, rangeStart, rangeEnd));
+): TaskPeriod[] => tasks.filter((task) => task.status !== "deleted").flatMap((task) => buildTaskInstances(task, rangeStart, rangeEnd));
 
 const subtractBlockedPeriods = (
   availableStart: number,

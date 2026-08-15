@@ -557,6 +557,22 @@ export const ScheduleView = ({
     }
   };
 
+  const mutateDeleted = async (task: LocalTaskRecord, action: "restore" | "purge"): Promise<void> => {
+    if (!schedule) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await schedule.mutateTask({ id: task.id, action });
+      setTasks(data.tasks);
+      setTaskUpdatedAt(data.updatedAt);
+      setNotice(action === "restore" ? "任务已恢复" : "任务已永久删除");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "回收站操作失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const generatePlan = async (): Promise<void> => {
     if (!schedule) return;
     setBusy(true);
@@ -603,6 +619,10 @@ export const ScheduleView = ({
   );
   const historicalTasks = useMemo(
     () => tasks.filter((task) => task.status !== "deleted" && task.type === "fixedlegacy"),
+    [tasks]
+  );
+  const deletedTasks = useMemo(
+    () => tasks.filter((task) => task.status === "deleted"),
     [tasks]
   );
 
@@ -803,6 +823,22 @@ export const ScheduleView = ({
                     <article className="schedule-task-row is-outdated" key={task.id}>
                       <div className="schedule-task-main"><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></div>
                       <span className="schedule-task-history-label">只读</span>
+                    </article>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+            {deletedTasks.length > 0 ? (
+              <details className="schedule-history-section">
+                <summary>最近删除（{deletedTasks.length} 项）</summary>
+                <div className="schedule-task-list">
+                  {deletedTasks.map((task) => (
+                    <article className="schedule-task-row is-deleted" key={task.id}>
+                      <div className="schedule-task-main"><strong>{task.title}</strong><small>{task.fromId ? "重复任务实例" : "单次任务"} · {formatTaskMeta(task)}</small></div>
+                      <div className="schedule-task-actions">
+                        <button className="text-button" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "restore")}>恢复</button>
+                        <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "purge")}>永久删除</button>
+                      </div>
                     </article>
                   ))}
                 </div>

@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld("campusos", {
     mutateTask: (input: {
       id: string;
       status?: "running" | "suspended" | "completed" | "deleted";
+      action?: "restore" | "purge";
       timeSpentMinutes?: number;
     }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
     generatePlan: (settings: {
@@ -164,6 +165,7 @@ contextBridge.exposeInMainWorld("campusos", {
     getStatus: () => ipcRenderer.invoke("campusos:updater:status"),
     check: () => ipcRenderer.invoke("campusos:updater:check"),
     download: () => ipcRenderer.invoke("campusos:updater:download"),
+    cancelDownload: () => ipcRenderer.invoke("campusos:updater:cancel"),
     install: () => ipcRenderer.invoke("campusos:updater:install"),
     subscribe: (listener: (status: unknown) => void) => {
       const channel = "campusos:updater:changed";
