@@ -204,24 +204,23 @@ describe("academic timetable events", () => {
       ]
     };
 
-    // 2026-07-28 is 23 days after the summer term ended: still inside the
-    // 45-day fallback window, so the spring-summer term (with 小学期) stays
-    // selected instead of jumping to the next autumn-winter term.
+    // 2026-07-15 is 10 days after the summer term ended: still inside the
+    // Celechron-aligned 14-day fallback window.
     const insideFallback = deriveTimetableCalendarEvents(
       [multiSemesterRecord],
       multiSemesterCalendar,
-      "2026-07-28T04:00:00.000Z"
+      "2026-07-15T04:00:00.000Z"
     );
     expect(new Set(insideFallback.events.map((event) => event.title))).toEqual(
       new Set(["小学期课程"])
     );
 
-    // 2026-08-30 is 56 days after the summer term ended: outside the fallback
-    // window, so the workspace projects the next autumn-winter term again.
+    // 2026-08-15 is 41 days after the summer term ended: outside the fallback,
+    // so the workspace projects the next autumn-winter term.
     const outsideFallback = deriveTimetableCalendarEvents(
       [multiSemesterRecord],
       multiSemesterCalendar,
-      "2026-08-30T04:00:00.000Z"
+      "2026-08-15T04:00:00.000Z"
     );
     expect(new Set(outsideFallback.events.map((event) => event.title))).toEqual(
       new Set(["秋学期课程", "冬学期课程"])

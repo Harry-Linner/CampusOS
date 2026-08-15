@@ -595,7 +595,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 
 - [x] ZJU 小学期（短学期）课程挂在教务系统 `xqm=2|夏` 学季（真实校历 4/27–7/05），
   抓取层本就覆盖四季，但投影层在暑假会直接选下一学年秋冬而跳过它。
-- [x] `selectAcademicSemesterWindow` 增加 45 天回落窗口：春夏学期结束后 45 天内
+- [x] `selectAcademicSemesterWindow` 按 Celechron 的 14 天边界回落：春夏学期结束后 14 天内
   优先投影刚结束的春夏学期（含 2|夏 小学期课程），之后才回落到下一学年秋冬；
   语义对齐 Celechron `lib/model/scholar.dart:97-110` 的 thisSemester 回落。
 - [x] 工作区 term 派生同步回落（`mergeAcademicCalendarIntoWorkspace`），
@@ -614,3 +614,22 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [x] 悬浮窗数据经受信 IPC（`campusos:desk-calendar:*`）读取，主窗口与悬浮窗
   分离 preload，符合现有受信 renderer 边界。
 - [x] 覆盖：主进程窗口/IPC/持久化测试、renderer 悬浮窗组件测试、ScheduleView 控制测试。
+
+### Calendar detail and reminder closure (2026-08-15)
+
+- [ ] 主日历与桌面日历的课程、考试、作业、任务均可打开统一详情。
+- [ ] 课程、考试和上游作业保持只读；自建任务支持编辑、完成和删除。
+- [ ] 自建任务支持覆盖全局提前量的单项提醒，包括不提醒、截止时、预设提前量和自定义时间。
+- [ ] 小学期继续归入春夏学期；有 `2|夏` 课程时显示“春夏学期（含小学期）”，并提供“仅看小学期”筛选。
+
+### Desktop background lifecycle (2026-08-15)
+
+- [x] 决策：开机自启属于 CampusOS Core，默认关闭；桌面日历不拥有独立登录项或进程生命周期。
+- [x] 决策：首次引导结束时询问是否开机自启，设置页持续提供同一开关。
+- [x] 决策：关闭主窗口的持久状态为 `ask | hide-to-tray | quit`，默认 `ask`。
+- [x] 决策：关闭询问支持本次独立选择，也支持“设为默认，以后不再询问”；设置页可恢复“每次询问”。
+- [ ] 新增 Core 生命周期偏好存储、开机自启 IPC、托盘与单实例恢复主窗口。
+- [ ] 托盘提供打开 CampusOS、桌面日历控制、立即同步和明确退出；日程插件禁用时移除桌面日历控制。
+- [ ] 标题栏关闭与 `Alt+F4` 走同一询问路径；托盘退出、更新重启和系统关机使用 quitting guard 绕过询问。
+- [ ] 登录项启动时后台运行并恢复已启用能力；手动启动显示主窗口。
+- [ ] 覆盖首次/重复询问、一次性选择、持久默认、设置重置、插件禁用和所有退出路径的 Electron 测试。

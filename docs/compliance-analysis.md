@@ -290,6 +290,18 @@ _Sources_
 - [《资金二清、信息二清，哪个属于非法经营？》](https://www.163.com/dy/article/JARNPSEK0519S96U.html)
 - [《电商平台资金沉淀的合规问题》](https://global.lianlianpay.com/article_train/16-92492.html)
 
+## 桌面后台运行与开机自启同意边界（2026-08-15）
+
+CampusOS 的开机自启、后台驻留和关闭窗口行为会改变用户设备启动项与本地进程持续时间，因此必须坚持明确、可撤回且不捆绑的选择：
+
+- 开机自启默认关闭，只能由首次引导中的明确选择或设置页操作开启；不得因启用日程插件、桌面日历、提醒或账号登录而自动开启。
+- 桌面日历不创建独立登录项，也不拥有独立进程生命周期。禁用日程插件或退出 CampusOS 时必须同步停止。
+- 首次关闭主窗口时必须说明“隐藏到托盘”会继续本地同步、提醒和已启用桌面能力，“退出 CampusOS”会停止这些行为。
+- “设为默认，以后不再询问”必须由用户主动勾选；设置页始终允许恢复“每次询问”，并允许关闭开机自启。
+- 这些偏好仅存储本地布尔值/枚举与更新时间，不需要账号、课程、文件、URL 或其他个人信息，不进入遥测或诊断导出。
+
+该边界与 [ADR-0005](adr/0005-desktop-background-lifecycle.md) 一致，避免通过插件功能捆绑开机启动或后台常驻。
+
 ## AI Assistant MVP boundary (2026-08-07)
 
 The AI Assistant processes only text the user explicitly submits to CampusOS.

@@ -72,6 +72,19 @@ body {
   padding: 4px 10px;
   border-radius: 6px;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.desk-cal-view-switcher button:hover {
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-view-switcher button:active,
+.desk-cal-icon:active,
+.desk-cal-today:active,
+.desk-cal-close:active,
+.desk-cal-day-button:active {
+  transform: translateY(1px);
 }
 
 .desk-cal-view-switcher button.is-active {
@@ -172,6 +185,30 @@ body {
   font-size: 11px;
   font-weight: 600;
   color: var(--desk-cal-muted);
+}
+
+.desk-cal-day-button {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 5px;
+  padding: 1px 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.desk-cal-day-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.desk-cal-view-switcher button:focus-visible,
+.desk-cal-icon:focus-visible,
+.desk-cal-today:focus-visible,
+.desk-cal-close:focus-visible,
+.desk-cal-day-button:focus-visible {
+  outline: 2px solid var(--desk-cal-accent);
+  outline-offset: 2px;
 }
 
 .desk-cal-cell.is-today time {

@@ -171,8 +171,9 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       const start = Date.parse(event.startAt);
       const end = Date.parse(event.endAt);
       if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
+      if (end <= start) continue;
       const rangeStart = startOfDay(new Date(start)).getTime();
-      const rangeEnd = startOfDay(new Date(end)).getTime();
+      const rangeEnd = startOfDay(new Date(end - 1)).getTime();
       for (let cursor = rangeStart; cursor <= rangeEnd; cursor += 24 * 60 * 60 * 1000) {
         const key = toDayKey(new Date(cursor));
         result.set(key, [...(result.get(key) ?? []), event]);
@@ -212,9 +213,21 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
 
   const periodLabel = view === "month" ? monthLabel : view === "week" ? weekLabel : dayLabel;
 
-  const switchView = (next: DeskCalendarView): void => {
+  const switchView = async (next: DeskCalendarView): Promise<void> => {
+    const previous = view;
     setView(next);
-    void api.setView(next).catch(() => undefined);
+    setError(null);
+    try {
+      await api.setView(next);
+    } catch (cause) {
+      setView(previous);
+      setError(cause instanceof Error ? cause.message : "日历视图保存失败。");
+    }
+  };
+
+  const openDay = (day: Date): void => {
+    setSelectedDate(day);
+    void switchView("day");
   };
 
   const movePeriod = (delta: number): void => {
@@ -242,7 +255,9 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     const isToday = isSameDayKey(key, todayKey);
     return (
       <section className={`desk-cal-cell${outside ? " is-outside" : ""}${isToday ? " is-today" : ""}`} key={key}>
-        <time dateTime={key}>{Number(key.slice(8, 10))}</time>
+        <button className="desk-cal-day-button" type="button" aria-label={`查看 ${key}`} onClick={() => openDay(day)}>
+          <time dateTime={key}>{Number(key.slice(8, 10))}</time>
+        </button>
         <div className="desk-cal-cell-events">
           {dayEvents.slice(0, 3).map(renderEventChip)}
           {dayEvents.length > 3 ? <small className="desk-cal-more">+{dayEvents.length - 3} 项</small> : null}
@@ -261,7 +276,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
               type="button"
               aria-pressed={view === mode}
               key={mode}
-              onClick={() => switchView(mode)}
+              onClick={() => void switchView(mode)}
             >
               {mode === "month" ? "月" : mode === "week" ? "周" : "日"}
             </button>
@@ -279,7 +294,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       </header>
 
       {error ? <p className="desk-cal-error" role="alert">{error}</p> : null}
-      {!snapshot ? <p className="desk-cal-empty">暂无日历数据，请先在工作台完成同步。</p> : null}
+      {!snapshot && !error ? <p className="desk-cal-empty">暂无日历数据，请先在工作台完成同步。</p> : null}
 
       {view === "month" ? (
         <div className="desk-cal-month-grid">

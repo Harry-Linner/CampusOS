@@ -298,7 +298,7 @@ describe("workspace capability integration", () => {
     };
 
     const insideFallback = createSnapshot();
-    insideFallback.generatedAt = "2026-07-28T04:00:00.000Z";
+    insideFallback.generatedAt = "2026-07-15T04:00:00.000Z";
     expect(
       mergeAcademicCalendarIntoWorkspace(insideFallback, calendarRecord).term
     ).toEqual({
@@ -309,7 +309,7 @@ describe("workspace capability integration", () => {
     });
 
     const outsideFallback = createSnapshot();
-    outsideFallback.generatedAt = "2026-08-30T04:00:00.000Z";
+    outsideFallback.generatedAt = "2026-08-15T04:00:00.000Z";
     expect(
       mergeAcademicCalendarIntoWorkspace(outsideFallback, calendarRecord).term
     ).toEqual({

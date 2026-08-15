@@ -99,12 +99,11 @@ export const selectAcademicSemesterWindow = (
   );
   if (active) return active;
 
-  // ZJU summer short-term (小学期) courses belong to the 2|夏 quarter, whose
-  // window ends in early July. During the break right after that window,
-  // Celechron's thisSemester still falls back to the most recent semester, so
-  // short-term courses stay visible instead of jumping to the next autumn term.
-  // CampusOS mirrors that: within 45 days after the spring-summer window ends,
-  // fall back to it so 小学期 timetable data (already fetched) is projected.
+  // Celechron lib/model/scholar.dart:97-110 keeps its second loaded semester
+  // current only while the latest period ended within the previous 14 days.
+  // CampusOS mechanically applies that boundary to the spring-summer window so
+  // 小学期 remains visible briefly after classes end, without hiding the next
+  // complete autumn-winter semester for the rest of the summer break.
   const recentSpringSummer = windows
     .filter((window) => window.semesterNumber === 2 && window.endDate < today)
     .sort((left, right) => right.endDate.localeCompare(left.endDate))[0];
@@ -125,8 +124,8 @@ export const selectAcademicSemesterWindow = (
   );
 };
 
-/** 小学期回落窗口：春夏学期结束后多少天内仍视为当前学期。 */
-export const SUMMER_TERM_FALLBACK_DAYS = 45;
+/** Celechron 对照：最近一学期结束后 14 天内仍视为当前学期。 */
+export const SUMMER_TERM_FALLBACK_DAYS = 14;
 
 const sameRepeatPattern = (
   left: AcademicTimetableSession,

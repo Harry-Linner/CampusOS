@@ -2,7 +2,7 @@
 
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CampusWorkspaceSnapshot,
   DeskCalendarSnapshotMessage
@@ -13,9 +13,17 @@ import {
   type DeskCalendarWindowApi
 } from "./DeskCalendarApp";
 
-afterEach(cleanup);
-
 const now = new Date("2026-08-15T04:00:00.000Z");
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const snapshot: CampusWorkspaceSnapshot = {
   generatedAt: now.toISOString(),
@@ -123,6 +131,25 @@ describe("buildDeskCalendarEvents", () => {
     const events = buildDeskCalendarEvents(local);
     expect(events.map((event) => event.title)).toEqual(["独立课程", "截止事项"]);
   });
+
+  it("treats an event end time as exclusive at midnight", async () => {
+    const midnightSnapshot = {
+      ...snapshot,
+      calendarEvents: [{
+        ...snapshot.calendarEvents![0],
+        startAt: "2026-08-15T15:00:00.000Z",
+        endAt: "2026-08-15T16:00:00.000Z"
+      }]
+    };
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({ ...message, snapshot: midnightSnapshot }))
+    });
+
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+    fireEvent.click(screen.getByRole("button", { name: "查看 2026-08-16" }));
+    expect(await screen.findByText("这一天没有安排")).toBeTruthy();
+  });
 });
 
 describe("DeskCalendarApp", () => {
@@ -153,6 +180,32 @@ describe("DeskCalendarApp", () => {
     expect(await screen.findByText("小学期课程")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "下一个周期" }));
     expect(await screen.findByText("期末考试")).toBeTruthy();
+  });
+
+  it("opens a selected month cell in the day view", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+
+    fireEvent.click(screen.getByRole("button", { name: "查看 2026-08-16" }));
+
+    expect(api.setView).toHaveBeenCalledWith("day");
+    expect(await screen.findByText("期末考试")).toBeTruthy();
+  });
+
+  it("reports a persisted view failure and restores the previous view", async () => {
+    const api = createApi({
+      setView: vi.fn(async () => {
+        throw new Error("保存失败");
+      })
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+
+    fireEvent.click(screen.getByRole("button", { name: "周" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("保存失败");
+    expect(screen.getByRole("button", { name: "月" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("closes through the api when the close button is pressed", async () => {

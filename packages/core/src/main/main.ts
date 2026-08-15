@@ -25,8 +25,10 @@ import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
 import { registerAiAssistantHandlers } from "./aiAssistantIpc";
 import {
+  markDeskCalendarAppQuitting,
   notifyDeskCalendarWorkspaceChanged,
-  registerDeskCalendarHandlers
+  registerDeskCalendarHandlers,
+  restoreDeskCalendarWindow
 } from "./deskCalendarWindow";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +102,7 @@ app.whenReady().then(async () => {
   registerDeskCalendarHandlers();
   registerUpdateHandlers();
   await createMainWindow();
+  await restoreDeskCalendarWindow();
   // The updater is intentionally started after the first window exists so
   // packaged startup status is visible through the normal renderer event.
   void checkForUpdates();
@@ -119,5 +122,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  markDeskCalendarAppQuitting();
   workspaceRefreshScheduler.stop();
 });

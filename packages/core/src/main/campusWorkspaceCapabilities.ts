@@ -301,11 +301,10 @@ export const mergeAcademicCalendarIntoWorkspace = (
     (quarter) => quarter.classesBeginDate > today
   );
 
-  // ZJU summer short-term (小学期) courses live in the 2|夏 quarter. When the
-  // spring-summer semester just ended (within SUMMER_TERM_FALLBACK_DAYS), keep
-  // presenting it as the current term so 小学期 courses remain visible instead
-  // of switching the workspace to the next autumn term. This mirrors Celechron
-  // lib/model/scholar.dart:97-110 thisSemester fallback semantics.
+  // Celechron lib/model/scholar.dart:97-110 keeps the latest semester current
+  // only for 14 days after its final period. CampusOS applies the same boundary
+  // to 2|夏 so 小学期 remains visible briefly, then exposes the next complete
+  // autumn-winter semester for the remaining summer break.
   const recentSpringSummerEnd = quarters
     .filter(
       (quarter) =>

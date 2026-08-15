@@ -39,6 +39,7 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 
 - Provide internal tabs for 课表、课程、考试、成绩 and 实践 without creating additional first-level destinations.
 - Course search, detail, history, exam countdown, GPA modes, major identification and practice records all stay within this workspace.
+- 小学期不成为独立学期模型。存在 `2|夏` 课程时，春夏学期标签显示“春夏学期（含小学期）”，并提供“仅看小学期”筛选；Celechron 对照的最近学期回落只保留 14 天，之后暑假默认选择下一完整秋冬学期。
 
 - Privacy masking is on by default and hides original course scores, per-course grade points, academic GPA, and major GPA together.
 - Turning privacy masking off reveals all four value groups in the existing layout; credit totals remain visible in either mode.
@@ -56,6 +57,9 @@ The grades view does not expose connector source-state badges. Major labels are 
 - 日视图 uses 24 hourly event containers labeled `00:00` through `23:00`. `24:00` belongs to the next day and is not rendered as a separate row; the day view’s outer border closes directly after the `23:00` container. Items in the same start hour are ordered by their exact time and stacked vertically; that hour grows with its content so no item crosses the next hour’s guide line.
 - Assign a stable functional color to each course across the app. Courses, deadlines, assignments, and exams all use solid borders; status differences use color, text, and detail metadata rather than dashed outlines.
 - Hovering or keyboard focusing an item reveals its exact time, location, instructor, submission destination, priority, and any provided preparation or requirement note. Clicking keeps the detail open.
+- Main-calendar and desktop-calendar event surfaces open the same detail contract. Courses, exams, and upstream assignments are read-only; local tasks expose edit, complete, and delete actions.
+- Local tasks can override global reminder lead times with no reminder, at due time, preset lead times, or a custom reminder time. Repeating tasks apply the rule to each generated occurrence.
+- The desktop calendar is a Schedule-plugin feature, not another app or navigation destination. Disabling Schedule closes it and removes its tray controls; quitting CampusOS closes it with the rest of the application.
 - Month and agenda navigation use previous month, next month, the month label, and “本月”. Day navigation uses the matching previous day, next day, date label, and “本日” controls. There is no sidebar or metrics panel.
 
 ### 扩展
@@ -80,6 +84,15 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 - Search is a Core command surface, not an installable plugin or first-level destination. It opens from the shell or `Ctrl/Cmd+K` and closes with `Esc`.
 - An empty query returns no results, matching the Celechron search controller. Non-empty queries filter the current formal workspace projection across deduplicated courses, deadlines, and materials; selecting a result navigates to its owning module.
+
+### Core desktop lifecycle
+
+- Auto-start is a global CampusOS setting, defaults off, is offered once after onboarding, and remains editable in Settings. No plugin registers a separate login item.
+- A login-item launch starts CampusOS in the background and restores enabled background capabilities; a normal launch opens the main window.
+- The initial close behavior is `每次询问`. Closing the main window asks the user to `隐藏到托盘`, `退出 CampusOS`, or `取消` and explains what background behavior will continue or stop.
+- The close dialog includes `设为默认，以后不再询问`. Unchecked applies the action once; checked persists that action. Settings exposes `每次询问`, `隐藏到托盘`, and `退出 CampusOS` at all times.
+- Title-bar close and `Alt+F4` share the same path. Tray quit, updater restart, and OS shutdown bypass the prompt through an explicit quitting guard.
+- The tray exposes `打开 CampusOS`, desktop-calendar controls when Schedule is enabled, `立即同步`, and `退出 CampusOS`.
 
 ## Visual system
 
@@ -106,6 +119,9 @@ The grades view does not expose connector source-state badges. Major labels are 
 - The monthly grid is usable at desktop width and can horizontally scroll at narrow widths; agenda and day timeline remain readable on narrow screens.
 - All interactive controls have visible keyboard focus and do not rely on hover alone.
 - Settings retain existing credential and reminder persistence behavior; test builds expose a working data refresh action with visible result feedback.
+- First close supports one-time choices and persisted defaults; resetting Settings to `每次询问` makes the next close prompt again.
+- Auto-start remains off until explicit consent, and disabling it removes only the CampusOS login item without changing plugin settings.
+- Hiding the main window preserves refresh, reminders, tray, and enabled desktop-calendar behavior; explicit quit stops all of them.
 - Settings diagnostics reload persisted refresh records, clear them through IPC, and export a sanitized TXT without exposing account IDs, passwords, Cookie, Session, ticket, token or sensitive URL parameters.
 
 ## Current implementation acceptance (2026-08-04)

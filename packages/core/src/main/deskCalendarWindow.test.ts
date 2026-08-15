@@ -7,7 +7,18 @@ import type { DeskCalendarSettings } from "@campusos/shared";
 const electronState = vi.hoisted(() => ({
   userDataPath: "",
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
-  windows: [] as Array<{ webContents: { send: ReturnType<typeof vi.fn> }; show: ReturnType<typeof vi.fn>; focus: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn>; isDestroyed: () => boolean; loadURL: ReturnType<typeof vi.fn>; loadFile: ReturnType<typeof vi.fn>; setAlwaysOnTop: ReturnType<typeof vi.fn>; setMenu: ReturnType<typeof vi.fn> }>
+  windows: [] as Array<{
+    webContents: { send: ReturnType<typeof vi.fn> };
+    show: ReturnType<typeof vi.fn>;
+    focus: ReturnType<typeof vi.fn>;
+    close: ReturnType<typeof vi.fn>;
+    isDestroyed: () => boolean;
+    loadURL: ReturnType<typeof vi.fn>;
+    loadFile: ReturnType<typeof vi.fn>;
+    setAlwaysOnTop: ReturnType<typeof vi.fn>;
+    setMenu: ReturnType<typeof vi.fn>;
+    listeners: Map<string, () => void>;
+  }>
 }));
 
 vi.mock("electron", () => ({
@@ -27,7 +38,10 @@ vi.mock("electron", () => ({
         focus: vi.fn(),
         close: vi.fn(),
         isDestroyed: () => false,
-        on: vi.fn(),
+        listeners: new Map<string, () => void>(),
+        on: vi.fn((event: string, listener: () => void) => {
+          window.listeners.set(event, listener);
+        }),
         loadURL: vi.fn(async () => undefined),
         loadFile: vi.fn(async () => undefined),
         setAlwaysOnTop: vi.fn(),
@@ -159,6 +173,59 @@ describe("desk calendar window IPC", () => {
 
     await save({}, { enabled: false });
     expect(electronState.windows[0].close).toHaveBeenCalled();
+  });
+
+  it("restores an enabled floating window on app startup", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "preferences"), { recursive: true });
+    await (await import("node:fs/promises")).writeFile(
+      join(storageRoot, "preferences", "desk-calendar.json"),
+      JSON.stringify({ enabled: true, view: "week", savedAt: "2026-08-15T04:00:00.000Z" }),
+      "utf8"
+    );
+
+    const { restoreDeskCalendarWindow } = await import("./deskCalendarWindow");
+    await restoreDeskCalendarWindow();
+
+    expect(electronState.windows).toHaveLength(1);
+    expect(electronState.windows[0].show).toHaveBeenCalled();
+  });
+
+  it("pushes a changed view to an already open floating window", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    await save({}, { enabled: true });
+    electronState.windows[0].webContents.send.mockClear();
+
+    await save({}, { view: "day" });
+    await vi.waitFor(() => {
+      expect(electronState.windows[0].webContents.send).toHaveBeenCalledWith(
+        "campusos:desk-calendar:snapshot",
+        expect.objectContaining({ view: "day" })
+      );
+    });
+  });
+
+  it("disables the preference when the window is closed outside the UI", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    const load = handlerFor("campusos:desk-calendar:settings:load");
+    await save({}, { enabled: true });
+
+    electronState.windows[0].listeners.get("closed")?.();
+    await vi.waitFor(async () => {
+      await expect(load({})).resolves.toMatchObject({ enabled: false });
+    });
   });
 
   it("returns the current workspace snapshot to the floating window", async () => {

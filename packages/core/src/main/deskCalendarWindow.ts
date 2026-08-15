@@ -6,7 +6,6 @@ import {
   normalizeDeskCalendarView,
   type DeskCalendarSettings,
   type DeskCalendarSnapshotMessage,
-  type DeskCalendarView
 } from "@campusos/shared";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
@@ -17,6 +16,7 @@ export const DESK_CALENDAR_SNAPSHOT_CHANNEL = "campusos:desk-calendar:snapshot";
 
 let deskCalendarWindow: BrowserWindow | null = null;
 let settings: DeskCalendarSettings | null = null;
+let appIsQuitting = false;
 
 const getSettingsPath = (): string =>
   join(app.getPath("userData"), "preferences", DESK_CALENDAR_SETTINGS_FILE);
@@ -29,7 +29,9 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
   const storagePath = getSettingsPath();
   try {
     const raw = await readFile(storagePath, "utf8");
-    const payload = JSON.parse(raw) as {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const payload = parsed as {
       enabled?: boolean;
       view?: unknown;
       savedAt?: string;
@@ -41,6 +43,7 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
       storagePath
     };
   } catch (error) {
+    if (error instanceof SyntaxError) return null;
     if (
       typeof error === "object" &&
       error !== null &&
@@ -96,6 +99,18 @@ const broadcastSnapshot = async (): Promise<void> => {
   deskCalendarWindow.webContents.send(DESK_CALENDAR_SNAPSHOT_CHANNEL, message);
 };
 
+const broadcastSnapshotSafely = (): void => {
+  void broadcastSnapshot().catch(() => undefined);
+};
+
+const disableAfterUserClose = async (): Promise<void> => {
+  if (appIsQuitting) return;
+  const current = await loadSettings();
+  if (!current.enabled) return;
+  await saveSettings({ enabled: false });
+  broadcastSettingsChanged();
+};
+
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const window = new BrowserWindow({
     width: 720,
@@ -122,6 +137,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   window.setMenu(null);
   window.on("closed", () => {
     deskCalendarWindow = null;
+    void disableAfterUserClose();
   });
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -135,7 +151,6 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   }
 
   window.show();
-  void broadcastSnapshot();
   return window;
 };
 
@@ -155,14 +170,14 @@ export const registerDeskCalendarHandlers = (): void => {
     return loadSettings();
   });
 
-  ipcMain.handle("campusos:desk-calendar:settings:save", async (event, input: {
-    enabled?: boolean;
-    view?: DeskCalendarView;
-  }) => {
+  ipcMain.handle("campusos:desk-calendar:settings:save", async (event, input: unknown) => {
     assertTrustedRenderer(event);
+    const candidate = typeof input === "object" && input !== null
+      ? input as { enabled?: unknown; view?: unknown }
+      : {};
     const patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view">> = {};
-    if (typeof input.enabled === "boolean") patch.enabled = input.enabled;
-    if (input.view !== undefined) patch.view = normalizeDeskCalendarView(input.view);
+    if (typeof candidate.enabled === "boolean") patch.enabled = candidate.enabled;
+    if (candidate.view !== undefined) patch.view = normalizeDeskCalendarView(candidate.view);
     const next = await saveSettings(patch);
 
     if (next.enabled) {
@@ -170,6 +185,7 @@ export const registerDeskCalendarHandlers = (): void => {
     } else if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
       deskCalendarWindow.close();
     }
+    if (next.enabled) broadcastSnapshotSafely();
     broadcastSettingsChanged();
     return next;
   });
@@ -191,8 +207,21 @@ export const registerDeskCalendarHandlers = (): void => {
 
 /** 工作区刷新后由协调器调用，向悬浮窗推送最新快照。 */
 export const notifyDeskCalendarWorkspaceChanged = (): void => {
-  void broadcastSnapshot();
+  broadcastSnapshotSafely();
 };
 
 export const getDeskCalendarSettings = (): Promise<DeskCalendarSettings> =>
   loadSettings();
+
+/** 应用启动完成后恢复用户上次启用的桌面日历。 */
+export const restoreDeskCalendarWindow = async (): Promise<void> => {
+  const current = await loadSettings();
+  if (!current.enabled) return;
+  await ensureDeskCalendarWindow();
+  broadcastSnapshotSafely();
+};
+
+/** 退出应用时保留启用偏好，避免把正常退出误判为用户关闭组件。 */
+export const markDeskCalendarAppQuitting = (): void => {
+  appIsQuitting = true;
+};

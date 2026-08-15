@@ -384,6 +384,21 @@ single-machine evidence and does not close multi-device, clean-Windows,
 desktop-notification, graduate-account, or Release-distribution acceptance.
 
 日程闭环已按 Celechron 1.3.0 的 task/arrange/flow 逻辑迁入 Core：任务和排程写入 SQLite v3，renderer 只通过正式 schedule IPC 读写；Windows 系统日历采用 RFC 5545 `.ics` 文件和默认文件关联交接，`shell.openPath` 失败会沿 IPC 返回错误，不伪造原生日历写入成功。边界记录在 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
+
+### Windows 后台驻留与关闭行为市场对照（2026-08-15）
+
+Microsoft Teams 将自动启动、后台运行和关闭窗口后继续运行暴露为可修改的系统设置；Zoom Workplace 同样把 Windows 自动启动与“关闭时最小化到通知区域”作为独立偏好，并提供可选的静默启动。这些产品共同说明：持续运行可以服务通知与实时能力，但不能把关闭按钮的含义或开机启动权静默替用户决定。
+
+Windows 交互指南建议只在应用无法安全替用户选择时使用阻塞对话框，按钮必须直接描述结果，并提供安全取消动作。CampusOS 的首次关闭正属于这一情况：隐藏到托盘会继续同步、提醒和桌面功能，而退出会停止它们。最终模式因此不是“永远询问”或“永远最小化”二选一，而是 `ask | hide-to-tray | quit`：在 `ask` 下每次可独立选择，并可在任一次选择时勾选“设为默认，以后不再询问”；设置页可随时恢复每次询问。
+
+Electron 已提供 `app.setLoginItemSettings`、`Tray` 和可取消的 `BrowserWindow.close` 事件，因此实现风险主要在状态一致性而不是平台能力：托盘退出、系统关机和更新重启必须设置 quitting guard；标题栏关闭与 `Alt+F4` 必须共用同一决策；桌面日历只能跟随 CampusOS 和日程插件生命周期。决策记录在 [ADR-0005](docs/adr/0005-desktop-background-lifecycle.md)。
+
+- [Microsoft Teams settings](https://support.microsoft.com/en-US/teams/notifications-settings/change-settings-in-microsoft-teams)
+- [Zoom Workplace desktop settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060612)
+- [Windows dialog guidance](https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/dialogs-and-flyouts/dialogs)
+- [Electron login-item API](https://www.electronjs.org/docs/latest/api/app)
+- [Electron tray guide](https://www.electronjs.org/docs/latest/tutorial/tray)
+- [Electron BrowserWindow close event](https://www.electronjs.org/docs/latest/api/browser-window)
 - 2026-06-17: initial draft — 8 WebSearches, 0 WebFetches (competitor pages were stale/non-functional); 28 sources cited
 
 ### Timetable diagnosis update (2026-08-03)
