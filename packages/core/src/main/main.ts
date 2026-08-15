@@ -20,7 +20,6 @@ import {
 } from "./campusmodRendererProtocol";
 import { initSentryMain } from "./sentryInit";
 import { checkForUpdates, registerUpdateHandlers } from "./autoUpdater";
-import { registerPluginHotReloadHandlers } from "./pluginHotReload";
 import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
@@ -93,7 +92,6 @@ app.whenReady().then(async () => {
   registerCampusWorkspaceHandlers();
   registerPluginRuntimeHandlers();
   registerDiagnosticHandlers();
-  registerPluginHotReloadHandlers();
   registerUpdateHandlers();
   await createMainWindow();
   // The updater is intentionally started after the first window exists so

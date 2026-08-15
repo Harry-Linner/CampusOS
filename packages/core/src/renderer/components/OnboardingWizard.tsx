@@ -3,6 +3,7 @@ import type { AcademicProgram } from "../../shared/credentialBridge";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
 import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
+import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useCampusWorkspace } from "../hooks/useCampusWorkspace";
 import { usePluginHost } from "../hooks/usePluginHost";
@@ -40,13 +41,15 @@ const allowsFixtureOnboarding =
 const RECOMMENDED_PLUGIN_IDS = [
   academicManifest.id,
   scheduleManifest.id,
-  materialsManifest.id
+  materialsManifest.id,
+  assistantManifest.id
 ];
 
 const recommendedPluginPermissions = new Map([
   academicManifest,
   scheduleManifest,
-  materialsManifest
+  materialsManifest,
+  assistantManifest
 ].map((manifest) => [manifest.id, manifest.permissions] as const));
 
 const RECOMMENDED_PLUGIN_DETAILS: Record<
@@ -64,6 +67,10 @@ const RECOMMENDED_PLUGIN_DETAILS: Record<
   "org.campusos.materials": {
     name: "资料",
     description: "按课程浏览资料，并使用受控下载队列保存文件。"
+  },
+  "org.campusos.ai-assistant": {
+    name: "AI 助手",
+    description: "将你主动提交的消息提取为可确认的日程候选。"
   }
 };
 
@@ -730,7 +737,7 @@ export const OnboardingWizard = ({
                 <div className="onboarding-done-item">
                   <strong>扩展已就绪</strong>
                 <span>
-                  学业、日程和资料模块可用
+                  学业、日程、资料和 AI 助手模块可用
                 </span>
               </div>
             </div>

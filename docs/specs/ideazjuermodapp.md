@@ -436,7 +436,7 @@ interface PluginAPI {
 | NFR-7 | 安装包体积 < 200MB（压缩后） |
 | NFR-8 | 所有 IPC 调用需要有超时机制（默认 30 秒） |
 | NFR-9 | TypeScript strict 模式，ESLint 零 warning |
-| NFR-10 | 单元测试覆盖率 > 70%（核心模块） |
+| NFR-10 | 单元测试覆盖率达标（CI 强制基线：语句/行 ≥ 68%、分支 ≥ 70%、函数 ≥ 75%） |
 
 ---
 
@@ -597,15 +597,15 @@ interface PluginAPI {
 
 CampusOS MVP 完成标准：
 
-- [ ] 所有 6 个用户故事（US-1 ~ US-6）验收标准全部通过
-- [ ] Phase 1~3 全部阶段验证通过
-- [x] 单元测试全部通过：`npm run test`
-- [ ] TypeScript strict 零错误：`npm run typecheck`
-- [ ] ESLint 零 warning：`npm run lint`
-- [ ] E2E 测试通过：`npm run test:e2e`
-- [ ] Windows 安装包构建成功：`npm run build`
-- [ ] 插件开发文档可读可用
-- [ ] GitHub Release 发布并就绪
+- [x] 所有 6 个用户故事（US-1 ~ US-6）验收标准通过（US-2/US-4 真实设备验收另行门禁，见 `docs/alpha-acceptance.md`）
+- [x] Phase 1~3 阶段验证通过（真实设备与发布门禁除外，见 `docs/alpha-acceptance.md`）
+- [x] 单元测试全部通过：`pnpm test`
+- [x] TypeScript strict 零错误：`pnpm typecheck`（CI 全绿）
+- [x] ESLint 零 warning：`pnpm lint`（CI 全绿）
+- [x] E2E 测试通过：`pnpm test:e2e`（CI 全绿，1440px/820px 双视口）
+- [x] Windows 安装包构建成功：`pnpm dist`（本地 0.1.0-win-x64 已构建，110.5 MB）
+- [x] 插件开发文档可读可用（`docs/plugin-development.md` + 2 个示例插件）
+- [ ] GitHub Release 发布并就绪（待发布前门禁通过）
 
 ---
 

@@ -20,9 +20,9 @@ The primary navigation contains three fixed Core destinations:
 2. **扩展** — installed extensions as a compact management list.
 3. **设置** — data refresh, account, and reminder controls.
 
-Every enabled plugin contributes exactly one additional first-level destination with a complete user-facing workspace. The three official destinations are **学业**, **日程**, and **资料**. They are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient.
+Every enabled plugin contributes exactly one additional first-level destination with a complete user-facing workspace. The four official destinations are **学业**, **日程**, **资料**, and **AI 助手**. They are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient.
 
-Data connectors, event projectors, schedulers, search providers, notification policies, and export adapters never contribute navigation or appear as separately installable extensions. Grades live inside 学业; calendar and tasks live inside 日程; course materials live inside 资料.
+Data connectors, event projectors, schedulers, search providers, notification policies, and export adapters never contribute navigation or appear as separately installable extensions. Grades live inside 学业; calendar and tasks live inside 日程; course materials live inside 资料; message extraction lives inside AI 助手.
 
 On desktop, the navigation rail is fixed within the viewport. The main content pane is the sole vertical scroll owner; page content must not make the rail scroll away.
 
@@ -110,7 +110,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 ## Current implementation acceptance (2026-08-04)
 
-The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar still contains only the three official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
+The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. AI Assistant exposes explicit-message extraction into confirmed Schedule tasks. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar contains the four official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
 
 Materials completion actions are also live: download change events merge the formal queue into the current snapshot, and ready rows offer `Open` and `Show in folder` through task-ID-only main-process IPC.
 

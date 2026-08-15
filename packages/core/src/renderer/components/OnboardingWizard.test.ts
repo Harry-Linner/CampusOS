@@ -425,7 +425,7 @@ describe("OnboardingWizard", () => {
       screen.getByRole("button", { name: "安装选中插件" })
     );
     expect(await screen.findByText("一切就绪")).toBeDefined();
-    expect(window.campusos!.plugins.configure).toHaveBeenCalledTimes(3);
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledTimes(4);
     expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
       pluginId: "org.campusos.academic",
       enabled: true,
@@ -440,6 +440,11 @@ describe("OnboardingWizard", () => {
       pluginId: "org.campusos.materials",
       enabled: true,
       grantedPermissions: ["storage:domain:materials"]
+    });
+    expect(window.campusos!.plugins.configure).toHaveBeenCalledWith({
+      pluginId: "org.campusos.ai-assistant",
+      enabled: true,
+      grantedPermissions: []
     });
 
     // Step 4: done → complete

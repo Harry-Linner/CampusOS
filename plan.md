@@ -193,7 +193,7 @@ flowchart TD
 **Journey steps covered:** Step 1 (launch App → 看到工作台) — 仅验证技术骨架
 
 **Success metrics:**
-- `npm run test` 全绿，覆盖率 > 70%
+- `npm run test` 全绿，覆盖率 > 70%（当前 CI 强制基线：语句/行 ≥ 68%、分支 ≥ 70%、函数 ≥ 75%，见 `packages/core/vitest.config.ts`）
 - `npm run typecheck` TypeScript strict 零错误
 - hello-world 插件恰好产生一个左侧栏入口，fixture source adapter 提供的能力可被消费者解析
 - 插件安装/卸载生命周期正常（load → activate → deactivate → unload）

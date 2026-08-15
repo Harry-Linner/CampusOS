@@ -6,19 +6,20 @@
 
 ## Current Product Contract
 
-CampusOS exposes exactly three user-facing official modules in the left activity bar:
+CampusOS exposes exactly four user-facing official modules in the left activity bar:
 
 | Module | Responsibilities |
 | --- | --- |
 | Academic | timetable, course catalog, exams, grades, and extracurricular credits |
 | Schedule | month, week, day, tasks, planning, reminders, and iCal export |
 | Materials | course materials, course filters, and download queue |
+| AI Assistant | explicit user submission → provider extraction → editable confirmation → Schedule commit |
 
 The desktop product does not include a campus-card feature. Campus-card functionality belongs to the mobile product and must not be registered, rendered, or listed as a desktop plugin.
 
 The Schedule module is the single owner of calendar behavior. There is no standalone calendar plugin, desktop companion window, mini floating calendar, system-tray calendar process, or multi-window calendar architecture.
 
-Core destinations remain dashboard, extensions, and settings. Connectors, event projection, scheduling, search, and export are implementation services used by the three modules rather than additional first-level plugins.
+Core destinations remain dashboard, extensions, and settings. Connectors, event projection, scheduling, search, and export are implementation services used by the four modules rather than additional first-level plugins.
 
 ## Data And Domain Rules
 
@@ -34,7 +35,7 @@ Core destinations remain dashboard, extensions, and settings. Connectors, event 
 
 Completed in the current implementation:
 
-- three-module plugin model and left-bar registration;
+- four-module plugin model and left-bar registration;
 - canonical calendar projection and source refresh replacement;
 - timetable, exam, assignment, task, reminder, planning, and iCal integration;
 - course catalog linkage and exam countdowns;
