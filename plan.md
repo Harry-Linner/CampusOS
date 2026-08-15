@@ -617,6 +617,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 
 ### Calendar detail and reminder closure (2026-08-15)
 
+- [x] 开发期直接将任务逾期状态从 `failed` 改为 `overdue`，不保留兼容别名或历史迁移。
 - [ ] 主日历与桌面日历的课程、考试、作业、任务均可打开统一详情。
 - [ ] 课程、考试和上游作业保持只读；自建任务支持编辑、完成和删除。
 - [ ] 自建任务支持覆盖全局提前量的单项提醒，包括不提醒、截止时、预设提前量和自定义时间。

@@ -786,7 +786,7 @@ export const ScheduleView = ({
                 <article className={`schedule-task-row is-${task.status}`} key={task.id}>
                   <button className="schedule-task-main" type="button" onClick={() => setForm(taskToForm(task))}><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></button>
                   <div className="schedule-task-actions">
-                    {task.type === "deadline" && (task.status === "running" || task.status === "failed") ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "suspended")}>暂停</button> : null}
+                    {task.type === "deadline" && (task.status === "running" || task.status === "overdue") ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "suspended")}>暂停</button> : null}
                     {task.type === "deadline" && task.status === "suspended" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "running")}>继续</button> : null}
                     {task.type === "deadline" && task.status !== "completed" && task.status !== "deleted" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "completed")}>完成</button> : null}
                     <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void mutate(task, "deleted")}>删除</button>

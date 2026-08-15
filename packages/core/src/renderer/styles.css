@@ -4146,7 +4146,7 @@ input:focus-visible {
 }
 
 .schedule-task-row.is-completed .schedule-task-main strong,
-.schedule-task-row.is-failed .schedule-task-main strong {
+.schedule-task-row.is-overdue .schedule-task-main strong {
   color: var(--ink-faint);
 }
 

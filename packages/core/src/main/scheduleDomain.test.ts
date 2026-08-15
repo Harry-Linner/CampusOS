@@ -81,7 +81,7 @@ describe("schedule domain", () => {
       [
         task({ id: "done", timeSpentMinutes: 60 }),
         task({
-          id: "failed",
+          id: "overdue",
           startAt: "2026-08-03T08:00:00+08:00",
           endAt: "2026-08-03T18:00:00+08:00"
         }),
@@ -102,7 +102,7 @@ describe("schedule domain", () => {
     );
 
     expect(refreshed.tasks.find((item) => item.id === "done")?.status).toBe("completed");
-    expect(refreshed.tasks.find((item) => item.id === "failed")?.status).toBe("failed");
+    expect(refreshed.tasks.find((item) => item.id === "overdue")?.status).toBe("overdue");
     expect(refreshed.tasks.filter((item) => item.type === "fixedlegacy")).toHaveLength(3);
     expect(refreshed.tasks.find((item) => item.id === "weekly")?.startAt).toBe(
       "2026-08-04T01:00:00.000Z"

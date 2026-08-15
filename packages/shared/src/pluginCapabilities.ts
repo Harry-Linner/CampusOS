@@ -396,7 +396,7 @@ export type LocalTaskStatus =
   | "running"
   | "suspended"
   | "completed"
-  | "failed"
+  | "overdue"
   | "deleted"
   | "outdated";
 export type LocalTaskRepeatType = "norepeat" | "days" | "month" | "year";

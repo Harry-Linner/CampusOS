@@ -196,7 +196,7 @@ const normalizeStatus = (value: unknown): LocalTaskStatus => {
     "running",
     "suspended",
     "completed",
-    "failed",
+    "overdue",
     "deleted",
     "outdated"
   ];
@@ -322,7 +322,7 @@ export const refreshLocalTasks = (
       if (task.timeSpentMinutes >= task.timeNeededMinutes) {
         task.status = "completed";
       } else if (task.status !== "completed" && Date.parse(task.endAt) < now.getTime()) {
-        task.status = "failed";
+        task.status = "overdue";
       }
       continue;
     }
