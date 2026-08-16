@@ -236,6 +236,12 @@ body {
   outline-offset: 2px;
 }
 
+.desk-cal-lunar {
+  color: var(--desk-cal-muted);
+  font-size: 9px;
+  line-height: 1;
+}
+
 .desk-cal-cell.is-today time {
   color: var(--desk-cal-accent);
 }
@@ -402,4 +408,69 @@ body {
   padding: 6px 10px;
   border-radius: 8px;
   background: rgba(220, 80, 80, 0.15);
+}
+
+.desk-cal-task-add,
+.desk-cal-detail-complete,
+.desk-cal-detail-open,
+.desk-cal-detail-close,
+.desk-cal-task-form button {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--desk-cal-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.desk-cal-task-add,
+.desk-cal-detail-complete {
+  border-color: rgba(217, 164, 65, 0.7);
+  background: rgba(217, 164, 65, 0.18);
+}
+
+.desk-cal-task-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 10px;
+  background: rgba(17, 22, 34, 0.94);
+}
+
+.desk-cal-task-form header,
+.desk-cal-task-form-grid {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.desk-cal-task-form label {
+  display: grid;
+  gap: 3px;
+  color: var(--desk-cal-muted);
+  font-size: 11px;
+}
+
+.desk-cal-task-form input,
+.desk-cal-task-form textarea,
+.desk-cal-task-form select {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--desk-cal-text);
+  font: inherit;
+  padding: 5px;
+}
+
+.desk-cal-task-form textarea {
+  min-height: 48px;
+  resize: vertical;
+}
+
+.desk-cal-task-form-grid > label {
+  flex: 1 1 0;
 }

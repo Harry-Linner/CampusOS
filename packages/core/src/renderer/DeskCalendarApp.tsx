@@ -3,7 +3,9 @@ import type {
   CalendarEventRecord,
   CampusWorkspaceSnapshot,
   DeskCalendarSnapshotMessage,
-  DeskCalendarView
+  DeskCalendarView,
+  LocalTaskInput,
+  LocalTaskRecord
 } from "@campusos/shared";
 import "./desk-calendar.css";
 
@@ -74,6 +76,51 @@ const buildMonthDays = (month: Date): Date[] => {
 
 const isSameDayKey = (left: string, right: string): boolean => left === right;
 
+const toDateTimeInput = (value: Date): string => {
+  const parts = getShanghaiParts(value);
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+};
+
+const fromDateTimeInput = (value: string): string => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) throw new Error("时间格式无效。");
+  return fromShanghaiParts(
+    Number(match[1]),
+    Number(match[2]),
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5])
+  ).toISOString();
+};
+
+const createDeskTaskForm = (date: Date, task?: LocalTaskRecord): DeskTaskForm => {
+  if (task) {
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      startAt: toDateTimeInput(new Date(task.startAt)),
+      endAt: toDateTimeInput(new Date(task.endAt)),
+      location: task.location,
+      type: task.type === "fixed" ? "fixed" : "deadline"
+    };
+  }
+  const start = fromShanghaiParts(
+    Number(getShanghaiParts(date).year),
+    Number(getShanghaiParts(date).month),
+    Number(getShanghaiParts(date).day),
+    9
+  );
+  return {
+    title: "",
+    description: "",
+    startAt: toDateTimeInput(start),
+    endAt: toDateTimeInput(new Date(start.getTime() + 60 * 60 * 1000)),
+    location: "",
+    type: "fixed"
+  };
+};
+
 interface DeskCalendarEvent {
   id: string;
   title: string;
@@ -81,12 +128,27 @@ interface DeskCalendarEvent {
   startAt: string;
   endAt: string;
   location: string | null;
+  taskId?: string;
+  task?: LocalTaskRecord;
+}
+
+interface DeskTaskForm {
+  id?: string;
+  title: string;
+  description: string;
+  startAt: string;
+  endAt: string;
+  location: string;
+  type: "deadline" | "fixed";
 }
 
 export const buildDeskCalendarEvents = (
-  snapshot: CampusWorkspaceSnapshot
+  snapshot: CampusWorkspaceSnapshot,
+  localTaskPeriods: import("@campusos/shared").LocalTaskPeriod[] = [],
+  localTasks: LocalTaskRecord[] = []
 ): DeskCalendarEvent[] => {
   const canonicalEventIds = new Set(snapshot.calendarEvents?.map((event) => event.id) ?? []);
+  const tasksById = new Map(localTasks.map((task) => [task.id, task]));
   return [
     ...(snapshot.calendarEvents ?? []).map((event) => ({
       id: `calendar:${event.id}`,
@@ -95,6 +157,16 @@ export const buildDeskCalendarEvents = (
       startAt: event.startAt,
       endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
       location: event.location
+    })),
+    ...localTaskPeriods.map((task) => ({
+      id: `task:${task.id}`,
+      title: task.title,
+      kind: "task" as const,
+      startAt: task.startAt,
+      endAt: task.endAt,
+      location: task.location || null,
+      taskId: task.taskId,
+      task: tasksById.get(task.taskId)
     })),
     ...snapshot.courses
       .filter((course) => !canonicalEventIds.has(course.id))
@@ -141,17 +213,23 @@ export interface DeskCalendarWindowApi {
   setShowClock: (showClock: boolean) => Promise<unknown>;
   close: () => Promise<unknown>;
   openMain: (entityId: string) => Promise<unknown>;
+  completeTask: (taskId: string) => Promise<unknown>;
+  saveTask: (input: LocalTaskInput) => Promise<unknown>;
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
 }
 
 export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.Element => {
   const [view, setView] = useState<DeskCalendarView>("month");
   const [snapshot, setSnapshot] = useState<CampusWorkspaceSnapshot | null>(null);
+  const [latestMessage, setLatestMessage] = useState<DeskCalendarSnapshotMessage | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<DeskCalendarEvent | null>(null);
   const [showClock, setShowClock] = useState(true);
   const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [taskForm, setTaskForm] = useState<DeskTaskForm | null>(null);
+  const [savingTask, setSavingTask] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -159,6 +237,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       if (!active) return;
       setView(message.view);
       setSnapshot(message.snapshot);
+      setLatestMessage(message);
     };
     void Promise.all([api.loadSnapshot(), api.loadSettings()]).then(([message, settings]) => {
       apply(message);
@@ -188,7 +267,9 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     }
   };
 
-  const events = useMemo(() => (snapshot ? buildDeskCalendarEvents(snapshot) : []), [snapshot]);
+  const events = useMemo(() => (
+    snapshot ? buildDeskCalendarEvents(snapshot, latestMessage?.localTaskPeriods, latestMessage?.localTasks) : []
+  ), [snapshot, latestMessage]);
   const eventsByDay = useMemo(() => {
     const result = new Map<string, DeskCalendarEvent[]>();
     for (const event of events) {
@@ -254,6 +335,43 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     void switchView("day");
   };
 
+  const saveTask = async (): Promise<void> => {
+    if (!taskForm) return;
+    setSavingTask(true);
+    setError(null);
+    try {
+      const startAt = fromDateTimeInput(taskForm.startAt);
+      const endAt = fromDateTimeInput(taskForm.endAt);
+      const end = new Date(endAt);
+      const input: LocalTaskInput = {
+        ...(taskForm.id ? { id: taskForm.id } : {}),
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim(),
+        startAt,
+        endAt,
+        location: taskForm.location.trim(),
+        timeSpentMinutes: 0,
+        timeNeededMinutes: Math.max(1, Math.round((end.getTime() - Date.parse(startAt)) / 60_000)),
+        breakable: true,
+        type: taskForm.type,
+        repeatType: "norepeat",
+        repeatPeriod: 1,
+        repeatEndsOn: taskForm.endAt.slice(0, 10),
+        blocksPlanning: true,
+        reminderMode: "global",
+        reminderLeadMinutes: null,
+        reminderAt: null
+      };
+      await api.saveTask(input);
+      setTaskForm(null);
+      setSelectedEvent(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "任务保存失败。");
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
   const movePeriod = (delta: number): void => {
     setSelectedDate((current) => {
       if (view === "day") return addDays(current, delta);
@@ -311,6 +429,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
           <strong>{periodLabel}</strong>
           <button className="desk-cal-icon" type="button" aria-label="下一个周期" onClick={() => movePeriod(1)}>›</button>
           <button className="desk-cal-today" type="button" onClick={() => setSelectedDate(new Date())}>今天</button>
+          <button className="desk-cal-task-add" type="button" onClick={() => setTaskForm(createDeskTaskForm(selectedDate))}>新建任务</button>
           <button className="desk-cal-clock-toggle" type="button" aria-pressed={showClock} onClick={() => void toggleClock()}>时钟</button>
         </div>
         <button className="desk-cal-close" type="button" aria-label="关闭桌面日历" onClick={() => void api.close()}>
@@ -372,9 +491,28 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
         <section className="desk-cal-detail" aria-label="安排详情">
           <div><span>{eventKindLabel[selectedEvent.kind]}</span><strong>{selectedEvent.title}</strong></div>
           <p>{formatEventTime(selectedEvent)}{selectedEvent.location ? ` · ${selectedEvent.location}` : ""}</p>
-          <small>桌面日历仅查看详情；编辑、完成或删除请回到 CampusOS 的日程模块。</small>
+          {selectedEvent.taskId ? <button className="desk-cal-detail-complete" type="button" disabled={completingTaskId === selectedEvent.taskId} onClick={() => {
+            const taskId = selectedEvent.taskId;
+            if (!taskId) return;
+            setCompletingTaskId(taskId);
+            void api.completeTask(taskId).then(() => setSelectedEvent(null)).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "任务完成失败。")).finally(() => setCompletingTaskId(null));
+          }}>{completingTaskId === selectedEvent.taskId ? "完成中…" : "完成任务"}</button> : null}
+          {selectedEvent.task ? <button className="desk-cal-detail-open" type="button" onClick={() => setTaskForm(createDeskTaskForm(selectedDate, selectedEvent.task))}>编辑任务</button> : null}
+          <small>{selectedEvent.taskId ? "自建任务可在此完成或编辑。" : "上游课程、考试和作业仅查看详情。"}</small>
           <button className="desk-cal-detail-open" type="button" onClick={() => void api.openMain(selectedEvent.id)}>打开 CampusOS 日程</button>
           <button className="desk-cal-detail-close" type="button" onClick={() => setSelectedEvent(null)}>关闭详情</button>
+        </section>
+      ) : null}
+
+      {taskForm ? (
+        <section className="desk-cal-task-form" aria-label={taskForm.id ? "编辑任务" : "新建任务"}>
+          <header><strong>{taskForm.id ? "编辑任务" : "新建任务"}</strong><button type="button" onClick={() => setTaskForm(null)}>关闭</button></header>
+          <label>标题<input autoFocus required value={taskForm.title} onChange={(event) => setTaskForm({ ...taskForm, title: event.target.value })} /></label>
+          <label>说明<textarea value={taskForm.description} onChange={(event) => setTaskForm({ ...taskForm, description: event.target.value })} /></label>
+          <div className="desk-cal-task-form-grid"><label>开始<input type="datetime-local" required value={taskForm.startAt} onChange={(event) => setTaskForm({ ...taskForm, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={taskForm.endAt} onChange={(event) => setTaskForm({ ...taskForm, endAt: event.target.value })} /></label></div>
+          <label>地点<input value={taskForm.location} onChange={(event) => setTaskForm({ ...taskForm, location: event.target.value })} /></label>
+          <label>类型<select value={taskForm.type} onChange={(event) => setTaskForm({ ...taskForm, type: event.target.value as DeskTaskForm["type"] })}><option value="fixed">日程</option><option value="deadline">DDL</option></select></label>
+          <button className="desk-cal-detail-complete" type="button" disabled={savingTask || !taskForm.title.trim()} onClick={() => void saveTask()}>{savingTask ? "保存中…" : "保存任务"}</button>
         </section>
       ) : null}
     </div>

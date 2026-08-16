@@ -391,7 +391,7 @@ export interface AiAssistantExtractionResult {
   unresolvedQuestions: string[];
 }
 
-export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
+export type LocalTaskType = "deadline" | "fixed" | "floating" | "fixedlegacy";
 export type LocalTaskStatus =
   | "running"
   | "suspended"

@@ -314,4 +314,17 @@ describe("schedule domain", () => {
     expect(first.content).toContain("DESCRIPTION:line 1\\nline 2");
     expect(first.content).toContain("LOCATION:Room\\, 1");
   });
+
+  it("keeps a floating task out of the calendar while preserving its task record", () => {
+    const floating = createTaskRecord({
+      ...task(),
+      title: "Inbox item",
+      type: "floating",
+      reminderMode: "none"
+    });
+    const refreshed = refreshLocalTasks([floating], now);
+    expect(refreshed.tasks).toHaveLength(1);
+    expect(refreshed.tasks[0]).toMatchObject({ title: "Inbox item", type: "floating", status: "running" });
+    expect(getTaskCalendarPeriods(refreshed.tasks, now, new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000))).toEqual([]);
+  });
 });

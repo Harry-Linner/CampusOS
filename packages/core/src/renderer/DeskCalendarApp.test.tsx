@@ -89,6 +89,8 @@ const message: DeskCalendarSnapshotMessage = {
 const createApi = (overrides: Partial<DeskCalendarWindowApi> = {}): DeskCalendarWindowApi => ({
   loadSettings: vi.fn(async () => ({ showClock: true })),
   loadSnapshot: vi.fn(async () => message),
+  completeTask: vi.fn(async () => undefined),
+  saveTask: vi.fn(async () => undefined),
   setView: vi.fn(async () => undefined),
   setShowClock: vi.fn(async () => undefined),
   close: vi.fn(async () => undefined),
@@ -179,7 +181,7 @@ describe("DeskCalendarApp", () => {
     const events = await screen.findAllByRole("button", { name: "小学期课程" });
     fireEvent.click(events[0]);
     expect(screen.getByLabelText("安排详情")).toBeTruthy();
-    expect(screen.getByText(/编辑、完成或删除请回到 CampusOS/)).toBeTruthy();
+    expect(document.querySelector(".desk-cal-detail-complete")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "打开 CampusOS 日程" }));
     expect(api.openMain).toHaveBeenCalledWith(expect.stringMatching(/^calendar:/));
   });
@@ -233,6 +235,26 @@ describe("DeskCalendarApp", () => {
     expect(api.setShowClock).toHaveBeenCalledWith(false);
     await vi.waitFor(() => expect(document.querySelector(".desk-cal-clock")).toBeNull());
   });
+  it("projects local tasks and completes them through the desktop IPC", async () => {
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({
+        ...message,
+        localTaskPeriods: [{
+          id: "task-period-1", taskId: "task-1", title: "Local task", description: "", location: "",
+          startAt: "2026-08-15T01:00:00.000Z", endAt: "2026-08-15T02:00:00.000Z",
+          type: "deadline" as const, status: "running" as const, blocksPlanning: true
+        }]
+      }))
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    const task = await screen.findByText("Local task");
+    fireEvent.click(task);
+    const complete = document.querySelector(".desk-cal-detail-complete");
+    expect(complete).toBeTruthy();
+    fireEvent.click(complete as HTMLButtonElement);
+    await vi.waitFor(() => expect(api.completeTask).toHaveBeenCalledWith("task-1"));
+  });
+
   it("closes through the api when the close button is pressed", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));

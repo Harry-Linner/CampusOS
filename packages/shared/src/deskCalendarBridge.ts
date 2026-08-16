@@ -1,4 +1,5 @@
 import type { CampusWorkspaceSnapshot } from "./campus";
+import type { LocalTaskInput, LocalTaskPeriod, LocalTaskRecord } from "./pluginCapabilities";
 
 /** 桌面悬浮日历的视图模式。 */
 export type DeskCalendarView = "month" | "week" | "day";
@@ -14,6 +15,8 @@ export interface DeskCalendarSettings {
 export interface DeskCalendarSnapshotMessage {
   view: DeskCalendarView;
   snapshot: CampusWorkspaceSnapshot | null;
+  localTaskPeriods?: LocalTaskPeriod[];
+  localTasks?: LocalTaskRecord[];
   generatedAt: string;
 }
 
@@ -36,6 +39,8 @@ export interface DeskCalendarWindowBridge {
   setShowClock: (showClock: boolean) => Promise<DeskCalendarSettings>;
   close: () => Promise<void>;
   openMain: (entityId: string) => Promise<void>;
+  completeTask: (taskId: string) => Promise<void>;
+  saveTask: (input: LocalTaskInput) => Promise<void>;
   loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
 }

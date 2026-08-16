@@ -217,7 +217,7 @@ const normalizeStatus = (value: unknown): LocalTaskStatus => {
 };
 
 const normalizeType = (value: unknown): LocalTaskType =>
-  value === "fixed" || value === "fixedlegacy" ? value : "deadline";
+  value === "fixed" || value === "floating" || value === "fixedlegacy" ? value : "deadline";
 
 const normalizeRepeatType = (value: unknown): LocalTaskRepeatType =>
   value === "days" || value === "weeks" || value === "weekdays" || value === "month" || value === "year"
@@ -366,6 +366,10 @@ export const refreshLocalTasks = (
 
   for (const task of current) {
     if (task.status === "deleted") continue;
+    if (task.type === "floating") {
+      continue;
+    }
+
     if (task.type === "deadline") {
       if (task.timeSpentMinutes >= task.timeNeededMinutes) {
         task.status = "completed";
@@ -446,6 +450,7 @@ const buildTaskInstances = (
   rangeEnd: Date
 ): TaskPeriod[] => {
   const result: TaskPeriod[] = [];
+  if (task.type === "floating") return result;
   const start = parseDate(task.startAt, "任务开始时间");
   const end = parseDate(task.endAt, "任务结束时间");
   const addInstance = (instanceStart: Date, instanceEnd: Date, suffix: string): void => {

@@ -51,7 +51,7 @@ const persistTasks = (tasks: LocalTaskRecord[]): LocalTasksData => {
   return { tasks, updatedAt };
 };
 
-const loadTasks = (): LocalTasksData => {
+export const loadScheduleTasks = (): LocalTasksData => {
   const stored = getOfficialDatabaseService().loadLocalTasks();
   const source = stored && Array.isArray(stored.tasks)
     ? (stored.tasks as LocalTaskRecord[])
@@ -63,7 +63,7 @@ const loadTasks = (): LocalTasksData => {
   return { tasks: refreshed.tasks, updatedAt: stored.savedAt };
 };
 
-const loadPeriods = (input: { startAt: string; endAt: string }): LocalTaskPeriod[] => {
+export const loadSchedulePeriods = (input: { startAt: string; endAt: string }): LocalTaskPeriod[] => {
   const start = new Date(input.startAt);
   const end = new Date(input.endAt);
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start >= end) {
@@ -71,10 +71,10 @@ const loadPeriods = (input: { startAt: string; endAt: string }): LocalTaskPeriod
   }
   // The recurrence and day-chopping rules are kept in scheduleDomain.ts,
   // directly ported from Celechron task.dart getPeriodOfDay/chopDatePeriod.
-  return getTaskCalendarPeriods(loadTasks().tasks, start, end);
+  return getTaskCalendarPeriods(loadScheduleTasks().tasks, start, end);
 };
 
-const saveTask = async (input: LocalTaskInput): Promise<LocalTasksData> => {
+export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTasksData> => {
   const source = readStoredTasks();
   if (!input.id && input.source?.kind === "ai-assistant") {
     const duplicate = source.find((task) => task.source?.kind === "ai-assistant" && task.source.fingerprint === input.source?.fingerprint);
@@ -120,7 +120,7 @@ const saveTask = async (input: LocalTaskInput): Promise<LocalTasksData> => {
   return result;
 };
 
-const mutateTask = async (input: LocalTaskMutation): Promise<LocalTasksData> => {
+export const mutateScheduleTask = async (input: LocalTaskMutation): Promise<LocalTasksData> => {
   const refreshed = refreshLocalTasks(readStoredTasks(), new Date());
   const updated = applyTaskMutation(refreshed.tasks, input);
   const result = persistTasks(refreshLocalTasks(updated, new Date()).tasks);
@@ -130,7 +130,7 @@ const mutateTask = async (input: LocalTaskMutation): Promise<LocalTasksData> => 
 };
 
 const generatePlan = async (settings: PlannerSettings): Promise<PlannerScheduleData> => {
-  const tasks = loadTasks().tasks;
+  const tasks = loadScheduleTasks().tasks;
   const workspace = await hydrateCampusWorkspace();
   const plan = generatePlannerSchedule(
     workspace.snapshot,
@@ -174,7 +174,7 @@ const exportIcal = async (input: CalendarExportInput): Promise<CalendarExportRes
   if (!input || typeof input.termLabel !== "string") {
     throw new Error("日历导出参数无效。");
   }
-  const tasks = loadTasks().tasks;
+  const tasks = loadScheduleTasks().tasks;
   const workspace = await hydrateCampusWorkspace();
   const result = await writeScheduleIcalFile(
     workspace.snapshot,
@@ -189,19 +189,19 @@ const exportIcal = async (input: CalendarExportInput): Promise<CalendarExportRes
 export const registerScheduleHandlers = (): void => {
   ipcMain.handle("campusos:schedule:tasks:load", async (event) => {
     assertTrustedRenderer(event);
-    return loadTasks();
+    return loadScheduleTasks();
   });
   ipcMain.handle("campusos:schedule:periods:load", async (event, input: { startAt: string; endAt: string }) => {
     assertTrustedRenderer(event);
-    return loadPeriods(input);
+    return loadSchedulePeriods(input);
   });
   ipcMain.handle("campusos:schedule:task:save", async (event, input: LocalTaskInput) => {
     assertTrustedRenderer(event);
-    return saveTask(input);
+    return saveScheduleTask(input);
   });
   ipcMain.handle("campusos:schedule:task:mutate", async (event, input: LocalTaskMutation) => {
     assertTrustedRenderer(event);
-    return mutateTask(input);
+    return mutateScheduleTask(input);
   });
   ipcMain.handle("campusos:schedule:plan:generate", async (event, settings: PlannerSettings) => {
     assertTrustedRenderer(event);

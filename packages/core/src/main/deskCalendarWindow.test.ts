@@ -49,7 +49,9 @@ vi.mock("electron", () => ({
         loadURL: vi.fn(async () => undefined),
         loadFile: vi.fn(async () => undefined),
         setAlwaysOnTop: vi.fn(),
-        setMenu: vi.fn()
+        setMenu: vi.fn(),
+        getNormalBounds: vi.fn(() => ({ x: 0, y: 0, width: 720, height: 560 })),
+        isMaximized: vi.fn(() => false)
       };
       electronState.windows.push(window);
       return window;
@@ -90,6 +92,13 @@ vi.mock("./campusWorkspaceStore", () => ({
     storagePath: "C:/workspace.sqlite",
     hydratedFrom: "disk"
   }))
+}));
+
+vi.mock("./scheduleIpc", () => ({
+  loadSchedulePeriods: vi.fn(() => []),
+  loadScheduleTasks: vi.fn(() => ({ tasks: [], updatedAt: "2026-08-15T04:00:00.000Z" })),
+  saveScheduleTask: vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-15T04:00:00.000Z" })),
+  mutateScheduleTask: vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-15T04:00:00.000Z" }))
 }));
 
 vi.mock("./ipcSecurity", () => ({
@@ -260,6 +269,31 @@ describe("desk calendar window IPC", () => {
     const message = await snapshotHandler({}) as { snapshot: typeof snapshot; view: string };
     expect(message.snapshot.generatedAt).toBe("2026-08-15T04:00:00.000Z");
     expect(message.view).toBe("month");
+  });
+
+  it("saves a desktop task through the trusted schedule mutation path", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await registerFresh();
+    const saveTask = handlerFor("campusos:desk-calendar:task:save");
+    await saveTask({}, {
+      title: "Direct task",
+      description: "",
+      startAt: "2026-08-16T01:00:00.000Z",
+      endAt: "2026-08-16T02:00:00.000Z",
+      location: "",
+      timeSpentMinutes: 0,
+      timeNeededMinutes: 60,
+      breakable: true,
+      type: "fixed",
+      repeatType: "norepeat",
+      repeatPeriod: 1,
+      repeatEndsOn: "2026-08-16",
+      blocksPlanning: true
+    });
+    const schedule = await import("./scheduleIpc");
+    expect(schedule.saveScheduleTask).toHaveBeenCalledWith(expect.objectContaining({ title: "Direct task", type: "fixed" }));
   });
 
   it("closes the floating window and disables the setting on close", async () => {

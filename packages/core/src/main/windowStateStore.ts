@@ -8,7 +8,7 @@ export interface StoredWindowState {
   maximized: boolean;
 }
 
-const statePath = (): string => join(app.getPath("userData"), "settings", "main-window.json");
+const statePath = (key = "main-window"): string => join(app.getPath("userData"), "settings", `${key}.json`);
 
 const isRectangle = (value: unknown): value is Rectangle => {
   if (typeof value !== "object" || value === null) return false;
@@ -34,24 +34,24 @@ export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ w
   return { bounds: { x: Math.round(bounds.x), y: Math.round(bounds.y), width, height }, maximized: candidate.maximized };
 };
 
-export const loadWindowState = async (): Promise<StoredWindowState | null> => {
+export const loadWindowState = async (key = "main-window"): Promise<StoredWindowState | null> => {
   try {
-    return normalizeWindowState(JSON.parse(await readFile(statePath(), "utf8")));
+    return normalizeWindowState(JSON.parse(await readFile(statePath(key), "utf8")));
   } catch {
     return null;
   }
 };
 
-export const saveWindowState = async (window: BrowserWindow): Promise<void> => {
+export const saveWindowState = async (window: BrowserWindow, key = "main-window"): Promise<void> => {
   const state: StoredWindowState = { bounds: window.getNormalBounds(), maximized: window.isMaximized() };
-  const target = statePath();
+  const target = statePath(key);
   await mkdir(dirname(target), { recursive: true });
   const temporary = `${target}.${randomUUID()}.tmp`;
   await writeFile(temporary, JSON.stringify(state, null, 2), "utf8");
   await rename(temporary, target);
 };
 
-export const attachWindowStatePersistence = (window: BrowserWindow): (() => void) => {
+export const attachWindowStatePersistence = (window: BrowserWindow, key = "main-window"): (() => void) => {
   let timer: ReturnType<typeof setTimeout> | null = null;
   let detached = false;
   const persist = (): void => {
@@ -59,7 +59,7 @@ export const attachWindowStatePersistence = (window: BrowserWindow): (() => void
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      void saveWindowState(window).catch(() => undefined);
+      void saveWindowState(window, key).catch(() => undefined);
     }, 250);
   };
   window.on("move", persist);

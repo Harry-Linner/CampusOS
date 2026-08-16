@@ -38,7 +38,7 @@ interface TaskFormState {
   endAt: string;
   location: string;
   breakable: boolean;
-  type: "deadline" | "fixed";
+  type: "deadline" | "fixed" | "floating";
   repeatType: "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
   repeatPeriod: number;
   repeatEndsOn: string;
@@ -543,7 +543,7 @@ export const ScheduleView = ({
         repeatPeriod: form.repeatPeriod,
         repeatEndsOn: form.repeatEndsOn,
         repeatWeekdays: form.repeatWeekdays ?? [],
-        blocksPlanning: form.blocksPlanning,
+        blocksPlanning: form.type === "floating" ? false : form.blocksPlanning,
         reminderMode: form.reminderMode,
         reminderLeadMinutes: form.reminderMode === "lead" ? form.reminderLeadMinutes : null,
         reminderAt: form.reminderMode === "custom" ? fromDateTimeInput(form.reminderAt) : null
@@ -657,7 +657,11 @@ export const ScheduleView = ({
       : formatMonth(selectedDate);
 
   const currentTasks = useMemo(
-    () => tasks.filter((task) => task.status !== "deleted" && task.type !== "fixedlegacy"),
+    () => tasks.filter((task) => task.status !== "deleted" && task.type !== "fixedlegacy" && task.type !== "floating"),
+    [tasks]
+  );
+  const floatingTasks = useMemo(
+    () => tasks.filter((task) => task.status !== "deleted" && task.type === "floating"),
     [tasks]
   );
   const historicalTasks = useMemo(
@@ -678,6 +682,9 @@ export const ScheduleView = ({
   }, [deletedTasks]);
 
   const formatTaskMeta = (task: LocalTaskRecord): string => {
+    if (task.type === "floating") {
+      return task.reminderAt ? `提醒：${formatDateTime(task.reminderAt)}` : "未安排日期";
+    }
     if (task.type === "fixed") {
       const repeat = task.repeatType === "norepeat"
         ? "不重复"
@@ -703,6 +710,9 @@ export const ScheduleView = ({
         <div className="schedule-actions">
           <button className="text-button" type="button" disabled={busy || !schedule} onClick={() => setForm(defaultTaskForm(selectedDate))}>
             新建任务
+          </button>
+          <button className="text-button" type="button" disabled={busy || !schedule} onClick={() => setForm({ ...defaultTaskForm(selectedDate), type: "floating", blocksPlanning: false, reminderMode: "none" })}>
+            新建无日期待办
           </button>
           <button className="text-button" type="button" disabled={busy || !schedule} onClick={() => void exportIcal()}>
             导出 iCal
@@ -869,6 +879,21 @@ export const ScheduleView = ({
         </section>
 
         <aside className="schedule-sidebar">
+          <section className="schedule-task-section" aria-labelledby="schedule-floating-heading">
+            <div className="section-heading"><h2 id="schedule-floating-heading">无日期待办</h2><span>{floatingTasks.length} 项</span></div>
+            <div className="schedule-task-list">
+              {floatingTasks.map((task) => (
+                <article className={`schedule-task-row is-${task.status}`} key={task.id}>
+                  <button className="schedule-task-main" type="button" onClick={() => setForm(taskToForm(task))}><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></button>
+                  <div className="schedule-task-actions">
+                    {task.status !== "completed" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "completed")}>完成</button> : null}
+                    <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void deleteTask(task)}>删除</button>
+                  </div>
+                </article>
+              ))}
+              {floatingTasks.length === 0 ? <div className="quiet-empty-state">可收集尚未安排日期的事项</div> : null}
+            </div>
+          </section>
           <section className="schedule-task-section" aria-labelledby="schedule-task-heading">
             <div className="section-heading"><h2 id="schedule-task-heading">任务</h2><span>{currentTasks.length} 项</span></div>
             <div className="schedule-task-list">
@@ -928,12 +953,11 @@ export const ScheduleView = ({
               <div className="section-heading"><h2>{form.id ? "编辑任务" : "新建任务"}</h2><button className="text-button" type="button" onClick={() => setForm(null)}>关闭</button></div>
               <label>标题<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
               <label>说明<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-              <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div>
+              {form.type !== "floating" ? <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div> : <p className="schedule-form-hint">无日期待办不会出现在日历或自动排程中；可单独设置提醒时间。</p>}
               <div className="schedule-form-grid"><label>所需分钟<input type="number" min="1" value={form.timeNeededMinutes} onChange={(event) => setForm({ ...form, timeNeededMinutes: Number(event.target.value) })} /></label><label>已用分钟<input type="number" min="0" value={form.timeSpentMinutes} onChange={(event) => setForm({ ...form, timeSpentMinutes: Number(event.target.value) })} /></label></div>
               <label>地点<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
-              <label className="schedule-check"><input type="checkbox" checked={form.breakable} onChange={(event) => setForm({ ...form, breakable: event.target.checked })} />允许拆分</label>
-              <label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label>
-              <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option></select></label>
+              {form.type !== "floating" ? <><label className="schedule-check"><input type="checkbox" checked={form.breakable} onChange={(event) => setForm({ ...form, breakable: event.target.checked })} />允许拆分</label><label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label></> : null}
+              <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option><option value="floating">无日期待办</option></select></label>
               <label>单项提醒<select value={form.reminderMode === "lead" ? `lead:${form.reminderLeadMinutes}` : form.reminderMode} onChange={(event) => { const value = event.target.value; if (value.startsWith("lead:")) setForm({ ...form, reminderMode: "lead", reminderLeadMinutes: Number(value.slice(5)) }); else setForm({ ...form, reminderMode: value as TaskFormState["reminderMode"] }); }}><option value="global">使用全局提前量</option><option value="none">不提醒</option><option value="at-time">开始/截止时</option><option value="lead:5">提前 5 分钟</option><option value="lead:15">提前 15 分钟</option><option value="lead:30">提前 30 分钟</option><option value="lead:60">提前 1 小时</option><option value="lead:1440">提前 1 天</option><option value="custom">自定义时间</option></select></label>
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" required value={form.reminderAt} onChange={(event) => setForm({ ...form, reminderAt: event.target.value })} /></label> : null}
               {form.type === "fixed" ? <>

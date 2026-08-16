@@ -7,9 +7,17 @@ import {
   type DeskCalendarView,
   type DeskCalendarSettings,
   type DeskCalendarSnapshotMessage,
+  type LocalTaskInput,
 } from "@campusos/shared";
 import { assertTrustedDeskCalendarCaller } from "./ipcSecurity";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
+import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
+import {
+  loadSchedulePeriods,
+  loadScheduleTasks,
+  mutateScheduleTask,
+  saveScheduleTask
+} from "./scheduleIpc";
 
 const DESK_CALENDAR_SETTINGS_FILE = "desk-calendar.json";
 export const DESK_CALENDAR_CHANGED_CHANNEL = "campusos:desk-calendar:changed";
@@ -94,9 +102,15 @@ const broadcastSettingsChanged = (): void => {
 
 const currentSnapshotMessage = async (): Promise<DeskCalendarSnapshotMessage> => {
   const record = await hydrateCampusWorkspace();
+  const now = new Date();
   return {
     view: (await loadSettings()).view,
     snapshot: record.snapshot,
+    localTaskPeriods: loadSchedulePeriods({
+      startAt: new Date(now.getTime() - 366 * 24 * 60 * 60 * 1000).toISOString(),
+      endAt: new Date(now.getTime() + 1096 * 24 * 60 * 60 * 1000).toISOString()
+    }),
+    localTasks: loadScheduleTasks().tasks,
     generatedAt: record.snapshot.generatedAt
   };
 };
@@ -120,7 +134,9 @@ const disableAfterUserClose = async (): Promise<void> => {
 };
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
+  const storedState = await loadWindowState("desk-calendar");
   const window = new BrowserWindow({
+    ...(storedState?.bounds ?? {}),
     width: 720,
     height: 560,
     minWidth: 420,
@@ -141,9 +157,12 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
     }
   });
 
+  const detachWindowStatePersistence = attachWindowStatePersistence(window, "desk-calendar");
+  if (storedState?.maximized) window.maximize();
   window.setAlwaysOnTop(true, "floating");
   window.setMenu(null);
   window.on("closed", () => {
+    detachWindowStatePersistence();
     deskCalendarWindow = null;
     void disableAfterUserClose();
   });
@@ -197,6 +216,25 @@ export const registerDeskCalendarHandlers = (): void => {
     if (next.enabled) broadcastSnapshotSafely();
     broadcastSettingsChanged();
     return next;
+  });
+
+  ipcMain.handle("campusos:desk-calendar:task:complete", async (event, input: unknown) => {
+    assertTrustedDeskCalendarCaller(event);
+    const taskId = typeof input === "object" && input !== null && "taskId" in input && typeof input.taskId === "string"
+      ? input.taskId.trim()
+      : "";
+    if (!taskId || taskId.length > 512) throw new Error("Invalid desktop calendar task.");
+    await mutateScheduleTask({ id: taskId, status: "completed", scope: "single" });
+    broadcastSnapshotSafely();
+  });
+
+  ipcMain.handle("campusos:desk-calendar:task:save", async (event, input: unknown) => {
+    assertTrustedDeskCalendarCaller(event);
+    if (typeof input !== "object" || input === null) {
+      throw new Error("Invalid desktop calendar task.");
+    }
+    await saveScheduleTask(input as LocalTaskInput);
+    broadcastSnapshotSafely();
   });
 
   ipcMain.handle("campusos:desk-calendar:window:snapshot", async (event) => {

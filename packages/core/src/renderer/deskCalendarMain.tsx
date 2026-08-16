@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import type { DeskCalendarSnapshotMessage, DeskCalendarView } from "@campusos/shared";
+import type { DeskCalendarSnapshotMessage, DeskCalendarView, LocalTaskInput } from "@campusos/shared";
 import { DeskCalendarApp, type DeskCalendarWindowApi } from "./DeskCalendarApp";
 
 declare global {
@@ -11,6 +11,8 @@ declare global {
       setShowClock: (showClock: boolean) => Promise<unknown>;
       close: () => Promise<unknown>;
       openMain: (entityId: string) => Promise<unknown>;
+      completeTask: (taskId: string) => Promise<unknown>;
+      saveTask: (input: LocalTaskInput) => Promise<unknown>;
       loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
       subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
     };

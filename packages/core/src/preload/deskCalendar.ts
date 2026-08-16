@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DeskCalendarView } from "@campusos/shared";
+import type { DeskCalendarView, LocalTaskInput } from "@campusos/shared";
 
 contextBridge.exposeInMainWorld("deskCalendar", {
   loadSettings: () => ipcRenderer.invoke("campusos:desk-calendar:settings:load"),
@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld("deskCalendar", {
   close: () => ipcRenderer.invoke("campusos:desk-calendar:window:close"),
   openMain: (entityId: string) =>
     ipcRenderer.invoke("campusos:desk-calendar:window:open-main", { entityId }),
+  completeTask: (taskId: string) =>
+    ipcRenderer.invoke("campusos:desk-calendar:task:complete", { taskId }),
+  saveTask: (input: LocalTaskInput) =>
+    ipcRenderer.invoke("campusos:desk-calendar:task:save", input),
   loadSnapshot: () => ipcRenderer.invoke("campusos:desk-calendar:window:snapshot"),
   subscribe: (listener: (message: unknown) => void) => {
     const channel = "campusos:desk-calendar:snapshot";
