@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const electronState = vi.hoisted(() => ({
   userDataPath: "",
-  appPath: "D:\\\\Desktop\\\\code\\\\CampusOS\\\\packages\\\\core\\\\out\\\\main",
+  appPath: "",
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   loginItemSettings: vi.fn(),
   quit: vi.fn(),
@@ -79,7 +79,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   electronState.handlers.clear();
-  electronState.appPath = join("D:", "Desktop", "code", "CampusOS", "packages", "core", "out", "main");
+  electronState.appPath = join(process.cwd(), "out", "main");
   electronState.trayInstances.length = 0;
   electronState.trayImagePaths.length = 0;
   electronState.menuTemplate = [];
@@ -174,7 +174,7 @@ describe("app lifecycle", () => {
     await lifecycle.createCampusTray();
 
     expect(electronState.trayImagePaths[0]).toBe(
-      join("D:", "Desktop", "code", "CampusOS", "build", "icon.ico")
+      join(process.cwd(), "..", "..", "build", "icon.ico")
     );
     expect(electronState.trayImagePaths[0]).not.toBe(process.execPath);
 
