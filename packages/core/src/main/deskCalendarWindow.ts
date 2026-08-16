@@ -37,11 +37,13 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
     const payload = parsed as {
       enabled?: boolean;
       view?: unknown;
+      showClock?: boolean;
       savedAt?: string;
     };
     return {
       enabled: payload.enabled === true,
       view: normalizeDeskCalendarView(payload.view),
+      showClock: payload.showClock !== false,
       savedAt: payload.savedAt ?? new Date(0).toISOString(),
       storagePath
     };
@@ -67,7 +69,7 @@ const loadSettings = async (): Promise<DeskCalendarSettings> => {
 };
 
 const saveSettings = async (
-  patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view">>
+  patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view" | "showClock">>
 ): Promise<DeskCalendarSettings> => {
   const current = await loadSettings();
   const next: DeskCalendarSettings = {
@@ -179,11 +181,12 @@ export const registerDeskCalendarHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:settings:save", async (event, input: unknown) => {
     assertTrustedDeskCalendarCaller(event);
     const candidate = typeof input === "object" && input !== null
-      ? input as { enabled?: unknown; view?: unknown }
+      ? input as { enabled?: unknown; view?: unknown; showClock?: unknown }
       : {};
-    const patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view">> = {};
+    const patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view" | "showClock">> = {};
     if (typeof candidate.enabled === "boolean") patch.enabled = candidate.enabled;
     if (candidate.view !== undefined) patch.view = normalizeDeskCalendarView(candidate.view);
+    if (typeof candidate.showClock === "boolean") patch.showClock = candidate.showClock;
     const next = await saveSettings(patch);
 
     if (next.enabled) {

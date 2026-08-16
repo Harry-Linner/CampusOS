@@ -87,8 +87,10 @@ const message: DeskCalendarSnapshotMessage = {
 };
 
 const createApi = (overrides: Partial<DeskCalendarWindowApi> = {}): DeskCalendarWindowApi => ({
+  loadSettings: vi.fn(async () => ({ showClock: true })),
   loadSnapshot: vi.fn(async () => message),
   setView: vi.fn(async () => undefined),
+  setShowClock: vi.fn(async () => undefined),
   close: vi.fn(async () => undefined),
   openMain: vi.fn(async () => undefined),
   subscribe: vi.fn(() => () => undefined),
@@ -220,6 +222,17 @@ describe("DeskCalendarApp", () => {
     expect(screen.getByRole("button", { name: "月" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("shows the runtime clock and persists its visibility toggle", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+
+    expect(document.querySelector(".desk-cal-clock")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "时钟" }));
+
+    expect(api.setShowClock).toHaveBeenCalledWith(false);
+    await vi.waitFor(() => expect(document.querySelector(".desk-cal-clock")).toBeNull());
+  });
   it("closes through the api when the close button is pressed", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));

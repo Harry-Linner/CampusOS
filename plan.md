@@ -447,6 +447,10 @@ flowchart TD
 
 ## 7. Open decisions (to make this week)
 
+### DeskToDo 差异闭环（2026-08-16）
+
+桌面效率层按 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md) 执行。优先完成桌面日历直接操作、无日期待办和托盘真实验收，再建立时钟/天气/倒计时/进度条组件 registry，最后补齐多显示器布局、农历节日和外观配置。GitHub Gist/日历同步不迁入。
+
 > 以下决策已随实现落定并关闭，保留历史记录；新决策在此追加。
 
 - **JS 沙箱方案** — ✅ 已定（2026-07~08）：renderer 使用 Electron OS sandbox + 独立 `campusmod://` origin iframe（`campusmodRendererProtocol.ts`）；headless 内层使用 QuickJS/WASM（`quickjs-emscripten-core`），外层 utility process 的崩溃回收与权限代理保留为历史技术资产（`thirdPartyHeadlessUtilityRunner.ts`），不接入 `.campusmod` 生命周期。

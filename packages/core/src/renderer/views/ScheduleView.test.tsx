@@ -153,18 +153,21 @@ describe("ScheduleView", () => {
       loadSettings: vi.fn(async () => ({
         enabled: false,
         view: "month" as const,
+        showClock: true,
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
       })),
       setEnabled: vi.fn(async (enabled: boolean) => ({
         enabled,
         view: "month" as const,
+        showClock: true,
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
       })),
       setView: vi.fn(async (view: "month" | "week" | "day") => ({
         enabled: true,
         view,
+        showClock: true,
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
       })),

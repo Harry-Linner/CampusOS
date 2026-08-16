@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("deskCalendar", {
   loadSettings: () => ipcRenderer.invoke("campusos:desk-calendar:settings:load"),
   setView: (view: DeskCalendarView) =>
     ipcRenderer.invoke("campusos:desk-calendar:settings:save", { view }),
+  setShowClock: (showClock: boolean) =>
+    ipcRenderer.invoke("campusos:desk-calendar:settings:save", { showClock }),
   close: () => ipcRenderer.invoke("campusos:desk-calendar:window:close"),
   openMain: (entityId: string) =>
     ipcRenderer.invoke("campusos:desk-calendar:window:open-main", { entityId }),

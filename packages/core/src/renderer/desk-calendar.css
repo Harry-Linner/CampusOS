@@ -137,6 +137,30 @@ body {
   color: var(--desk-cal-text);
 }
 
+.desk-cal-clock-toggle {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.desk-cal-clock-toggle[aria-pressed="true"] {
+  border-color: var(--desk-cal-border);
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-clock {
+  align-self: flex-end;
+  color: var(--desk-cal-text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  margin: -2px 32px 2px 0;
+}
+
 .desk-cal-close {
   border: none;
   background: transparent;
@@ -205,6 +229,7 @@ body {
 .desk-cal-view-switcher button:focus-visible,
 .desk-cal-icon:focus-visible,
 .desk-cal-today:focus-visible,
+.desk-cal-clock-toggle:focus-visible,
 .desk-cal-close:focus-visible,
 .desk-cal-day-button:focus-visible {
   outline: 2px solid var(--desk-cal-accent);

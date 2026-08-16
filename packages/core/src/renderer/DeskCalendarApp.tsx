@@ -135,8 +135,10 @@ const formatEventTime = (event: DeskCalendarEvent): string => {
 };
 
 export interface DeskCalendarWindowApi {
+  loadSettings: () => Promise<{ showClock: boolean }>;
   loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
   setView: (view: DeskCalendarView) => Promise<unknown>;
+  setShowClock: (showClock: boolean) => Promise<unknown>;
   close: () => Promise<unknown>;
   openMain: (entityId: string) => Promise<unknown>;
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
@@ -147,6 +149,8 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   const [snapshot, setSnapshot] = useState<CampusWorkspaceSnapshot | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<DeskCalendarEvent | null>(null);
+  const [showClock, setShowClock] = useState(true);
+  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -156,7 +160,10 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       setView(message.view);
       setSnapshot(message.snapshot);
     };
-    void api.loadSnapshot().then(apply).catch((cause: unknown) => {
+    void Promise.all([api.loadSnapshot(), api.loadSettings()]).then(([message, settings]) => {
+      apply(message);
+      setShowClock(settings.showClock);
+    }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "无法读取桌面日历数据。");
     });
     const unsubscribe = api.subscribe(apply);
@@ -165,6 +172,21 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       unsubscribe();
     };
   }, [api]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const toggleClock = async (): Promise<void> => {
+    const next = !showClock;
+    try {
+      await api.setShowClock(next);
+      setShowClock(next);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法保存时钟设置。");
+    }
+  };
 
   const events = useMemo(() => (snapshot ? buildDeskCalendarEvents(snapshot) : []), [snapshot]);
   const eventsByDay = useMemo(() => {
@@ -289,11 +311,13 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
           <strong>{periodLabel}</strong>
           <button className="desk-cal-icon" type="button" aria-label="下一个周期" onClick={() => movePeriod(1)}>›</button>
           <button className="desk-cal-today" type="button" onClick={() => setSelectedDate(new Date())}>今天</button>
+          <button className="desk-cal-clock-toggle" type="button" aria-pressed={showClock} onClick={() => void toggleClock()}>时钟</button>
         </div>
         <button className="desk-cal-close" type="button" aria-label="关闭桌面日历" onClick={() => void api.close()}>
           ×
         </button>
       </header>
+      {showClock ? <time className="desk-cal-clock" dateTime={now.toISOString()}>{new Intl.DateTimeFormat("zh-CN", { timeZone: SHANGHAI_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(now)}</time> : null}
 
       {error ? <p className="desk-cal-error" role="alert">{error}</p> : null}
       {!snapshot && !error ? <p className="desk-cal-empty">暂无日历数据，请先在工作台完成同步。</p> : null}

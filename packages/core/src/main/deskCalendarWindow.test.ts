@@ -134,17 +134,17 @@ describe("desk calendar window IPC", () => {
     const save = handlerFor("campusos:desk-calendar:settings:save");
 
     const initial = await load({}) as DeskCalendarSettings;
-    expect(initial).toMatchObject({ enabled: false, view: "month" });
+    expect(initial).toMatchObject({ enabled: false, view: "month", showClock: true });
 
-    const saved = await save({}, { enabled: true, view: "week" }) as DeskCalendarSettings;
-    expect(saved).toMatchObject({ enabled: true, view: "week" });
+    const saved = await save({}, { enabled: true, view: "week", showClock: false }) as DeskCalendarSettings;
+    expect(saved).toMatchObject({ enabled: true, view: "week", showClock: false });
     await expect(readFile(saved.storagePath, "utf8")).resolves.toContain(
       '"view": "week"'
     );
 
     // Re-loading after save returns the persisted state.
     const reloaded = await load({}) as DeskCalendarSettings;
-    expect(reloaded).toMatchObject({ enabled: true, view: "week" });
+    expect(reloaded).toMatchObject({ enabled: true, view: "week", showClock: false });
   });
 
   it("persists settings when a legacy preferences file already exists", async () => {

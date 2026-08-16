@@ -6,6 +6,7 @@ export type DeskCalendarView = "month" | "week" | "day";
 export interface DeskCalendarSettings {
   enabled: boolean;
   view: DeskCalendarView;
+  showClock: boolean;
   savedAt: string;
   storagePath: string;
 }
@@ -32,6 +33,7 @@ export interface DeskCalendarControlBridge {
 export interface DeskCalendarWindowBridge {
   loadSettings: () => Promise<DeskCalendarSettings>;
   setView: (view: DeskCalendarView) => Promise<DeskCalendarSettings>;
+  setShowClock: (showClock: boolean) => Promise<DeskCalendarSettings>;
   close: () => Promise<void>;
   openMain: (entityId: string) => Promise<void>;
   loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
@@ -43,6 +45,7 @@ export const createDefaultDeskCalendarSettings = (
 ): DeskCalendarSettings => ({
   enabled: false,
   view: "month",
+  showClock: true,
   savedAt: new Date(0).toISOString(),
   storagePath
 });

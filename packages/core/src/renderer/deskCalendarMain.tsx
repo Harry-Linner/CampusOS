@@ -6,8 +6,9 @@ import { DeskCalendarApp, type DeskCalendarWindowApi } from "./DeskCalendarApp";
 declare global {
   interface Window {
     deskCalendar: {
-      loadSettings: () => Promise<{ view: DeskCalendarView }>;
+      loadSettings: () => Promise<{ view: DeskCalendarView; showClock: boolean }>;
       setView: (view: DeskCalendarView) => Promise<unknown>;
+      setShowClock: (showClock: boolean) => Promise<unknown>;
       close: () => Promise<unknown>;
       openMain: (entityId: string) => Promise<unknown>;
       loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
