@@ -255,6 +255,50 @@ describe("DeskCalendarApp", () => {
     await vi.waitFor(() => expect(api.completeTask).toHaveBeenCalledWith("task-1"));
   });
 
+  it("creates a dated task from the current desktop calendar date", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+
+    fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Desktop created" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
+
+    await vi.waitFor(() => expect(api.saveTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Desktop created",
+      type: "fixed",
+      repeatType: "norepeat"
+    })));
+  });
+
+  it("opens the same task form for editing a projected local task", async () => {
+    const taskRecord = {
+      id: "task-1", status: "running" as const, description: "Initial", timeSpentMinutes: 0,
+      timeNeededMinutes: 60, startAt: "2026-08-15T01:00:00.000Z", endAt: "2026-08-15T02:00:00.000Z",
+      location: "Library", title: "Local task", breakable: true, type: "fixed" as const,
+      repeatType: "norepeat" as const, repeatPeriod: 1, repeatEndsOn: "2026-08-15", blocksPlanning: true,
+      fromId: null
+    };
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({
+        ...message,
+        localTaskPeriods: [{
+          id: "task-period-1", taskId: "task-1", title: "Local task", description: "Initial", location: "Library",
+          startAt: "2026-08-15T01:00:00.000Z", endAt: "2026-08-15T02:00:00.000Z",
+          type: "fixed" as const, status: "running" as const, blocksPlanning: true
+        }],
+        localTasks: [taskRecord]
+      }))
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    fireEvent.click(await screen.findByText("Local task"));
+    fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Edited task" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
+
+    await vi.waitFor(() => expect(api.saveTask).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1", title: "Edited task" })));
+  });
+
   it("closes through the api when the close button is pressed", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
