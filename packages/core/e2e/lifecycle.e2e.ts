@@ -47,7 +47,7 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window?.show();
-      window?.setBounds({ x: 160, y: 120, width: 1180, height: 760 });
+      window?.setBounds({ x: 160, y: 120, width: 1100, height: 720 });
     });
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 600));
     await app.close();
