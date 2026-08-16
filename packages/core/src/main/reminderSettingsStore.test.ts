@@ -74,8 +74,8 @@ describe("reminder settings IPC", () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
     temporaryDirectories.push(storageRoot);
     electronState.userDataPath = storageRoot;
-    const storagePath = join(storageRoot, "preferences", "reminder-settings.json");
-    await (await import("node:fs/promises")).mkdir(join(storageRoot, "preferences"), { recursive: true });
+    const storagePath = join(storageRoot, "settings", "reminder-settings.json");
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "settings"), { recursive: true });
     await (await import("node:fs/promises")).writeFile(storagePath, JSON.stringify({
       enabled: true,
       leadMinutes: [15],
@@ -87,5 +87,32 @@ describe("reminder settings IPC", () => {
     if (!load) throw new Error("reminder settings load handler was not registered");
 
     await expect(load({})).resolves.toMatchObject({ gradeChangesEnabled: true });
+  });
+
+  it("persists settings when Electron already owns the preferences path as a file", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await (await import("node:fs/promises")).writeFile(
+      join(storageRoot, "preferences"),
+      JSON.stringify({ spellcheck: true }),
+      "utf8"
+    );
+
+    registerReminderSettingsHandlers();
+    const save = electronState.handlers.get("campusos:reminders:settings:save");
+    if (!save) throw new Error("reminder settings save handler was not registered");
+
+    const record = await save({}, {
+      enabled: true,
+      leadMinutes: [15]
+    }) as ReminderSettingsRecord;
+
+    expect(record.storagePath).toBe(
+      join(storageRoot, "settings", "reminder-settings.json")
+    );
+    await expect(readFile(record.storagePath!, "utf8")).resolves.toContain(
+      '"enabled": true'
+    );
   });
 });

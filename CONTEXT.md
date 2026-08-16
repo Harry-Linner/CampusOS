@@ -35,6 +35,10 @@ Core 中不直接形成用户模块的实现，包括事件投影、任务存储
 
 User-facing plugins are exactly Academic, Schedule, Materials, and AI Assistant. Academic is one module with five internal tabs; Schedule owns calendar/tasks/planning/export; Materials owns semester/course browsing and the download queue; AI Assistant owns explicit-message parsing and confirmed task creation. Core connectors, event projections, sessions, global search, updater, About, and license presentation are internal. Authorized undergraduate runs on 2026-07-29, 2026-08-04, and 2026-08-05 completed the redacted live chain, including the private 2026-2027 timetable oracle and 2025-2026 materials/authenticated-download byte gates, with zero sensitive output. Campus Card is intentionally excluded from the desktop scope; graduate real-account, multi-device, clean Windows installation, notification, and Release-distribution gates remain open.
 
+### Timetable, materials, and desktop runtime update (2026-08-16)
+
+The undergraduate connector follows the Celechron 1.3.0 academic-year plan from the admission year through the current year, then probes the next year; each year requests autumn, winter, spring, and summer in order. Summer is the short term inside the spring-summer semester and can be filtered with `只看小学期`. Materials now exposes all authenticated historical semesters, including closed courses, while retaining `2025-2026 春夏` only as the private download baseline. CampusOS settings avoid Electron's file-owned `userData/preferences` path by using `userData/settings`; the tray uses the application icon resource rather than the Electron executable. The redacted live chain passed again on 2026-08-16 with complete timetable request structures, multiple learning semesters, authenticated download byte validation, and zero sensitive output.
+
 ### AI Assistant implementation update (2026-08-07)
 
 AI Assistant is the fourth user-facing module. Its first release accepts only

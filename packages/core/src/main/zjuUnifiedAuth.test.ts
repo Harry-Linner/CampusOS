@@ -407,6 +407,42 @@ describe("ZjuUnifiedAuthClient", () => {
     expect(requests[6].headers["X-Requested-With"]).toBeUndefined();
   });
 
+  it("requests closed courses when the materials connector asks for all semesters", async () => {
+    const coursesBody = JSON.stringify({ courses: [], pages: 1 });
+    const { requests, transport } = createSequenceTransport([
+      response(200, '<input name="execution" value="e1s1">'),
+      response(200, JSON.stringify({ modulus, exponent: "10001" })),
+      response(302, "", {
+        "set-cookie": ["iPlanetDirectoryPro=sso-value; Path=/; Secure"]
+      }),
+      response(302, "", {
+        location: "https://identity.zju.edu.cn/auth/continue"
+      }),
+      response(
+        200,
+        '<meta http-equiv="refresh" content="0;url=https://courses.zju.edu.cn/user/index?authenticated=1">'
+      ),
+      response(200, "learning home", {
+        "set-cookie": ["session=learning-session; Path=/; Secure; HttpOnly"]
+      }),
+      response(200, coursesBody)
+    ]);
+    const client = createZjuUnifiedAuthClient({ transport });
+
+    await client.requestLearningService(
+      { username: "3240100001", password: ["test", "password"].join(" ") },
+      { operation: "courses", page: 1, scope: "all" }
+    );
+
+    const coursesUrl = new URL(requests[6].url);
+    const conditions = JSON.parse(coursesUrl.searchParams.get("conditions") ?? "{}") as {
+      status?: string[];
+      classify_type?: string;
+    };
+    expect(conditions.status).toContain("closed");
+    expect(conditions.classify_type).toBe("all");
+  });
+
   it("retries one transient learning-session timeout before returning data", async () => {
     const routed = createAuthenticatedUndergraduateTransport();
     let learningLoginAttempts = 0;

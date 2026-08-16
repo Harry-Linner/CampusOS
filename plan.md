@@ -44,7 +44,7 @@
  - `zju-undergraduate` 已通过固定成绩查询操作发布 `academic.grades@1`；Academic 模块通过受控 capability IPC、运行时依赖授权和已验证账号隔离展示成绩。插件 activity view 现在能自动生成可达导航入口，加权绩点只使用接口明确返回的绩点；成绩页面默认开启隐私遮罩，课程分数、单课绩点、加权绩点与主修加权绩点均显示为 ***，可一键切换显示。
 - 设置页首次连接已加入显式本科/研究生培养层次：研究生路径只有在 CAS token 与认证后成绩结构都验证成功后才原子保存 v4 回执，正文和 token 不进入 IPC；旧 v3 本科凭据保持可用。`verify:zju-auth` 可通过 `CAMPUSOS_ZJU_PROGRAM=graduate` 选择研究生脱敏现场测试。
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
-- `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。开发期仍完整刷新上游目录，但工作区资料投影和新建下载任务只接受真实 `2025-2026 春/夏/春夏` 课程基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
+- `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。资料连接器使用包含已结课课程的全历史课程范围，工作区按全部有效学期投影，并将逐课 activities 请求限制为最多 4 路并发；真实 `2025-2026 春夏` 只作为私有下载验收基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
 - 既有 QuickJS/WASM 与 utility process headless 隔离实现保留为安全研究和历史技术资产，不接入 `.campusmod` 生命周期；纯 headless、main 和 connector 包不再属于插件产品形态。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不扩大插件执行边界。
 - SQLite `DatabaseService` 已完成 v1/v2/v3 migration：工作区快照、官方 capability provenance、下载队列、日程任务与自动排程写入同一数据库，旧 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
@@ -621,7 +621,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [ ] 主日历与桌面日历的课程、考试、作业、任务均可打开统一详情。
 - [ ] 课程、考试和上游作业保持只读；自建任务支持编辑、完成和删除。
 - [ ] 自建任务支持覆盖全局提前量的单项提醒，包括不提醒、截止时、预设提前量和自定义时间。
-- [ ] 小学期继续归入春夏学期；有 `2|夏` 课程时显示“春夏学期（含小学期）”，并提供“仅看小学期”筛选。
+- [x] 小学期继续归入春夏学期；有 `2|夏` 课程时显示“春夏学期（含小学期）”，并提供“只看小学期”筛选。
 
 ### Desktop background lifecycle (2026-08-16)
 

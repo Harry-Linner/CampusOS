@@ -131,7 +131,7 @@ export interface ZjuGraduateServiceResponse {
 export type ZjuLearningServiceRequest =
   | { operation: "todos" }
   | { operation: "semesters" }
-  | { operation: "courses"; page: number }
+  | { operation: "courses"; page: number; scope?: "active" | "all" }
   | { operation: "course-activities"; courseId: string };
 
 export interface ZjuLearningServiceResponse {
@@ -1587,12 +1587,23 @@ class ZjuUnifiedAuthClient {
           throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程页码无效。");
         }
         const url = new URL(LEARNING_COURSES_URL);
-        url.searchParams.set("conditions", JSON.stringify({
-          status: ["ongoing", "notStarted"],
-          keyword: "",
-          classify_type: "recently_started",
-          display_studio_list: false
-        }));
+        // CampusOS keeps the reference request shape but widens its active-course filter
+        // at the main-process adapter boundary to satisfy historical Materials browsing.
+        url.searchParams.set("conditions", JSON.stringify(
+          request.scope === "all"
+            ? {
+                status: ["ongoing", "notStarted", "closed"],
+                keyword: "",
+                classify_type: "all",
+                display_studio_list: false
+              }
+            : {
+                status: ["ongoing", "notStarted"],
+                keyword: "",
+                classify_type: "recently_started",
+                display_studio_list: false
+              }
+        ));
         url.searchParams.set(
           "fields",
           "id,name,course_code,department(id,name),grade(id,name),klass(id,name),course_type,cover,small_cover,start_date,end_date,is_started,is_closed,academic_year_id,semester_id,credit,compulsory,second_name,display_name,created_user(id,name),org(is_enterprise_or_organization),org_id,public_scope,audit_status,audit_remark,can_withdraw_course,imported_from,allow_clone,is_instructor,is_team_teaching,is_default_course_cover,instructors(id,name,email,avatar_small_url),course_attributes(teaching_class_name,is_during_publish_period,copy_status,tip,data),user_stick_course_record(id),classroom_schedule"

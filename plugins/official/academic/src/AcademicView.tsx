@@ -104,6 +104,7 @@ const TimetablePanel = ({
   >([]);
   const [calendar, setCalendar] = useState<AcademicCalendarConfigData | null>(null);
   const [termKey, setTermKey] = useState("");
+  const [summerOnly, setSummerOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -166,6 +167,9 @@ const TimetablePanel = ({
       : fallbackKey;
   const selected =
     semesters.find((semester) => semester.key === selectedKey) ?? null;
+  const visibleSessions = selected?.sessions.filter(
+    ({ session }) => !summerOnly || session.secondHalf
+  ) ?? [];
 
   return (
     <section className="academic-panel" aria-label="课表">
@@ -180,7 +184,10 @@ const TimetablePanel = ({
             <select
               aria-label="学期"
               value={selectedKey}
-              onChange={(event) => setTermKey(event.target.value)}
+              onChange={(event) => {
+                setTermKey(event.target.value);
+                setSummerOnly(false);
+              }}
             >
               {semesters.map((semester) => (
                 <option key={semester.key} value={semester.key}>
@@ -188,6 +195,16 @@ const TimetablePanel = ({
                 </option>
               ))}
             </select>
+          </label>
+        ) : null}
+        {selected?.semesterNumber === 2 ? (
+          <label className="academic-select-label academic-checkbox-label">
+            <input
+              type="checkbox"
+              checked={summerOnly}
+              onChange={(event) => setSummerOnly(event.target.checked)}
+            />
+            <span>只看小学期</span>
           </label>
         ) : null}
       </div>
@@ -198,11 +215,13 @@ const TimetablePanel = ({
       ) : null}
       {!selected ? (
         <p className="muted">当前没有可用课表。</p>
-      ) : selected.sessions.length === 0 ? (
-        <p className="muted">这个学期暂时没有课程安排。</p>
+      ) : visibleSessions.length === 0 ? (
+        <p className="muted">
+          {summerOnly ? "这个学期暂时没有小学期课程安排。" : "这个学期暂时没有课程安排。"}
+        </p>
       ) : (
         <ul className="academic-record-list">
-          {selected.sessions.map(({ providerId, session }) => (
+          {visibleSessions.map(({ providerId, session }) => (
             <li
               key={`${providerId}:${session.sourceId}:${session.periods.join("-")}`}
               className="academic-record-row"

@@ -19,7 +19,7 @@ let settings: DeskCalendarSettings | null = null;
 let appIsQuitting = false;
 
 const getSettingsPath = (): string =>
-  join(app.getPath("userData"), "preferences", DESK_CALENDAR_SETTINGS_FILE);
+  join(app.getPath("userData"), "settings", DESK_CALENDAR_SETTINGS_FILE);
 
 const ensurePreferencesDir = async (storagePath: string): Promise<void> => {
   await mkdir(dirname(storagePath), { recursive: true });

@@ -48,7 +48,7 @@ const normalizeSemester = (semester: string): { key: string; label: string } => 
   const season = /秋|冬/.test(normalized)
     ? { number: 1, label: "秋冬学期" }
     : /春|夏/.test(normalized)
-      ? { number: 2, label: "春夏学期" }
+      ? { number: 2, label: "春夏学期（含小学期）" }
       : null;
   if (!academicYear || !season) {
     return { key: normalized, label: semester };

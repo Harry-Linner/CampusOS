@@ -520,3 +520,11 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 - 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
+
+## 2026-08-16 课表、历史资料与桌面运行时修复
+
+- 现场 `EEXIST` 的直接原因不是 JSON 写入冲突，而是 Electron 已将 `userData/preferences` 创建为普通文件；桌面日历和提醒设置却把同一路径当目录执行 `mkdir`。CampusOS 设置现统一写入 `userData/settings`，不删除、不覆盖 Electron 的 `preferences` 文件，并由真实文件冲突回归测试锁定。
+- 托盘失败来自开发期把 `process.execPath`（Electron 可执行文件）传给 `Tray` 当作图片。开发期改为仓库 `build/icon.ico`，打包期改为随 `extraResources` 复制的 `resources/icon.ico`；`app.whenReady()` 初始化链增加显式错误收口，避免 Promise rejection 无处理。
+- `.tmp/celechron-1.3.0/lib/http/ugrs_spider.dart` 表明本科课表并非只查当前与下一学年：它从学号推导入学年，抓取入学年至当前学年，并在毕业边界内探测下一学年；每学年顺序固定为秋、冬、春、夏。`2|夏` 即小学期，继续并入春夏学期。CampusOS 已按该计划迁入，并在春夏课表提供“只看小学期”。
+- 资料历史范围是一次明确产品扩展：本地 ZJU Learning Assistant 对照只请求活跃课程，但用户要求所有过去学期，因此 CampusOS 课程分页包含已结课状态并取消工作区单学期白名单。其余业务 Session、分页、activities/uploads 解析、认证下载、缓存和失败边界保持不变；逐课 activities 最多 4 路并发，防止历史课程扩大后形成请求尖峰。
+- 2026-08-16 的真实账号脱敏验证通过完整课表请求结构、跨多个学在浙大学期、逐课资料目录、一份授权课件下载及实际字节校验，敏感字段输出为 0。该证据不替代多设备、全新 Windows 安装和真实系统托盘现场验收。

@@ -137,6 +137,27 @@ const parseJsonObject = (body: string, label: string): Record<string, unknown> =
   throw new Error(`${label}响应不是对象。`);
 };
 
+const mapWithConcurrency = async <Input, Output>(
+  values: readonly Input[],
+  concurrency: number,
+  mapper: (value: Input, index: number) => Promise<Output>
+): Promise<Output[]> => {
+  const results = new Array<Output>(values.length);
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), values.length) },
+    async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await mapper(values[index], index);
+      }
+    }
+  );
+  await Promise.all(workers);
+  return results;
+};
+
 export interface LearningCoursesPage {
   courses: LearningCourseRecord[];
   pages: number;
@@ -319,7 +340,7 @@ export const createZjuLearningConnector = ({
       ).values()];
       // zju-learning-assistant refreshes every selected course's activities before
       // publishing a new list; a partial directory must not replace the last snapshot.
-      const materials = (await Promise.all(courses.map(async (course, index) => {
+      const materials = (await mapWithConcurrency(courses, 4, async (course, index) => {
         try {
           const result = await fetchCourseActivities(course.sourceId);
           if (!result.ok) throw new Error(result.message);
@@ -330,7 +351,7 @@ export const createZjuLearningConnector = ({
             : "学在浙大课件请求失败。";
           throw new Error(`第 ${index + 1} 个课程课件请求失败：${message}`);
         }
-      }))).flat();
+      })).flat();
       await publish({
         capability: "learning.materials@1",
         accountId,

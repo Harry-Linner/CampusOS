@@ -126,7 +126,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 ## Current implementation acceptance (2026-08-04)
 
-The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. AI Assistant exposes explicit-message extraction into confirmed Schedule tasks. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar contains the four official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
+The Academic first-level module exposes five internal tabs (timetable, course catalog, exams, grades, practice), with runtime semester selection, summer defaulting to the next complete autumn-winter term, course search/detail, and capability reload tied to `snapshot.generatedAt`. Materials exposes all available historical semesters, semester/course browsing, selection, batch enqueue, queue progress, pause/resume/retry/cancel, and completed-file verification. Schedule exposes all four views, the next 48 hours, tasks, recurrence, planner, and iCal handoff. AI Assistant exposes explicit-message extraction into confirmed Schedule tasks. Core search, updater, About, and license surfaces are wired through formal state/IPC. The sidebar contains the four official user modules; Campus Card is not part of the desktop interface. Electron E2E passed at 1440px and 820px widths on 2026-08-04.
 
 Materials completion actions are also live: download change events merge the formal queue into the current snapshot, and ready rows offer `Open` and `Show in folder` through task-ID-only main-process IPC.
 
@@ -170,7 +170,13 @@ This section supersedes the earlier three-destination baseline: the current four
 
 ## Future-term timetable integrity (2026-08-03)
 
-When the calendar is in a vacation period, the preview must use the next complete academic term. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.
+When the calendar is in a vacation period, the preview must use the next complete academic term. Following `.tmp/celechron-1.3.0/lib/http/ugrs_spider.dart`, the connector derives the admission year from the student ID, requests every academic year from admission through the current year in the fixed `1|秋`, `1|冬`, `2|春`, `2|夏` order, and probes the next academic year without crossing the graduation bound. `2|夏` is the summer short term and merges into the spring-summer semester; the UI labels that semester `春夏学期（含小学期）` and offers `只看小学期`. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.
+
+## Historical materials and desktop-runtime repair (2026-08-16)
+
+The Materials connector requests active and closed courses, projects every valid semester returned by the authenticated account, and traverses each course's activities with a maximum concurrency of four. This deliberately extends the active-course-only range of the local ZJU Learning Assistant reference because the user requires past-semester downloads; authentication, course pagination, activity parsing, authenticated download, cache fallback, and failure boundaries remain unchanged.
+
+Electron's `userData/preferences` path is owned by Electron as a file in the affected development profile, so CampusOS JSON settings live under `userData/settings` and must never try to create `preferences` as a directory. The development tray loads `build/icon.ico`, the packaged tray loads the copied resource icon, and startup failures are caught instead of surfacing as unhandled promise rejections.
 
 ## Academic major summary integrity (2026-08-04)
 

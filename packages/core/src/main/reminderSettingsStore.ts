@@ -22,7 +22,7 @@ interface StoredReminderSettingsPayload {
 }
 
 const getReminderSettingsPath = (): string =>
-  join(app.getPath("userData"), "preferences", REMINDER_SETTINGS_FILE);
+  join(app.getPath("userData"), "settings", REMINDER_SETTINGS_FILE);
 
 const ensureReminderSettingsDir = async (storagePath: string): Promise<void> => {
   await mkdir(dirname(storagePath), { recursive: true });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -143,12 +143,30 @@ describe("desk calendar window IPC", () => {
     expect(reloaded).toMatchObject({ enabled: true, view: "week" });
   });
 
+  it("persists settings when a legacy preferences file already exists", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await writeFile(
+      join(storageRoot, "preferences"),
+      JSON.stringify({ spellcheck: true }),
+      "utf8"
+    );
+
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    const saved = await save({}, { enabled: true, view: "week" }) as DeskCalendarSettings;
+
+    expect(saved.storagePath).toBe(join(storageRoot, "settings", "desk-calendar.json"));
+    await expect(readFile(saved.storagePath, "utf8")).resolves.toContain('"enabled": true');
+  });
+
   it("normalizes an invalid persisted view to month", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
     temporaryDirectories.push(storageRoot);
     electronState.userDataPath = storageRoot;
-    const storagePath = join(storageRoot, "preferences", "desk-calendar.json");
-    await (await import("node:fs/promises")).mkdir(join(storageRoot, "preferences"), { recursive: true });
+    const storagePath = join(storageRoot, "settings", "desk-calendar.json");
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "settings"), { recursive: true });
     await (await import("node:fs/promises")).writeFile(storagePath, JSON.stringify({
       enabled: false,
       view: "year",
@@ -179,9 +197,9 @@ describe("desk calendar window IPC", () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
     temporaryDirectories.push(storageRoot);
     electronState.userDataPath = storageRoot;
-    await (await import("node:fs/promises")).mkdir(join(storageRoot, "preferences"), { recursive: true });
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "settings"), { recursive: true });
     await (await import("node:fs/promises")).writeFile(
-      join(storageRoot, "preferences", "desk-calendar.json"),
+      join(storageRoot, "settings", "desk-calendar.json"),
       JSON.stringify({ enabled: true, view: "week", savedAt: "2026-08-15T04:00:00.000Z" }),
       "utf8"
     );

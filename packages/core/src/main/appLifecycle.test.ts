@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const electronState = vi.hoisted(() => ({
   userDataPath: "",
+  appPath: "D:\\\\Desktop\\\\code\\\\CampusOS\\\\packages\\\\core\\\\out\\\\main",
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   loginItemSettings: vi.fn(),
   quit: vi.fn(),
   showMessageBox: vi.fn(),
+  trayImagePaths: [] as string[],
   trayInstances: [] as Array<{
     setToolTip: ReturnType<typeof vi.fn>;
     setContextMenu: ReturnType<typeof vi.fn>;
@@ -20,6 +22,8 @@ const electronState = vi.hoisted(() => ({
 vi.mock("electron", () => ({
   app: {
     getPath: vi.fn(() => electronState.userDataPath),
+    getAppPath: vi.fn(() => electronState.appPath),
+    isPackaged: false,
     setLoginItemSettings: electronState.loginItemSettings,
     quit: electronState.quit
   },
@@ -38,7 +42,8 @@ vi.mock("electron", () => ({
       return template;
     })
   },
-  Tray: vi.fn().mockImplementation(() => {
+  Tray: vi.fn().mockImplementation((imagePath: string) => {
+    electronState.trayImagePaths.push(imagePath);
     const instance = {
       setToolTip: vi.fn(),
       setContextMenu: vi.fn(),
@@ -74,7 +79,9 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   electronState.handlers.clear();
+  electronState.appPath = join("D:", "Desktop", "code", "CampusOS", "packages", "core", "out", "main");
   electronState.trayInstances.length = 0;
+  electronState.trayImagePaths.length = 0;
   electronState.menuTemplate = [];
   deskCalendarState.enabled = false;
 });
@@ -165,6 +172,11 @@ describe("app lifecycle", () => {
     const window = createWindow();
     await lifecycle.attachMainWindowLifecycle(window as never);
     await lifecycle.createCampusTray();
+
+    expect(electronState.trayImagePaths[0]).toBe(
+      join("D:", "Desktop", "code", "CampusOS", "build", "icon.ico")
+    );
+    expect(electronState.trayImagePaths[0]).not.toBe(process.execPath);
 
     electronState.trayInstances[0]?.listeners.get("double-click")?.();
     expect(window.restore).toHaveBeenCalledOnce();

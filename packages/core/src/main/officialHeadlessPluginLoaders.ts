@@ -212,7 +212,10 @@ export const createOfficialHeadlessPluginLoaders = ({
         try {
           const response = await requestZjuLearningService({
             operation: "courses",
-            page
+            page,
+            // The local ZJU Learning Assistant reference requests active courses only;
+            // CampusOS widens this adapter boundary because Materials must expose user-requested history.
+            scope: "all"
           });
           return { ok: true as const, body: response.body };
         } catch (error) {

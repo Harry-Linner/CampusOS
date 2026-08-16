@@ -55,13 +55,27 @@ const timetable: AcademicTimetableData = {
   terms: [
     {
       academicYearStart: 2025,
+      season: "2|春",
+      state: "live",
+      sessions: [
+        {
+          ...baseSession,
+          sourceId: "spring-session",
+          courseName: "春季课程"
+        }
+      ]
+    },
+    {
+      academicYearStart: 2025,
       season: "2|夏",
       state: "live",
       sessions: [
         {
           ...baseSession,
           sourceId: "historical-session",
-          courseName: "历史学期课程"
+          courseName: "历史学期课程",
+          firstHalf: false,
+          secondHalf: true
         }
       ]
     },
@@ -270,7 +284,14 @@ describe("AcademicView", () => {
     const semester = await screen.findByRole("combobox", { name: "学期" });
     expect((semester as HTMLSelectElement).value).toBe("2025:2");
     expect(screen.getByText("历史学期课程")).toBeDefined();
+    expect(screen.getByText("春季课程")).toBeDefined();
     expect(screen.queryByText("目标学期课程")).toBeNull();
+    expect(screen.getByRole("option", { name: "2025-2026 春夏学期（含小学期）" }))
+      .toBeDefined();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "只看小学期" }));
+    expect(screen.getByText("历史学期课程")).toBeDefined();
+    expect(screen.queryByText("春季课程")).toBeNull();
   });
 
   it("exposes five internal tabs and reads the selected academic capabilities", async () => {

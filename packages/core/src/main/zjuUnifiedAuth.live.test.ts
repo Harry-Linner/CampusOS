@@ -191,7 +191,7 @@ describe("ZJU unified authentication live verification", () => {
 
         expect(valid).toBe(true);
         const timetableOracle = await loadTimetableOracle();
-        const timetableQueries = createTimetableQueries(new Date());
+        const timetableQueries = createTimetableQueries(new Date(), username);
         const futureAcademicYearStart = Math.max(
           ...timetableQueries.map((query) => query.academicYearStart)
         );
@@ -347,7 +347,7 @@ describe("ZJU unified authentication live verification", () => {
           currentStage = `learning-courses-page-${page}`;
           const response = await client.requestLearningService(
             { username, password },
-            { operation: "courses", page }
+            { operation: "courses", page, scope: "all" }
           );
           const payload = JSON.parse(response.body) as unknown;
           const record = typeof payload === "object" &&
@@ -394,6 +394,13 @@ describe("ZJU unified authentication live verification", () => {
             semesterName: semesterNameById.get(String(semesterId)) ?? ""
           };
         });
+        const historicalSemesterCount = new Set(
+          courseDescriptors
+            .map((course) => course.semesterName)
+            .filter(Boolean)
+        ).size;
+        currentStage = `learning-historical-semesters-${historicalSemesterCount}`;
+        expect(historicalSemesterCount).toBeGreaterThan(1);
         let downloadCandidate: {
           uploadId: string;
           referenceId: string;

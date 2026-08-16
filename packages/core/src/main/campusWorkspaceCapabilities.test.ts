@@ -701,7 +701,7 @@ describe("workspace capability integration", () => {
     expect(refreshed.summary.materialsReady).toBe(1);
   });
 
-  it("uses only 2025-2026 spring-summer materials as the development download source", () => {
+  it("projects materials and courses from every available semester", () => {
     const material = {
       sourceId: "1:100",
       uploadId: "10",
@@ -747,14 +747,24 @@ describe("workspace capability integration", () => {
       }
     });
 
-    expect(refreshed.materials.map((item) => item.id)).toEqual(["1:100", "2:200"]);
+    expect(refreshed.materials.map((item) => item.id)).toEqual([
+      "1:100",
+      "2:200",
+      "3:300",
+      "4:400"
+    ]);
     expect(refreshed.materialCourses).toEqual([
       {
         id: "course-target",
         name: "target course",
         semester: "2025-2026春夏"
+      },
+      {
+        id: "course-outside",
+        name: "outside course",
+        semester: "2024-2025春夏"
       }
     ]);
-    expect(refreshed.summary.materialsReady).toBe(2);
+    expect(refreshed.summary.materialsReady).toBe(4);
   });
 });

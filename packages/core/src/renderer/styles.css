@@ -2307,6 +2307,19 @@ input:focus-visible {
   font-size: 0.8rem;
 }
 
+.academic-checkbox-label {
+  min-height: 34px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.academic-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .academic-search {
   width: min(280px, 42vw);
 }

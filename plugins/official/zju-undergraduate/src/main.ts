@@ -113,7 +113,10 @@ const shanghaiAcademicClock = new Intl.DateTimeFormat("en-US", {
   month: "numeric"
 });
 
-export const createTimetableQueries = (now: Date): TimetableQuery[] => {
+export const createTimetableQueries = (
+  now: Date,
+  studentId?: string
+): TimetableQuery[] => {
   // Celechron derives the academic year from the university's Shanghai
   // calendar, rather than the host process timezone.
   const parts = shanghaiAcademicClock.formatToParts(now);
@@ -125,8 +128,29 @@ export const createTimetableQueries = (now: Date): TimetableQuery[] => {
   );
   const currentAcademicYearStart =
     calendarMonth >= 9 ? calendarYear : calendarYear - 1;
+  // Celechron lib/http/ugrs_spider.dart:354-371 and
+  // lib/http/calendar_config_parser.dart:14-51 derive the enrollment year
+  // from the student number, fetch every year through the current academic
+  // year, then probe exactly one future year without crossing graduation.
+  const enrollmentDigits = studentId?.trim().match(/^\d(\d{2})/)?.[1];
+  const parsedEnrollmentYear = enrollmentDigits
+    ? Number.parseInt(enrollmentDigits, 10) + 2000
+    : null;
+  const enrollmentYearStart = parsedEnrollmentYear !== null &&
+      Number.isSafeInteger(parsedEnrollmentYear)
+    ? parsedEnrollmentYear
+    : currentAcademicYearStart;
+  const graduationYearStart = enrollmentYearStart + 7;
+  const probeUpperBound = Math.min(
+    currentAcademicYearStart + 1,
+    graduationYearStart
+  );
+  const academicYears = Array.from(
+    { length: Math.max(1, probeUpperBound - enrollmentYearStart + 1) },
+    (_unused, index) => enrollmentYearStart + index
+  );
 
-  return [currentAcademicYearStart, currentAcademicYearStart + 1].flatMap(
+  return academicYears.flatMap(
     (academicYearStart) =>
       seasons.map((season) => ({ academicYearStart, season }))
   );
@@ -1196,7 +1220,7 @@ export const createZjuUndergraduateConnector = ({
     const examsResult = await refreshExams(proof, updatedAt);
     const gradesResult = await refreshGrades(proof, updatedAt);
 
-    const queries = createTimetableQueries(refreshedAt);
+    const queries = createTimetableQueries(refreshedAt, proof.studentId);
     let results: TimetableTermFetchResult[];
     try {
       results = await fetchTimetableTerms(queries);

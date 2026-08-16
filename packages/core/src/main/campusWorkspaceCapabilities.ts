@@ -15,7 +15,6 @@ import type {
 import { firstWaveSourceCatalog } from "@campusos/shared";
 import { SUMMER_TERM_FALLBACK_DAYS } from "@campusos/shared";
 import { buildReminderQueue } from "../shared/campusWorkspace";
-import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
 const HOUR_IN_MS = 60 * 60 * 1000;
 const DAY_IN_MS = 24 * HOUR_IN_MS;
@@ -155,18 +154,13 @@ export const mergeLearningMaterialsIntoWorkspace = (
   record: CapabilityRecord<LearningMaterialsData> | null
 ): CampusWorkspaceSnapshot => {
   const materialCourses = record?.data?.courses
-    .filter(
-      (course) =>
-        course.semesterName !== null &&
-        isDevelopmentCoursewareSemester(course.semesterName)
-    )
+    .filter((course) => course.semesterName !== null)
     .map((course) => ({
       id: course.sourceId,
       name: course.name,
       semester: course.semesterName!
     })) ?? [];
   const materials = record?.data?.materials
-    .filter((material) => isDevelopmentCoursewareSemester(material.semesterName))
     .map((material) => ({
       id: material.sourceId,
       title: material.fileName,

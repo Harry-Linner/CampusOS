@@ -45,11 +45,11 @@ describe("zju undergraduate connector", () => {
         verifiedService: "undergraduate-academic-affairs"
       })),
       fetchTimetableTerms: vi.fn(async (queries: readonly TimetableQuery[]) =>
-        queries.map((query: TimetableQuery, index: number) => ({
+        queries.map((query: TimetableQuery) => ({
           query,
           ok: true as const,
           body:
-            index === 0
+            query.academicYearStart === 2025 && query.season === "1|秋"
               ? JSON.stringify({
                   kbList: [
                     {
@@ -278,14 +278,21 @@ describe("zju undergraduate connector", () => {
     }));
   });
 
-  it("derives current and next academic years from the runtime clock", () => {
+  it("derives enrollment history through the next academic-year probe like Celechron", () => {
     const queries = createTimetableQueries(
-      new Date("2026-07-19T04:00:00.000Z")
+      new Date("2026-07-19T04:00:00.000Z"),
+      "3240100001"
     );
 
-    expect(queries).toHaveLength(8);
+    expect(queries).toHaveLength(12);
     expect([...new Set(queries.map(({ academicYearStart }) => academicYearStart))])
-      .toEqual([2025, 2026]);
+      .toEqual([2024, 2025, 2026]);
+    expect(queries.slice(-4).map(({ season }) => season)).toEqual([
+      "1|秋",
+      "1|冬",
+      "2|春",
+      "2|夏"
+    ]);
   });
 
   it("uses the Shanghai academic-year boundary regardless of the process timezone", () => {

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Tray } from "electron";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -85,6 +86,18 @@ const showMainWindow = (): void => {
   mainWindow.focus();
 };
 
+const developmentTrayIconPath = (): string => {
+  let currentPath = app.getAppPath();
+  while (true) {
+    const candidate = join(currentPath, "build", "icon.ico");
+    if (existsSync(candidate)) return candidate;
+    const parentPath = dirname(currentPath);
+    if (parentPath === currentPath) break;
+    currentPath = parentPath;
+  }
+  throw new Error("CampusOS tray icon is missing from the development workspace.");
+};
+
 const rebuildTrayMenu = async (): Promise<void> => {
   if (!tray) return;
   const deskCalendar = await getDeskCalendarSettings();
@@ -148,7 +161,10 @@ export const attachMainWindowLifecycle = async (window: BrowserWindow): Promise<
 
 export const createCampusTray = async (): Promise<void> => {
   if (tray) return;
-  tray = new Tray(process.execPath);
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, "icon.ico")
+    : developmentTrayIconPath();
+  tray = new Tray(iconPath);
   tray.setToolTip("CampusOS");
   tray.on("double-click", showMainWindow);
   await rebuildTrayMenu();

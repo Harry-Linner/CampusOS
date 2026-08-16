@@ -97,7 +97,7 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   return window;
 };
 
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
   initSentryMain();
   registerCampusmodRendererProtocol();
   registerAcademicCredentialHandlers();
@@ -130,6 +130,10 @@ app.whenReady().then(async () => {
       await createMainWindow();
     }
   });
+}).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : "未知启动错误";
+  process.stderr.write(`[CampusOS] startup failed: ${message}\n`);
+  app.quit();
 });
 
 app.on("window-all-closed", () => undefined);

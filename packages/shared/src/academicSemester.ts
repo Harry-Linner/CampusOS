@@ -38,8 +38,8 @@ export const formatAcademicSemesterLabel = (
   academicYearStart: number,
   semesterNumber: AcademicSemesterNumber
 ): string => `${academicYearStart}-${academicYearStart + 1} ${
-  semesterNumber === 1 ? "秋冬" : "春夏"
-}学期`;
+  semesterNumber === 1 ? "秋冬学期" : "春夏学期（含小学期）"
+}`;
 
 const formatShanghaiDate = (dateTime: string): string => {
   const values = Object.fromEntries(
