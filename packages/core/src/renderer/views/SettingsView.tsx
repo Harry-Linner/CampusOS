@@ -520,6 +520,16 @@ export const SettingsView = ({
             <summary>查看 MIT 许可证</summary>
             <pre>{`${appInfo?.copyright ?? "Copyright (c) 2026 Harry-Linner"}\n\n${mitLicenseText}`}</pre>
           </details>
+          <div className="settings-actions">
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => void window.campusos?.feedback?.openIssue()}
+            >
+              提交问题反馈
+            </button>
+          </div>
+          <p className="page-copy">反馈会打开 GitHub Issues，不会自动附带账号、课程、文件或本地诊断数据。</p>
         </section>
 
         {showDevelopmentTools && onRestartOnboarding ? (

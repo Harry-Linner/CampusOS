@@ -25,6 +25,7 @@ export * from "./academicSemester";
 export * from "./pluginCapabilities";
 export * from "./deskCalendarBridge";
 export * from "./appNavigationBridge";
+export * from "./feedbackBridge";
 
 export type CampusPermission =
   | `network:${string}`

@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld("campusos", {
       return () => ipcRenderer.removeListener(channel, handler);
     }
   },
+  feedback: {
+    openIssue: () => ipcRenderer.invoke("campusos:feedback:open")
+  },
   workspace: {
     hydrate: () => ipcRenderer.invoke("campusos:workspace:hydrate"),
     sync: () => ipcRenderer.invoke("campusos:workspace:sync"),

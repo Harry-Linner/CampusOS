@@ -13,6 +13,7 @@ import type { AppLifecycleBridge } from "./appLifecycleBridge";
 import type { NotificationCenterBridge } from "./notificationBridge";
 import type { BackupBridge } from "./backupBridge";
 import type { AppNavigationBridge } from "@campusos/shared";
+import type { FeedbackBridge } from "@campusos/shared";
 
 export type CampusWorkspaceHydratedFrom = "disk" | "generated" | "synced";
 
@@ -54,4 +55,5 @@ export interface CampusosBridge {
   notifications?: NotificationCenterBridge;
   backup?: BackupBridge;
   navigation?: AppNavigationBridge;
+  feedback?: FeedbackBridge;
 }
