@@ -18,4 +18,8 @@ describe("window state store", () => {
   it("enforces the application minimum dimensions", () => {
     expect(normalizeWindowState({ bounds: { x: 10, y: 10, width: 200, height: 200 }, maximized: false }, displays)?.bounds).toMatchObject({ width: 1100, height: 720 });
   });
+
+  it("uses the desktop calendar minimum dimensions without inheriting main-window sizing", () => {
+    expect(normalizeWindowState({ bounds: { x: 10, y: 10, width: 200, height: 200 }, maximized: false }, displays, { minimumWidth: 420, minimumHeight: 320 })?.bounds).toMatchObject({ width: 420, height: 320 });
+  });
 });

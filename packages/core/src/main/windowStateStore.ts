@@ -16,13 +16,13 @@ const isRectangle = (value: unknown): value is Rectangle => {
   return [candidate.x, candidate.y, candidate.width, candidate.height].every((item) => typeof item === "number" && Number.isFinite(item));
 };
 
-export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ workArea: Rectangle }> = screen.getAllDisplays()): StoredWindowState | null => {
+export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ workArea: Rectangle }> = screen.getAllDisplays(), options: { minimumWidth?: number; minimumHeight?: number } = {}): StoredWindowState | null => {
   if (typeof value !== "object" || value === null) return null;
   const candidate = value as Partial<StoredWindowState>;
   if (!isRectangle(candidate.bounds) || typeof candidate.maximized !== "boolean") return null;
   const bounds = candidate.bounds;
-  const minimumWidth = 1100;
-  const minimumHeight = 720;
+  const minimumWidth = options.minimumWidth ?? 1100;
+  const minimumHeight = options.minimumHeight ?? 720;
   const width = Math.max(minimumWidth, Math.round(candidate.bounds.width));
   const height = Math.max(minimumHeight, Math.round(candidate.bounds.height));
   const visible = displays.some((display) => {
@@ -34,9 +34,9 @@ export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ w
   return { bounds: { x: Math.round(bounds.x), y: Math.round(bounds.y), width, height }, maximized: candidate.maximized };
 };
 
-export const loadWindowState = async (key = "main-window"): Promise<StoredWindowState | null> => {
+export const loadWindowState = async (key = "main-window", options: { minimumWidth?: number; minimumHeight?: number } = {}): Promise<StoredWindowState | null> => {
   try {
-    return normalizeWindowState(JSON.parse(await readFile(statePath(key), "utf8")));
+    return normalizeWindowState(JSON.parse(await readFile(statePath(key), "utf8")), undefined, options);
   } catch {
     return null;
   }

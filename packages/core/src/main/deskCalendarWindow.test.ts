@@ -201,6 +201,7 @@ describe("desk calendar window IPC", () => {
     await save({}, { enabled: true });
     expect(electronState.windows).toHaveLength(1);
     expect(electronState.windows[0].setAlwaysOnTop).toHaveBeenCalled();
+    electronState.windows[0].listeners.get("move")?.();
 
     await save({}, { enabled: false });
     expect(electronState.windows[0].close).toHaveBeenCalled();
@@ -311,6 +312,29 @@ describe("desk calendar window IPC", () => {
     expect(weather).toMatchObject({ location: "杭州", temperatureC: 27.5, weatherCode: 1, error: null });
     const stored = JSON.parse(await readFile(join(storageRoot, "settings", "desk-calendar.json"), "utf8")) as { weather: { temperatureC: number } };
     expect(stored.weather.temperatureC).toBe(27.5);
+  });
+
+  it("persists normalized widget, countdown, progress, appearance, holiday, and display settings", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    await save({}, {
+      widgets: [{ id: "clock", enabled: false }, { id: "weather", enabled: true }],
+      countdowns: [{ id: "countdown-1", title: "Exam", targetAt: "2026-08-20T00:00:00.000Z" }],
+      progress: [{ id: "progress-1", title: "Term", startAt: "2026-08-01T00:00:00.000Z", endAt: "2026-09-01T00:00:00.000Z" }],
+      appearance: { opacity: 0.55, background: "#223344" },
+      statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
+      displayProfiles: [{ displayKey: "primary", bounds: { x: 0, y: 0, width: 720, height: 560 } }]
+    });
+    await expect(handlerFor("campusos:desk-calendar:settings:load")({})).resolves.toMatchObject({
+      countdowns: [{ id: "countdown-1" }],
+      progress: [{ id: "progress-1" }],
+      appearance: { opacity: 0.55, background: "#223344" },
+      statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
+      displayProfiles: [{ displayKey: "primary" }]
+    });
   });
 
   it("returns the cached weather with an explicit provider error", async () => {

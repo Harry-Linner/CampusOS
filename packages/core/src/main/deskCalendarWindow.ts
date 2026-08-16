@@ -252,7 +252,7 @@ const disableAfterUserClose = async (): Promise<void> => {
 };
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
-  const storedState = await loadWindowState("desk-calendar");
+  const storedState = await loadWindowState("desk-calendar", { minimumWidth: 420, minimumHeight: 320 });
   const currentSettings = await loadSettings();
   const profile = currentSettings.displayProfiles.find((candidate) => candidate.displayKey === getDisplayKey());
   const profileBounds = profile && isVisibleOnCurrentDisplays(profile.bounds) ? profile.bounds : undefined;
@@ -281,7 +281,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const detachWindowStatePersistence = attachWindowStatePersistence(window, "desk-calendar");
   const persistDisplayProfile = (): void => {
     const nextProfile = { displayKey: getDisplayKey(), bounds: window.getNormalBounds() };
-    void saveSettings({ displayProfiles: [...currentSettings.displayProfiles.filter((candidate) => candidate.displayKey !== nextProfile.displayKey), nextProfile] }).catch(() => undefined);
+    void loadSettings().then((latest) => saveSettings({ displayProfiles: [...latest.displayProfiles.filter((candidate) => candidate.displayKey !== nextProfile.displayKey), nextProfile] })).catch(() => undefined);
   };
   window.on("move", persistDisplayProfile);
   window.on("resize", persistDisplayProfile);

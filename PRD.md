@@ -25,7 +25,7 @@ CampusOS 只有一个应用生命周期。开机自启是默认关闭的 Core �
 
 ### DeskToDo 差异闭环（2026-08-16）
 
-CampusOS 将桌面效率层的十项差异纳入正式路线：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件 registry、多显示器布局记忆，以及农历/节日/法定假期/桌面外观。GitHub Gist/日历同步明确排除。具体基线、边界和验收标准见 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)。
+CampusOS 已完成桌面效率层十项差异闭环：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件 registry、多显示器布局记忆，以及农历/节日/法定假期/桌面外观。GitHub Gist/日历同步明确排除。具体实现证据见 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)。
 
 ---
 

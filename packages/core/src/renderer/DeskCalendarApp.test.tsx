@@ -237,6 +237,14 @@ describe("DeskCalendarApp", () => {
     expect(api.setShowClock).toHaveBeenCalledWith(false);
     await vi.waitFor(() => expect(document.querySelector(".desk-cal-clock")).toBeNull());
   });
+
+  it("refreshes weather through the renderer bridge", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+    fireEvent.click(screen.getByRole("button", { name: "刷新" }));
+    await vi.waitFor(() => expect(api.refreshWeather).toHaveBeenCalledOnce());
+  });
   it("projects local tasks and completes them through the desktop IPC", async () => {
     const api = createApi({
       loadSnapshot: vi.fn(async () => ({
@@ -299,6 +307,36 @@ describe("DeskCalendarApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
 
     await vi.waitFor(() => expect(api.saveTask).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1", title: "Edited task" })));
+  });
+
+  it("persists widget ordering, countdown, progress, and appearance changes", async () => {
+    const api = createApi();
+    const prompt = vi.spyOn(window, "prompt");
+    prompt.mockReturnValueOnce("Exam").mockReturnValueOnce("2026-08-20T09:00");
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+    fireEvent.click(screen.getByRole("button", { name: "组件" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加倒计时" }));
+    await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ countdowns: [expect.objectContaining({ title: "Exam" })] })));
+    const opacity = screen.getByLabelText("透明度");
+    fireEvent.change(opacity, { target: { value: "0.6" } });
+    expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ appearance: expect.objectContaining({ opacity: 0.6 }) }));
+    prompt.mockRestore();
+  });
+
+  it("adds a bounded progress widget and toggles its registry state", async () => {
+    const api = createApi();
+    const prompt = vi.spyOn(window, "prompt");
+    prompt.mockReturnValueOnce("Semester").mockReturnValueOnce("2026-08-01T00:00").mockReturnValueOnce("2026-09-01T00:00");
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("小学期课程");
+    fireEvent.click(screen.getByRole("button", { name: "组件" }));
+    fireEvent.click(screen.getByRole("button", { name: "添加进度条" }));
+    await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ progress: [expect.objectContaining({ title: "Semester" })] })));
+    const weatherToggle = screen.getByRole("checkbox", { name: "天气" });
+    fireEvent.click(weatherToggle);
+    expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ widgets: expect.arrayContaining([expect.objectContaining({ id: "weather", enabled: false })]) }));
+    prompt.mockRestore();
   });
 
   it("closes through the api when the close button is pressed", async () => {

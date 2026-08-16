@@ -81,6 +81,24 @@ const solarFestivals: Record<string, string> = {
   "01-01": "元旦", "03-08": "妇女节", "05-01": "劳动节", "06-01": "儿童节", "10-01": "国庆节", "12-25": "圣诞节"
 };
 
+const lunarFestivals: Record<string, string> = {
+  "一月初一": "春节",
+  "一月十五": "元宵节",
+  "五月初五": "端午节",
+  "八月十五": "中秋节"
+};
+
+const formulaFestival = (day: Date): string | null => {
+  const parts = getShanghaiParts(day);
+  const month = Number(parts.month);
+  const date = Number(parts.day);
+  const weekday = getShanghaiWeekday(day);
+  if (month === 5 && weekday === 0 && date >= 8 && date <= 14) return "母亲节";
+  if (month === 6 && weekday === 0 && date >= 15 && date <= 21) return "父亲节";
+  if (month === 11 && weekday === 4 && date >= 22 && date <= 28) return "感恩节";
+  return null;
+};
+
 const calendarAnnotation = (day: Date, statutoryHolidays: DeskCalendarSettings["statutoryHolidays"]): string => {
   const key = toDayKey(day);
   const statutory = statutoryHolidays.find((holiday) => holiday.date === key)?.label;
@@ -88,7 +106,8 @@ const calendarAnnotation = (day: Date, statutoryHolidays: DeskCalendarSettings["
   const solar = solarFestivals[key.slice(5)];
   if (solar) return solar;
   const parts = new Intl.DateTimeFormat("zh-CN-u-ca-chinese", { timeZone: SHANGHAI_TIME_ZONE, month: "short", day: "numeric" }).formatToParts(day);
-  return parts.filter((part) => part.type === "month" || part.type === "day").map((part) => part.value).join("");
+  const lunar = parts.filter((part) => part.type === "month" || part.type === "day").map((part) => part.value).join("");
+  return lunarFestivals[lunar] ?? formulaFestival(day) ?? lunar;
 };
 
 const toDateTimeInput = (value: Date): string => {
