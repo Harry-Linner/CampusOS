@@ -83,6 +83,8 @@ test("takes a fixture-backed onboarding through the schedule module using real E
     await page.getByRole("button", { name: "确认，继续" }).click();
     await expect(page.getByRole("heading", { name: "推荐扩展" })).toBeVisible();
     await page.getByRole("button", { name: "安装选中插件" }).click();
+    await expect(page.getByRole("heading", { name: "后台与通知" })).toBeVisible();
+    await page.getByRole("button", { name: "保存并继续" }).click();
     await expect(page.getByRole("heading", { name: "一切就绪" })).toBeVisible();
 
     await page.getByRole("button", { name: "进入 CampusOS" }).click();

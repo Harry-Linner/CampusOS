@@ -57,6 +57,7 @@ const completeOnboarding = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "开始同步" }).click();
   await page.getByRole("button", { name: "确认，继续" }).click();
   await page.getByRole("button", { name: "安装选中插件" }).click();
+  await page.getByRole("button", { name: "保存并继续" }).click();
   await page.getByRole("button", { name: "进入 CampusOS" }).click();
 };
 
