@@ -317,7 +317,7 @@ describe("schedule domain", () => {
 
   it("keeps a floating task out of the calendar while preserving its task record", () => {
     const floating = createTaskRecord({
-      ...task(),
+      ...task({}),
       title: "Inbox item",
       type: "floating",
       reminderMode: "none"
