@@ -400,6 +400,7 @@ export type LocalTaskStatus =
   | "deleted"
   | "outdated";
 export type LocalTaskRepeatType = "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
+export type LocalTaskReminderMode = "global" | "none" | "at-time" | "lead" | "custom";
 
 export interface LocalTaskRecord {
   id: string;
@@ -418,6 +419,9 @@ export interface LocalTaskRecord {
   repeatEndsOn: string;
   repeatWeekdays?: number[];
   blocksPlanning: boolean;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
   fromId: string | null;
   deletedAt?: string | null;
   courseName?: string | null;
@@ -448,6 +452,9 @@ export interface LocalTaskInput {
   repeatEndsOn: string;
   repeatWeekdays?: number[];
   blocksPlanning: boolean;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
   courseName?: string | null;
   source?: LocalTaskSource | null;
 }

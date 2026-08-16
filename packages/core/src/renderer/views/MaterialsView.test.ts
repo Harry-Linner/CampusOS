@@ -86,6 +86,30 @@ const snapshot: CampusWorkspaceSnapshot = {
 };
 
 describe("MaterialsView", () => {
+  it("keeps the summer short term separate from spring-summer materials", () => {
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      loading: false,
+      onRefresh: vi.fn(async () => undefined),
+      snapshot: {
+        ...snapshot,
+        materials: [
+          ...snapshot.materials,
+          {
+            ...snapshot.materials[0],
+            id: "material-short",
+            courseName: "短学期课程",
+            semester: "2025-2026短"
+          }
+        ]
+      }
+    }));
+
+    expect(screen.getByRole("option", { name: "2025-2026 短学期" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "2025-2026 春夏学期" })).toBeTruthy();
+    expect(screen.queryByText(/含小学期/)).toBeNull();
+  });
+
   it("browses the target semester by course and enqueues selected files", async () => {
     const enqueue = vi.fn(async () => undefined);
     const onRefresh = vi.fn(async () => undefined);

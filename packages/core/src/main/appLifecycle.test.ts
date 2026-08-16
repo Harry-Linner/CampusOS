@@ -16,7 +16,12 @@ const electronState = vi.hoisted(() => ({
     setContextMenu: ReturnType<typeof vi.fn>;
     listeners: Map<string, () => void>;
   }>,
-  menuTemplate: [] as Array<{ label?: string; click?: () => void | Promise<void> }>
+  menuTemplate: [] as Array<{
+    label?: string;
+    click?: () => void | Promise<void>;
+    enabled?: boolean;
+    submenu?: Array<{ label?: string; click?: () => void | Promise<void> }>;
+  }>
 }));
 
 vi.mock("electron", () => ({
@@ -59,14 +64,21 @@ vi.mock("electron", () => ({
 
 const deskCalendarState = vi.hoisted(() => ({
   enabled: false,
+  view: "month",
   setEnabled: vi.fn(async (enabled: boolean) => {
     deskCalendarState.enabled = enabled;
-  })
+  }),
+  setView: vi.fn(async (view: string) => {
+    deskCalendarState.view = view;
+  }),
+  settingsChangedListener: vi.fn()
 }));
 
 vi.mock("./deskCalendarWindow", () => ({
-  getDeskCalendarSettings: vi.fn(async () => ({ enabled: deskCalendarState.enabled, view: "month" })),
-  setDeskCalendarEnabled: deskCalendarState.setEnabled
+  getDeskCalendarSettings: vi.fn(async () => ({ enabled: deskCalendarState.enabled, view: deskCalendarState.view })),
+  setDeskCalendarEnabled: deskCalendarState.setEnabled,
+  setDeskCalendarView: deskCalendarState.setView,
+  setDeskCalendarSettingsChangedListener: deskCalendarState.settingsChangedListener
 }));
 
 vi.mock("./ipcSecurity", () => ({
@@ -84,6 +96,7 @@ beforeEach(() => {
   electronState.trayImagePaths.length = 0;
   electronState.menuTemplate = [];
   deskCalendarState.enabled = false;
+  deskCalendarState.view = "month";
 });
 
 afterEach(async () => {
@@ -185,6 +198,14 @@ describe("app lifecycle", () => {
 
     await electronState.menuTemplate.find((item) => item.label === "显示桌面日历")?.click?.();
     expect(deskCalendarState.setEnabled).toHaveBeenCalledWith(true);
+
+    const viewMenu = electronState.menuTemplate.find((item) => item.label === "桌面日历视图");
+    await viewMenu?.submenu?.find((item) => item.label === "周视图")?.click?.();
+    expect(deskCalendarState.setView).toHaveBeenCalledWith("week");
+
+    await lifecycle.setSchedulePluginEnabled(false);
+    expect(deskCalendarState.setEnabled).toHaveBeenCalledWith(false);
+    expect(electronState.menuTemplate.some((item) => item.label === "桌面日历视图")).toBe(false);
 
     electronState.menuTemplate.find((item) => item.label === "退出 CampusOS")?.click?.();
     expect(electronState.quit).toHaveBeenCalledOnce();

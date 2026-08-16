@@ -220,7 +220,9 @@ const normalizeType = (value: unknown): LocalTaskType =>
   value === "fixed" || value === "fixedlegacy" ? value : "deadline";
 
 const normalizeRepeatType = (value: unknown): LocalTaskRepeatType =>
-  value === "days" || value === "month" || value === "year" ? value : "norepeat";
+  value === "days" || value === "weeks" || value === "weekdays" || value === "month" || value === "year"
+    ? value
+    : "norepeat";
 
 const finiteNumber = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -257,6 +259,15 @@ export const normalizeTaskRecord = (
     repeatEndsOn: dateOnlyIso(value.repeatEndsOn, "重复结束日期"),
     repeatWeekdays: Array.isArray(value.repeatWeekdays) ? value.repeatWeekdays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [],
     blocksPlanning: value.blocksPlanning !== false,
+    reminderMode: value.reminderMode === "none" || value.reminderMode === "at-time" || value.reminderMode === "lead" || value.reminderMode === "custom"
+      ? value.reminderMode
+      : "global",
+    reminderLeadMinutes: Number.isFinite(value.reminderLeadMinutes)
+      ? Math.max(0, Math.round(value.reminderLeadMinutes ?? 0))
+      : null,
+    reminderAt: typeof value.reminderAt === "string" && Number.isFinite(Date.parse(value.reminderAt))
+      ? new Date(value.reminderAt).toISOString()
+      : null,
     fromId: typeof value.fromId === "string" ? value.fromId : null,
     deletedAt: typeof value.deletedAt === "string" && Number.isFinite(Date.parse(value.deletedAt)) ? value.deletedAt : null,
     courseName: typeof value.courseName === "string" ? value.courseName : null,
@@ -369,6 +380,9 @@ export const refreshLocalTasks = (
     const repeatEnd = dateOnly(parseDate(task.repeatEndsOn, "重复结束日期"));
     let start = parseDate(task.startAt, "任务开始时间");
     let end = parseDate(task.endAt, "任务结束时间");
+    const customReminderOffsetMs = task.reminderMode === "custom" && task.reminderAt
+      ? Date.parse(task.reminderAt) - start.getTime()
+      : null;
     task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
 
     let guard = 0;
@@ -397,6 +411,9 @@ export const refreshLocalTasks = (
       end = next.end;
       task.startAt = start.toISOString();
       task.endAt = end.toISOString();
+      if (customReminderOffsetMs !== null) {
+        task.reminderAt = new Date(start.getTime() + customReminderOffsetMs).toISOString();
+      }
       task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
       if (++guard > 20_000) throw new Error("重复任务实例数量超过安全上限。");
     }

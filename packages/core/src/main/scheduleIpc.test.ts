@@ -42,7 +42,24 @@ vi.mock("./campusWorkspaceStore", () => ({
   hydrateCampusWorkspace: async () => {
     if (!workspaceState.snapshot) throw new Error("test workspace is not initialized");
     return { snapshot: workspaceState.snapshot };
-  }
+  },
+  rescheduleCampusWorkspaceReminders: vi.fn(async () => ({
+    enabled: true,
+    supported: true,
+    scheduledCount: 0,
+    nextFireAt: null,
+    lastScheduledAt: fixedNow.toISOString(),
+    transport: "electron"
+  }))
+}));
+
+vi.mock("./reminderSettingsStore", () => ({
+  readReminderSettingsRecord: vi.fn(async () => ({
+    enabled: true,
+    leadMinutes: [15],
+    savedAt: null,
+    storagePath: null
+  }))
 }));
 
 import {

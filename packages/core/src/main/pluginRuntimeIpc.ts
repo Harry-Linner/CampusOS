@@ -10,6 +10,9 @@ import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
 import { createPluginCapabilityAccess } from "./pluginCapabilityAccess";
+import { setSchedulePluginEnabled } from "./appLifecycle";
+
+const SCHEDULE_PLUGIN_ID = "org.campusos.schedule";
 
 const isConfigurationInput = (
   input: unknown
@@ -67,6 +70,10 @@ export const registerPluginRuntimeHandlers = (): void => {
       }
     }
   };
+  const applyDesktopCapabilityState = async (snapshot: PluginRuntimeSnapshot): Promise<void> => {
+    const schedule = snapshot.plugins.find((plugin) => plugin.id === SCHEDULE_PLUGIN_ID);
+    await setSchedulePluginEnabled(schedule?.enabled === true && schedule.status === "active");
+  };
   let initialCacheServed = false;
 
   ipcMain.handle("campusos:plugins:load", async (event) => {
@@ -75,11 +82,17 @@ export const registerPluginRuntimeHandlers = (): void => {
       initialCacheServed = true;
       const cached = await runtime.loadCached();
       if (cached) {
-        void runtime.load().then(notifyRuntimeChanged, () => undefined);
+        void runtime.load().then(async (snapshot) => {
+          await applyDesktopCapabilityState(snapshot);
+          notifyRuntimeChanged(snapshot);
+        }, () => undefined);
+        await applyDesktopCapabilityState(cached);
         return cached;
       }
     }
-    return runtime.load();
+    const snapshot = await runtime.load();
+    await applyDesktopCapabilityState(snapshot);
+    return snapshot;
   });
 
   ipcMain.handle(
@@ -90,7 +103,9 @@ export const registerPluginRuntimeHandlers = (): void => {
         throw new Error("Invalid plugin runtime configuration request.");
       }
 
-      return runtime.configure(input);
+      const snapshot = await runtime.configure(input);
+      await applyDesktopCapabilityState(snapshot);
+      return snapshot;
     }
   );
 

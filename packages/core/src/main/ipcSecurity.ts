@@ -4,42 +4,56 @@ import { dirname, resolve } from "node:path";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
-const isTrustedDevelopmentUrl = (senderUrl: URL): boolean => {
+type TrustedRendererPage = "index.html" | "desk-calendar.html";
+
+const isTrustedDevelopmentUrl = (
+  senderUrl: URL,
+  pages: readonly TrustedRendererPage[]
+): boolean => {
   const configuredUrl = process.env.ELECTRON_RENDERER_URL;
   if (!configuredUrl) return false;
 
   try {
     const expectedUrl = new URL(configuredUrl);
-    return (
-      senderUrl.origin === expectedUrl.origin &&
-      senderUrl.pathname === expectedUrl.pathname
-    );
+    if (senderUrl.origin !== expectedUrl.origin) return false;
+    return pages.some((page) => {
+      const expectedPageUrl = page === "index.html"
+        ? expectedUrl
+        : new URL(page, expectedUrl);
+      return senderUrl.pathname === expectedPageUrl.pathname;
+    });
   } catch {
     return false;
   }
 };
 
-const isTrustedPackagedUrl = (senderUrl: URL): boolean => {
+const isTrustedPackagedUrl = (
+  senderUrl: URL,
+  pages: readonly TrustedRendererPage[]
+): boolean => {
   if (
     senderUrl.protocol !== "file:" ||
     senderUrl.search !== "" ||
     senderUrl.hash !== ""
   ) return false;
 
-  const expectedPath = resolve(
-    currentDir,
-    "..",
-    "renderer",
-    "index.html"
-  );
   try {
-    return resolve(fileURLToPath(senderUrl)) === expectedPath;
+    const senderPath = resolve(fileURLToPath(senderUrl));
+    return pages.some((page) => senderPath === resolve(
+      currentDir,
+      "..",
+      "renderer",
+      page
+    ));
   } catch {
     return false;
   }
 };
 
-export const assertTrustedRenderer = (event: IpcMainInvokeEvent): void => {
+const assertTrustedPages = (
+  event: IpcMainInvokeEvent,
+  pages: readonly TrustedRendererPage[]
+): void => {
   const frame = event.senderFrame;
   if (!frame || frame !== event.sender.mainFrame) {
     throw new Error("Credential request rejected from an untrusted frame.");
@@ -53,9 +67,17 @@ export const assertTrustedRenderer = (event: IpcMainInvokeEvent): void => {
   }
 
   if (
-    !isTrustedDevelopmentUrl(senderUrl) &&
-    !isTrustedPackagedUrl(senderUrl)
+    !isTrustedDevelopmentUrl(senderUrl, pages) &&
+    !isTrustedPackagedUrl(senderUrl, pages)
   ) {
     throw new Error("Credential request rejected from an untrusted origin.");
   }
+};
+
+export const assertTrustedRenderer = (event: IpcMainInvokeEvent): void => {
+  assertTrustedPages(event, ["index.html"]);
+};
+
+export const assertTrustedDeskCalendarCaller = (event: IpcMainInvokeEvent): void => {
+  assertTrustedPages(event, ["index.html", "desk-calendar.html"]);
 };

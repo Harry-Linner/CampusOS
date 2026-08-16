@@ -170,6 +170,15 @@ describe("DeskCalendarApp", () => {
     expect(screen.getByRole("button", { name: "周" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("opens an event detail without enabling edits inside the desktop window", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    const events = await screen.findAllByRole("button", { name: "小学期课程" });
+    fireEvent.click(events[0]);
+    expect(screen.getByLabelText("安排详情")).toBeTruthy();
+    expect(screen.getByText(/编辑、完成或删除请回到 CampusOS/)).toBeTruthy();
+  });
+
   it("switches to the day view and lists the day's events", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));

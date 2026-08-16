@@ -269,7 +269,7 @@ describe("AcademicView", () => {
     expect(screen.getByText("这个学期暂时没有课程安排。")).toBeDefined();
   });
 
-  it("prefers the spring-summer term (含小学期) inside the summer fallback window", async () => {
+  it("prefers the spring-summer term (含短学期) inside the summer fallback window", async () => {
     render(
       createElement(AcademicView, {
         capabilities: createCapabilities([]),
@@ -286,10 +286,10 @@ describe("AcademicView", () => {
     expect(screen.getByText("历史学期课程")).toBeDefined();
     expect(screen.getByText("春季课程")).toBeDefined();
     expect(screen.queryByText("目标学期课程")).toBeNull();
-    expect(screen.getByRole("option", { name: "2025-2026 春夏学期（含小学期）" }))
+    expect(screen.getByRole("option", { name: "2025-2026 春夏学期（含短学期）" }))
       .toBeDefined();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "只看小学期" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "只看短学期" }));
     expect(screen.getByText("历史学期课程")).toBeDefined();
     expect(screen.queryByText("春季课程")).toBeNull();
   });

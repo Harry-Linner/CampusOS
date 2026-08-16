@@ -401,6 +401,11 @@ describe("ZJU unified authentication live verification", () => {
         ).size;
         currentStage = `learning-historical-semesters-${historicalSemesterCount}`;
         expect(historicalSemesterCount).toBeGreaterThan(1);
+        const shortTermCourseCount = courseDescriptors.filter((course) =>
+          /短学期|短/.test(course.semesterName)
+        ).length;
+        currentStage = `learning-short-term-courses-${shortTermCourseCount}`;
+        expect(shortTermCourseCount).toBeGreaterThan(0);
         let downloadCandidate: {
           uploadId: string;
           referenceId: string;

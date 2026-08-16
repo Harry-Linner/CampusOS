@@ -145,6 +145,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   const [view, setView] = useState<DeskCalendarView>("month");
   const [snapshot, setSnapshot] = useState<CampusWorkspaceSnapshot | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [selectedEvent, setSelectedEvent] = useState<DeskCalendarEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -240,12 +241,12 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   };
 
   const renderEventChip = (event: DeskCalendarEvent): JSX.Element => (
-    <span className={`desk-cal-event desk-cal-event-${event.kind}`} key={event.id} title={event.location ?? undefined}>
+    <button className={`desk-cal-event desk-cal-event-${event.kind}`} key={event.id} title={event.location ?? undefined} type="button" onClick={() => setSelectedEvent(event)}>
       {event.kind !== "course" && event.kind !== "task" ? (
         <em>{eventKindLabel[event.kind]}</em>
       ) : null}
       <strong>{event.title}</strong>
-    </span>
+    </button>
   );
 
   const renderDayCell = (day: Date): JSX.Element => {
@@ -328,18 +329,27 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       {view === "day" ? (
         <div className="desk-cal-day-list">
           {(eventsByDay.get(toDayKey(selectedDate)) ?? []).map((event) => (
-            <article className={`desk-cal-day-row desk-cal-event-${event.kind}`} key={event.id}>
+            <button className={`desk-cal-day-row desk-cal-event-${event.kind}`} key={event.id} type="button" onClick={() => setSelectedEvent(event)}>
               <time>{formatEventTime(event)}</time>
               <div>
                 <strong>{event.title}</strong>
                 {event.location ? <small>{event.location}</small> : null}
               </div>
-            </article>
+            </button>
           ))}
           {(eventsByDay.get(toDayKey(selectedDate)) ?? []).length === 0 ? (
             <p className="desk-cal-empty">这一天没有安排</p>
           ) : null}
         </div>
+      ) : null}
+
+      {selectedEvent ? (
+        <section className="desk-cal-detail" aria-label="安排详情">
+          <div><span>{eventKindLabel[selectedEvent.kind]}</span><strong>{selectedEvent.title}</strong></div>
+          <p>{formatEventTime(selectedEvent)}{selectedEvent.location ? ` · ${selectedEvent.location}` : ""}</p>
+          <small>桌面日历仅查看详情；编辑、完成或删除请回到 CampusOS 的日程模块。</small>
+          <button className="desk-cal-detail-close" type="button" onClick={() => setSelectedEvent(null)}>关闭详情</button>
+        </section>
       ) : null}
     </div>
   );

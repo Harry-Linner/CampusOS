@@ -39,7 +39,7 @@ On desktop, the navigation rail is fixed within the viewport. The main content p
 
 - Provide internal tabs for 课表、课程、考试、成绩 and 实践 without creating additional first-level destinations.
 - Course search, detail, history, exam countdown, GPA modes, major identification and practice records all stay within this workspace.
-- 小学期不成为独立学期模型。存在 `2|夏` 课程时，春夏学期标签显示“春夏学期（含小学期）”，并提供“仅看小学期”筛选；Celechron 对照的最近学期回落只保留 14 天，之后暑假默认选择下一完整秋冬学期。
+- 短学期不成为学业课表的独立学期模型。存在 `2|夏` 课程时，春夏学期标签显示“春夏学期（含短学期）”，并提供“只看短学期”筛选；资料模块则把短学期作为独立学期分组。Celechron 对照的最近学期回落只保留 14 天，之后暑假默认选择下一完整秋冬学期。
 
 - Privacy masking is on by default and hides original course scores, per-course grade points, academic GPA, and major GPA together.
 - Turning privacy masking off reveals all four value groups in the existing layout; credit totals remain visible in either mode.
@@ -92,7 +92,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 - The initial close behavior is `每次询问`. Closing the main window asks the user to `隐藏到托盘`, `退出 CampusOS`, or `取消` and explains what background behavior will continue or stop.
 - The close dialog includes `设为默认，以后不再询问`. Unchecked applies the action once; checked persists that action. Settings exposes `每次询问`, `隐藏到托盘`, and `退出 CampusOS` at all times.
 - Title-bar close and `Alt+F4` share the same path. Tray quit, updater restart, and OS shutdown bypass the prompt through an explicit quitting guard.
-- The tray exposes `打开 CampusOS`, desktop-calendar controls when Schedule is enabled, `立即同步`, and `退出 CampusOS`.
+- The tray exposes `打开 CampusOS`, desktop-calendar enablement and month/week/day controls when Schedule is enabled, and `退出 CampusOS`. Automatic synchronization has no global manual action.
 
 ## Visual system
 
@@ -170,7 +170,7 @@ This section supersedes the earlier three-destination baseline: the current four
 
 ## Future-term timetable integrity (2026-08-03)
 
-When the calendar is in a vacation period, the preview must use the next complete academic term. Following `.tmp/celechron-1.3.0/lib/http/ugrs_spider.dart`, the connector derives the admission year from the student ID, requests every academic year from admission through the current year in the fixed `1|秋`, `1|冬`, `2|春`, `2|夏` order, and probes the next academic year without crossing the graduation bound. `2|夏` is the summer short term and merges into the spring-summer semester; the UI labels that semester `春夏学期（含小学期）` and offers `只看小学期`. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.
+When the calendar is in a vacation period, the preview must use the next complete academic term. Following `.tmp/celechron-1.3.0/lib/http/ugrs_spider.dart`, the connector derives the admission year from the student ID, requests every academic year from admission through the current year in the fixed `1|秋`, `1|冬`, `2|春`, `2|夏` order, and probes the next academic year without crossing the graduation bound. `2|夏` is the summer short term and merges into the Academic spring-summer semester, where the UI labels it `春夏学期（含短学期）` and offers `只看短学期`; Materials groups it separately as `短学期`. The connector sends `xnm=YYYY-YYYY` and `xqm=<season>` exactly as in Celechron 1.3.0; a successful HTTP response alone is insufficient because the upstream can return a different timetable for a truncated year value. Acceptance is performed on the capability and workspace layers with a local private oracle: forbidden-course matches must be zero, and all final-exam courses from the same term must be present.
 
 ## Historical materials and desktop-runtime repair (2026-08-16)
 
@@ -203,11 +203,12 @@ graduate-account, or Release-distribution acceptance.
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
 - 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
 
-## 2026-08-16 完整实现同步
+## 2026-08-16 实现状态同步
 
-- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
+- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；单实例唤醒、托盘桌面日历视图切换和插件停用联动已经实现。
 - 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
 - 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
 - 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
+- 自建任务的单项提醒已接入正式调度；插件后台热更新仍缺少可信更新源与版本发现协议，保持未实现状态。

@@ -204,7 +204,7 @@ const TimetablePanel = ({
               checked={summerOnly}
               onChange={(event) => setSummerOnly(event.target.checked)}
             />
-            <span>只看小学期</span>
+            <span>只看短学期</span>
           </label>
         ) : null}
       </div>
@@ -217,7 +217,7 @@ const TimetablePanel = ({
         <p className="muted">当前没有可用课表。</p>
       ) : visibleSessions.length === 0 ? (
         <p className="muted">
-          {summerOnly ? "这个学期暂时没有小学期课程安排。" : "这个学期暂时没有课程安排。"}
+          {summerOnly ? "这个学期暂时没有短学期课程安排。" : "这个学期暂时没有课程安排。"}
         </p>
       ) : (
         <ul className="academic-record-list">

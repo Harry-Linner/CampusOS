@@ -14,7 +14,11 @@ import type {
 } from "@campusos/shared";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
-import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
+import {
+  hydrateCampusWorkspace,
+  rescheduleCampusWorkspaceReminders
+} from "./campusWorkspaceStore";
+import { readReminderSettingsRecord } from "./reminderSettingsStore";
 import {
   applyTaskMutation,
   createIcalContent,
@@ -70,7 +74,7 @@ const loadPeriods = (input: { startAt: string; endAt: string }): LocalTaskPeriod
   return getTaskCalendarPeriods(loadTasks().tasks, start, end);
 };
 
-const saveTask = (input: LocalTaskInput): LocalTasksData => {
+const saveTask = async (input: LocalTaskInput): Promise<LocalTasksData> => {
   const source = readStoredTasks();
   if (!input.id && input.source?.kind === "ai-assistant") {
     const duplicate = source.find((task) => task.source?.kind === "ai-assistant" && task.source.fingerprint === input.source?.fingerprint);
@@ -112,14 +116,16 @@ const saveTask = (input: LocalTaskInput): LocalTasksData => {
   const result = persistTasks(refreshed.tasks);
   result.operation = { kind: existingIndex >= 0 ? "updated" : "created", taskId: next.id };
   notifyScheduleChanged();
+  await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());
   return result;
 };
 
-const mutateTask = (input: LocalTaskMutation): LocalTasksData => {
+const mutateTask = async (input: LocalTaskMutation): Promise<LocalTasksData> => {
   const refreshed = refreshLocalTasks(readStoredTasks(), new Date());
   const updated = applyTaskMutation(refreshed.tasks, input);
   const result = persistTasks(refreshLocalTasks(updated, new Date()).tasks);
   notifyScheduleChanged();
+  await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());
   return result;
 };
 

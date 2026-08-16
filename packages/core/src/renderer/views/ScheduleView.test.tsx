@@ -91,6 +91,20 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
 };
 
 describe("ScheduleView", () => {
+  it("explains how automatic scheduling uses tasks and blocked time", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule()
+    }));
+
+    expect(await screen.findByText("它会怎么安排？")).toBeTruthy();
+    expect(screen.getByText(/结果只供预览，不会改动原任务/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "生成排程建议" })).toBeTruthy();
+  });
+
   it("loads formal task data, shows four views, and saves a new task through the bridge", async () => {
     const schedule = createSchedule();
     render(createElement(ScheduleView, {
@@ -176,6 +190,22 @@ describe("ScheduleView", () => {
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "task-1", status: "completed" }));
   });
 
+  it("opens a local task detail before offering edit actions", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule()
+    }));
+
+    const taskButtons = await screen.findAllByRole("button", { name: "Read notes" });
+    fireEvent.click(taskButtons[0]);
+    expect(screen.getByRole("heading", { name: "安排详情" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(screen.getByRole("heading", { name: "编辑任务" })).toBeTruthy();
+  });
+
   it("shows fixed schedules and keeps fixed legacy history read-only", async () => {
     const fixed: LocalTaskRecord = {
       ...record,
@@ -227,13 +257,13 @@ describe("ScheduleView", () => {
     fireEvent.change(screen.getAllByRole("combobox")[0], {
       target: { value: "fixed" }
     });
-    fireEvent.change(screen.getAllByRole("combobox")[1], {
+    fireEvent.change(screen.getByLabelText("重复"), {
       target: { value: "days" }
     });
     const form = container.querySelector(".schedule-task-form");
     expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(3);
 
-    fireEvent.change(screen.getAllByRole("combobox")[1], {
+    fireEvent.change(screen.getByLabelText("重复"), {
       target: { value: "month" }
     });
     expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(2);

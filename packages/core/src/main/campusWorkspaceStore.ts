@@ -5,6 +5,7 @@ import type {
   AcademicGradesData,
   CalendarEventsData,
   LearningMaterialsData,
+  LocalTaskRecord,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
@@ -43,6 +44,11 @@ import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
 import { appendDiagnosticEntry } from "./diagnosticLogStore";
 import { publishE2eFixtureCapabilities } from "./e2eFixtureSources";
 import { useE2eFixtureSources } from "./officialAcademicCalendarRequest";
+
+const readLocalReminderTasks = (): LocalTaskRecord[] => {
+  const stored = getOfficialDatabaseService().loadLocalTasks();
+  return stored && Array.isArray(stored.tasks) ? stored.tasks as LocalTaskRecord[] : [];
+};
 
 const WORKSPACE_STORE_FILE = "campus-workspace.json";
 export const CAMPUS_WORKSPACE_CHANGED_CHANNEL = "campusos:workspace:changed";
@@ -209,7 +215,7 @@ const buildGeneratedRecord = async (
     }
   };
   const stored = await getWorkspaceSnapshotStore().save(snapshot);
-  scheduleWorkspaceReminders(stored.snapshot, reminderSettings);
+  scheduleWorkspaceReminders(stored.snapshot, reminderSettings, new Date(), readLocalReminderTasks());
 
   return {
     snapshot: stored.snapshot,
@@ -234,7 +240,7 @@ export const hydrateCampusWorkspace =
       const hydrated = snapshot === stored.snapshot
         ? stored
         : await snapshotStore.save(snapshot);
-      scheduleWorkspaceReminders(hydrated.snapshot, reminderSettings);
+      scheduleWorkspaceReminders(hydrated.snapshot, reminderSettings, new Date(), readLocalReminderTasks());
 
       return {
         snapshot: hydrated.snapshot,
@@ -257,7 +263,7 @@ export const rescheduleCampusWorkspaceReminders = async (
 ): Promise<ReminderSchedulerState> => {
   const snapshotStore = getWorkspaceSnapshotStore();
   const stored = await snapshotStore.load();
-  if (!stored) return scheduleWorkspaceReminders(null, settings, now);
+  if (!stored) return scheduleWorkspaceReminders(null, settings, now, readLocalReminderTasks());
 
   const snapshot = pruneWorkspaceDeadlinesBeforeToday(
     stored.snapshot,
@@ -269,7 +275,7 @@ export const rescheduleCampusWorkspaceReminders = async (
     notifyCampusWorkspaceChanged();
   }
 
-  return scheduleWorkspaceReminders(snapshot, settings, now);
+  return scheduleWorkspaceReminders(snapshot, settings, now, readLocalReminderTasks());
 };
 
 export const registerCampusWorkspaceHandlers = (): void => {

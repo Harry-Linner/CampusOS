@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CampusReminder, CampusWorkspaceSnapshot } from "@campusos/shared";
+import type { CampusReminder, CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 
 const notificationState = vi.hoisted(() => ({
   supported: true,
@@ -64,6 +64,26 @@ const snapshot = (reminders: CampusReminder[]): CampusWorkspaceSnapshot => ({
     remindersQueued: reminders.length,
     deadlinesDueSoon: 0
   }
+});
+
+const localTask = (overrides: Partial<LocalTaskRecord> = {}): LocalTaskRecord => ({
+  id: "local-1",
+  status: "running",
+  description: "",
+  timeSpentMinutes: 0,
+  timeNeededMinutes: 30,
+  startAt: new Date(now.getTime() + 31 * 60_000).toISOString(),
+  endAt: new Date(now.getTime() + 61 * 60_000).toISOString(),
+  location: "自习室",
+  title: "本地任务",
+  breakable: true,
+  type: "deadline",
+  repeatType: "norepeat",
+  repeatPeriod: 1,
+  repeatEndsOn: "2026-08-05",
+  blocksPlanning: true,
+  fromId: null,
+  ...overrides
 });
 
 describe("reminder scheduler", () => {
@@ -171,5 +191,33 @@ describe("reminder scheduler", () => {
 
     expect(state).toMatchObject({ enabled: false, scheduledCount: 0, nextFireAt: null });
     expect(notificationState.show).not.toHaveBeenCalled();
+  });
+
+  it("schedules a local task with its own lead time instead of the global value", () => {
+    const state = scheduleWorkspaceReminders(snapshot([]), {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now, [localTask({ reminderMode: "lead", reminderLeadMinutes: 60 })]);
+
+    expect(state.scheduledCount).toBe(1);
+    vi.advanceTimersByTime(60_000);
+    expect(notificationState.options).toEqual([{
+      title: "本地任务",
+      body: "将在 60 分钟后开始",
+      silent: false
+    }]);
+  });
+
+  it("does not schedule a local task whose reminder is disabled", () => {
+    const state = scheduleWorkspaceReminders(snapshot([]), {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now, [localTask({ reminderMode: "none" })]);
+
+    expect(state.scheduledCount).toBe(0);
   });
 });

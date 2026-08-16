@@ -89,7 +89,7 @@ vi.mock("./campusWorkspaceStore", () => ({
 }));
 
 vi.mock("./ipcSecurity", () => ({
-  assertTrustedRenderer: vi.fn()
+  assertTrustedDeskCalendarCaller: vi.fn()
 }));
 
 const temporaryDirectories: string[] = [];

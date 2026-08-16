@@ -44,6 +44,9 @@ interface TaskFormState {
   repeatEndsOn: string;
   repeatWeekdays?: number[];
   blocksPlanning: boolean;
+  reminderMode: "global" | "none" | "at-time" | "lead" | "custom";
+  reminderLeadMinutes: number;
+  reminderAt: string;
 }
 
 const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
@@ -192,7 +195,10 @@ const defaultTaskForm = (date = new Date()): TaskFormState => {
     repeatType: "norepeat",
     repeatPeriod: 1,
     repeatEndsOn: toDateInput(end),
-    blocksPlanning: true
+    blocksPlanning: true,
+    reminderMode: "global",
+    reminderLeadMinutes: 15,
+    reminderAt: toDateTimeInput(end)
   };
 };
 
@@ -210,7 +216,10 @@ const taskToForm = (task: LocalTaskRecord): TaskFormState => ({
   repeatType: task.repeatType,
   repeatPeriod: task.repeatPeriod,
   repeatEndsOn: task.repeatEndsOn,
-  blocksPlanning: task.blocksPlanning
+  blocksPlanning: task.blocksPlanning,
+  reminderMode: task.reminderMode ?? "global",
+  reminderLeadMinutes: task.reminderLeadMinutes ?? 15,
+  reminderAt: task.reminderAt ? toDateTimeInput(new Date(task.reminderAt)) : toDateTimeInput(new Date(task.endAt))
 });
 
 const buildEvents = (
@@ -372,6 +381,10 @@ export const ScheduleView = ({
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
   const [pendingRestore, setPendingRestore] = useState<LocalTaskRecord | null>(null);
+  const selectedTask = useMemo(
+    () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
+    [selectedEvent, tasks]
+  );
 
   const loadDeskCalendarState = useCallback(async (): Promise<void> => {
     if (!deskCalendar) return;
@@ -495,14 +508,6 @@ export const ScheduleView = ({
   };
 
   const selectEvent = (event: ScheduleEvent): void => {
-    if (event.taskId) {
-      const task = tasks.find((candidate) => candidate.id === event.taskId);
-      if (task) {
-        setForm(taskToForm(task));
-        setSelectedEvent(null);
-        return;
-      }
-    }
     setSelectedEvent(event);
   };
 
@@ -528,7 +533,10 @@ export const ScheduleView = ({
         repeatPeriod: form.repeatPeriod,
         repeatEndsOn: form.repeatEndsOn,
         repeatWeekdays: form.repeatWeekdays ?? [],
-        blocksPlanning: form.blocksPlanning
+        blocksPlanning: form.blocksPlanning,
+        reminderMode: form.reminderMode,
+        reminderLeadMinutes: form.reminderMode === "lead" ? form.reminderLeadMinutes : null,
+        reminderAt: form.reminderMode === "custom" ? fromDateTimeInput(form.reminderAt) : null
       };
       const data = await schedule.saveTask(input);
       setTasks(data.tasks);
@@ -903,7 +911,7 @@ export const ScheduleView = ({
             ) : null}
           </section>
 
-          {selectedEvent ? <section className="schedule-detail-section"><div className="section-heading"><h2>安排详情</h2><button className="text-button" type="button" onClick={() => setSelectedEvent(null)}>关闭</button></div><strong>{selectedEvent.title}</strong><p>{formatEventMeta(selectedEvent)}</p><p>{selectedEvent.location || selectedEvent.note || ""}</p></section> : null}
+          {selectedEvent ? <section className="schedule-detail-section"><div className="section-heading"><h2>安排详情</h2><button className="text-button" type="button" onClick={() => setSelectedEvent(null)}>关闭</button></div><strong>{selectedEvent.title}</strong><p>{formatEventMeta(selectedEvent)}</p><p>{selectedEvent.location || selectedEvent.note || ""}</p>{selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? <div className="schedule-detail-actions"><button className="text-button" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask))}>编辑</button>{selectedTask.type === "deadline" && selectedTask.status !== "completed" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed")}>完成</button> : null}<button className="text-button is-danger" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask)}>删除</button></div> : <small>课程、考试和上游作业为只读；需要修改自建任务时请在 CampusOS 主窗口操作。</small>}</section> : null}
 
           {form ? (
             <form className="schedule-task-form" onSubmit={(event) => void saveForm(event)}>
@@ -916,6 +924,8 @@ export const ScheduleView = ({
               <label className="schedule-check"><input type="checkbox" checked={form.breakable} onChange={(event) => setForm({ ...form, breakable: event.target.checked })} />允许拆分</label>
               <label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label>
               <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option></select></label>
+              <label>单项提醒<select value={form.reminderMode === "lead" ? `lead:${form.reminderLeadMinutes}` : form.reminderMode} onChange={(event) => { const value = event.target.value; if (value.startsWith("lead:")) setForm({ ...form, reminderMode: "lead", reminderLeadMinutes: Number(value.slice(5)) }); else setForm({ ...form, reminderMode: value as TaskFormState["reminderMode"] }); }}><option value="global">使用全局提前量</option><option value="none">不提醒</option><option value="at-time">开始/截止时</option><option value="lead:5">提前 5 分钟</option><option value="lead:15">提前 15 分钟</option><option value="lead:30">提前 30 分钟</option><option value="lead:60">提前 1 小时</option><option value="lead:1440">提前 1 天</option><option value="custom">自定义时间</option></select></label>
+              {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" required value={form.reminderAt} onChange={(event) => setForm({ ...form, reminderAt: event.target.value })} /></label> : null}
               {form.type === "fixed" ? <>
                 <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="weeks">每隔几周</option><option value="weekdays">每周工作日</option><option value="month">每月</option><option value="year">每年</option></select></label>
                 {form.repeatType === "days" || form.repeatType === "weeks" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
@@ -927,8 +937,12 @@ export const ScheduleView = ({
 
           <section className="schedule-plan-section" aria-labelledby="schedule-plan-heading">
             <div className="section-heading"><h2 id="schedule-plan-heading">自动排程</h2><span>{plan?.valid ? `休息 ${plan.restMinutes} 分钟` : ""}</span></div>
-            <div className="schedule-form-grid"><label>专注分钟<input type="number" min="1" value={settings.workMinutes} onChange={(event) => setSettings({ ...settings, workMinutes: Number(event.target.value) })} /></label><label>休息分钟<input type="number" min="0" value={settings.restMinutes} onChange={(event) => setSettings({ ...settings, restMinutes: Number(event.target.value) })} /></label><label>开始小时<input type="number" min="0" max="23" value={settings.availableStartHour} onChange={(event) => setSettings({ ...settings, availableStartHour: Number(event.target.value) })} /></label><label>结束小时<input type="number" min="1" max="24" value={settings.availableEndHour} onChange={(event) => setSettings({ ...settings, availableEndHour: Number(event.target.value) })} /></label><label>规划天数<input type="number" min="1" max="366" value={settings.horizonDays} onChange={(event) => setSettings({ ...settings, horizonDays: Number(event.target.value) })} /></label></div>
-            <button className="primary-button" type="button" disabled={busy || !schedule} onClick={() => void generatePlan()}>{busy ? "处理中" : "生成排程"}</button>
+            <div className="schedule-plan-guide">
+              <strong>它会怎么安排？</strong>
+              <ol><li>先新建 DDL，填写截止时间和预计所需分钟。</li><li>课程、固定日程和勾选“占用排程时间”的任务会被自动避开。</li><li>设置每天可用时段后生成建议；结果只供预览，不会改动原任务。</li></ol>
+            </div>
+            <div className="schedule-form-grid"><label>每段专注（分钟）<input type="number" min="1" value={settings.workMinutes} onChange={(event) => setSettings({ ...settings, workMinutes: Number(event.target.value) })} /></label><label>段间休息（分钟）<input type="number" min="0" value={settings.restMinutes} onChange={(event) => setSettings({ ...settings, restMinutes: Number(event.target.value) })} /></label><label>每天开始（整点）<input type="number" min="0" max="23" value={settings.availableStartHour} onChange={(event) => setSettings({ ...settings, availableStartHour: Number(event.target.value) })} /></label><label>每天结束（整点）<input type="number" min="1" max="24" value={settings.availableEndHour} onChange={(event) => setSettings({ ...settings, availableEndHour: Number(event.target.value) })} /></label><label>向后规划（天）<input type="number" min="1" max="366" value={settings.horizonDays} onChange={(event) => setSettings({ ...settings, horizonDays: Number(event.target.value) })} /></label></div>
+            <button className="primary-button" type="button" disabled={busy || !schedule} onClick={() => void generatePlan()}>{busy ? "处理中" : "生成排程建议"}</button>
             {plan && !plan.valid ? <p className="schedule-plan-error" role="alert">{plan.reason}</p> : null}
             {plan?.valid ? <div className="schedule-plan-list">{plan.segments.map((segment) => <div className="schedule-plan-row" key={segment.id}><time>{formatTimeRange(segment.startAt, segment.endAt)}</time><strong>{segment.title}</strong></div>)}</div> : null}
           </section>

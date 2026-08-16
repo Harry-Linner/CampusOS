@@ -36,6 +36,10 @@ vi.mock("./pluginCapabilityAccess", () => ({
   createPluginCapabilityAccess: vi.fn(() => ({ read: vi.fn(async () => []) }))
 }));
 
+vi.mock("./appLifecycle", () => ({
+  setSchedulePluginEnabled: vi.fn(async () => undefined)
+}));
+
 vi.mock("./officialPluginRuntimeService", () => ({
   getOfficialPluginRuntimeService: vi.fn(() => ({
     loadCached: state.loadCached,

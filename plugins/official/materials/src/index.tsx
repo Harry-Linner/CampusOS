@@ -45,11 +45,18 @@ const normalizeSemester = (semester: string): { key: string; label: string } => 
     .replaceAll("—", "-")
     .replace(/\s+/g, "");
   const academicYear = /(20\d{2})-(20\d{2})/.exec(normalized);
+  const shortTerm = /短学期|短|小学期/.test(normalized);
   const season = /秋|冬/.test(normalized)
     ? { number: 1, label: "秋冬学期" }
     : /春|夏/.test(normalized)
-      ? { number: 2, label: "春夏学期（含小学期）" }
+      ? { number: 2, label: "春夏学期" }
       : null;
+  if (academicYear && shortTerm) {
+    return {
+      key: `${academicYear[1]}:short`,
+      label: `${academicYear[1]}-${academicYear[2]} 短学期`
+    };
+  }
   if (!academicYear || !season) {
     return { key: normalized, label: semester };
   }

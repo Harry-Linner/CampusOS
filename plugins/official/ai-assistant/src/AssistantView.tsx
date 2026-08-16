@@ -245,9 +245,18 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
           <section className="assistant-input-panel" aria-label="消息输入">
             <label className="assistant-label" htmlFor="assistant-message">粘贴消息</label>
             <textarea id="assistant-message" className="assistant-message-input" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="粘贴需要安排到日程的群聊消息" />
-            <label className="assistant-label" htmlFor="assistant-sent-at">消息发送时间（可选）</label>
-            <input id="assistant-sent-at" type="datetime-local" value={sourceSentAt} onChange={(event) => setSourceSentAt(event.target.value)} />
-            <p className="meta-line">提供消息发送时间，才能准确解析“明天、下周五”等相对日期。</p>
+            <div className="assistant-time-context">
+              <div className="assistant-time-copy">
+                <span className="eyebrow">时间上下文</span>
+                <label htmlFor="assistant-sent-at">消息发送时间</label>
+                <p>消息里有“明天、下周五”时填写；没有相对日期可以留空。</p>
+              </div>
+              <div className="assistant-time-control">
+                <input id="assistant-sent-at" type="datetime-local" value={sourceSentAt} onChange={(event) => setSourceSentAt(event.target.value)} />
+                <button className="text-button" type="button" onClick={() => setSourceSentAt(toDateTimeInput(new Date().toISOString()))}>使用当前时间</button>
+                {sourceSentAt ? <button className="text-button" type="button" onClick={() => setSourceSentAt("")}>清除</button> : null}
+              </div>
+            </div>
             <div className="assistant-actions"><button className="primary-button" type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>{busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}</button>{!settings?.configured ? <button className="text-button" type="button" onClick={() => setSection("settings")}>先配置 AI 连接</button> : null}</div>
           </section>
           <section className="assistant-draft-panel" aria-label="提取结果">

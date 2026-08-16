@@ -83,6 +83,18 @@ const createScheduleBridge = (overrides: Partial<NonNullable<PluginComponentProp
 });
 
 describe("AssistantView", () => {
+  it("presents message time as an optional context control", async () => {
+    const assistant = createAssistantBridge();
+    render(createElement(AssistantView, { ...baseProps, assistant }));
+    await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
+
+    expect(screen.getByText("时间上下文")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "使用当前时间" }));
+    expect((screen.getByLabelText("消息发送时间") as HTMLInputElement).value).not.toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "清除" }));
+    expect((screen.getByLabelText("消息发送时间") as HTMLInputElement).value).toBe("");
+  });
+
   it("parses a message into a candidate and commits it through Schedule with a local fingerprint", async () => {
     const assistant = createAssistantBridge();
     const saveTask = vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-05T00:00:00.000Z", operation: { kind: "created" as const, taskId: "task-1" } }));

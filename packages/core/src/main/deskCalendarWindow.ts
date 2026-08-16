@@ -4,10 +4,11 @@ import { dirname, join } from "node:path";
 import {
   createDefaultDeskCalendarSettings,
   normalizeDeskCalendarView,
+  type DeskCalendarView,
   type DeskCalendarSettings,
   type DeskCalendarSnapshotMessage,
 } from "@campusos/shared";
-import { assertTrustedRenderer } from "./ipcSecurity";
+import { assertTrustedDeskCalendarCaller } from "./ipcSecurity";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 
 const DESK_CALENDAR_SETTINGS_FILE = "desk-calendar.json";
@@ -17,6 +18,7 @@ export const DESK_CALENDAR_SNAPSHOT_CHANNEL = "campusos:desk-calendar:snapshot";
 let deskCalendarWindow: BrowserWindow | null = null;
 let settings: DeskCalendarSettings | null = null;
 let appIsQuitting = false;
+let settingsChangedListener: (() => void | Promise<void>) | null = null;
 
 const getSettingsPath = (): string =>
   join(app.getPath("userData"), "settings", DESK_CALENDAR_SETTINGS_FILE);
@@ -81,6 +83,9 @@ const saveSettings = async (
 const broadcastSettingsChanged = (): void => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(DESK_CALENDAR_CHANGED_CHANNEL);
+  }
+  if (settingsChangedListener) {
+    void Promise.resolve(settingsChangedListener()).catch(() => undefined);
   }
 };
 
@@ -166,12 +171,12 @@ const ensureDeskCalendarWindow = async (): Promise<BrowserWindow> => {
 
 export const registerDeskCalendarHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:settings:load", async (event) => {
-    assertTrustedRenderer(event);
+    assertTrustedDeskCalendarCaller(event);
     return loadSettings();
   });
 
   ipcMain.handle("campusos:desk-calendar:settings:save", async (event, input: unknown) => {
-    assertTrustedRenderer(event);
+    assertTrustedDeskCalendarCaller(event);
     const candidate = typeof input === "object" && input !== null
       ? input as { enabled?: unknown; view?: unknown }
       : {};
@@ -191,12 +196,12 @@ export const registerDeskCalendarHandlers = (): void => {
   });
 
   ipcMain.handle("campusos:desk-calendar:window:snapshot", async (event) => {
-    assertTrustedRenderer(event);
+    assertTrustedDeskCalendarCaller(event);
     return currentSnapshotMessage();
   });
 
   ipcMain.handle("campusos:desk-calendar:window:close", async (event) => {
-    assertTrustedRenderer(event);
+    assertTrustedDeskCalendarCaller(event);
     await saveSettings({ enabled: false });
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
       deskCalendarWindow.close();
@@ -220,6 +225,22 @@ export const setDeskCalendarEnabled = async (enabled: boolean): Promise<DeskCale
   if (next.enabled) broadcastSnapshotSafely();
   broadcastSettingsChanged();
   return next;
+};
+
+export const setDeskCalendarView = async (view: DeskCalendarView): Promise<DeskCalendarSettings> => {
+  const next = await saveSettings({ view });
+  if (next.enabled) {
+    await ensureDeskCalendarWindow();
+    broadcastSnapshotSafely();
+  }
+  broadcastSettingsChanged();
+  return next;
+};
+
+export const setDeskCalendarSettingsChangedListener = (
+  listener: (() => void | Promise<void>) | null
+): void => {
+  settingsChangedListener = listener;
 };
 
 /** 应用启动完成后恢复用户上次启用的桌面日历。 */

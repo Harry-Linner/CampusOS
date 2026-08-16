@@ -37,7 +37,7 @@ User-facing plugins are exactly Academic, Schedule, Materials, and AI Assistant.
 
 ### Timetable, materials, and desktop runtime update (2026-08-16)
 
-The undergraduate connector follows the Celechron 1.3.0 academic-year plan from the admission year through the current year, then probes the next year; each year requests autumn, winter, spring, and summer in order. Summer is the short term inside the spring-summer semester and can be filtered with `只看小学期`. Materials now exposes all authenticated historical semesters, including closed courses, while retaining `2025-2026 春夏` only as the private download baseline. CampusOS settings avoid Electron's file-owned `userData/preferences` path by using `userData/settings`; the tray uses the application icon resource rather than the Electron executable. The redacted live chain passed again on 2026-08-16 with complete timetable request structures, multiple learning semesters, authenticated download byte validation, and zero sensitive output.
+The undergraduate connector follows the Celechron 1.3.0 academic-year plan from the admission year through the current year, then probes the next year; each year requests autumn, winter, spring, and summer in order. Summer is the short term inside Academic's spring-summer semester and can be filtered with `只看短学期`; Materials exposes it as a separate `短学期` group alongside all authenticated historical semesters. CampusOS settings avoid Electron's file-owned `userData/preferences` path by using `userData/settings`; the tray uses the application icon resource rather than the Electron executable. The redacted live chain passed again on 2026-08-16 with complete timetable request structures, a non-zero short-term course assertion, multiple learning semesters, authenticated download byte validation, and zero sensitive output.
 
 ### AI Assistant implementation update (2026-08-07)
 
@@ -103,11 +103,12 @@ Electron tests cover the controlled path.
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
 - 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
 
-## 2026-08-16 完整实现同步
+## 2026-08-16 实现状态同步
 
-- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
+- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；单实例唤醒、托盘月/周/日切换和日程插件停用联动已经实现。
 - 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
 - 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
 - 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
+- 自建任务单项提醒支持不提醒、开始/截止时、预设提前量和自定义时间，并走正式 Electron 调度链；插件后台热更新仍缺少可信更新源与版本发现协议，未标记完成。

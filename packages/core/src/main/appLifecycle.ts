@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Tray } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  Tray,
+  type MenuItemConstructorOptions
+} from "electron";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -11,7 +19,9 @@ import type {
 import { assertTrustedRenderer } from "./ipcSecurity";
 import {
   getDeskCalendarSettings,
-  setDeskCalendarEnabled
+  setDeskCalendarEnabled,
+  setDeskCalendarSettingsChangedListener,
+  setDeskCalendarView
 } from "./deskCalendarWindow";
 
 const SETTINGS_FILE = "app-lifecycle.json";
@@ -19,6 +29,7 @@ let settings: AppLifecycleSettings | null = null;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let appIsQuitting = false;
+let schedulePluginEnabled = true;
 
 const settingsPath = (): string => join(app.getPath("userData"), "settings", SETTINGS_FILE);
 
@@ -79,7 +90,7 @@ const persistSettings = async (patch: AppLifecycleSettingsPatch): Promise<AppLif
   return { ...next };
 };
 
-const showMainWindow = (): void => {
+export const showCampusMainWindow = (): void => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
@@ -101,15 +112,39 @@ const developmentTrayIconPath = (): string => {
 const rebuildTrayMenu = async (): Promise<void> => {
   if (!tray) return;
   const deskCalendar = await getDeskCalendarSettings();
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "打开 CampusOS", click: showMainWindow },
-    {
-      label: deskCalendar.enabled ? "隐藏桌面日历" : "显示桌面日历",
-      click: async () => {
-        await setDeskCalendarEnabled(!deskCalendar.enabled);
-        await rebuildTrayMenu();
+  const viewItems: MenuItemConstructorOptions[] = ([
+    ["月视图", "month"],
+    ["周视图", "week"],
+    ["日视图", "day"]
+  ] as const).map(([label, view]) => ({
+    label,
+    type: "radio",
+    checked: deskCalendar.view === view,
+    click: async () => {
+      await setDeskCalendarView(view);
+      await rebuildTrayMenu();
+    }
+  }));
+  const template: MenuItemConstructorOptions[] = [
+    { label: "打开 CampusOS", click: showCampusMainWindow }
+  ];
+  if (schedulePluginEnabled) {
+    template.push(
+      {
+        label: deskCalendar.enabled ? "隐藏桌面日历" : "显示桌面日历",
+        click: async () => {
+          await setDeskCalendarEnabled(!deskCalendar.enabled);
+          await rebuildTrayMenu();
+        }
+      },
+      {
+        label: "桌面日历视图",
+        enabled: deskCalendar.enabled,
+        submenu: viewItems
       }
-    },
+    );
+  }
+  template.push(
     { type: "separator" },
     {
       label: "退出 CampusOS",
@@ -118,7 +153,8 @@ const rebuildTrayMenu = async (): Promise<void> => {
         app.quit();
       }
     }
-  ]));
+  );
+  tray.setContextMenu(Menu.buildFromTemplate(template));
 };
 
 export const attachMainWindowLifecycle = async (window: BrowserWindow): Promise<void> => {
@@ -166,7 +202,14 @@ export const createCampusTray = async (): Promise<void> => {
     : developmentTrayIconPath();
   tray = new Tray(iconPath);
   tray.setToolTip("CampusOS");
-  tray.on("double-click", showMainWindow);
+  tray.on("double-click", showCampusMainWindow);
+  setDeskCalendarSettingsChangedListener(rebuildTrayMenu);
+  await rebuildTrayMenu();
+};
+
+export const setSchedulePluginEnabled = async (enabled: boolean): Promise<void> => {
+  schedulePluginEnabled = enabled;
+  if (!enabled) await setDeskCalendarEnabled(false);
   await rebuildTrayMenu();
 };
 

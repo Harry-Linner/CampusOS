@@ -37,6 +37,7 @@ import {
   createCampusTray,
   markCampusAppQuitting,
   registerAppLifecycleHandlers,
+  showCampusMainWindow,
   shouldStartHidden
 } from "./appLifecycle";
 
@@ -97,44 +98,62 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   return window;
 };
 
-void app.whenReady().then(async () => {
-  initSentryMain();
-  registerCampusmodRendererProtocol();
-  registerAcademicCredentialHandlers();
-  registerReminderSettingsHandlers({
-    onSettingsSaved: async (settings) => {
-      await rescheduleCampusWorkspaceReminders(settings);
-    }
-  });
-  registerDownloadHandlers();
-  registerScheduleHandlers();
-  registerAiAssistantHandlers();
-  registerCampusWorkspaceHandlers();
-  registerPluginRuntimeHandlers();
-  registerDiagnosticHandlers();
-  registerDeskCalendarHandlers();
-  registerUpdateHandlers();
-  registerAppLifecycleHandlers();
-  registerNotificationHandlers();
-  registerBackupHandlers();
-  await createMainWindow();
-  await createCampusTray();
-  await restoreDeskCalendarWindow();
-  // The updater is intentionally started after the first window exists so
-  // packaged startup status is visible through the normal renderer event.
-  void checkForUpdates();
-  workspaceRefreshScheduler.start();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
-  app.on("activate", async () => {
+const startCampusApp = (): void => {
+  app.on("second-instance", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      await createMainWindow();
+      void createMainWindow().then(showCampusMainWindow);
+      return;
     }
+    showCampusMainWindow();
   });
-}).catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : "未知启动错误";
-  process.stderr.write(`[CampusOS] startup failed: ${message}\n`);
+
+  void app.whenReady().then(async () => {
+    initSentryMain();
+    registerCampusmodRendererProtocol();
+    registerAcademicCredentialHandlers();
+    registerReminderSettingsHandlers({
+      onSettingsSaved: async (settings) => {
+        await rescheduleCampusWorkspaceReminders(settings);
+      }
+    });
+    registerDownloadHandlers();
+    registerScheduleHandlers();
+    registerAiAssistantHandlers();
+    registerCampusWorkspaceHandlers();
+    registerPluginRuntimeHandlers();
+    registerDiagnosticHandlers();
+    registerDeskCalendarHandlers();
+    registerUpdateHandlers();
+    registerAppLifecycleHandlers();
+    registerNotificationHandlers();
+    registerBackupHandlers();
+    await createMainWindow();
+    await createCampusTray();
+    await restoreDeskCalendarWindow();
+    // The updater is intentionally started after the first window exists so
+    // packaged startup status is visible through the normal renderer event.
+    void checkForUpdates();
+    workspaceRefreshScheduler.start();
+
+    app.on("activate", async () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        await createMainWindow();
+      }
+    });
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "未知启动错误";
+    process.stderr.write(`[CampusOS] startup failed: ${message}\n`);
+    app.quit();
+  });
+};
+
+if (!hasSingleInstanceLock) {
   app.quit();
-});
+} else {
+  startCampusApp();
+}
 
 app.on("window-all-closed", () => undefined);
 
