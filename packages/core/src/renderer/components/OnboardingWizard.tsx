@@ -153,6 +153,15 @@ export const OnboardingWizard = ({
   const [notificationEnabled, setNotificationEnabled] = useState(true);
   const [preferenceSaving, setPreferenceSaving] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
+  const [analyticsAvailable, setAnalyticsAvailable] = useState(false);
+
+  useEffect(() => {
+    void window.campusos?.analytics?.load().then((record) => {
+      setAnalyticsConsent(record.consent);
+      setAnalyticsAvailable(record.available);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void window.campusos?.lifecycle?.load().then((record) => {
@@ -185,8 +194,10 @@ export const OnboardingWizard = ({
   const handleSync = async (): Promise<void> => {
     setSyncStarted(true);
     setSyncError(null);
+    void window.campusos?.analytics?.track("sync_started");
     try {
       await workspace.sync();
+      void window.campusos?.analytics?.track("sync_finished");
     } catch (error) {
       setSyncError(
         error instanceof Error ? error.message : "数据刷新失败。"
@@ -247,6 +258,8 @@ export const OnboardingWizard = ({
         notificationEnabled,
         notificationPrompted: true
       });
+      await window.campusos?.analytics?.setConsent(analyticsConsent);
+      await window.campusos?.analytics?.track("onboarding_completed");
       goTo("done");
     } catch (error) {
       setPreferenceError(error instanceof Error ? error.message : "偏好保存失败。");
@@ -750,6 +763,10 @@ export const OnboardingWizard = ({
               <label className="onboarding-plugin-card">
                 <span className="onboarding-plugin-info"><strong>登录系统时启动 CampusOS</strong><span>默认关闭，之后可在设置中修改。</span></span>
                 <input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} />
+              </label>
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>允许匿名使用分析</strong><span>{analyticsAvailable ? "默认关闭，仅用于功能漏斗，不收集账号、课程、任务、文件或密钥。之后可在设置中修改。" : "分析服务未配置，当前不会发送任何数据。"}</span></span>
+                <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={(event) => setAnalyticsConsent(event.target.checked)} />
               </label>
               <label className="onboarding-plugin-card">
                 <span className="onboarding-plugin-info"><strong>允许桌面通知</strong><span>用于课程、考试、作业和本地任务提醒；关闭不会阻塞其他功能。</span></span>

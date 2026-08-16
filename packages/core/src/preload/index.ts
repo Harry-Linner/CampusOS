@@ -17,6 +17,11 @@ contextBridge.exposeInMainWorld("campusos", {
   feedback: {
     openIssue: () => ipcRenderer.invoke("campusos:feedback:open")
   },
+  analytics: {
+    load: () => ipcRenderer.invoke("campusos:analytics:load"),
+    setConsent: (consent: boolean) => ipcRenderer.invoke("campusos:analytics:set-consent", consent),
+    track: (event: string) => ipcRenderer.invoke("campusos:analytics:track", event)
+  },
   workspace: {
     hydrate: () => ipcRenderer.invoke("campusos:workspace:hydrate"),
     sync: () => ipcRenderer.invoke("campusos:workspace:sync"),

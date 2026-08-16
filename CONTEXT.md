@@ -112,3 +112,10 @@ Electron tests cover the controlled path.
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 自建任务单项提醒支持不提醒、开始/截止时、预设提前量和自定义时间，并走正式 Electron 调度链；插件更新协议已完成，默认清单位于 `plugins/updates.json`，生产清单通过受信 HTTPS 源发布。
+
+
+## Runtime consent and integration boundaries (2026-08-16)
+
+- Anonymous usage analytics is opt-in, disabled by default, and only sends a fixed event allowlist from the main process. No account, course, task, file, private URL, cookie, token, or AI key is sent; without a configured PostHog project key the feature remains unavailable.
+- DingTalk import is an explicit disabled placeholder. It does not read DingTalk data, start login, or open a background connection.
+- The fallback academic login remains intentionally unclaimed until a browser-exported cookie can be validated through the same real ZJU service chain as password login; no cookie is accepted as success based on syntax or HTTP status alone.

@@ -42,6 +42,7 @@ import {
 } from "./appLifecycle";
 import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
 import { registerFeedbackHandlers } from "./feedbackIpc";
+import { registerAnalyticsHandlers } from "./analyticsIpc";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
@@ -136,6 +137,7 @@ const startCampusApp = (): void => {
     registerNotificationHandlers();
     registerBackupHandlers();
     registerFeedbackHandlers();
+    registerAnalyticsHandlers();
     await createMainWindow();
     await createCampusTray();
     await restoreDeskCalendarWindow();

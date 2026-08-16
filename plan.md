@@ -656,3 +656,11 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 插件后台热更新已完成：可信 HTTPS 更新清单、版本发现、用户按插件批准、摘要/签名校验、原子替换、权限变化重新确认和 API 变化拒绝均已接入；默认清单位于 `plugins/updates.json`。
+
+
+## 2026-08-16 code completion checkpoint
+
+- [x] User feedback entry
+- [x] Anonymous opt-in analytics with allowlisted events
+- [x] DingTalk import placeholder
+- [ ] Cookie/browser-extension fallback login: requires a real authenticated upstream validation run before claiming completion.

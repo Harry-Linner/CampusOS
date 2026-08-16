@@ -356,3 +356,10 @@ minimization review.
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 插件后台热更新已接入可信 HTTPS 更新清单、版本发现、摘要/开发者签名校验和用户按插件批准；权限/能力/schema 变化重新确认，API 版本变化拒绝热更新。
+
+
+## 2026-08-16 implementation addendum
+
+- Anonymous analytics is disabled by default and requires explicit user consent. The event set is fixed and contains no academic, task, file, credential, URL, or AI-key fields. If no PostHog project key is configured, no analytics request is sent.
+- DingTalk is currently a disabled UI placeholder and performs no data access.
+- Cookie fallback login is not represented as available functionality until real upstream validation is implemented; the application must not persist or expose unverified cookie material.

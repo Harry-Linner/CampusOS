@@ -71,6 +71,9 @@ export const SettingsView = ({
   const [lifecycleSaving, setLifecycleSaving] = useState(false);
   const [lifecycleMessage, setLifecycleMessage] = useState("");
   const [backupMessage, setBackupMessage] = useState("");
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
+  const [analyticsAvailable, setAnalyticsAvailable] = useState(false);
+  const [analyticsMessage, setAnalyticsMessage] = useState("");
   const authenticatedProfile =
     academicCredential.record?.verificationState === "verified" &&
     academicCredential.record.username === username.trim() &&
@@ -95,6 +98,13 @@ export const SettingsView = ({
       setGradeChangesEnabled(reminderSettings.record.gradeChangesEnabled !== false);
     }
   }, [reminderSettings.record]);
+
+  useEffect(() => {
+    void window.campusos?.analytics?.load().then((record) => {
+      setAnalyticsConsent(record.consent);
+      setAnalyticsAvailable(record.available);
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void window.campusos?.lifecycle?.load().then((record) => {
@@ -498,6 +508,21 @@ export const SettingsView = ({
           ) : null}
         </section>
 
+        <section className="settings-section" aria-labelledby="analytics-heading">
+          <header className="settings-section-heading"><h2 id="analytics-heading">匿名使用分析</h2></header>
+          <p className="page-copy">默认关闭。开启后仅发送功能漏斗事件，不包含账号、课程、任务内容、文件名、私有 URL、Cookie、Token 或 AI Key。</p>
+          <label className="setting-switch">
+            <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={async (event) => {
+              const next = event.target.checked;
+              const record = await window.campusos?.analytics?.setConsent(next);
+              if (record) { setAnalyticsConsent(record.consent); setAnalyticsAvailable(record.available); setAnalyticsMessage(next ? "已开启匿名分析" : "已关闭匿名分析"); }
+            }} />
+            <span className="switch-track" aria-hidden="true"><span /></span>
+            <span>{analyticsAvailable ? "允许发送匿名功能事件" : "分析服务未配置"}</span>
+          </label>
+          {analyticsMessage ? <p className="save-note">{analyticsMessage}</p> : null}
+        </section>
+
         <section className="settings-section" aria-labelledby="about-heading">
           <header className="settings-section-heading">
             <h2 id="about-heading">关于</h2>
@@ -551,6 +576,12 @@ export const SettingsView = ({
             </div>
           </section>
         ) : null}
+
+        <section className="settings-section" aria-labelledby="dingtalk-heading">
+          <header className="settings-section-heading"><h2 id="dingtalk-heading">钉钉</h2></header>
+          <p className="page-copy">钉钉登录与消息导入入口已预留，当前不会读取钉钉数据，也不会发起登录或后台连接。</p>
+          <button className="text-button" type="button" disabled aria-disabled="true">钉钉导入（即将支持）</button>
+        </section>
 
         <section className="settings-section" aria-labelledby="account-heading">
           <header className="settings-section-heading">
