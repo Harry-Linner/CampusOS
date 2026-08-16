@@ -50,18 +50,22 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
       window?.setBounds({ x: 160, y: 120, width: 1180, height: 760 });
     });
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 600));
-    const appliedBounds = await app.evaluate(({ BrowserWindow }) =>
-      BrowserWindow.getAllWindows()[0]?.getNormalBounds()
-    );
     await app.close();
+    const storedWindowState = JSON.parse(
+      await readFile(join(settingsDirectory, "main-window.json"), "utf8")
+    ) as { bounds: { x: number; y: number; width: number; height: number } };
+    expect(storedWindowState.bounds.x).toBe(160);
+    expect(storedWindowState.bounds.y).toBe(120);
+    expect(storedWindowState.bounds.width).toBeGreaterThanOrEqual(1100);
+    expect(storedWindowState.bounds.height).toBeGreaterThanOrEqual(720);
 
     app = await launch(userDataPath);
     page = await app.firstWindow({ timeout: 10_000 });
     const restored = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
-    expect(restored?.x).toBe(appliedBounds?.x);
-    expect(restored?.y).toBe(appliedBounds?.y);
-    expect(Math.abs((restored?.width ?? 0) - (appliedBounds?.width ?? 0))).toBeLessThanOrEqual(4);
-    expect(Math.abs((restored?.height ?? 0) - (appliedBounds?.height ?? 0))).toBeLessThanOrEqual(4);
+    expect(restored?.x).toBe(storedWindowState.bounds.x);
+    expect(restored?.y).toBe(storedWindowState.bounds.y);
+    expect(Math.abs((restored?.width ?? 0) - storedWindowState.bounds.width)).toBeLessThanOrEqual(4);
+    expect(Math.abs((restored?.height ?? 0) - storedWindowState.bounds.height)).toBeLessThanOrEqual(4);
     await app.close();
 
     app = await launch(userDataPath, ["--hidden"]);
