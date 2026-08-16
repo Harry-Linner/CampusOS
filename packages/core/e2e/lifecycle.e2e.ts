@@ -44,13 +44,15 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible())).toBe(false);
     await expect.poll(async () => JSON.parse(await readFile(join(settingsDirectory, "app-lifecycle.json"), "utf8")).closeBehavior).toBe("hide-to-tray");
 
-    const appliedBounds = await app.evaluate(({ BrowserWindow }) => {
+    await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window?.show();
       window?.setBounds({ x: 160, y: 120, width: 1180, height: 760 });
-      return window?.getNormalBounds();
     });
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 600));
+    const appliedBounds = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0]?.getNormalBounds()
+    );
     await app.close();
 
     app = await launch(userDataPath);
