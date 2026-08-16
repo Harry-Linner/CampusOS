@@ -9,7 +9,7 @@ declare global {
       loadSettings: () => Promise<{ view: DeskCalendarView }>;
       setView: (view: DeskCalendarView) => Promise<unknown>;
       close: () => Promise<unknown>;
-      openMain: () => Promise<unknown>;
+      openMain: (entityId: string) => Promise<unknown>;
       loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
       subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
     };

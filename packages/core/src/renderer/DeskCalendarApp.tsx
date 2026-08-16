@@ -138,7 +138,7 @@ export interface DeskCalendarWindowApi {
   loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
   setView: (view: DeskCalendarView) => Promise<unknown>;
   close: () => Promise<unknown>;
-  openMain: () => Promise<unknown>;
+  openMain: (entityId: string) => Promise<unknown>;
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
 }
 
@@ -349,7 +349,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
           <div><span>{eventKindLabel[selectedEvent.kind]}</span><strong>{selectedEvent.title}</strong></div>
           <p>{formatEventTime(selectedEvent)}{selectedEvent.location ? ` · ${selectedEvent.location}` : ""}</p>
           <small>桌面日历仅查看详情；编辑、完成或删除请回到 CampusOS 的日程模块。</small>
-          <button className="desk-cal-detail-open" type="button" onClick={() => void api.openMain()}>打开 CampusOS 日程</button>
+          <button className="desk-cal-detail-open" type="button" onClick={() => void api.openMain(selectedEvent.id)}>打开 CampusOS 日程</button>
           <button className="desk-cal-detail-close" type="button" onClick={() => setSelectedEvent(null)}>关闭详情</button>
         </section>
       ) : null}

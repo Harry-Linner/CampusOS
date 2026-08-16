@@ -33,6 +33,7 @@ export interface DeskCalendarWindowBridge {
   loadSettings: () => Promise<DeskCalendarSettings>;
   setView: (view: DeskCalendarView) => Promise<DeskCalendarSettings>;
   close: () => Promise<void>;
+  openMain: (entityId: string) => Promise<void>;
   loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
 }

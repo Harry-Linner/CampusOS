@@ -1,4 +1,5 @@
 import type { CampusDownloadRequest, CampusWorkspaceSnapshot } from "./campus";
+import type { AppNavigationRequest } from "./appNavigationBridge";
 import type {
   AiAssistantExtractionResult,
   AiAssistantConnectionTestInput,
@@ -23,6 +24,7 @@ export * from "./campus";
 export * from "./academicSemester";
 export * from "./pluginCapabilities";
 export * from "./deskCalendarBridge";
+export * from "./appNavigationBridge";
 
 export type CampusPermission =
   | `network:${string}`
@@ -152,6 +154,7 @@ export interface PluginComponentProps {
   loading: boolean;
   capabilities: PluginCapabilityClient;
   onRefresh: () => Promise<void>;
+  navigationTarget?: AppNavigationRequest | null;
   downloads?: {
     enqueue: (input: CampusDownloadRequest) => Promise<void>;
     pause: (id: string) => Promise<void>;

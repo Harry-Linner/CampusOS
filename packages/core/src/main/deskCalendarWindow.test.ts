@@ -11,6 +11,8 @@ const electronState = vi.hoisted(() => ({
     webContents: { send: ReturnType<typeof vi.fn> };
     show: ReturnType<typeof vi.fn>;
     focus: ReturnType<typeof vi.fn>;
+    isMinimized: ReturnType<typeof vi.fn>;
+    restore: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
     isDestroyed: () => boolean;
     loadURL: ReturnType<typeof vi.fn>;
@@ -36,6 +38,8 @@ vi.mock("electron", () => ({
         webContents: { send: vi.fn() },
         show: vi.fn(),
         focus: vi.fn(),
+        isMinimized: vi.fn(() => false),
+        restore: vi.fn(),
         close: vi.fn(),
         isDestroyed: () => false,
         listeners: new Map<string, () => void>(),
@@ -274,5 +278,27 @@ describe("desk calendar window IPC", () => {
 
     const load = handlerFor("campusos:desk-calendar:settings:load");
     await expect(load({})).resolves.toMatchObject({ enabled: false });
+  });
+
+  it("focuses the main window and forwards the exact selected event", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    await save({}, { enabled: true });
+    const { BrowserWindow } = await import("electron");
+    const mainWindow = new BrowserWindow();
+    const openMain = handlerFor("campusos:desk-calendar:window:open-main");
+
+    await openMain({}, { entityId: "calendar:event-1" });
+
+    expect(mainWindow.show).toHaveBeenCalled();
+    expect(mainWindow.focus).toHaveBeenCalled();
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith(
+      "campusos:navigation:request",
+      expect.objectContaining({ viewId: "schedule", entityId: "calendar:event-1" })
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ActivityItemId } from "@campusos/shared";
+import type { ActivityItemId, AppNavigationRequest } from "@campusos/shared";
 import { ActivityBar } from "./components/ActivityBar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import {
@@ -36,6 +36,7 @@ export const App = (): JSX.Element => {
     readOnboardingCompleted()
   );
   const [activeView, setActiveView] = useState<ActivityItemId>("dashboard");
+  const [navigationTarget, setNavigationTarget] = useState<AppNavigationRequest | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [assistantSetupOpen, setAssistantSetupOpen] = useState(false);
   const [assistantSetupDismissed, setAssistantSetupDismissed] = useState(false);
@@ -57,6 +58,11 @@ export const App = (): JSX.Element => {
       unsubscribePlugins();
     };
   }, []);
+
+  useEffect(() => window.campusos?.navigation?.subscribe((request) => {
+    setActiveView(request.viewId);
+    setNavigationTarget(request);
+  }), []);
 
   useEffect(() => {
     if (!onboardingComplete || !pluginHost.ready || assistantSetupDismissed) return;
@@ -196,6 +202,7 @@ export const App = (): JSX.Element => {
         schedule={window.campusos?.schedule}
         assistant={window.campusos?.assistant}
         deskCalendar={window.campusos?.deskCalendar}
+        navigationTarget={navigationTarget?.viewId === activeView ? navigationTarget : null}
       />
     );
   } else {

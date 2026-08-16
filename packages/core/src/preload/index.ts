@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld("campusos", {
     phase: "workspace-persisted",
     storageMode: "sqlite"
   },
+  navigation: {
+    subscribe: (listener: (request: unknown) => void) => {
+      const channel = "campusos:navigation:request";
+      const handler = (_event: Electron.IpcRendererEvent, request: unknown) => listener(request);
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
+  },
   workspace: {
     hydrate: () => ipcRenderer.invoke("campusos:workspace:hydrate"),
     sync: () => ipcRenderer.invoke("campusos:workspace:sync"),

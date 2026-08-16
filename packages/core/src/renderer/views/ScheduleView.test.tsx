@@ -91,6 +91,27 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
 };
 
 describe("ScheduleView", () => {
+  it("opens the exact event requested by desktop calendar navigation", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn() },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule(),
+      navigationTarget: {
+        requestId: "request-1",
+        viewId: "schedule",
+        entityId: "task:period-1"
+      }
+    }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "日视图" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getByRole("heading", { name: "安排详情" })).toBeTruthy();
+    });
+    expect(screen.getAllByText("Read notes").length).toBeGreaterThan(0);
+  });
+
   it("explains how automatic scheduling uses tasks and blocked time", async () => {
     render(createElement(ScheduleView, {
       loading: false,

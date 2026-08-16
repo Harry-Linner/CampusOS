@@ -354,7 +354,8 @@ export const ScheduleView = ({
   loading,
   snapshot,
   schedule,
-  deskCalendar
+  deskCalendar,
+  navigationTarget
 }: ScheduleViewProps): JSX.Element => {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -510,6 +511,15 @@ export const ScheduleView = ({
   const selectEvent = (event: ScheduleEvent): void => {
     setSelectedEvent(event);
   };
+
+  useEffect(() => {
+    if (navigationTarget?.viewId !== "schedule" || !navigationTarget.entityId) return;
+    const target = events.find((event) => event.id === navigationTarget.entityId);
+    if (!target) return;
+    setSelectedDate(new Date(target.startAt));
+    setViewMode("day");
+    setSelectedEvent(target);
+  }, [events, navigationTarget]);
 
   const saveForm = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();

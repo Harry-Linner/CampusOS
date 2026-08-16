@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld("deskCalendar", {
   setView: (view: DeskCalendarView) =>
     ipcRenderer.invoke("campusos:desk-calendar:settings:save", { view }),
   close: () => ipcRenderer.invoke("campusos:desk-calendar:window:close"),
-  openMain: () => ipcRenderer.invoke("campusos:desk-calendar:window:open-main"),
+  openMain: (entityId: string) =>
+    ipcRenderer.invoke("campusos:desk-calendar:window:open-main", { entityId }),
   loadSnapshot: () => ipcRenderer.invoke("campusos:desk-calendar:window:snapshot"),
   subscribe: (listener: (message: unknown) => void) => {
     const channel = "campusos:desk-calendar:snapshot";

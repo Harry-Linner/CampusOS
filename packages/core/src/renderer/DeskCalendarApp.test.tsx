@@ -178,6 +178,8 @@ describe("DeskCalendarApp", () => {
     fireEvent.click(events[0]);
     expect(screen.getByLabelText("安排详情")).toBeTruthy();
     expect(screen.getByText(/编辑、完成或删除请回到 CampusOS/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "打开 CampusOS 日程" }));
+    expect(api.openMain).toHaveBeenCalledWith(expect.stringMatching(/^calendar:/));
   });
 
   it("switches to the day view and lists the day's events", async () => {

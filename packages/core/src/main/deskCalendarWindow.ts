@@ -14,6 +14,7 @@ import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 const DESK_CALENDAR_SETTINGS_FILE = "desk-calendar.json";
 export const DESK_CALENDAR_CHANGED_CHANNEL = "campusos:desk-calendar:changed";
 export const DESK_CALENDAR_SNAPSHOT_CHANNEL = "campusos:desk-calendar:snapshot";
+export const APP_NAVIGATION_REQUEST_CHANNEL = "campusos:navigation:request";
 
 let deskCalendarWindow: BrowserWindow | null = null;
 let settings: DeskCalendarSettings | null = null;
@@ -209,13 +210,25 @@ export const registerDeskCalendarHandlers = (): void => {
     broadcastSettingsChanged();
   });
 
-  ipcMain.handle("campusos:desk-calendar:window:open-main", async (event) => {
+  ipcMain.handle("campusos:desk-calendar:window:open-main", async (event, input: unknown) => {
     assertTrustedDeskCalendarCaller(event);
+    const entityId = typeof input === "object" && input !== null &&
+      "entityId" in input && typeof input.entityId === "string"
+      ? input.entityId.trim()
+      : "";
+    if (!entityId || entityId.length > 512) {
+      throw new Error("Invalid desktop calendar navigation target.");
+    }
     const mainWindow = BrowserWindow.getAllWindows().find((window) => window !== deskCalendarWindow && !window.isDestroyed());
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
+    mainWindow.webContents.send(APP_NAVIGATION_REQUEST_CHANNEL, {
+      requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      viewId: "schedule",
+      entityId
+    });
   });
 };
 
