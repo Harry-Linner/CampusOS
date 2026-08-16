@@ -9,7 +9,8 @@ import type {
   PluginPackageMutationResult,
   PluginPackageRegistrySnapshot,
   PluginPackageSelection,
-  PluginRuntimeBridge
+  PluginRuntimeBridge,
+  PluginUpdateCandidate
 } from "../../shared/pluginBridge";
 
 const resolvePluginRuntimeBridge = (): PluginRuntimeBridge => {
@@ -52,6 +53,19 @@ export const uninstallPluginPackage = async (
   pluginId: string
 ): Promise<PluginPackageMutationResult> =>
   resolvePluginRuntimeBridge().uninstallPackage(pluginId);
+
+export const checkPluginUpdates = async (): Promise<PluginUpdateCandidate[]> =>
+  (await resolvePluginRuntimeBridge().checkUpdates?.()) ?? [];
+
+export const updatePluginPackage = async (
+  candidate: PluginUpdateCandidate
+): Promise<PluginPackageMutationResult> =>
+  (() => {
+    const bridge = resolvePluginRuntimeBridge();
+    return bridge.updatePackage
+      ? bridge.updatePackage(candidate)
+      : Promise.reject(new Error("插件更新功能不可用。"));
+  })();
 
 export const readPluginCapability = async <T>(
   pluginId: string,

@@ -8,7 +8,8 @@ import { getSandboxedRendererExecutionIssue } from "@campusos/shared";
 import type { LoadedPlugin } from "../lib/pluginHost";
 import type {
   PluginPackageInspection,
-  PluginPackageRegistrySnapshot
+  PluginPackageRegistrySnapshot,
+  PluginUpdateCandidate
 } from "../../shared/pluginBridge";
 
 interface ExtensionsViewProps {
@@ -21,6 +22,8 @@ interface ExtensionsViewProps {
   onDiscardPackage: (token: string) => Promise<void>;
   onInstallPackage: (token: string) => Promise<void>;
   onUninstallPackage: (pluginId: string) => Promise<void>;
+  onCheckUpdates?: () => Promise<PluginUpdateCandidate[]>;
+  onUpdatePackage?: (candidate: PluginUpdateCandidate) => Promise<void>;
 }
 
 const permissionLabel = (permission: CampusPermission): string => {
@@ -87,7 +90,9 @@ export const ExtensionsView = ({
   onSelectPackage,
   onDiscardPackage,
   onInstallPackage,
-  onUninstallPackage
+  onUninstallPackage,
+  onCheckUpdates,
+  onUpdatePackage
 }: ExtensionsViewProps): JSX.Element => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [draftPermissions, setDraftPermissions] = useState<
@@ -99,6 +104,8 @@ export const ExtensionsView = ({
     PluginPackageInspection | null
   >(null);
   const [uninstallConfirmId, setUninstallConfirmId] = useState<string | null>(null);
+  const [updateCandidates, setUpdateCandidates] = useState<PluginUpdateCandidate[]>([]);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
   const activeCount = plugins.filter(
     (plugin) => plugin.runtime.status === "active"
   ).length;
@@ -153,6 +160,32 @@ export const ExtensionsView = ({
       setActionError(
         nextError instanceof Error ? nextError.message : "插件卸载失败。"
       );
+    }
+  };
+
+  const checkUpdates = async (): Promise<void> => {
+    setCheckingUpdates(true);
+    setActionError(null);
+    try {
+      setUpdateCandidates(onCheckUpdates ? await onCheckUpdates() : []);
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : "插件更新检查失败。");
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const updatePackage = async (candidate: PluginUpdateCandidate): Promise<void> => {
+    setPendingId(candidate.pluginId);
+    setActionError(null);
+    try {
+      if (!onUpdatePackage) return;
+      await onUpdatePackage(candidate);
+      setUpdateCandidates((current) => current.filter((item) => item.pluginId !== candidate.pluginId));
+    } catch (nextError) {
+      setActionError(nextError instanceof Error ? nextError.message : "插件更新失败。");
+    } finally {
+      setPendingId(null);
     }
   };
 
@@ -211,8 +244,25 @@ export const ExtensionsView = ({
           >
             从文件安装
           </button>
+          <button className="text-button" type="button" disabled={loading || checkingUpdates || !onCheckUpdates} onClick={() => void checkUpdates()}>
+            {checkingUpdates ? "检查中" : "检查插件更新"}
+          </button>
         </div>
       </header>
+
+      {updateCandidates.length > 0 ? (
+        <section className="extension-update-list" aria-label="插件更新">
+          <strong>发现可用插件更新</strong>
+          {updateCandidates.map((candidate) => (
+            <div className="extension-update-row" key={candidate.pluginId}>
+              <span>{candidate.manifest.displayName} · v{candidate.version}{candidate.requiresReapproval ? " · 需要重新确认权限/能力" : ""}</span>
+              <button className="primary-button" type="button" disabled={pendingId === candidate.pluginId || loading} onClick={() => void updatePackage(candidate)}>
+                {pendingId === candidate.pluginId ? "后台更新中" : "允许后台更新"}
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       {error || actionError ? (
         <p className="error-copy extension-error" role="alert">

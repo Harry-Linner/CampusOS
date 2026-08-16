@@ -40,6 +40,7 @@ import {
   showCampusMainWindow,
   shouldStartHidden
 } from "./appLifecycle";
+import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
@@ -53,9 +54,11 @@ const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
 });
 
 const createMainWindow = async (): Promise<BrowserWindow> => {
+  const savedState = await loadWindowState();
   const window = new BrowserWindow({
-    width: 1340,
-    height: 900,
+    width: savedState?.bounds.width ?? 1340,
+    height: savedState?.bounds.height ?? 900,
+    ...(savedState ? { x: savedState.bounds.x, y: savedState.bounds.y } : {}),
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#f3efe6",
@@ -74,6 +77,8 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
       webviewTag: false
     }
   });
+  if (savedState?.maximized) window.maximize();
+  attachWindowStatePersistence(window);
 
   await attachMainWindowLifecycle(window);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));

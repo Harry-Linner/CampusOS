@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain } from "electron";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { autoUpdater as AutoUpdaterType } from "electron-updater";
 import type {
   CampusAppInfo,
@@ -11,11 +13,36 @@ let currentStatus: UpdateStatus = app.isPackaged
   : { state: "unavailable" };
 let updater: typeof AutoUpdaterType | null = null;
 let updaterEventsBound = false;
+let dismissedVersion: string | null | undefined;
+
+const dismissalPath = (): string => join(app.getPath("userData"), "settings", "update-preferences.json");
+
+const loadDismissedVersion = async (): Promise<string | null> => {
+  if (dismissedVersion !== undefined) return dismissedVersion;
+  try {
+    const parsed = JSON.parse(await readFile(dismissalPath(), "utf8")) as { dismissedVersion?: unknown };
+    dismissedVersion = typeof parsed.dismissedVersion === "string" ? parsed.dismissedVersion : null;
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
+      dismissedVersion = null;
+    } else {
+      dismissedVersion = null;
+    }
+  }
+  return dismissedVersion;
+};
+
+const persistDismissedVersion = async (version: string): Promise<void> => {
+  const target = dismissalPath();
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, JSON.stringify({ dismissedVersion: version }, null, 2), "utf8");
+  dismissedVersion = version;
+};
 
 const normalizeReleaseNotes = (value: unknown): string[] => {
-  if (typeof value === "string") return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 20);
+  if (typeof value === "string") return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!Array.isArray(value)) return [];
-  return value.map((entry) => typeof entry === "string" ? entry : typeof entry === "object" && entry !== null && "note" in entry && typeof entry.note === "string" ? entry.note : "").filter(Boolean).slice(0, 20);
+  return value.map((entry) => typeof entry === "string" ? entry : typeof entry === "object" && entry !== null && "note" in entry && typeof entry.note === "string" ? entry.note : "").filter(Boolean);
 };
 
 const sanitizeUpdateError = (error: unknown): string => {
@@ -43,7 +70,7 @@ const bindUpdaterEvents = (instance: typeof AutoUpdaterType): void => {
   instance.on("checking-for-update", () => emit({ state: "checking" }));
   instance.on("update-available", (info) => {
     const releaseNotes = normalizeReleaseNotes(info.releaseNotes);
-    emit({ state: "available", version: info.version, ...(releaseNotes.length ? { releaseNotes } : {}) });
+    emit({ state: "available", version: info.version, prompt: dismissedVersion !== info.version, ...(releaseNotes.length ? { releaseNotes } : {}) });
   });
   instance.on("update-not-available", (info) =>
     emit({ state: "up-to-date", version: info.version })
@@ -80,6 +107,7 @@ export const checkForUpdates = async (): Promise<UpdateStatus> => {
   }
 
   try {
+    await loadDismissedVersion();
     emit({ state: "checking" });
     await (await getAutoUpdater()).checkForUpdates();
   } catch (error) {
@@ -119,6 +147,17 @@ export const cancelDownload = async (): Promise<UpdateStatus> => {
   return getUpdateStatus();
 };
 
+export const dismissUpdate = async (version: string): Promise<UpdateStatus> => {
+  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+    throw new Error("更新版本号无效。");
+  }
+  await persistDismissedVersion(version);
+  if (currentStatus.version === version && currentStatus.state === "available") {
+    emit({ ...currentStatus, prompt: false });
+  }
+  return getUpdateStatus();
+};
+
 export const quitAndInstall = async (): Promise<void> => {
   if (currentStatus.state !== "ready") return;
   (await getAutoUpdater()).quitAndInstall();
@@ -148,6 +187,11 @@ export const registerUpdateHandlers = (): void => {
   ipcMain.handle("campusos:updater:cancel", async (event) => {
     assertTrustedRenderer(event);
     return cancelDownload();
+  });
+  ipcMain.handle("campusos:updater:dismiss", async (event, version: unknown) => {
+    assertTrustedRenderer(event);
+    if (typeof version !== "string") throw new Error("更新版本号无效。");
+    return dismissUpdate(version);
   });
   ipcMain.handle("campusos:updater:install", async (event) => {
     assertTrustedRenderer(event);

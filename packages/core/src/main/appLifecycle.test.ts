@@ -179,6 +179,28 @@ describe("app lifecycle", () => {
     });
   });
 
+  it("keeps asking when the user chooses a one-time action", async () => {
+    await createStorageRoot();
+    electronState.showMessageBox.mockResolvedValue({ response: 0, checkboxChecked: false });
+    const lifecycle = await import("./appLifecycle");
+    const window = createWindow();
+    await lifecycle.attachMainWindowLifecycle(window as never);
+    await window.listeners.get("close")?.({ preventDefault: vi.fn() });
+    expect(electronState.showMessageBox).toHaveBeenCalledOnce();
+    await expect(lifecycle.getAppLifecycleSettings()).resolves.toMatchObject({ closeBehavior: "ask" });
+  });
+
+  it("does not hide or quit when closing is cancelled", async () => {
+    await createStorageRoot();
+    electronState.showMessageBox.mockResolvedValue({ response: 2, checkboxChecked: false });
+    const lifecycle = await import("./appLifecycle");
+    const window = createWindow();
+    await lifecycle.attachMainWindowLifecycle(window as never);
+    await window.listeners.get("close")?.({ preventDefault: vi.fn() });
+    expect(window.hide).not.toHaveBeenCalled();
+    expect(electronState.quit).not.toHaveBeenCalled();
+  });
+
   it("builds tray actions and supports hidden startup and explicit quit", async () => {
     await createStorageRoot();
     const lifecycle = await import("./appLifecycle");

@@ -208,6 +208,15 @@ export const registerDeskCalendarHandlers = (): void => {
     }
     broadcastSettingsChanged();
   });
+
+  ipcMain.handle("campusos:desk-calendar:window:open-main", async (event) => {
+    assertTrustedDeskCalendarCaller(event);
+    const mainWindow = BrowserWindow.getAllWindows().find((window) => window !== deskCalendarWindow && !window.isDestroyed());
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
 };
 
 /** 工作区刷新后由协调器调用，向悬浮窗推送最新快照。 */

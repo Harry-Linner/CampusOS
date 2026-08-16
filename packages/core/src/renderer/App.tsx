@@ -26,6 +26,7 @@ import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 import { subscribeToPluginRuntimeChanges } from "./lib/pluginBridge";
 import { AssistantSetupDialog } from "@campusos/plugin-ai-assistant";
 import { NotificationCenter } from "./components/NotificationCenter";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 
 const isDevelopmentBuild =
   (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
@@ -164,6 +165,8 @@ export const App = (): JSX.Element => {
         onDiscardPackage={pluginHost.discardPackage}
         onInstallPackage={pluginHost.installPackage}
         onUninstallPackage={pluginHost.uninstallPackage}
+        onCheckUpdates={pluginHost.checkUpdates}
+        onUpdatePackage={pluginHost.updatePackage}
       />
     );
   } else if (activeView === "settings") {
@@ -216,6 +219,7 @@ export const App = (): JSX.Element => {
         onSearch={() => setSearchOpen(true)}
       />
       <NotificationCenter />
+      <UpdatePrompt />
       <main id="main-content" className="main-pane">
         {workspace.error ? (
           <div className="workspace-error-banner" role="alert">

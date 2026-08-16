@@ -28,6 +28,7 @@ import {
   type InstalledCampusmodPackage
 } from "./campusmodPackageRegistry";
 import { preparePluginRuntimeStartupCache } from "./pluginRuntimeCache";
+import { createPluginUpdateService, type PluginUpdateCandidate } from "./pluginUpdateService";
 
 export interface PluginPackageMutationResult {
   installedPackage?: InstalledCampusmodPackage;
@@ -51,6 +52,8 @@ export interface OfficialPluginRuntimeService {
     relativePath: string
   ) => Promise<Uint8Array>;
   uninstallPackage: (pluginId: string) => Promise<PluginPackageMutationResult>;
+  checkUpdates: () => Promise<PluginUpdateCandidate[]>;
+  updatePackage: (candidate: PluginUpdateCandidate) => Promise<PluginPackageMutationResult>;
   shutdown: () => Promise<void>;
 }
 
@@ -102,6 +105,7 @@ export const getOfficialPluginRuntimeService =
     const packageRegistry = createCampusmodPackageRegistry({
       rootPath: join(pluginRootPath, "installed")
     });
+    const pluginUpdateService = createPluginUpdateService({ registry: packageRegistry });
     const repository = createPluginRuntimeRepository({
       storagePath: join(pluginRootPath, "runtime-state.json"),
       loadManifests: async () => [
@@ -227,6 +231,23 @@ export const getOfficialPluginRuntimeService =
         return {
           registry,
           runtime: await load()
+        };
+      },
+      checkUpdates: () => pluginUpdateService.check(),
+      updatePackage: async (candidate) => {
+        const installedPackage = await pluginUpdateService.update(candidate);
+        if (candidate.requiresReapproval) {
+          const runtimeBeforeUpdate = await load();
+          const current = runtimeBeforeUpdate.plugins.find((plugin) => plugin.id === candidate.pluginId);
+          if (current) {
+            await repository.configure({ pluginId: candidate.pluginId, enabled: false, grantedPermissions: [] });
+          }
+        }
+        const runtime = await load();
+        return {
+          installedPackage,
+          registry: await packageRegistry.load(),
+          runtime
         };
       },
       shutdown: () => lifecycle.shutdown()

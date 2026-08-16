@@ -477,7 +477,7 @@ export const SettingsView = ({
             <details className="update-notes-disclosure">
               <summary>查看更新内容</summary>
               <ul className="update-notes-list">
-                {updateStatus.releaseNotes.slice(0, 5).map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
+                {updateStatus.releaseNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
               </ul>
             </details>
           ) : null}

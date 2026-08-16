@@ -90,6 +90,7 @@ const createApi = (overrides: Partial<DeskCalendarWindowApi> = {}): DeskCalendar
   loadSnapshot: vi.fn(async () => message),
   setView: vi.fn(async () => undefined),
   close: vi.fn(async () => undefined),
+  openMain: vi.fn(async () => undefined),
   subscribe: vi.fn(() => () => undefined),
   ...overrides
 });

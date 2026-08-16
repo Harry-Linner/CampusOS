@@ -6,7 +6,8 @@ import type {
 } from "@campusos/shared";
 import type {
   PluginPackageInspection,
-  PluginPackageRegistrySnapshot
+  PluginPackageRegistrySnapshot,
+  PluginUpdateCandidate
 } from "../../shared/pluginBridge";
 import { loadPlugins, type LoadedPlugin } from "../lib/pluginHost";
 import {
@@ -16,7 +17,9 @@ import {
   loadInstalledPluginPackages,
   loadPluginRuntimeSnapshot,
   selectPluginPackage,
-  uninstallPluginPackage
+  uninstallPluginPackage,
+  checkPluginUpdates,
+  updatePluginPackage
 } from "../lib/pluginBridge";
 
 interface PluginHostState {
@@ -32,6 +35,8 @@ interface PluginHostState {
   discardPackage: (token: string) => Promise<void>;
   installPackage: (token: string) => Promise<void>;
   uninstallPackage: (pluginId: string) => Promise<void>;
+  checkUpdates: () => Promise<PluginUpdateCandidate[]>;
+  updatePackage: (candidate: PluginUpdateCandidate) => Promise<void>;
 }
 
 export const usePluginHost = (): PluginHostState => {
@@ -148,6 +153,17 @@ export const usePluginHost = (): PluginHostState => {
               : "插件卸载失败。"
           );
           throw nextError;
+        } finally {
+          setLoading(false);
+        }
+      },
+      checkUpdates: () => checkPluginUpdates(),
+      updatePackage: async (candidate) => {
+        setLoading(true);
+        try {
+          const result = await updatePluginPackage(candidate);
+          await applySnapshot(result.runtime);
+          startTransition(() => setPackageRegistry(result.registry));
         } finally {
           setLoading(false);
         }

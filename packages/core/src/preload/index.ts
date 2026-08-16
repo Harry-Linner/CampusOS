@@ -155,6 +155,8 @@ contextBridge.exposeInMainWorld("campusos", {
     loadPackages: () => ipcRenderer.invoke("campusos:plugins:package:load"),
     uninstallPackage: (pluginId: string) =>
       ipcRenderer.invoke("campusos:plugins:package:uninstall", pluginId),
+    checkUpdates: () => ipcRenderer.invoke("campusos:plugins:update:check"),
+    updatePackage: (candidate: unknown) => ipcRenderer.invoke("campusos:plugins:update:apply", candidate),
     readCapability: (input: { pluginId: string; capability: string }) =>
       ipcRenderer.invoke("campusos:plugins:capability:read", input)
   },
@@ -191,6 +193,7 @@ contextBridge.exposeInMainWorld("campusos", {
     check: () => ipcRenderer.invoke("campusos:updater:check"),
     download: () => ipcRenderer.invoke("campusos:updater:download"),
     cancelDownload: () => ipcRenderer.invoke("campusos:updater:cancel"),
+    dismiss: (version: string) => ipcRenderer.invoke("campusos:updater:dismiss", version),
     install: () => ipcRenderer.invoke("campusos:updater:install"),
     subscribe: (listener: (status: unknown) => void) => {
       const channel = "campusos:updater:changed";

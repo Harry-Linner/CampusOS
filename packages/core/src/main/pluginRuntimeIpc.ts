@@ -11,6 +11,7 @@ import { getOfficialCapabilityRepository } from "./officialCapabilityRepository"
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
 import { createPluginCapabilityAccess } from "./pluginCapabilityAccess";
 import { setSchedulePluginEnabled } from "./appLifecycle";
+import type { PluginUpdateCandidate } from "./pluginUpdateService";
 
 const SCHEDULE_PLUGIN_ID = "org.campusos.schedule";
 
@@ -46,6 +47,17 @@ const isThirdPartyPluginId = (value: unknown): value is string =>
   typeof value === "string" &&
   /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/.test(value) &&
   !value.startsWith("org.campusos.");
+
+const isPluginUpdateCandidate = (value: unknown): value is PluginUpdateCandidate => {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<PluginUpdateCandidate>;
+  return isThirdPartyPluginId(candidate.pluginId) &&
+    typeof candidate.version === "string" &&
+    typeof candidate.packageUrl === "string" &&
+    typeof candidate.packageSha256 === "string" &&
+    typeof candidate.manifest === "object" && candidate.manifest !== null &&
+    (candidate.requiresReapproval === undefined || typeof candidate.requiresReapproval === "boolean");
+};
 
 export const registerPluginRuntimeHandlers = (): void => {
   const runtime = getOfficialPluginRuntimeService();
@@ -160,6 +172,17 @@ export const registerPluginRuntimeHandlers = (): void => {
       return runtime.uninstallPackage(pluginId);
     }
   );
+
+  ipcMain.handle("campusos:plugins:update:check", async (event) => {
+    assertTrustedRenderer(event);
+    return runtime.checkUpdates();
+  });
+
+  ipcMain.handle("campusos:plugins:update:apply", async (event, input: unknown) => {
+    assertTrustedRenderer(event);
+    if (!isPluginUpdateCandidate(input)) throw new Error("插件更新候选无效。");
+    return runtime.updatePackage(input);
+  });
 
   ipcMain.handle(
     "campusos:plugins:capability:read",

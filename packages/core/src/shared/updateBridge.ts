@@ -14,6 +14,7 @@ export interface UpdateStatus {
   progress?: number;
   releaseNotes?: string[];
   error?: string;
+  prompt?: boolean;
 }
 
 export interface CampusAppInfo {
@@ -30,6 +31,7 @@ export interface UpdateBridge {
   check: () => Promise<UpdateStatus>;
   download: () => Promise<UpdateStatus>;
   cancelDownload: () => Promise<UpdateStatus>;
+  dismiss: (version: string) => Promise<UpdateStatus>;
   install: () => Promise<void>;
   subscribe: (listener: (status: UpdateStatus) => void) => () => void;
 }

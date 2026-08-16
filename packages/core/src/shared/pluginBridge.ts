@@ -55,6 +55,15 @@ export interface PluginPackageMutationResult {
   runtime: PluginRuntimeSnapshot;
 }
 
+export interface PluginUpdateCandidate {
+  pluginId: string;
+  version: string;
+  packageUrl: string;
+  packageSha256: string;
+  manifest: PluginManifestV2;
+  requiresReapproval?: boolean;
+}
+
 export interface PluginRuntimeBridge {
   load: () => Promise<PluginRuntimeSnapshot>;
   subscribe: (listener: (snapshot: PluginRuntimeSnapshot) => void) => () => void;
@@ -66,6 +75,8 @@ export interface PluginRuntimeBridge {
   installPackage: (token: string) => Promise<PluginPackageMutationResult>;
   loadPackages: () => Promise<PluginPackageRegistrySnapshot>;
   uninstallPackage: (pluginId: string) => Promise<PluginPackageMutationResult>;
+  checkUpdates?: () => Promise<PluginUpdateCandidate[]>;
+  updatePackage?: (candidate: PluginUpdateCandidate) => Promise<PluginPackageMutationResult>;
   readCapability: <T>(
     input: PluginCapabilityReadInput
   ) => Promise<CapabilityRecord<T>[]>;
