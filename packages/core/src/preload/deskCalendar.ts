@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld("deskCalendar", {
     ipcRenderer.invoke("campusos:desk-calendar:settings:save", { view }),
   setShowClock: (showClock: boolean) =>
     ipcRenderer.invoke("campusos:desk-calendar:settings:save", { showClock }),
+  saveSettings: (patch: unknown) =>
+    ipcRenderer.invoke("campusos:desk-calendar:settings:save", patch),
+  refreshWeather: () => ipcRenderer.invoke("campusos:desk-calendar:weather:refresh"),
   close: () => ipcRenderer.invoke("campusos:desk-calendar:window:close"),
   openMain: (entityId: string) =>
     ipcRenderer.invoke("campusos:desk-calendar:window:open-main", { entityId }),

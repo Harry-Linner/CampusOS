@@ -87,10 +87,12 @@ const message: DeskCalendarSnapshotMessage = {
 };
 
 const createApi = (overrides: Partial<DeskCalendarWindowApi> = {}): DeskCalendarWindowApi => ({
-  loadSettings: vi.fn(async () => ({ showClock: true })),
+  loadSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [{ id: "clock" as const, enabled: true }, { id: "weather" as const, enabled: true }, { id: "countdown" as const, enabled: true }, { id: "progress" as const, enabled: true }], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722" }, statutoryHolidays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
   loadSnapshot: vi.fn(async () => message),
   completeTask: vi.fn(async () => undefined),
   saveTask: vi.fn(async () => undefined),
+  saveSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722" }, statutoryHolidays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
+  refreshWeather: vi.fn(async () => ({ location: "Hangzhou", temperatureC: 20, weatherCode: 0, observedAt: now.toISOString(), cachedAt: now.toISOString(), error: null })),
   setView: vi.fn(async () => undefined),
   setShowClock: vi.fn(async () => undefined),
   close: vi.fn(async () => undefined),

@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain } from "electron";
+import { BrowserWindow, app, ipcMain, screen } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
@@ -7,6 +7,7 @@ import {
   type DeskCalendarView,
   type DeskCalendarSettings,
   type DeskCalendarSnapshotMessage,
+  type DeskCalendarWeather,
   type LocalTaskInput,
 } from "@campusos/shared";
 import { assertTrustedDeskCalendarCaller } from "./ipcSecurity";
@@ -36,6 +37,73 @@ const ensurePreferencesDir = async (storagePath: string): Promise<void> => {
   await mkdir(dirname(storagePath), { recursive: true });
 };
 
+const normalizeWidgets = (value: unknown): DeskCalendarSettings["widgets"] => {
+  const defaults = createDefaultDeskCalendarSettings("").widgets;
+  if (!Array.isArray(value)) return defaults;
+  return defaults.map((item) => ({
+    id: item.id,
+    enabled: value.some((candidate) => typeof candidate === "object" && candidate !== null &&
+      (candidate as { id?: unknown }).id === item.id && (candidate as { enabled?: unknown }).enabled === true)
+  }));
+};
+
+const normalizeAppearance = (value: unknown): DeskCalendarSettings["appearance"] => {
+  if (typeof value !== "object" || value === null) return createDefaultDeskCalendarSettings("").appearance;
+  const candidate = value as { opacity?: unknown; background?: unknown };
+  return {
+    opacity: typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity)
+      ? Math.max(0.2, Math.min(1, candidate.opacity))
+      : 0.88,
+    background: typeof candidate.background === "string" && /^#[0-9a-fA-F]{6}$/.test(candidate.background)
+      ? candidate.background
+      : "#111722"
+  };
+};
+
+const normalizeCountdowns = (value: unknown): DeskCalendarSettings["countdowns"] => Array.isArray(value)
+  ? value.flatMap((item) => typeof item === "object" && item !== null && typeof (item as { id?: unknown }).id === "string" && typeof (item as { title?: unknown }).title === "string" && typeof (item as { targetAt?: unknown }).targetAt === "string" && Number.isFinite(Date.parse((item as { targetAt: string }).targetAt))
+    ? [{ id: (item as { id: string }).id.slice(0, 128), title: (item as { title: string }).title.slice(0, 160), targetAt: new Date((item as { targetAt: string }).targetAt).toISOString() }]
+    : [])
+  : [];
+
+const normalizeProgress = (value: unknown): DeskCalendarSettings["progress"] => Array.isArray(value)
+  ? value.flatMap((item) => typeof item === "object" && item !== null && typeof (item as { id?: unknown }).id === "string" && typeof (item as { title?: unknown }).title === "string" && typeof (item as { startAt?: unknown }).startAt === "string" && typeof (item as { endAt?: unknown }).endAt === "string" && Date.parse((item as { startAt: string }).startAt) < Date.parse((item as { endAt: string }).endAt)
+    ? [{ id: (item as { id: string }).id.slice(0, 128), title: (item as { title: string }).title.slice(0, 160), startAt: new Date((item as { startAt: string }).startAt).toISOString(), endAt: new Date((item as { endAt: string }).endAt).toISOString() }]
+    : [])
+  : [];
+
+const normalizeStatutoryHolidays = (value: unknown): DeskCalendarSettings["statutoryHolidays"] => Array.isArray(value)
+  ? value.flatMap((item) => typeof item === "object" && item !== null && typeof (item as { date?: unknown }).date === "string" && /^\d{4}-\d{2}-\d{2}$/.test((item as { date: string }).date) && typeof (item as { label?: unknown }).label === "string"
+    ? [{ date: (item as { date: string }).date, label: (item as { label: string }).label.slice(0, 80) }]
+    : [])
+  : [];
+
+const normalizeDisplayProfiles = (value: unknown): DeskCalendarSettings["displayProfiles"] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    if (typeof item !== "object" || item === null) return [];
+    const candidate = item as { displayKey?: unknown; bounds?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown } };
+    const bounds = candidate.bounds;
+    if (typeof candidate.displayKey !== "string" || !bounds || ![bounds.x, bounds.y, bounds.width, bounds.height].every((part) => typeof part === "number" && Number.isFinite(part))) return [];
+    return [{ displayKey: candidate.displayKey.slice(0, 512), bounds: { x: Math.round(bounds.x as number), y: Math.round(bounds.y as number), width: Math.max(420, Math.round(bounds.width as number)), height: Math.max(320, Math.round(bounds.height as number)) } }];
+  })
+  : [];
+
+const getDisplayKey = (): string => {
+  try {
+    return screen.getAllDisplays().map((display) => `${display.bounds.x},${display.bounds.y},${display.bounds.width},${display.bounds.height}`).sort().join("|");
+  } catch {
+    return "default";
+  }
+};
+
+const isVisibleOnCurrentDisplays = (bounds: { x: number; y: number; width: number; height: number }): boolean => {
+  try {
+    return screen.getAllDisplays().some((display) => Math.max(bounds.x, display.workArea.x) < Math.min(bounds.x + bounds.width, display.workArea.x + display.workArea.width) && Math.max(bounds.y, display.workArea.y) < Math.min(bounds.y + bounds.height, display.workArea.y + display.workArea.height));
+  } catch {
+    return false;
+  }
+};
+
 const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
   const storagePath = getSettingsPath();
   try {
@@ -46,12 +114,26 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
       enabled?: boolean;
       view?: unknown;
       showClock?: boolean;
+      widgets?: unknown;
+      countdowns?: unknown;
+      progress?: unknown;
+      weather?: DeskCalendarWeather | null;
+      appearance?: unknown;
+      statutoryHolidays?: unknown;
+      displayProfiles?: unknown;
       savedAt?: string;
     };
     return {
       enabled: payload.enabled === true,
       view: normalizeDeskCalendarView(payload.view),
       showClock: payload.showClock !== false,
+      widgets: normalizeWidgets(payload.widgets),
+      countdowns: normalizeCountdowns(payload.countdowns),
+      progress: normalizeProgress(payload.progress),
+      weather: payload.weather && typeof payload.weather === "object" ? payload.weather : null,
+      appearance: normalizeAppearance(payload.appearance),
+      statutoryHolidays: normalizeStatutoryHolidays(payload.statutoryHolidays),
+      displayProfiles: normalizeDisplayProfiles(payload.displayProfiles),
       savedAt: payload.savedAt ?? new Date(0).toISOString(),
       storagePath
     };
@@ -77,7 +159,7 @@ const loadSettings = async (): Promise<DeskCalendarSettings> => {
 };
 
 const saveSettings = async (
-  patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view" | "showClock">>
+  patch: Partial<Omit<DeskCalendarSettings, "savedAt" | "storagePath">>
 ): Promise<DeskCalendarSettings> => {
   const current = await loadSettings();
   const next: DeskCalendarSettings = {
@@ -125,6 +207,42 @@ const broadcastSnapshotSafely = (): void => {
   void broadcastSnapshot().catch(() => undefined);
 };
 
+const refreshWeather = async (): Promise<DeskCalendarWeather> => {
+  const current = await loadSettings();
+  const location = current.weather?.location?.trim() || "Hangzhou";
+  try {
+    const geocoding = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1&language=zh&format=json`);
+    if (!geocoding.ok) throw new Error(`定位服务返回 ${geocoding.status}`);
+    const place = (await geocoding.json() as { results?: Array<{ latitude: number; longitude: number; name: string }> }).results?.[0];
+    if (!place) throw new Error("未找到该地点。");
+    const forecast = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&timezone=Asia%2FShanghai`);
+    if (!forecast.ok) throw new Error(`天气服务返回 ${forecast.status}`);
+    const data = await forecast.json() as { current?: { temperature_2m?: number; weather_code?: number; time?: string } };
+    if (!data.current || !Number.isFinite(data.current.temperature_2m) || !Number.isFinite(data.current.weather_code)) throw new Error("天气服务返回无效数据。");
+    const weather: DeskCalendarWeather = {
+      location: place.name,
+      temperatureC: data.current.temperature_2m!,
+      weatherCode: data.current.weather_code!,
+      observedAt: data.current.time ?? new Date().toISOString(),
+      cachedAt: new Date().toISOString(),
+      error: null
+    };
+    await saveSettings({ weather });
+    return weather;
+  } catch (cause) {
+    const weather: DeskCalendarWeather = {
+      location,
+      temperatureC: current.weather?.temperatureC ?? 0,
+      weatherCode: current.weather?.weatherCode ?? -1,
+      observedAt: current.weather?.observedAt ?? new Date(0).toISOString(),
+      cachedAt: current.weather?.cachedAt ?? new Date(0).toISOString(),
+      error: cause instanceof Error ? cause.message : "天气刷新失败。"
+    };
+    await saveSettings({ weather });
+    return weather;
+  }
+};
+
 const disableAfterUserClose = async (): Promise<void> => {
   if (appIsQuitting) return;
   const current = await loadSettings();
@@ -135,8 +253,11 @@ const disableAfterUserClose = async (): Promise<void> => {
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const storedState = await loadWindowState("desk-calendar");
+  const currentSettings = await loadSettings();
+  const profile = currentSettings.displayProfiles.find((candidate) => candidate.displayKey === getDisplayKey());
+  const profileBounds = profile && isVisibleOnCurrentDisplays(profile.bounds) ? profile.bounds : undefined;
   const window = new BrowserWindow({
-    ...(storedState?.bounds ?? {}),
+    ...(profileBounds ?? storedState?.bounds ?? {}),
     width: 720,
     height: 560,
     minWidth: 420,
@@ -158,6 +279,12 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   });
 
   const detachWindowStatePersistence = attachWindowStatePersistence(window, "desk-calendar");
+  const persistDisplayProfile = (): void => {
+    const nextProfile = { displayKey: getDisplayKey(), bounds: window.getNormalBounds() };
+    void saveSettings({ displayProfiles: [...currentSettings.displayProfiles.filter((candidate) => candidate.displayKey !== nextProfile.displayKey), nextProfile] }).catch(() => undefined);
+  };
+  window.on("move", persistDisplayProfile);
+  window.on("resize", persistDisplayProfile);
   if (storedState?.maximized) window.maximize();
   window.setAlwaysOnTop(true, "floating");
   window.setMenu(null);
@@ -200,12 +327,19 @@ export const registerDeskCalendarHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:settings:save", async (event, input: unknown) => {
     assertTrustedDeskCalendarCaller(event);
     const candidate = typeof input === "object" && input !== null
-      ? input as { enabled?: unknown; view?: unknown; showClock?: unknown }
+      ? input as Partial<DeskCalendarSettings>
       : {};
-    const patch: Partial<Pick<DeskCalendarSettings, "enabled" | "view" | "showClock">> = {};
+    const patch: Partial<Omit<DeskCalendarSettings, "savedAt" | "storagePath">> = {};
     if (typeof candidate.enabled === "boolean") patch.enabled = candidate.enabled;
     if (candidate.view !== undefined) patch.view = normalizeDeskCalendarView(candidate.view);
     if (typeof candidate.showClock === "boolean") patch.showClock = candidate.showClock;
+    if (candidate.widgets !== undefined) patch.widgets = normalizeWidgets(candidate.widgets);
+    if (candidate.countdowns !== undefined) patch.countdowns = normalizeCountdowns(candidate.countdowns);
+    if (candidate.progress !== undefined) patch.progress = normalizeProgress(candidate.progress);
+    if (candidate.appearance !== undefined) patch.appearance = normalizeAppearance(candidate.appearance);
+    if (candidate.statutoryHolidays !== undefined) patch.statutoryHolidays = normalizeStatutoryHolidays(candidate.statutoryHolidays);
+    if (candidate.displayProfiles !== undefined) patch.displayProfiles = normalizeDisplayProfiles(candidate.displayProfiles);
+    if (candidate.weather !== undefined) patch.weather = candidate.weather;
     const next = await saveSettings(patch);
 
     if (next.enabled) {
@@ -216,6 +350,13 @@ export const registerDeskCalendarHandlers = (): void => {
     if (next.enabled) broadcastSnapshotSafely();
     broadcastSettingsChanged();
     return next;
+  });
+
+  ipcMain.handle("campusos:desk-calendar:weather:refresh", async (event) => {
+    assertTrustedDeskCalendarCaller(event);
+    const weather = await refreshWeather();
+    broadcastSettingsChanged();
+    return weather;
   });
 
   ipcMain.handle("campusos:desk-calendar:task:complete", async (event, input: unknown) => {

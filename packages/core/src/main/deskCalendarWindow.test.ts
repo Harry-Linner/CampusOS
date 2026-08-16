@@ -296,6 +296,35 @@ describe("desk calendar window IPC", () => {
     expect(schedule.saveScheduleTask).toHaveBeenCalledWith(expect.objectContaining({ title: "Direct task", type: "fixed" }));
   });
 
+  it("refreshes weather through the main-process provider and persists the cache", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ results: [{ latitude: 30.27, longitude: 120.15, name: "杭州" }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ current: { temperature_2m: 27.5, weather_code: 1, time: "2026-08-16T12:00" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    await save({}, { weather: { location: "杭州" } });
+    const weather = await handlerFor("campusos:desk-calendar:weather:refresh")({});
+    expect(weather).toMatchObject({ location: "杭州", temperatureC: 27.5, weatherCode: 1, error: null });
+    const stored = JSON.parse(await readFile(join(storageRoot, "settings", "desk-calendar.json"), "utf8")) as { weather: { temperatureC: number } };
+    expect(stored.weather.temperatureC).toBe(27.5);
+  });
+
+  it("returns the cached weather with an explicit provider error", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, status: 503 })));
+    await registerFresh();
+    const save = handlerFor("campusos:desk-calendar:settings:save");
+    await save({}, { weather: { location: "杭州", temperatureC: 26, weatherCode: 2, observedAt: "2026-08-16T11:00:00.000Z", cachedAt: "2026-08-16T11:00:00.000Z", error: null } });
+    const weather = await handlerFor("campusos:desk-calendar:weather:refresh")({});
+    expect(weather).toMatchObject({ location: "杭州", temperatureC: 26, weatherCode: 2, error: "定位服务返回 503" });
+  });
+
   it("closes the floating window and disables the setting on close", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-desk-cal-"));
     temporaryDirectories.push(storageRoot);
