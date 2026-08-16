@@ -72,9 +72,10 @@ contextBridge.exposeInMainWorld("campusos", {
       title: string;
       breakable: boolean;
       type: "deadline" | "fixed";
-      repeatType: "norepeat" | "days" | "month" | "year";
+      repeatType: "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
       repeatPeriod: number;
       repeatEndsOn: string;
+      repeatWeekdays?: number[];
       blocksPlanning: boolean;
       courseName?: string | null;
       source?: { kind: "ai-assistant"; fingerprint: string; provider: string; model: string; importedAt: string } | null;
@@ -83,6 +84,8 @@ contextBridge.exposeInMainWorld("campusos", {
       id: string;
       status?: "running" | "suspended" | "completed" | "deleted";
       action?: "restore" | "purge";
+      scope?: "single" | "future" | "series";
+      includeCompleted?: boolean;
       timeSpentMinutes?: number;
     }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
     generatePlan: (settings: {
@@ -159,6 +162,28 @@ contextBridge.exposeInMainWorld("campusos", {
     load: () => ipcRenderer.invoke("campusos:diagnostics:load"),
     clear: () => ipcRenderer.invoke("campusos:diagnostics:clear"),
     exportTxt: () => ipcRenderer.invoke("campusos:diagnostics:export")
+  },
+  backup: {
+    export: () => ipcRenderer.invoke("campusos:backup:export"),
+    preview: () => ipcRenderer.invoke("campusos:backup:preview"),
+    restore: (mode: "merge" | "replace") => ipcRenderer.invoke("campusos:backup:restore", mode)
+  },
+  notifications: {
+    load: () => ipcRenderer.invoke("campusos:notifications:load"),
+    markRead: (id: string) => ipcRenderer.invoke("campusos:notifications:read", id),
+    markHandled: (id: string) => ipcRenderer.invoke("campusos:notifications:handled", id),
+    clearExpired: () => ipcRenderer.invoke("campusos:notifications:clear-expired"),
+    subscribe: (listener: () => void) => {
+      const channel = "campusos:notifications:changed";
+      const handler = () => listener();
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
+  },
+  lifecycle: {
+    load: () => ipcRenderer.invoke("campusos:lifecycle:load"),
+    save: (patch: { launchAtLogin?: boolean; closeBehavior?: "ask" | "hide-to-tray" | "quit"; notificationEnabled?: boolean; notificationPrompted?: boolean }) =>
+      ipcRenderer.invoke("campusos:lifecycle:save", patch)
   },
   updates: {
     getAppInfo: () => ipcRenderer.invoke("campusos:app:info"),

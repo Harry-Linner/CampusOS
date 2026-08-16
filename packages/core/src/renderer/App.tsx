@@ -25,6 +25,7 @@ import {
 import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 import { subscribeToPluginRuntimeChanges } from "./lib/pluginBridge";
 import { AssistantSetupDialog } from "@campusos/plugin-ai-assistant";
+import { NotificationCenter } from "./components/NotificationCenter";
 
 const isDevelopmentBuild =
   (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
@@ -214,6 +215,7 @@ export const App = (): JSX.Element => {
         onSelect={setActiveView}
         onSearch={() => setSearchOpen(true)}
       />
+      <NotificationCenter />
       <main id="main-content" className="main-pane">
         {workspace.error ? (
           <div className="workspace-error-banner" role="alert">

@@ -39,7 +39,7 @@ const bindUpdaterEvents = (instance: typeof AutoUpdaterType): void => {
   if (updaterEventsBound) return;
   updaterEventsBound = true;
   instance.autoDownload = false;
-  instance.autoInstallOnAppQuit = true;
+  instance.autoInstallOnAppQuit = false;
   instance.on("checking-for-update", () => emit({ state: "checking" }));
   instance.on("update-available", (info) => {
     const releaseNotes = normalizeReleaseNotes(info.releaseNotes);

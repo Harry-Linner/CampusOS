@@ -213,6 +213,15 @@ export const notifyDeskCalendarWorkspaceChanged = (): void => {
 export const getDeskCalendarSettings = (): Promise<DeskCalendarSettings> =>
   loadSettings();
 
+export const setDeskCalendarEnabled = async (enabled: boolean): Promise<DeskCalendarSettings> => {
+  const next = await saveSettings({ enabled });
+  if (next.enabled) await ensureDeskCalendarWindow();
+  else if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) deskCalendarWindow.close();
+  if (next.enabled) broadcastSnapshotSafely();
+  broadcastSettingsChanged();
+  return next;
+};
+
 /** 应用启动完成后恢复用户上次启用的桌面日历。 */
 export const restoreDeskCalendarWindow = async (): Promise<void> => {
   const current = await loadSettings();

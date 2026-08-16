@@ -385,7 +385,7 @@ desktop-notification, graduate-account, or Release-distribution acceptance.
 
 日程闭环已按 Celechron 1.3.0 的 task/arrange/flow 逻辑迁入 Core：任务和排程写入 SQLite v3，renderer 只通过正式 schedule IPC 读写；Windows 系统日历采用 RFC 5545 `.ics` 文件和默认文件关联交接，`shell.openPath` 失败会沿 IPC 返回错误，不伪造原生日历写入成功。边界记录在 [ADR-0003](docs/adr/0003-windows-calendar-export.md)。
 
-### Windows 后台驻留与关闭行为市场对照（2026-08-15）
+### Windows 后台驻留与关闭行为市场对照（2026-08-16）
 
 Microsoft Teams 将自动启动、后台运行和关闭窗口后继续运行暴露为可修改的系统设置；Zoom Workplace 同样把 Windows 自动启动与“关闭时最小化到通知区域”作为独立偏好，并提供可选的静默启动。这些产品共同说明：持续运行可以服务通知与实时能力，但不能把关闭按钮的含义或开机启动权静默替用户决定。
 
@@ -500,7 +500,7 @@ URL. Contract tests and a local-provider Electron flow cover structured
 capability testing, discovery, multi-intent review, exact evidence, ambiguity,
 prompt injection, duplicate prevention, and deterministic update/cancel.
 
-## 2026-08-15 决策同步：CampusOS 生命周期、任务回收站与更新
+## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
 
 - CampusOS 只有一个应用生命周期；桌面日历是 Schedule 插件能力，不是独立应用或独立开机项。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
 - 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
@@ -511,3 +511,12 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 - 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
 - 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+
+## 2026-08-16 完整实现同步
+
+- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
+- 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
+- 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
+- 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
+- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
+- 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。

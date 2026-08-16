@@ -17,7 +17,7 @@ CampusOS 的插件是用户可在扩展页启用、禁用，并在左侧栏获�
 
 本科/研究生教务、学在浙大、素拓和在线校历是 Core 托管的数据连接器，不是插件，不出现在扩展列表或左侧栏。事件投影、任务存储、排程算法、通知、诊断和系统导出是内部服务。移动端专属功能不进入桌面端产品范围。该边界以 [ADR-0002](docs/adr/0002-user-facing-plugin-modules.md) 和 [模块设计](docs/design/celechron-inspired-plugin-suite.md) 为准。
 
-### 桌面后台生命周期（2026-08-15）
+### 桌面后台生命周期（2026-08-16）
 
 CampusOS 只有一个应用生命周期。开机自启是默认关闭的 Core 全局设置，在首次引导结束时询问一次，并可在设置页随时修改；桌面日历不能拥有独立自启动项。Windows 登录启动 CampusOS 时允许后台启动并恢复已启用的桌面能力，手动启动则打开主窗口。
 
@@ -342,7 +342,7 @@ bot/webhook integration; those inputs require later consent and compliance
 decisions.
 This MVP entry supersedes earlier three-module wording in this historical PRD; the current official sidebar set is Academic, Schedule, Materials, and AI Assistant.
 
-## 2026-08-15 决策同步：CampusOS 生命周期、任务回收站与更新
+## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
 
 - CampusOS 只有一个应用生命周期；桌面日历是 Schedule 插件能力，不是独立应用或独立开机项。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
 - 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
@@ -353,3 +353,12 @@ This MVP entry supersedes earlier three-module wording in this historical PRD; t
 - 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
 - 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+
+## 2026-08-16 完整实现同步
+
+- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
+- 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
+- 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
+- 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
+- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
+- 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。

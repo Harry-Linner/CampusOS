@@ -9,6 +9,9 @@ import type { ScheduleBridge } from "./scheduleBridge";
 import type { AcademicBridge } from "./academicBridge";
 import type { UpdateBridge } from "./updateBridge";
 import type { AiAssistantBridge } from "./assistantBridge";
+import type { AppLifecycleBridge } from "./appLifecycleBridge";
+import type { NotificationCenterBridge } from "./notificationBridge";
+import type { BackupBridge } from "./backupBridge";
 
 export type CampusWorkspaceHydratedFrom = "disk" | "generated" | "synced";
 
@@ -46,4 +49,7 @@ export interface CampusosBridge {
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;
   updates: UpdateBridge;
+  lifecycle?: AppLifecycleBridge;
+  notifications?: NotificationCenterBridge;
+  backup?: BackupBridge;
 }

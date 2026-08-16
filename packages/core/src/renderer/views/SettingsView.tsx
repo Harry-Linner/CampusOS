@@ -65,6 +65,12 @@ export const SettingsView = ({
   const [diagnosticMessage, setDiagnosticMessage] = useState("");
   const [appInfo, setAppInfo] = useState<CampusAppInfo | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "idle" });
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
+  const [closeBehavior, setCloseBehavior] = useState<"ask" | "hide-to-tray" | "quit">("ask");
+  const [notificationPermissionEnabled, setNotificationPermissionEnabled] = useState(true);
+  const [lifecycleSaving, setLifecycleSaving] = useState(false);
+  const [lifecycleMessage, setLifecycleMessage] = useState("");
+  const [backupMessage, setBackupMessage] = useState("");
   const authenticatedProfile =
     academicCredential.record?.verificationState === "verified" &&
     academicCredential.record.username === username.trim() &&
@@ -89,6 +95,37 @@ export const SettingsView = ({
       setGradeChangesEnabled(reminderSettings.record.gradeChangesEnabled !== false);
     }
   }, [reminderSettings.record]);
+
+  useEffect(() => {
+    void window.campusos?.lifecycle?.load().then((record) => {
+      setLaunchAtLogin(record.launchAtLogin);
+      setCloseBehavior(record.closeBehavior);
+      setNotificationPermissionEnabled(record.notificationEnabled);
+    }).catch(() => undefined);
+  }, []);
+
+  const saveLifecycleSettings = async (): Promise<void> => {
+    const lifecycle = window.campusos?.lifecycle;
+    if (!lifecycle) return;
+    setLifecycleSaving(true);
+    setLifecycleMessage("");
+    try {
+      const record = await lifecycle.save({
+        launchAtLogin,
+        closeBehavior,
+        notificationEnabled: notificationPermissionEnabled,
+        notificationPrompted: true
+      });
+      setLaunchAtLogin(record.launchAtLogin);
+      setCloseBehavior(record.closeBehavior);
+      setNotificationPermissionEnabled(record.notificationEnabled);
+      setLifecycleMessage("后台与通知设置已保存");
+    } catch (error) {
+      setLifecycleMessage(error instanceof Error ? error.message : "设置保存失败。");
+    } finally {
+      setLifecycleSaving(false);
+    }
+  };
 
   const reloadDiagnostics = async (): Promise<void> => {
     setDiagnosticState("loading");
@@ -175,6 +212,35 @@ export const SettingsView = ({
     }
   })();
 
+  const exportBackup = async (): Promise<void> => {
+    if (!window.campusos?.backup) return;
+    setBackupMessage("");
+    try {
+      const result = await window.campusos.backup.export();
+      if (result) setBackupMessage(`备份已导出：${result.taskCount} 项本地任务。备份不含密码、Cookie、Session、Token 或 AI Key。`);
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "备份导出失败。");
+    }
+  };
+
+  const restoreBackup = async (): Promise<void> => {
+    const backup = window.campusos?.backup;
+    if (!backup) return;
+    setBackupMessage("");
+    try {
+      const preview = await backup.preview();
+      if (!preview) return;
+      const replace = window.confirm(`备份包含 ${preview.taskCount} 项任务。确定要替换当前本地任务吗？取消则合并。`);
+      const result = await backup.restore(replace ? "replace" : "merge");
+      if (result) {
+        setBackupMessage(`${replace ? "替换" : "合并"}恢复完成：${result.taskCount} 项任务。`);
+        await refreshData();
+      }
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "备份恢复失败。");
+    }
+  };
+
   const refreshData = async (): Promise<void> => {
     setRefreshState("refreshing");
     setRefreshError("");
@@ -231,6 +297,32 @@ export const SettingsView = ({
               ))}
             </div>
           </fieldset>
+        </section>
+
+        <section className="settings-section" aria-labelledby="lifecycle-heading">
+          <header className="settings-section-heading"><h2 id="lifecycle-heading">后台与启动</h2></header>
+          <p className="page-copy">桌面日历与提醒随 CampusOS 运行，不会注册独立开机项。</p>
+          <div className="settings-toggle-list">
+            <label><input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} /><span>登录系统时启动 CampusOS</span></label>
+            <label><input type="checkbox" checked={notificationPermissionEnabled} onChange={(event) => setNotificationPermissionEnabled(event.target.checked)} /><span>允许桌面通知</span></label>
+          </div>
+          <fieldset className="academic-program-fieldset">
+            <legend>关闭主窗口时</legend>
+            <div className="academic-program-options">
+              {([ ["ask", "每次询问"], ["hide-to-tray", "隐藏到托盘"], ["quit", "退出 CampusOS"] ] as const).map(([value, label]) => (
+                <label key={value} className={closeBehavior === value ? "selected" : undefined}><input type="radio" name="close-behavior" value={value} checked={closeBehavior === value} onChange={() => setCloseBehavior(value)} /><span>{label}</span></label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="settings-actions"><button className="primary-button" type="button" disabled={lifecycleSaving} onClick={() => void saveLifecycleSettings()}>{lifecycleSaving ? "保存中" : "保存后台设置"}</button></div>
+          {lifecycleMessage ? <p className="save-note" role="status">{lifecycleMessage}</p> : null}
+        </section>
+
+        <section className="settings-section" aria-labelledby="backup-heading">
+          <header className="settings-section-heading"><h2 id="backup-heading">备份与恢复</h2></header>
+          <p className="page-copy">手动导出本地任务、排程和通知索引。备份不加密，请只保存到可信位置，不包含密码、Cookie、Session、Token 或 AI Key。</p>
+          <div className="settings-actions"><button className="text-button" type="button" onClick={() => void exportBackup()}>导出备份</button><button className="text-button" type="button" onClick={() => void restoreBackup()}>预览并恢复</button></div>
+          {backupMessage ? <p className="save-note" role="status">{backupMessage}</p> : null}
         </section>
 
         <section className="settings-section" aria-labelledby="data-heading">
@@ -558,6 +650,10 @@ export const SettingsView = ({
                 已验证并安全保存
               </span>
             ) : null}
+          </div>
+
+          <div className="settings-actions">
+            <button className="text-button is-danger" type="button" disabled={academicCredential.loading} onClick={() => { if (!window.confirm("退出当前账号并清除认证缓存？本地任务、通知和日历设置会保留。")) return; void academicCredential.clear().then(() => { setUsername(""); setPassword(""); }); }}>退出当前账号</button>
           </div>
 
           {authenticatedProfile ? (

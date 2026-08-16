@@ -133,11 +133,22 @@ const addNextPeriod = (
   start: Date,
   end: Date,
   repeatType: LocalTaskRepeatType,
-  repeatPeriod: number
+  repeatPeriod: number,
+  repeatWeekdays: number[] = []
 ): { start: Date; end: Date } => {
-  if (repeatType === "days") {
-    const delta = Math.max(1, repeatPeriod) * DAY_MS;
+  if (repeatType === "days" || repeatType === "weeks") {
+    const delta = Math.max(1, repeatPeriod) * (repeatType === "weeks" ? 7 : 1) * DAY_MS;
     return { start: new Date(start.getTime() + delta), end: new Date(end.getTime() + delta) };
+  }
+
+  if (repeatType === "weekdays") {
+    const allowed = (repeatWeekdays.length > 0 ? repeatWeekdays : [1, 2, 3, 4, 5]).sort((left, right) => left - right);
+    const parts = getShanghaiDateParts(start);
+    const currentDay = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
+    const nextOffset = allowed.map((weekday) => (weekday - currentDay + 7) % 7 || 7).sort((left, right) => left - right)[0] ?? 7;
+    const nextStart = new Date(start.getTime() + nextOffset * DAY_MS);
+    const delta = nextStart.getTime() - start.getTime();
+    return { start: nextStart, end: new Date(end.getTime() + delta) };
   }
 
   if (repeatType === "month") {
@@ -244,8 +255,10 @@ export const normalizeTaskRecord = (
     repeatType: normalizeRepeatType(value.repeatType),
     repeatPeriod: Math.max(1, Math.round(finiteNumber(value.repeatPeriod, 1))),
     repeatEndsOn: dateOnlyIso(value.repeatEndsOn, "重复结束日期"),
+    repeatWeekdays: Array.isArray(value.repeatWeekdays) ? value.repeatWeekdays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [],
     blocksPlanning: value.blocksPlanning !== false,
     fromId: typeof value.fromId === "string" ? value.fromId : null,
+    deletedAt: typeof value.deletedAt === "string" && Number.isFinite(Date.parse(value.deletedAt)) ? value.deletedAt : null,
     courseName: typeof value.courseName === "string" ? value.courseName : null,
     source: value.source && typeof value.source === "object" && value.source.kind === "ai-assistant" && typeof value.source.fingerprint === "string"
       ? {
@@ -283,33 +296,47 @@ export const applyTaskMutation = (
   tasks: LocalTaskRecord[],
   mutation: LocalTaskMutation
 ): LocalTaskRecord[] => {
-  let found = false;
+  const target = tasks.find((task) => task.id === mutation.id);
+  if (!target) throw new Error("任务不存在。");
+  const seriesId = target.type === "fixedlegacy" ? target.fromId : target.id;
+  const scope = mutation.scope ?? "single";
+  const matchesSeries = (task: LocalTaskRecord): boolean =>
+    task.id === mutation.id || (seriesId !== null && (task.id === seriesId || task.fromId === seriesId));
+
   if (mutation.action === "purge") {
-    const retained = tasks.filter((task) => task.id !== mutation.id);
+    const retained = tasks.filter((task) => {
+      if (!matchesSeries(task)) return true;
+      if (scope === "series") return mutation.includeCompleted !== false || task.status !== "completed";
+      return task.id !== mutation.id;
+    });
     if (retained.length === tasks.length) throw new Error("任务不存在。");
     return retained;
   }
-  const result = tasks.map((task) => {
-    if (task.id !== mutation.id) return task;
-    found = true;
+
+  return tasks.map((task) => {
+    const isTarget = task.id === mutation.id;
+    const isSeriesMember = matchesSeries(task);
+    const shouldApply = mutation.action === "restore"
+      ? isTarget
+      : mutation.status === "deleted" && (
+        scope === "series" ? isSeriesMember : scope === "future" ? isTarget || (seriesId !== null && task.fromId === seriesId && Date.parse(task.startAt) >= Date.parse(target.startAt)) : isTarget
+      );
+    if (!shouldApply) return task;
     const next = { ...task };
     if (mutation.action === "restore") {
-      next.status = next.type === "deadline" && Date.parse(next.endAt) < Date.now() ? "overdue" : "running";
+      next.status = next.type === "deadline" && Date.parse(next.endAt) < Date.now() ? "overdue" : next.type === "fixedlegacy" ? "outdated" : "running";
+      next.deletedAt = null;
+    } else if (mutation.status) {
+      next.status = mutation.status;
+      next.deletedAt = mutation.status === "deleted" ? new Date().toISOString() : null;
     }
-    if (mutation.status) next.status = mutation.status;
     if (mutation.timeSpentMinutes !== undefined) {
-      next.timeSpentMinutes = Math.min(
-        next.timeNeededMinutes,
-        Math.max(0, Math.round(mutation.timeSpentMinutes))
-      );
+      next.timeSpentMinutes = Math.min(next.timeNeededMinutes, Math.max(0, Math.round(mutation.timeSpentMinutes)));
     }
     if (next.status === "completed") next.timeSpentMinutes = next.timeNeededMinutes;
     return next;
   });
-  if (!found) throw new Error("任务不存在。");
-  return result;
 };
-
 const taskChanged = (left: LocalTaskRecord[], right: LocalTaskRecord[]): boolean =>
   JSON.stringify(left) !== JSON.stringify(right);
 
@@ -319,8 +346,10 @@ export const refreshLocalTasks = (
   options?: ScheduleDomainOptions
 ): TaskRefreshResult => {
   const idFactory = getIdFactory(options);
+  const cutoff = now.getTime() - 30 * DAY_MS;
   const current = source
-    .map((task) => normalizeTaskRecord(task, { ...options, idFactory }));
+    .map((task) => normalizeTaskRecord(task, { ...options, idFactory }))
+    .filter((task) => task.status !== "deleted" || !task.deletedAt || Date.parse(task.deletedAt) >= cutoff);
   const existingFixedIds = new Set<string>();
   const historical: LocalTaskRecord[] = [];
 
@@ -355,14 +384,15 @@ export const refreshLocalTasks = (
         repeatEndsOn: toIso(dateOnly(end)).slice(0, 10),
         startAt: start.toISOString(),
         endAt: end.toISOString(),
-        fromId: task.id
+        fromId: task.id,
+        deletedAt: null
       };
       historical.push(legacy);
       if (task.repeatType === "norepeat") {
         task.status = "outdated";
         break;
       }
-      const next = addNextPeriod(start, end, task.repeatType, task.repeatPeriod);
+      const next = addNextPeriod(start, end, task.repeatType, task.repeatPeriod, task.repeatWeekdays ?? []);
       start = next.start;
       end = next.end;
       task.startAt = start.toISOString();
@@ -437,7 +467,7 @@ const buildTaskInstances = (
   while (instanceStart.getTime() <= rangeEnd.getTime() && dateOnly(instanceStart).getTime() <= repeatEnd.getTime()) {
     addInstance(instanceStart, instanceEnd, `-${instanceStart.toISOString()}`);
     if (task.repeatType === "norepeat") break;
-    const next = addNextPeriod(instanceStart, instanceEnd, task.repeatType, task.repeatPeriod);
+    const next = addNextPeriod(instanceStart, instanceEnd, task.repeatType, task.repeatPeriod, task.repeatWeekdays ?? []);
     instanceStart = next.start;
     instanceEnd = next.end;
     if (++guard > 20_000) break;

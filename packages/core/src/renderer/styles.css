@@ -4664,3 +4664,27 @@ input:focus-visible {
     flex-direction: column;
   }
 }
+
+.notification-center {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 30;
+}
+.notification-trigger {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 8px 13px;
+  box-shadow: var(--shadow-soft);
+}
+.notification-badge { display: inline-flex; min-width: 18px; justify-content: center; margin-left: 6px; border-radius: 999px; background: var(--accent); color: white; font-size: 11px; }
+.notification-popover { width: min(380px, calc(100vw - 32px)); margin-top: 8px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
+.notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.notification-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.notification-item > button:first-child { flex: 1; display: grid; gap: 3px; border: 0; background: transparent; color: inherit; text-align: left; }
+.notification-item span, .notification-item time { color: var(--ink-muted); font-size: 12px; }
+.schedule-deleted-group { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.schedule-deleted-group-heading { display: flex; justify-content: space-between; color: var(--ink-muted); font-size: 12px; }.schedule-delete-decision { position: fixed; inset: auto 24px 24px auto; z-index: 35; width: min(460px, calc(100vw - 48px)); padding: 18px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
+.schedule-delete-decision p { margin: 6px 0 14px; color: var(--ink-muted); }

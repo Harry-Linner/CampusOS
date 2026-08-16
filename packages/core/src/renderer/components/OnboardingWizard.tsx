@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AcademicProgram } from "../../shared/credentialBridge";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
@@ -13,13 +13,14 @@ interface OnboardingWizardProps {
   allowDevelopmentAuthSkip?: boolean;
 }
 
-type OnboardingStep = "welcome" | "account" | "sync" | "plugins" | "done";
+type OnboardingStep = "welcome" | "account" | "sync" | "plugins" | "preferences" | "done";
 
 const STEP_LABELS: { step: OnboardingStep; label: string }[] = [
   { step: "welcome", label: "开始" },
   { step: "account", label: "账号" },
   { step: "sync", label: "同步" },
   { step: "plugins", label: "扩展" },
+  { step: "preferences", label: "偏好" },
   { step: "done", label: "完成" }
 ];
 
@@ -28,6 +29,7 @@ const STEP_ORDER: OnboardingStep[] = [
   "account",
   "sync",
   "plugins",
+  "preferences",
   "done"
 ];
 
@@ -147,6 +149,17 @@ export const OnboardingWizard = ({
   const [pluginConfiguring, setPluginConfiguring] = useState(false);
   const [pluginConfigured, setPluginConfigured] = useState(false);
   const [pluginErrors, setPluginErrors] = useState<string[]>([]);
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [preferenceSaving, setPreferenceSaving] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void window.campusos?.lifecycle?.load().then((record) => {
+      setLaunchAtLogin(record.launchAtLogin);
+      setNotificationEnabled(record.notificationEnabled);
+    }).catch(() => undefined);
+  }, []);
 
   const goTo = (step: OnboardingStep): void => {
     setCurrentStep(step);
@@ -217,7 +230,29 @@ export const OnboardingWizard = ({
     }
     setPluginConfiguring(false);
     setPluginConfigured(true);
-    goTo("done");
+    goTo(window.campusos?.lifecycle ? "preferences" : "done");
+  };
+
+  const handleSavePreferences = async (): Promise<void> => {
+    const lifecycle = window.campusos?.lifecycle;
+    if (!lifecycle) {
+      goTo("done");
+      return;
+    }
+    setPreferenceSaving(true);
+    setPreferenceError(null);
+    try {
+      await lifecycle.save({
+        launchAtLogin,
+        notificationEnabled,
+        notificationPrompted: true
+      });
+      goTo("done");
+    } catch (error) {
+      setPreferenceError(error instanceof Error ? error.message : "偏好保存失败。");
+    } finally {
+      setPreferenceSaving(false);
+    }
   };
 
   const handleFinish = (): void => {
@@ -703,6 +738,29 @@ export const OnboardingWizard = ({
             <p className="page-copy onboarding-skip-note">
               后续可在扩展面板中发现更多社区插件。
             </p>
+          </div>
+        ) : null}
+
+        {/* Step: Preferences */}
+        {currentStep === "preferences" ? (
+          <div className="onboarding-step-content">
+            <h2 className="onboarding-step-title">后台与通知</h2>
+            <p className="page-copy">桌面日历属于 CampusOS 日程插件。开启开机自启后，CampusOS 会在登录系统时后台启动，并恢复你已启用的桌面日历和提醒。</p>
+            <div className="onboarding-preference-list">
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>登录系统时启动 CampusOS</strong><span>默认关闭，之后可在设置中修改。</span></span>
+                <input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} />
+              </label>
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>允许桌面通知</strong><span>用于课程、考试、作业和本地任务提醒；关闭不会阻塞其他功能。</span></span>
+                <input type="checkbox" checked={notificationEnabled} onChange={(event) => setNotificationEnabled(event.target.checked)} />
+              </label>
+            </div>
+            {preferenceError ? <p className="error-copy" role="alert">{preferenceError}</p> : null}
+            <div className="settings-actions onboarding-actions">
+              <button className="text-button" type="button" onClick={() => goTo("plugins")}>返回</button>
+              <button className="primary-button" type="button" disabled={preferenceSaving} onClick={() => void handleSavePreferences()}>{preferenceSaving ? "保存中…" : "保存并继续"}</button>
+            </div>
           </div>
         ) : null}
 

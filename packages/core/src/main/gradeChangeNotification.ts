@@ -6,6 +6,7 @@ import type {
 import { summarizeAcademicGrades } from "@campusos/plugin-academic/gradesModel";
 import type { DatabaseService } from "./databaseService";
 import type { RefreshSourceStatus } from "./refreshCoordinator";
+import { addNotification } from "./notificationCenter";
 
 export interface GradeChangeNotificationMessage {
   title: string;
@@ -79,6 +80,7 @@ export const processGradeChangeNotification = async ({
   const previous = database.loadAcademicGradeNotificationBaseline(accountId);
 
   if (!previous) {
+    try { await addNotification({ kind: "grade", ...FIRST_NOTIFICATION, showDesktop: false }); } catch (error) { void error; }
     await notify(FIRST_NOTIFICATION);
     database.saveAcademicGradeNotificationBaseline(accountId, nextBaseline);
     return "baseline-created";
@@ -87,7 +89,10 @@ export const processGradeChangeNotification = async ({
   const changed =
     previous.fivePointGpa !== nextBaseline.fivePointGpa ||
     previous.gradedCourseCount !== nextBaseline.gradedCourseCount;
-  if (changed) await notify(CHANGE_NOTIFICATION);
+  if (changed) {
+    try { await addNotification({ kind: "grade", ...CHANGE_NOTIFICATION, showDesktop: false }); } catch (error) { void error; }
+    await notify(CHANGE_NOTIFICATION);
+  }
   database.saveAcademicGradeNotificationBaseline(accountId, nextBaseline);
 
   return changed ? "change-notified" : "unchanged";

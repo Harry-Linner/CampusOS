@@ -591,7 +591,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [x] Keep desktop pet, OCR, continuous clipboard reads, and direct
   WeChat/DingTalk access deferred until separate permission and compliance work.
 
-### Summer short-term (小学期) fallback (2026-08-15)
+### Summer short-term (小学期) fallback (2026-08-16)
 
 - [x] ZJU 小学期（短学期）课程挂在教务系统 `xqm=2|夏` 学季（真实校历 4/27–7/05），
   抓取层本就覆盖四季，但投影层在暑假会直接选下一学年秋冬而跳过它。
@@ -602,7 +602,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
   暑假回落期内总览/学业默认显示春夏学期而非下学期预览。
 - [x] 覆盖：投影测试（回落内/外两场景）、term 派生测试、AcademicView 默认学期测试。
 
-### Desk calendar floating window (2026-08-15)
+### Desk calendar floating window (2026-08-16)
 
 - [x] 借鉴 DeskToDo（`https://github.com/ShawnXu01/DeskToDo`，MIT）的桌面悬浮形态：
   独立无边框、半透明、置顶、跳过任务栏的 `BrowserWindow`，加载独立 renderer 入口
@@ -615,7 +615,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
   分离 preload，符合现有受信 renderer 边界。
 - [x] 覆盖：主进程窗口/IPC/持久化测试、renderer 悬浮窗组件测试、ScheduleView 控制测试。
 
-### Calendar detail and reminder closure (2026-08-15)
+### Calendar detail and reminder closure (2026-08-16)
 
 - [x] 开发期直接将任务逾期状态从 `failed` 改为 `overdue`，不保留兼容别名或历史迁移。
 - [ ] 主日历与桌面日历的课程、考试、作业、任务均可打开统一详情。
@@ -623,7 +623,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [ ] 自建任务支持覆盖全局提前量的单项提醒，包括不提醒、截止时、预设提前量和自定义时间。
 - [ ] 小学期继续归入春夏学期；有 `2|夏` 课程时显示“春夏学期（含小学期）”，并提供“仅看小学期”筛选。
 
-### Desktop background lifecycle (2026-08-15)
+### Desktop background lifecycle (2026-08-16)
 
 - [x] 决策：开机自启属于 CampusOS Core，默认关闭；桌面日历不拥有独立登录项或进程生命周期。
 - [x] 决策：首次引导结束时询问是否开机自启，设置页持续提供同一开关。
@@ -635,7 +635,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [ ] 登录项启动时后台运行并恢复已启用能力；手动启动显示主窗口。
 - [ ] 覆盖首次/重复询问、一次性选择、持久默认、设置重置、插件禁用和所有退出路径的 Electron 测试。
 
-## 2026-08-15 决策同步：CampusOS 生命周期、任务回收站与更新
+## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
 
 - CampusOS 只有一个应用生命周期；桌面日历是 Schedule 插件能力，不是独立应用或独立开机项。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
 - 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
@@ -646,3 +646,12 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
 - 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+
+## 2026-08-16 完整实现同步
+
+- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
+- 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
+- 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
+- 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
+- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
+- 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。

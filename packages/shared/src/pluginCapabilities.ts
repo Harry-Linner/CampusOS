@@ -399,7 +399,7 @@ export type LocalTaskStatus =
   | "overdue"
   | "deleted"
   | "outdated";
-export type LocalTaskRepeatType = "norepeat" | "days" | "month" | "year";
+export type LocalTaskRepeatType = "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
 
 export interface LocalTaskRecord {
   id: string;
@@ -416,8 +416,10 @@ export interface LocalTaskRecord {
   repeatType: LocalTaskRepeatType;
   repeatPeriod: number;
   repeatEndsOn: string;
+  repeatWeekdays?: number[];
   blocksPlanning: boolean;
   fromId: string | null;
+  deletedAt?: string | null;
   courseName?: string | null;
   source?: LocalTaskSource | null;
 }
@@ -444,6 +446,7 @@ export interface LocalTaskInput {
   repeatType: LocalTaskRepeatType;
   repeatPeriod: number;
   repeatEndsOn: string;
+  repeatWeekdays?: number[];
   blocksPlanning: boolean;
   courseName?: string | null;
   source?: LocalTaskSource | null;
@@ -453,6 +456,8 @@ export interface LocalTaskMutation {
   id: string;
   status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
   action?: "restore" | "purge";
+  scope?: "single" | "future" | "series";
+  includeCompleted?: boolean;
   timeSpentMinutes?: number;
 }
 

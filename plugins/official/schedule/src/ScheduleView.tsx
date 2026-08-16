@@ -39,9 +39,10 @@ interface TaskFormState {
   location: string;
   breakable: boolean;
   type: "deadline" | "fixed";
-  repeatType: "norepeat" | "days" | "month" | "year";
+  repeatType: "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
   repeatPeriod: number;
   repeatEndsOn: string;
+  repeatWeekdays?: number[];
   blocksPlanning: boolean;
 }
 
@@ -368,6 +369,9 @@ export const ScheduleView = ({
   const [deskCalendarEnabled, setDeskCalendarEnabledState] = useState(false);
   const [deskCalendarView, setDeskCalendarViewState] = useState<DeskCalendarView>("month");
   const [deskCalendarBusy, setDeskCalendarBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
+  const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState<LocalTaskRecord | null>(null);
 
   const loadDeskCalendarState = useCallback(async (): Promise<void> => {
     if (!deskCalendar) return;
@@ -523,6 +527,7 @@ export const ScheduleView = ({
         repeatType: form.type === "fixed" ? form.repeatType : "norepeat",
         repeatPeriod: form.repeatPeriod,
         repeatEndsOn: form.repeatEndsOn,
+        repeatWeekdays: form.repeatWeekdays ?? [],
         blocksPlanning: form.blocksPlanning
       };
       const data = await schedule.saveTask(input);
@@ -539,13 +544,14 @@ export const ScheduleView = ({
 
   const mutate = async (
     task: LocalTaskRecord,
-    status: "running" | "suspended" | "completed" | "deleted"
+    status: "running" | "suspended" | "completed" | "deleted",
+    options: { scope?: "single" | "future" | "series"; includeCompleted?: boolean } = {}
   ): Promise<void> => {
     if (!schedule) return;
     setBusy(true);
     setError(null);
     try {
-      const data = await schedule.mutateTask({ id: task.id, status });
+      const data = await schedule.mutateTask({ id: task.id, status, ...(options.scope ? { scope: options.scope } : {}), ...(options.includeCompleted !== undefined ? { includeCompleted: options.includeCompleted } : {}) });
       setTasks(data.tasks);
       setTaskUpdatedAt(data.updatedAt);
       if (form?.id === task.id) setForm(null);
@@ -557,8 +563,27 @@ export const ScheduleView = ({
     }
   };
 
-  const mutateDeleted = async (task: LocalTaskRecord, action: "restore" | "purge"): Promise<void> => {
+  const deleteTask = async (task: LocalTaskRecord): Promise<void> => {
+    if ((task.type === "fixed" && task.repeatType !== "norepeat") || task.status === "completed") {
+      setPendingDelete(task);
+      setDeleteCompletedHistory(false);
+      return;
+    }
+    await mutate(task, "deleted");
+  };
+
+  const confirmTaskDelete = async (scope: "single" | "future" | "series"): Promise<void> => {
+    if (!pendingDelete) return;
+    const task = pendingDelete;
+    setPendingDelete(null);
+    await mutate(task, "deleted", { scope, includeCompleted: deleteCompletedHistory });
+  };
+  const mutateDeleted = async (task: LocalTaskRecord, action: "restore" | "purge", allowExpired = false): Promise<void> => {
     if (!schedule) return;
+    if (action === "restore" && Date.parse(task.endAt) < Date.now() && !allowExpired) {
+      setPendingRestore(task);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -625,6 +650,14 @@ export const ScheduleView = ({
     () => tasks.filter((task) => task.status === "deleted"),
     [tasks]
   );
+  const deletedGroups = useMemo(() => {
+    const groups = new Map<string, LocalTaskRecord[]>();
+    for (const task of deletedTasks) {
+      const key = task.fromId ?? task.id;
+      groups.set(key, [...(groups.get(key) ?? []), task]);
+    }
+    return [...groups.entries()];
+  }, [deletedTasks]);
 
   const formatTaskMeta = (task: LocalTaskRecord): string => {
     if (task.type === "fixed") {
@@ -632,6 +665,8 @@ export const ScheduleView = ({
         ? "不重复"
         : task.repeatType === "days"
           ? `每隔 ${task.repeatPeriod} 天`
+          : task.repeatType === "weeks"
+            ? `每隔 ${task.repeatPeriod} 周`
           : task.repeatType === "month"
             ? "每月"
             : "每年";
@@ -702,6 +737,23 @@ export const ScheduleView = ({
 
       {error ? <div className="workspace-error-banner" role="alert">{error}</div> : null}
       {notice ? <div className="schedule-notice" role="status">{notice}</div> : null}
+      {pendingRestore ? (
+        <section className="schedule-delete-decision" role="dialog" aria-modal="true" aria-label="恢复过期任务">
+          <strong>“{pendingRestore.title}”已经过期</strong><p>是否恢复这个过期实例？过期提醒不会补发；未来实例仍按原规则注册。</p>
+          <div className="settings-actions"><button className="text-button" type="button" onClick={() => setPendingRestore(null)}>取消</button><button className="primary-button" type="button" onClick={() => { const task = pendingRestore; setPendingRestore(null); void mutateDeleted(task, "restore", true); }}>恢复此实例</button></div>
+        </section>
+      ) : null}
+      {pendingDelete ? (
+        <section className="schedule-delete-decision" role="dialog" aria-modal="true" aria-label="删除任务">
+          <div><strong>删除“{pendingDelete.title}”</strong><p>{pendingDelete.type === "fixed" && pendingDelete.repeatType !== "norepeat" ? "请选择重复任务的删除范围。" : "这是已完成任务，请确认是否移入最近删除。"}</p></div>
+          {pendingDelete.type === "fixed" && pendingDelete.repeatType !== "norepeat" ? <label className="schedule-check"><input type="checkbox" checked={deleteCompletedHistory} onChange={(event) => setDeleteCompletedHistory(event.target.checked)} />同时包含已完成历史</label> : null}
+          <div className="settings-actions">
+            <button className="text-button" type="button" onClick={() => setPendingDelete(null)}>取消</button>
+            <button className="text-button" type="button" onClick={() => void confirmTaskDelete("single")}>当前实例</button>
+            {pendingDelete.type === "fixed" && pendingDelete.repeatType !== "norepeat" ? <><button className="text-button" type="button" onClick={() => void confirmTaskDelete("future")}>当前及未来</button><button className="text-button is-danger" type="button" onClick={() => void confirmTaskDelete("series")}>整个系列</button></> : null}
+          </div>
+        </section>
+      ) : null}
       {!schedule ? <div className="quiet-empty-state">日程服务尚未连接。</div> : null}
 
       <section className="schedule-next-section" aria-labelledby="schedule-next-heading">
@@ -809,7 +861,7 @@ export const ScheduleView = ({
                     {task.type === "deadline" && (task.status === "running" || task.status === "overdue") ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "suspended")}>暂停</button> : null}
                     {task.type === "deadline" && task.status === "suspended" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "running")}>继续</button> : null}
                     {task.type === "deadline" && task.status !== "completed" && task.status !== "deleted" ? <button className="text-button" type="button" disabled={busy} onClick={() => void mutate(task, "completed")}>完成</button> : null}
-                    <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void mutate(task, "deleted")}>删除</button>
+                    <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void deleteTask(task)}>删除</button>
                   </div>
                 </article>
               ))}
@@ -832,14 +884,19 @@ export const ScheduleView = ({
               <details className="schedule-history-section">
                 <summary>最近删除（{deletedTasks.length} 项）</summary>
                 <div className="schedule-task-list">
-                  {deletedTasks.map((task) => (
-                    <article className="schedule-task-row is-deleted" key={task.id}>
-                      <div className="schedule-task-main"><strong>{task.title}</strong><small>{task.fromId ? "重复任务实例" : "单次任务"} · {formatTaskMeta(task)}</small></div>
-                      <div className="schedule-task-actions">
-                        <button className="text-button" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "restore")}>恢复</button>
-                        <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "purge")}>永久删除</button>
-                      </div>
-                    </article>
+                  {deletedGroups.map(([groupId, group]) => (
+                    <div className="schedule-deleted-group" key={groupId}>
+                      <div className="schedule-deleted-group-heading"><strong>{group[0]?.fromId ? "重复任务系列" : "单次任务"}</strong><span>{group.length} 项</span></div>
+                      {group.map((task) => (
+                        <article className="schedule-task-row is-deleted" key={task.id}>
+                          <div className="schedule-task-main"><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></div>
+                          <div className="schedule-task-actions">
+                            <button className="text-button" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "restore")}>恢复</button>
+                            <button className="text-button is-danger" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "purge")}>永久删除</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   ))}
                 </div>
               </details>
@@ -860,8 +917,8 @@ export const ScheduleView = ({
               <label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label>
               <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option></select></label>
               {form.type === "fixed" ? <>
-                <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="month">每月</option><option value="year">每年</option></select></label>
-                {form.repeatType === "days" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
+                <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="weeks">每隔几周</option><option value="weekdays">每周工作日</option><option value="month">每月</option><option value="year">每年</option></select></label>
+                {form.repeatType === "days" || form.repeatType === "weeks" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
                 {form.repeatType !== "norepeat" ? <label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label> : null}
               </> : null}
               <button className="primary-button" type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</button>

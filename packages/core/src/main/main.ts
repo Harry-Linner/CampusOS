@@ -11,6 +11,8 @@ import {
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
+import { registerNotificationHandlers } from "./notificationCenter";
+import { registerBackupHandlers } from "./backupStore";
 import {
   CAMPUSMOD_RENDERER_SCHEME
 } from "./campusmodRendererProtocolPolicy";
@@ -30,6 +32,13 @@ import {
   registerDeskCalendarHandlers,
   restoreDeskCalendarWindow
 } from "./deskCalendarWindow";
+import {
+  attachMainWindowLifecycle,
+  createCampusTray,
+  markCampusAppQuitting,
+  registerAppLifecycleHandlers,
+  shouldStartHidden
+} from "./appLifecycle";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 registerCampusmodRendererScheme();
@@ -42,13 +51,14 @@ const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
   }
 });
 
-const createMainWindow = async (): Promise<void> => {
+const createMainWindow = async (): Promise<BrowserWindow> => {
   const window = new BrowserWindow({
     width: 1340,
     height: 900,
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#f3efe6",
+    show: false,
     titleBarStyle: "hiddenInset",
     autoHideMenuBar: true,
     webPreferences: {
@@ -64,6 +74,7 @@ const createMainWindow = async (): Promise<void> => {
     }
   });
 
+  await attachMainWindowLifecycle(window);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-frame-navigate", (details) => {
     const initiatorUrl = details.initiator?.url;
@@ -82,6 +93,8 @@ const createMainWindow = async (): Promise<void> => {
   } else {
     await window.loadFile(join(currentDir, "../renderer/index.html"));
   }
+  if (!shouldStartHidden()) window.show();
+  return window;
 };
 
 app.whenReady().then(async () => {
@@ -101,7 +114,11 @@ app.whenReady().then(async () => {
   registerDiagnosticHandlers();
   registerDeskCalendarHandlers();
   registerUpdateHandlers();
+  registerAppLifecycleHandlers();
+  registerNotificationHandlers();
+  registerBackupHandlers();
   await createMainWindow();
+  await createCampusTray();
   await restoreDeskCalendarWindow();
   // The updater is intentionally started after the first window exists so
   // packaged startup status is visible through the normal renderer event.
@@ -115,13 +132,10 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+app.on("window-all-closed", () => undefined);
 
 app.on("before-quit", () => {
+  markCampusAppQuitting();
   markDeskCalendarAppQuitting();
   workspaceRefreshScheduler.stop();
 });

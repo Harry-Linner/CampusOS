@@ -208,7 +208,8 @@ describe("ScheduleView", () => {
     expect(screen.getByText("历史日程（1 项）")).toBeTruthy();
     expect(screen.getByText("只读")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
-    await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "fixed-1", status: "deleted" }));
+    fireEvent.click(screen.getByRole("button", { name: "整个系列" }));
+    await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "fixed-1", status: "deleted", scope: "series", includeCompleted: false }));
   });
 
   it("only exposes a repeat interval for Celechron's day-based recurrence", async () => {
