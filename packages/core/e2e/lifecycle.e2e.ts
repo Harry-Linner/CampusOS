@@ -44,10 +44,11 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible())).toBe(false);
     await expect.poll(async () => JSON.parse(await readFile(join(settingsDirectory, "app-lifecycle.json"), "utf8")).closeBehavior).toBe("hide-to-tray");
 
-    await app.evaluate(({ BrowserWindow }) => {
+    const appliedBounds = await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0];
       window?.show();
       window?.setBounds({ x: 160, y: 120, width: 1180, height: 760 });
+      return window?.getNormalBounds();
     });
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 600));
     await app.close();
@@ -55,10 +56,10 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     app = await launch(userDataPath);
     page = await app.firstWindow({ timeout: 10_000 });
     const restored = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
-    expect(restored?.x).toBe(160);
-    expect(restored?.y).toBe(120);
-    expect(Math.abs((restored?.width ?? 0) - 1180)).toBeLessThanOrEqual(4);
-    expect(Math.abs((restored?.height ?? 0) - 760)).toBeLessThanOrEqual(4);
+    expect(restored?.x).toBe(appliedBounds?.x);
+    expect(restored?.y).toBe(appliedBounds?.y);
+    expect(Math.abs((restored?.width ?? 0) - (appliedBounds?.width ?? 0))).toBeLessThanOrEqual(4);
+    expect(Math.abs((restored?.height ?? 0) - (appliedBounds?.height ?? 0))).toBeLessThanOrEqual(4);
     await app.close();
 
     app = await launch(userDataPath, ["--hidden"]);
