@@ -309,6 +309,29 @@ describe("DeskCalendarApp", () => {
     await vi.waitFor(() => expect(api.saveTask).toHaveBeenCalledWith(expect.objectContaining({ id: "task-1", title: "Edited task" })));
   });
 
+  it("opens an unprojected local task from the DeskTodo sidebar", async () => {
+    const taskRecord = {
+      id: "floating-task-1", status: "running" as const, description: "Inbox task", timeSpentMinutes: 0,
+      timeNeededMinutes: 30, startAt: "2026-08-15T03:00:00.000Z", endAt: "2026-08-15T03:30:00.000Z",
+      location: "", title: "Inbox task", breakable: true, type: "fixed" as const,
+      repeatType: "norepeat" as const, repeatPeriod: 1, repeatEndsOn: "2026-08-15", blocksPlanning: false,
+      fromId: null
+    };
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({ ...message, localTasks: [taskRecord] }))
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    const inboxTask = await screen.findByText("Inbox task");
+    fireEvent.contextMenu(inboxTask);
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.contextMenu(document.querySelector(".desk-cal-cell.is-today") as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.click(screen.getByRole("button", { name: "新建待办" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.doubleClick(inboxTask);
+    expect((await screen.findByLabelText("标题") as HTMLInputElement).value).toBe("Inbox task");
+  });
+
   it("persists widget ordering, countdown, progress, and appearance changes", async () => {
     const api = createApi();
     const prompt = vi.spyOn(window, "prompt");

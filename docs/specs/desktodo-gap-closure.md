@@ -55,7 +55,7 @@
 
 - 代码入口与正式数据链：`packages/core/src/renderer/DeskCalendarApp.tsx` 保持既有 `DeskCalendarWindowApi`、快照订阅、任务保存/完成、天气刷新和设置持久化链路；新增 DeskTodo 风格的组件区、待办侧栏和日历主区，仅消费 `localTasks` 与 `localTaskPeriods` 正式快照。
 - 用户可见验收：桌面日历改为组件区 + 待办侧栏 + 月/周/日历主体的三栏布局；待办支持双击/右键打开既有真实编辑表单；月历日期格保留上游课程/考试/作业只读边界，并支持本地任务创建入口。
-- 测试/构建命令及结果：`pnpm --filter @campusos/core test -- DeskCalendarApp.test.tsx deskCalendarWindow.test.ts`（33 通过）；`pnpm --filter @campusos/core typecheck`（通过）；`pnpm --filter @campusos/core build`（通过）；`git diff --check`（通过）。
+- 测试/构建命令及结果：`pnpm --filter @campusos/core test -- DeskCalendarApp.test.tsx deskCalendarWindow.test.ts`（34 通过）；`pnpm --filter @campusos/core test:coverage`（通过，覆盖率达到全局阈值）；`pnpm --filter @campusos/core typecheck`（通过）；`pnpm --filter @campusos/core build`（通过）；`git diff --check`（通过）。
 - 未完成项与下一步：本轮未迁移 DeskTodo 的 PyQt 源码或 GitHub Gist 同步；若要继续逼近原版，需要在真实桌面窗口上做多显示器视觉验收和调整模式体验验收。
 
 ### 2026-08-16：DTD-01、DTD-02、DTD-03 桌面操作与托盘
