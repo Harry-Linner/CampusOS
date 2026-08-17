@@ -534,3 +534,322 @@ body {
   gap: 6px;
   align-items: center;
 }
+
+/* DeskToDo-style desktop composition: widgets, inbox, then calendar. */
+.desk-cal-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 178px 218px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(18, 20, 24, 0.96), rgba(25, 27, 30, 0.91));
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.desk-cal-toolbar {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 3px 2px 9px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.desk-cal-view-switcher {
+  align-self: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.desk-cal-controls {
+  justify-content: flex-end;
+}
+
+.desk-cal-task-add {
+  border: 0;
+  border-radius: 7px;
+  background: var(--desk-cal-accent);
+  color: #19150d;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.desk-cal-clock {
+  display: none;
+}
+
+.desk-cal-widgets {
+  grid-column: 1;
+  grid-row: 2;
+  align-content: start;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+.desk-cal-widgets::before {
+  content: "组件";
+  display: block;
+  color: var(--desk-cal-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 2px 4px 1px;
+}
+
+.desk-cal-widget {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.desk-cal-widget strong {
+  font-size: 12px;
+}
+
+.desk-cal-widget span {
+  grid-column: 1 / -1;
+  color: var(--desk-cal-muted);
+}
+
+.desk-cal-widget button {
+  padding: 2px 6px;
+}
+
+.desk-cal-task-rail {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 3px 10px 4px;
+  border-inline: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.desk-cal-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 12px;
+  color: var(--desk-cal-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.desk-cal-rail-header div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.desk-cal-rail-header strong {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 9px;
+  background: rgba(217, 164, 65, 0.16);
+  color: var(--desk-cal-accent);
+  font-size: 10px;
+  text-align: center;
+}
+
+.desk-cal-rail-header button,
+.desk-cal-sidebar-new {
+  border: 0;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  cursor: pointer;
+}
+
+.desk-cal-task-tabs {
+  display: flex;
+  gap: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--desk-cal-muted);
+  font-size: 10px;
+  padding: 0 2px 7px;
+}
+
+.desk-cal-task-tabs .is-active {
+  color: var(--desk-cal-accent);
+}
+
+.desk-cal-sidebar-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  overflow: auto;
+  padding: 9px 0;
+}
+
+.desk-cal-sidebar-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--desk-cal-text);
+  text-align: left;
+  padding: 8px 5px;
+  cursor: pointer;
+}
+
+.desk-cal-sidebar-task:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.desk-cal-sidebar-task > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.desk-cal-sidebar-task strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-cal-sidebar-task small,
+.desk-cal-sidebar-empty {
+  color: var(--desk-cal-muted);
+  font-size: 10px;
+}
+
+.desk-cal-task-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--desk-cal-accent);
+  box-shadow: 0 0 0 3px rgba(217, 164, 65, 0.12);
+}
+
+.desk-cal-sidebar-empty {
+  margin: auto 0;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.desk-cal-sidebar-new {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 2px 3px;
+  text-align: left;
+}
+
+.desk-cal-month-grid,
+.desk-cal-week-grid,
+.desk-cal-day-list {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+}
+
+.desk-cal-month-grid {
+  gap: 4px;
+}
+
+.desk-cal-cell {
+  border-radius: 7px;
+  border-color: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.025);
+  padding: 5px;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.desk-cal-cell:hover {
+  border-color: rgba(217, 164, 65, 0.45);
+  background: rgba(217, 164, 65, 0.06);
+}
+
+.desk-cal-cell.is-today {
+  border-color: rgba(217, 164, 65, 0.7);
+  box-shadow: inset 0 2px 0 var(--desk-cal-accent);
+}
+
+.desk-cal-day-button {
+  padding: 2px 3px 5px;
+}
+
+.desk-cal-event {
+  border-left-width: 2px;
+  border-radius: 3px;
+  padding: 3px 5px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.desk-cal-event:hover {
+  background: rgba(217, 164, 65, 0.18);
+}
+
+.desk-cal-event strong {
+  font-size: 10px;
+}
+
+.desk-cal-error,
+.desk-cal-empty {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: start;
+  z-index: 2;
+  margin: 12px;
+}
+
+.desk-cal-widget-settings {
+  position: absolute;
+  z-index: 5;
+  top: 52px;
+  right: 10px;
+  width: min(360px, calc(100% - 20px));
+  max-height: calc(100% - 62px);
+  overflow: auto;
+  border-radius: 11px;
+  background: rgba(28, 30, 34, 0.98);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
+}
+
+@media (max-width: 900px) {
+  .desk-cal-shell {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+
+  .desk-cal-widgets {
+    display: none;
+  }
+
+  .desk-cal-task-rail {
+    grid-column: 1;
+  }
+
+  .desk-cal-month-grid,
+  .desk-cal-week-grid,
+  .desk-cal-day-list,
+  .desk-cal-error,
+  .desk-cal-empty {
+    grid-column: 2;
+  }
+}

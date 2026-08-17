@@ -359,6 +359,13 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   }, [events]);
 
   const todayKey = toDayKey(new Date());
+  const sidebarTasks = useMemo(() => (
+    (latestMessage?.localTasks ?? [])
+      .filter((task) => !(latestMessage?.localTaskPeriods ?? []).some((period) => period.taskId === task.id))
+      .filter((task) => task.status !== "completed")
+      .sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt))
+  ), [latestMessage]);
+
   const monthDays = useMemo(() => buildMonthDays(selectedDate), [selectedDate]);
   const weekDays = useMemo(() => {
     const first = startOfWeek(selectedDate);
@@ -464,7 +471,14 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     const outside = view === "month" && !isSameDayKey(key.slice(0, 7), toDayKey(selectedDate).slice(0, 7));
     const isToday = isSameDayKey(key, todayKey);
     return (
-      <section className={`desk-cal-cell${outside ? " is-outside" : ""}${isToday ? " is-today" : ""}`} key={key}>
+      <section
+        className={`desk-cal-cell${outside ? " is-outside" : ""}${isToday ? " is-today" : ""}`}
+        key={key}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          if (!outside) setTaskForm(createDeskTaskForm(day));
+        }}
+      >
         <button className="desk-cal-day-button" type="button" aria-label={`查看 ${key}`} onClick={() => openDay(day)}>
           <time dateTime={key}>{Number(key.slice(8, 10))}</time>
           <small className="desk-cal-lunar">{calendarAnnotation(day, deskSettings?.statutoryHolidays ?? [])}</small>
@@ -522,6 +536,15 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
         <label>透明度<input type="range" min="0.2" max="1" step="0.05" value={deskSettings.appearance.opacity} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, opacity: Number(event.target.value) } })} /></label><label>背景<input type="color" value={deskSettings.appearance.background} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, background: event.target.value } })} /></label>
       </section> : null}
 
+      <aside className="desk-cal-task-rail" aria-label="待办事项">
+        <div className="desk-cal-rail-header"><div><span>待办</span><strong>{sidebarTasks.length}</strong></div><button type="button" aria-label="新建待办" onClick={() => setTaskForm(createDeskTaskForm(new Date()))}>＋</button></div>
+        <div className="desk-cal-task-tabs"><span className="is-active">进行中</span><span>已完成</span></div>
+        <div className="desk-cal-sidebar-list">
+          {sidebarTasks.map((task) => <button className="desk-cal-sidebar-task" key={task.id} type="button" onDoubleClick={() => setTaskForm(createDeskTaskForm(selectedDate, task))} onContextMenu={(event) => { event.preventDefault(); setTaskForm(createDeskTaskForm(selectedDate, task)); }}><span className="desk-cal-task-dot" /><span><strong>{task.title}</strong><small>{toDayKey(new Date(task.startAt))}</small></span></button>)}
+          {sidebarTasks.length === 0 ? <p className="desk-cal-sidebar-empty">没有待办事项<br /><small>用“新建任务”添加第一项</small></p> : null}
+        </div>
+        <button className="desk-cal-sidebar-new" type="button" onClick={() => setTaskForm(createDeskTaskForm(selectedDate))}>＋ 添加待办</button>
+      </aside>
       {error ? <p className="desk-cal-error" role="alert">{error}</p> : null}
       {!snapshot && !error ? <p className="desk-cal-empty">暂无日历数据，请先在工作台完成同步。</p> : null}
 
