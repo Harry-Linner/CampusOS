@@ -57,7 +57,7 @@ const settings: BriefProfile = {
 
 const createBridge = (overrides: Partial<NonNullable<PluginComponentProps["brief"]>> = {}): NonNullable<PluginComponentProps["brief"]> => ({
   getState: vi.fn(async (): Promise<BriefState> => ({ status: "idle", snapshot: null, error: null })),
-  refresh: vi.fn(async () => readyState),
+  refresh: vi.fn(async (): Promise<BriefState> => ({ status: "idle", snapshot: null, error: null })),
   openExternal: vi.fn(async () => undefined),
   loadSettings: vi.fn(async () => settings),
   saveSettings: vi.fn(async (input: BriefProfileInput): Promise<BriefProfile> => ({ ...input, savedAt: "2026-08-22T00:00:00.000Z" })),
@@ -95,12 +95,22 @@ describe("BriefView", () => {
     expect(screen.getByText("阿尔法")).toBeTruthy();
   });
 
-  it("refreshes through the bridge and applies the returned state", async () => {
-    const bridge = createBridge();
+  it("auto-generates on first open when no snapshot exists", async () => {
+    const bridge = createBridge({ refresh: vi.fn(async (): Promise<BriefState> => readyState) });
+    render(createElement(BriefView, { ...baseProps, brief: bridge }));
+    expect(await screen.findByText("阿尔法")).toBeTruthy();
+    expect(bridge.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes manually through the bridge and applies the returned state", async () => {
+    const bridge = createBridge({
+      getState: vi.fn(async (): Promise<BriefState> => readyState),
+      refresh: vi.fn(async (): Promise<BriefState> => readyState)
+    });
     render(createElement(BriefView, { ...baseProps, brief: bridge }));
     fireEvent.click(screen.getByText("刷新早报"));
     await waitFor(() => expect(screen.getByText("阿尔法")).toBeTruthy());
-    expect(bridge.refresh).toHaveBeenCalledOnce();
+    expect(bridge.refresh).toHaveBeenCalledTimes(1);
   });
 
   it("switches to the settings tab and saves the interest profile", async () => {

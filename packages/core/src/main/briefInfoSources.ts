@@ -36,6 +36,12 @@ export const BRIEF_SOURCE_DEFINITIONS: BriefSourceDefinition[] = [
     label: "InfoQ",
     feedUrl: "https://www.infoq.cn/feed",
     interestHint: "技术/工程"
+  },
+  {
+    id: "solidot",
+    label: "Solidot",
+    feedUrl: "https://www.solidot.org/index.rss",
+    interestHint: "技术/科学/中文"
   }
 ];
 

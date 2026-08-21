@@ -351,3 +351,12 @@ export const manifest: PluginManifestV2 = {
 - [x] **验证证据**：`pnpm --filter @campusos/core typecheck` 零错误；`pnpm --filter @campusos/core lint` 零告警（含 daily-brief）；`pnpm --filter @campusos/core test` → **475 passed / 1 skipped**（86 文件通过）
 - [x] **依赖**：`rss-parser`（仅主进程 connector 使用）；better-sqlite3 原生模块已按本机 Node ABI 重建
 - [ ] **待发布门槛**（非本切片范围）：桌面通知（Phase 3）、Obsidian 接入（Phase 1）、真实 LLM 端到端人工验收（需用户配置 API Key 后在真实环境跑一次刷新）
+
+### 2026-08-22 修复轮（用户实测反馈）
+
+- **打开即生成**：早报视图在"无任何快照"时自动生成一次（原先必须手动点刷新，用户误以为 AI 未接入）；竞态已修（先取状态再决定是否自动刷新）
+- **条目缓存持久化 bug**：抓取到的条目此前未写入 `brief_item_cache`，导致"阅读原文"必然报"不在本地缓存"；现 refresh 时逐条 upsert
+- **失败可感知**：所有信息源降级 → 明确错误"所有信息源抓取失败"；未启用任何源 → "请先启用至少一个信息源"（原先静默显示"今日暂无新内容"）
+- **新增中文源**：预设源 +Solidot（`https://www.solidot.org/index.rss`，国内可访问），缓解海外源不可达问题
+- **UI 样式**：为 `brief-*` / `interest-*` / `source-toggle-*` 类补齐完整 CSS（此前全部无样式定义，是"UI 坏了"的根因），全部使用主题 token（`--ink`/`--paper`/`--line`/`--accent-*`/`--card-bg`/`--radius-sm`），支持亮/暗/高对比三主题
+- 验证：typecheck 零错误；lint 零告警；`pnpm test` → **479 passed / 1 skipped**（新增自动生成、全源降级、全禁用、条目持久化用例）

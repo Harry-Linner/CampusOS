@@ -17,7 +17,8 @@ interface EditableInterest {
 const SOURCE_LABELS: Record<string, string> = {
   arxiv: "arXiv（学术/计算机）",
   "hacker-news": "Hacker News（技术/创业）",
-  infoq: "InfoQ（技术/工程）"
+  infoq: "InfoQ（技术/工程）",
+  solidot: "Solidot（科技/科学/中文）"
 };
 
 const toEditable = (profile: BriefProfile): EditableInterest[] =>

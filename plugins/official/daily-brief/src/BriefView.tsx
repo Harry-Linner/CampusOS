@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   BriefItem,
   BriefState,
@@ -26,6 +26,26 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
   });
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const busyRef = useRef(false);
+  const autoRefreshed = useRef(false);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!brief || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      setState(await brief.refresh());
+    } catch (cause) {
+      setState((current) => ({
+        status: "error",
+        snapshot: current.snapshot,
+        error: cause instanceof Error ? cause.message : "刷新失败。"
+      }));
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, [brief]);
 
   useEffect(() => {
     if (!brief) return;
@@ -33,7 +53,13 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
     void brief
       .getState()
       .then((next) => {
-        if (active) setState(next);
+        if (!active) return;
+        setState(next);
+        // Generate on first open when nothing has been produced yet.
+        if (!autoRefreshed.current && next.status === "idle" && !next.snapshot) {
+          autoRefreshed.current = true;
+          void refresh();
+        }
       })
       .catch(() => undefined);
     const unsubscribe = brief.subscribe((next) => setState(next));
@@ -41,23 +67,7 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
       active = false;
       unsubscribe();
     };
-  }, [brief]);
-
-  const refresh = async (): Promise<void> => {
-    if (!brief || busy) return;
-    setBusy(true);
-    try {
-      setState(await brief.refresh());
-    } catch (cause) {
-      setState({
-        status: "error",
-        snapshot: state.snapshot,
-        error: cause instanceof Error ? cause.message : "刷新失败。"
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, [brief, refresh]);
 
   const openOriginal = (item: BriefItem): void => {
     if (!brief) return;

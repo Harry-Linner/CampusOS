@@ -281,14 +281,34 @@ export const createBriefService = ({
         const enabledSourceIds = BRIEF_SOURCE_IDS.filter(
           (id) => profile.sourceEnabled[id] !== false
         );
+        if (enabledSourceIds.length === 0) {
+          setState({
+            status: "error",
+            snapshot: state.snapshot,
+            error: "请先在早报设置中启用至少一个信息源。"
+          });
+          return state;
+        }
         const outcome = await fetchSources({ enabledSourceIds });
 
+        for (const item of outcome.items) {
+          await store.upsertItem(item);
+        }
+
         if (outcome.items.length === 0) {
+          if (outcome.degraded.length > 0) {
+            setState({
+              status: "error",
+              snapshot: state.snapshot,
+              error: "所有信息源抓取失败，请检查网络后重试。"
+            });
+            return state;
+          }
           const empty: BriefSnapshot = {
             date: shanghaiDate(now(), timezone),
             generatedAt: now().toISOString(),
             sections: [],
-            degradedSources: outcome.degraded,
+            degradedSources: [],
             note: "今日暂无新内容。"
           };
           await store.saveSnapshot(empty);

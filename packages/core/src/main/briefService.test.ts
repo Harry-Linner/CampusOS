@@ -69,14 +69,18 @@ interface Harness {
 const createHarness = ({
   raw = validRaw,
   configured = true,
-  fetchItems = items
+  fetchItems = items,
+  profileOverride = null,
+  degraded
 }: {
   raw?: unknown;
   configured?: boolean;
   fetchItems?: BriefCachedItem[];
+  profileOverride?: BriefProfile | null;
+  degraded?: string[];
 } = {}): Harness => {
   const store: BriefStore = {
-    loadProfile: vi.fn(async () => null),
+    loadProfile: vi.fn(async () => profileOverride),
     saveProfile: vi.fn(async (profile: BriefProfile) => ({ ...profile, savedAt: "2026-08-22T00:00:00.000Z" })),
     loadSnapshot: vi.fn(async () => null),
     saveSnapshot: vi.fn(async () => undefined),
@@ -87,7 +91,7 @@ const createHarness = ({
   };
   const fetcher: BriefFetcher = vi.fn(async () => ({
     items: fetchItems,
-    degraded: fetchItems.length === items.length ? [] : ["infoq"]
+    degraded: degraded ?? (fetchItems.length === items.length ? [] : ["infoq"])
   }));
   const runtime: AiRuntime = {
     load: vi.fn(async (): Promise<AiRuntimeConnection> =>
@@ -118,12 +122,42 @@ describe("briefService", () => {
     expect(await service.getState()).toMatchObject({ status: "idle" });
   });
 
-  it("produces an empty ready brief when no items are fetched", async () => {
-    const { service } = createHarness({ fetchItems: [], configured: false });
+  it("produces an empty ready brief when feeds have no new content", async () => {
+    const { service } = createHarness({ fetchItems: [], degraded: [], configured: false });
     const state = await service.refresh();
     expect(state.status).toBe("ready");
     expect(state.snapshot?.sections).toEqual([]);
     expect(state.snapshot?.note).toContain("暂无新内容");
+  });
+
+  it("fails with a network hint when every enabled source is degraded", async () => {
+    const harness = createHarness();
+    (harness.fetcher as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      items: [],
+      degraded: ["arxiv", "hacker-news", "infoq", "solidot"]
+    });
+    const state = await harness.service.refresh();
+    expect(state.status).toBe("error");
+    expect(state.error).toContain("所有信息源抓取失败");
+  });
+
+  it("fails with a settings hint when no source is enabled", async () => {
+    const { service } = createHarness({
+      profileOverride: {
+        interests: [{ name: "数学", weight: 5 }],
+        sourceEnabled: { arxiv: false, "hacker-news": false, infoq: false, solidot: false },
+        savedAt: null
+      }
+    });
+    const state = await service.refresh();
+    expect(state.status).toBe("error");
+    expect(state.error).toContain("启用至少一个信息源");
+  });
+
+  it("persists every fetched item into the item cache", async () => {
+    const { service, store } = createHarness();
+    await service.refresh();
+    expect(store.upsertItem).toHaveBeenCalledTimes(2);
   });
 
   it("fails with a setup hint when the AI runtime is not configured", async () => {
@@ -212,7 +246,7 @@ describe("briefService", () => {
       sourceEnabled: { arxiv: true, "hacker-news": false, unknown: true }
     });
     expect(saved.interests[0]).toMatchObject({ name: "数学", weight: 3, note: null });
-    expect(saved.sourceEnabled).toEqual({ arxiv: true, "hacker-news": false, infoq: false });
+    expect(saved.sourceEnabled).toEqual({ arxiv: true, "hacker-news": false, infoq: false, solidot: false });
   });
 
   it("notifies subscribers when the state changes", async () => {
