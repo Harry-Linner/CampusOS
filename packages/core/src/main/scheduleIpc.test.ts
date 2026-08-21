@@ -113,29 +113,34 @@ const task: LocalTaskRecord = {
   fromId: null
 };
 
-const assistantTaskInput: LocalTaskInput = {
-  title: "Review project brief",
-  description: "Prepare the review notes",
-  timeSpentMinutes: 0,
-  timeNeededMinutes: 60,
-  startAt: "2026-08-20T08:00:00.000Z",
-  endAt: "2026-08-20T09:00:00.000Z",
-  location: "",
-  breakable: true,
-  type: "deadline",
-  repeatType: "norepeat",
-  repeatPeriod: 1,
-  repeatEndsOn: "2026-08-20",
-  blocksPlanning: true,
-  courseName: "Sample Course",
-  source: {
-    kind: "ai-assistant",
-    fingerprint: "assistant-fingerprint-1",
-    provider: "deepseek",
-    model: "deepseek-chat",
-    importedAt: "2026-08-08T00:00:00.000Z"
-  }
-};
+const assistantTaskInput: LocalTaskInput = (() => {
+  // Time-relative fixture so the task stays "running" regardless of run date.
+  const start = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    title: "Review project brief",
+    description: "Prepare the review notes",
+    timeSpentMinutes: 0,
+    timeNeededMinutes: 60,
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    location: "",
+    breakable: true,
+    type: "deadline",
+    repeatType: "norepeat",
+    repeatPeriod: 1,
+    repeatEndsOn: start.toISOString().slice(0, 10),
+    blocksPlanning: true,
+    courseName: "Sample Course",
+    source: {
+      kind: "ai-assistant",
+      fingerprint: "assistant-fingerprint-1",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      importedAt: "2026-08-08T00:00:00.000Z"
+    }
+  };
+})();
 
 const trustedEvent = (): { senderFrame: { url: string }; sender: { mainFrame: unknown } } => {
   const frame = { url: "http://localhost:5173/" };

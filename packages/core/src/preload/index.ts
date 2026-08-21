@@ -150,6 +150,24 @@ contextBridge.exposeInMainWorld("campusos", {
     discoverModels: (input: { apiKey: string; provider: string; protocol: string; baseUrl: string }) =>
       ipcRenderer.invoke("campusos:assistant:models:discover", input)
   },
+  brief: {
+    getState: () => ipcRenderer.invoke("campusos:brief:get"),
+    refresh: () => ipcRenderer.invoke("campusos:brief:refresh"),
+    openExternal: (fingerprint: string) =>
+      ipcRenderer.invoke("campusos:brief:open-external", fingerprint),
+    loadSettings: () => ipcRenderer.invoke("campusos:brief:settings:load"),
+    saveSettings: (input: {
+      interests: { name: string; weight: number; note?: string | null }[];
+      sourceEnabled: Record<string, boolean>;
+    }) => ipcRenderer.invoke("campusos:brief:settings:save", input),
+    subscribe: (listener: (state: unknown) => void) => {
+      const channel = "campusos:brief:changed";
+      const handler = (_event: Electron.IpcRendererEvent, state: unknown) =>
+        listener(state);
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
+  },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),
     subscribe: (listener: (snapshot: unknown) => void) => {

@@ -1,0 +1,19 @@
+{
+  "name": "@campusos/plugin-daily-brief",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./prompt": "./src/prompt.ts"
+  },
+  "dependencies": {
+    "@campusos/shared": "workspace:*",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "typescript": "^5.7.3"
+  }
+}

@@ -23,7 +23,7 @@ describe("officialPluginCatalog", () => {
     expect(visible.plugins.map((plugin) => plugin.id)).toEqual(
       officialUserPluginManifests.map((manifest) => manifest.id)
     );
-    expect(visible.plugins).toHaveLength(4);
+    expect(visible.plugins).toHaveLength(5);
     expect(visible.plugins.every(
       (plugin) => (plugin.manifest.contributes.views?.length ?? 0) === 1
     )).toBe(true);

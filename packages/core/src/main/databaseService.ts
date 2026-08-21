@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
+import type { BriefCachedItem } from "@campusos/shared";
 
 // Legacy schema compatibility only. New academic GPA business logic follows
 // Celechron's first returned attempt and never reads or writes this table.
@@ -45,6 +46,16 @@ export interface StoredAcademicGradeNotificationBaseline {
   savedAt: string;
 }
 
+export interface StoredBriefProfile {
+  profile: unknown;
+  savedAt: string;
+}
+
+export interface StoredBriefSnapshot {
+  snapshot: unknown;
+  savedAt: string;
+}
+
 export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
@@ -77,6 +88,13 @@ export interface DatabaseService {
   loadAcademicGradeNotificationBaseline: (
     accountId: string
   ) => StoredAcademicGradeNotificationBaseline | null;
+  saveBriefProfile: (profile: unknown, savedAt: string) => void;
+  loadBriefProfile: () => StoredBriefProfile | null;
+  saveBriefSnapshot: (snapshot: unknown, savedAt: string) => void;
+  loadBriefSnapshot: () => StoredBriefSnapshot | null;
+  /** Returns true when the item was newly inserted (dedupe across days). */
+  upsertBriefItem: (item: BriefCachedItem) => boolean;
+  findBriefItem: (fingerprint: string) => BriefCachedItem | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -158,6 +176,29 @@ const migrate = (database: Database.Database): void => {
       fused INTEGER NOT NULL CHECK (fused = 1),
       saved_at TEXT NOT NULL
     );
+  `);
+  applyMigration(7, `
+    CREATE TABLE brief_profiles (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      profile_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+    CREATE TABLE brief_snapshots (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      snapshot_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+    CREATE TABLE brief_item_cache (
+      fingerprint TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      published_at TEXT,
+      fetched_at TEXT NOT NULL
+    );
+    CREATE INDEX brief_item_cache_fetched
+      ON brief_item_cache (fetched_at);
   `);
 };
 
@@ -388,6 +429,89 @@ export const createDatabaseService = ({
         gradedCourseCount: row.graded_course_count,
         fused: true,
         savedAt: row.saved_at
+      };
+    },
+    saveBriefProfile: (profile, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("早报画像保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO brief_profiles (singleton, profile_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          profile_json = excluded.profile_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(profile), savedAt);
+    },
+    loadBriefProfile: () => {
+      const row = database.prepare(
+        "SELECT profile_json, saved_at FROM brief_profiles WHERE singleton = 1"
+      ).get() as { profile_json: string; saved_at: string } | undefined;
+      return row ? { profile: JSON.parse(row.profile_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    saveBriefSnapshot: (snapshot, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("早报快照保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO brief_snapshots (singleton, snapshot_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          snapshot_json = excluded.snapshot_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(snapshot), savedAt);
+    },
+    loadBriefSnapshot: () => {
+      const row = database.prepare(
+        "SELECT snapshot_json, saved_at FROM brief_snapshots WHERE singleton = 1"
+      ).get() as { snapshot_json: string; saved_at: string } | undefined;
+      return row ? { snapshot: JSON.parse(row.snapshot_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    upsertBriefItem: (item) => {
+      if (!item.fingerprint || !item.url || !item.title || !item.sourceId) {
+        throw new Error("早报条目缺少必要字段。");
+      }
+      if (!Number.isFinite(Date.parse(item.fetchedAt))) {
+        throw new Error("早报条目抓取时间无效。");
+      }
+      const result = database.prepare(`
+        INSERT OR IGNORE INTO brief_item_cache (
+          fingerprint, source_id, url, title, summary, published_at, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        item.fingerprint,
+        item.sourceId,
+        item.url,
+        item.title,
+        item.summary,
+        item.publishedAt,
+        item.fetchedAt
+      );
+      return result.changes === 1;
+    },
+    findBriefItem: (fingerprint) => {
+      const row = database.prepare(`
+        SELECT fingerprint, source_id, url, title, summary, published_at, fetched_at
+        FROM brief_item_cache
+        WHERE fingerprint = ?
+      `).get(fingerprint) as {
+        fingerprint: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        fetched_at: string;
+      } | undefined;
+      if (!row) return null;
+      return {
+        fingerprint: row.fingerprint,
+        sourceId: row.source_id,
+        url: row.url,
+        title: row.title,
+        summary: row.summary,
+        publishedAt: row.published_at,
+        fetchedAt: row.fetched_at
       };
     }
   };

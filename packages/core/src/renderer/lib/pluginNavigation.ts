@@ -29,6 +29,9 @@ const resolveActivityIcon = (icon: string): AppIconName => {
     case "assistant":
     case "aiassistant":
       return "assistant";
+    case "brief":
+    case "dailybrief":
+      return "brief";
     case "overview":
       return "overview";
     case "settings":

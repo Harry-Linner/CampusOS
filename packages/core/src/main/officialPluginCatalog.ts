@@ -14,12 +14,14 @@ import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exa
 import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
 import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
+import { manifest as dailyBriefManifest } from "@campusos/plugin-daily-brief/manifest";
 
 /** User-selectable Modules. Each contributes exactly one activity entry. */
 export const officialUserPluginManifests: PluginManifestV2[] = [
   academicManifest,
   scheduleManifest,
   assistantManifest,
+  dailyBriefManifest,
   materialsManifest
 ];
 

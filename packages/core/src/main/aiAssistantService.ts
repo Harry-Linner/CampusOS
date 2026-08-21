@@ -115,7 +115,7 @@ const isValidBaseUrl = (value: unknown): value is string => {
   }
 };
 
-const isStoredSettings = (value: unknown): value is StoredAiAssistantSettings => {
+export const isStoredSettings = (value: unknown): value is StoredAiAssistantSettings => {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Record<string, unknown>;
   return (candidate.dataVersion === 1 || candidate.dataVersion === 2) &&
@@ -124,7 +124,7 @@ const isStoredSettings = (value: unknown): value is StoredAiAssistantSettings =>
     (candidate.dataVersion === 1 || (isProvider(candidate.provider) && isProtocol(candidate.protocol) && isValidBaseUrl(candidate.baseUrl)));
 };
 
-const migrateSettings = (value: StoredAiAssistantSettings): StoredAiAssistantSettings => {
+export const migrateSettings = (value: StoredAiAssistantSettings): StoredAiAssistantSettings => {
   if (value.dataVersion === 2) return value;
   return {
     dataVersion: 2,
@@ -150,7 +150,7 @@ const toSettingsRecord = (stored: StoredAiAssistantSettings | null, encrypted: b
   };
 };
 
-const normalizeProfile = (input: Pick<AiAssistantSettingsInput, "provider" | "protocol" | "baseUrl" | "model">): AiProviderProfile => {
+export const normalizeProfile = (input: Pick<AiAssistantSettingsInput, "provider" | "protocol" | "baseUrl" | "model">): AiProviderProfile => {
   if (!isProvider(input.provider) || !isProtocol(input.protocol) || !isValidModel(input.model.trim())) {
     throw new AiAssistantServiceError("invalid-input", "AI 服务商、协议或模型名称无效。");
   }
@@ -164,7 +164,7 @@ const normalizeProfile = (input: Pick<AiAssistantSettingsInput, "provider" | "pr
   return { provider: input.provider, protocol: input.protocol, baseUrl: baseUrl.replace(/\/+$/, ""), model: input.model.trim() };
 };
 
-const getInputApiKey = (value: unknown): string => {
+export const getInputApiKey = (value: unknown): string => {
   const apiKey = typeof value === "string" ? value.trim() : "";
   if (!apiKey || apiKey.length > 512 || apiKey.includes("\n") || apiKey.includes("\r")) throw new AiAssistantServiceError("invalid-input", "API Key 格式无效。");
   return apiKey;

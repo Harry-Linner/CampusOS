@@ -13,6 +13,7 @@ import type { AppLifecycleBridge } from "./appLifecycleBridge";
 import type { NotificationCenterBridge } from "./notificationBridge";
 import type { BackupBridge } from "./backupBridge";
 import type { AppNavigationBridge } from "@campusos/shared";
+import type { BriefBridge } from "@campusos/shared";
 import type { FeedbackBridge } from "@campusos/shared";
 import type { AnalyticsBridge } from "./analyticsBridge";
 
@@ -48,6 +49,7 @@ export interface CampusosBridge {
   academic?: AcademicBridge;
   schedule?: ScheduleBridge;
   assistant?: AiAssistantBridge;
+  brief?: BriefBridge;
   deskCalendar?: DeskCalendarControlBridge;
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;

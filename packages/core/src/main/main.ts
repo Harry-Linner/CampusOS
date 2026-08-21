@@ -25,7 +25,13 @@ import { checkForUpdates, registerUpdateHandlers } from "./autoUpdater";
 import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
-import { registerAiAssistantHandlers } from "./aiAssistantIpc";
+import { registerAiAssistantHandlers, createAiAssistantVault } from "./aiAssistantIpc";
+import { registerBriefHandlers } from "./briefIpc";
+import { createBriefService } from "./briefService";
+import { createBriefStore } from "./briefStore";
+import { createAiRuntime } from "./aiRuntime";
+import { createBriefFetcher } from "./briefInfoSources";
+import { getOfficialDatabaseService } from "./officialDatabaseService";
 import {
   markDeskCalendarAppQuitting,
   notifyDeskCalendarWorkspaceChanged,
@@ -128,6 +134,11 @@ const startCampusApp = (): void => {
     registerDownloadHandlers();
     registerScheduleHandlers();
     registerAiAssistantHandlers();
+    registerBriefHandlers(createBriefService({
+      store: createBriefStore({ database: getOfficialDatabaseService() }),
+      runtime: createAiRuntime(createAiAssistantVault()),
+      fetchSources: createBriefFetcher()
+    }));
     registerCampusWorkspaceHandlers();
     registerPluginRuntimeHandlers();
     registerDiagnosticHandlers();

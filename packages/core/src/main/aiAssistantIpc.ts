@@ -20,7 +20,7 @@ const SETTINGS_FILE = "ai-assistant.json";
 const isFileNotFound = (error: unknown): boolean =>
   typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 
-const createVault = (): AiAssistantVault => {
+export const createAiAssistantVault = (): AiAssistantVault => {
   const storagePath = join(app.getPath("userData"), "secure", SETTINGS_FILE);
   return {
     encrypted: true,
@@ -66,7 +66,7 @@ const createVault = (): AiAssistantVault => {
   };
 };
 
-const createService = () => createAiAssistantService({ vault: createVault() });
+const createService = () => createAiAssistantService({ vault: createAiAssistantVault() });
 
 export const registerAiAssistantHandlers = (): void => {
   ipcMain.handle("campusos:assistant:settings:load", async (event) => {

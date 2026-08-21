@@ -17,7 +17,7 @@
     "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
     "verify:zju-auth": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/zjuUnifiedAuth.live.test.ts --reporter=verbose",
     "verify:headless-sandbox": "electron-vite build && node ../../scripts/run-headless-sandbox-smoke.mjs",
-    "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials && node ../../scripts/run-eslint.mjs plugins/official/ai-assistant"
+    "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials && node ../../scripts/run-eslint.mjs plugins/official/ai-assistant && node ../../scripts/run-eslint.mjs plugins/official/daily-brief"
   },
   "dependencies": {
     "@campusos/plugin-academic": "workspace:*",
@@ -25,6 +25,7 @@
     "@campusos/plugin-academic-timetable-events": "workspace:*",
     "@campusos/plugin-deadline-assistant": "workspace:*",
     "@campusos/plugin-ai-assistant": "workspace:*",
+    "@campusos/plugin-daily-brief": "workspace:*",
     "@campusos/plugin-materials": "workspace:*",
     "@campusos/plugin-schedule": "workspace:*",
     "@campusos/plugin-zju-calendar-config": "workspace:*",
@@ -39,7 +40,8 @@
     "fflate": "0.8.2",
     "quickjs-emscripten-core": "0.32.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "rss-parser": "^3.13.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
