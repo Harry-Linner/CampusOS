@@ -142,6 +142,14 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] **视觉重排**：日报改为语义化头部、状态条、轻量条目流和响应式设置表单；空态、加载态、错误态和降级源提示保持可达。
 - [x] **回归测试**：新增快照恢复、缓存去重、并发刷新与真实状态订阅相关覆盖；早报 Core/renderer 定向测试通过。
 
+### Phase B — 排版硬伤修复（2026-08-22）
+
+- [x] **字距**：中文标题移除 `tracking-tight`（-0.025em 负字距挤压全角字，是"字与字重叠"主因）；拉丁眉题 `DAILY BRIEF` 保留 `tracking-[0.16em]`
+- [x] **行高**：大标题 1.33（`leading-10` / `sm:leading-12`）、状态标题 1.6（`leading-8`）、板块标题 1.56（`leading-7`）、条目标题 16px 1.75（`leading-7`）、摘要 14px 2.0（`leading-7`）、元信息与设置说明 12px 1.67（`leading-5`）
+- [x] **纵向节奏**：条目 `py-5`→`py-6`，设置表单行 `gap-2`→`gap-3`
+- [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
+- [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
+
 ### Phase C（待做）
 
 - [ ] Settings → Assistant → Dashboard → Academic/Schedule → Materials → shell 分批迁移，替换即删
