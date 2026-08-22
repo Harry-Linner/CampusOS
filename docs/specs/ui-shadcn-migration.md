@@ -154,6 +154,13 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] **纵向节奏**：条目 `py-5`→`py-6`，设置表单行 `gap-2`→`gap-3`
 - [x] **一致性收尾**：空态标题补 `leading-7`、底部备注补 `leading-6`（与条目排版对齐）
 - [x] **设置页去冗余**：移除 InterestSettings 外层 Card 与「早报设置」CardHeader，改为平铺布局（说明段 + 关注领域 + 分隔线 + 信息源 + 保存按钮）；板块标题升为页面级 `text-base`；两条设计雷点已记录于 §0（设置视图禁套冗余卡片框、全局禁到处加框框）
+
+### Phase B/C 前置 — legacy token 缺口与按键组件修复（2026-08-22）
+
+- [x] **未定义 token 补全**：legacy 层引用了 6 个从未定义的 CSS 变量（`--ink-muted`/`--text-muted`/`--surface`/`--surface-raised`/`--shadow-soft`/`--shadow-elevated`），导致通知弹层、桌面日历菜单、删除确认框背景透明、无阴影、次级文字不淡化；已在 `styles.css :root` 映射到现行主题 token（随 light/dark/high-contrast 自动翻转）
+- [x] **通知中心按键**：触发器补 `cursor:pointer` + hover + focus-visible；条目主按钮补 `cursor:pointer`、hover 底色与 focus-visible（此前完全无交互反馈）
+- [x] **桌面日历按键**：视图切换按钮补 hover 底色/文字变化与 focus-visible；菜单项补 focus-visible；`.text-button/.icon-button/.primary-button` 补普通主题 focus-visible
+- [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**；Electron 实机计算样式确认通知弹层 `background: rgba(255,255,255,0.86)`、阴影生效、按键 `cursor: pointer`
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
