@@ -169,6 +169,12 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] **按键交互扫描**：`.danger-button`/`.secondary-button` 补 cursor+过渡；`.academic-program-options` 选项补 hover+焦点环；`.search-trigger`/`.module-tabs`/`.academic-course-option`/`.materials-course-option` 补 focus-visible
 - [x] **日程全部课程列表样式**：此前新增的跨学期课程列表无 CSS，按无框分隔线风格补全（学期标题/课程行/次级元信息），实机验证生效
 - [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**、构建成功、Electron 实机计算样式验证（课程列表边框/内边距/颜色/字距）
+
+### Phase B/C 前置 — 全库 CJK 负字距清零（2026-08-23）
+
+- [x] 用户反馈的"字与字重叠"此前只修了日报；legacy 全库审计发现 10 处 CJK 标题负字距（`.page-heading h1` -0.065em、`.agenda-day-heading time strong` -0.06em、`.panel-card h2`/`.page-header h1` -0.04em、`.calendar-controls strong` -0.035em、`.academic-panel-heading h2`/`.academic-course-detail h3` -0.03em、`.update-prompt h2` -0.03em、`.settings-section-heading h2` -0.02em、`.day-event-title`/`.extension-title strong`/`.todo-content strong` -0.015em），全部移除；`.page-heading h1` 行高 0.95→1.2
+- [x] 保留有意负字距：`.brand-lockup`（拉丁 logo）、`.grade-summary-card strong`/`.onboarding-sync-stat strong`（数字）
+- [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**、构建成功
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
