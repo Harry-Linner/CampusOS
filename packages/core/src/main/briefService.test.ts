@@ -4,19 +4,11 @@ import type {
   BriefProfile,
   BriefState
 } from "@campusos/shared";
-import type { AiProviderAdapter, AiProviderProfile } from "./aiProviderAdapters";
+import type { AiProviderAdapter } from "./aiProviderAdapters";
 import { AiProviderAdapterError } from "./aiProviderAdapters";
-import type { AiRuntime, AiRuntimeConnection } from "./aiRuntime";
 import type { BriefFetcher } from "./briefInfoSources";
 import { BriefServiceError, createBriefService } from "./briefService";
 import type { BriefStore } from "./briefStore";
-
-const profile: AiProviderProfile = {
-  provider: "openai",
-  protocol: "openai-responses",
-  baseUrl: "https://api.openai.com/v1",
-  model: "gpt-4o-mini"
-};
 
 const items: BriefCachedItem[] = [
   {
@@ -61,10 +53,17 @@ const validRaw = {
 interface Harness {
   store: BriefStore;
   fetcher: BriefFetcher;
-  runtime: AiRuntime;
   adapter: AiProviderAdapter;
   service: ReturnType<typeof createBriefService>;
 }
+
+const storedAi = {
+  provider: "deepseek" as const,
+  protocol: "openai-chat-completions" as const,
+  baseUrl: "https://api.deepseek.com/v1",
+  model: "deepseek-chat",
+  encryptedApiKey: "enc-mock"
+};
 
 const createHarness = ({
   raw = validRaw,
@@ -79,8 +78,14 @@ const createHarness = ({
   profileOverride?: BriefProfile | null;
   degraded?: string[];
 } = {}): Harness => {
+  const defaultProfile: BriefProfile = {
+    interests: [{ name: "数学", weight: 5 }],
+    sourceEnabled: { arxiv: true, "hacker-news": true, infoq: true, solidot: true },
+    ai: configured ? (storedAi as unknown as BriefProfile["ai"]) : null,
+    savedAt: null
+  };
   const store: BriefStore = {
-    loadProfile: vi.fn(async () => profileOverride),
+    loadProfile: vi.fn(async () => profileOverride ?? defaultProfile),
     saveProfile: vi.fn(async (profile: BriefProfile) => ({ ...profile, savedAt: "2026-08-22T00:00:00.000Z" })),
     loadSnapshot: vi.fn(async () => null),
     saveSnapshot: vi.fn(async () => undefined),
@@ -93,27 +98,26 @@ const createHarness = ({
     items: fetchItems,
     degraded: degraded ?? (fetchItems.length === items.length ? [] : ["infoq"])
   }));
-  const runtime: AiRuntime = {
-    load: vi.fn(async (): Promise<AiRuntimeConnection> =>
-      configured
-        ? { configured: true, profile, apiKey: "mock-key" }
-        : { configured: false }
-    )
-  };
   const adapter: AiProviderAdapter = {
-    profile,
+    profile: {
+      provider: "deepseek",
+      protocol: "openai-chat-completions",
+      baseUrl: "https://api.deepseek.com/v1",
+      model: "deepseek-chat"
+    },
     supportsModelListing: false,
     generateStructured: vi.fn(async () => raw),
     listModels: vi.fn(async () => [])
   };
   const service = createBriefService({
     store,
-    runtime,
     fetchSources: fetcher,
     createAdapter: () => adapter,
+    encryptSecret: (value) => `enc:${value}`,
+    decryptSecret: () => "mock-key",
     now: () => new Date("2026-08-22T08:00:00+08:00")
   });
-  return { store, fetcher, runtime, adapter, service };
+  return { store, fetcher, adapter, service };
 };
 
 describe("briefService", () => {
@@ -218,11 +222,11 @@ describe("briefService", () => {
     expect(harness.fetcher).toHaveBeenCalledOnce();
   });
 
-  it("fails with a setup hint when the AI runtime is not configured", async () => {
+  it("fails with a setup hint when the brief has no own AI key", async () => {
     const { service } = createHarness({ configured: false });
     const state = await service.refresh();
     expect(state.status).toBe("error");
-    expect(state.error).toContain("AI 助手设置");
+    expect(state.error).toContain("早报设置");
   });
 
   it("runs the full chain and persists the validated snapshot", async () => {

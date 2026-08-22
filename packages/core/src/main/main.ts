@@ -29,7 +29,6 @@ import { registerAiAssistantHandlers, createAiAssistantVault } from "./aiAssista
 import { registerBriefHandlers } from "./briefIpc";
 import { createBriefService } from "./briefService";
 import { createBriefStore } from "./briefStore";
-import { createAiRuntime } from "./aiRuntime";
 import { createBriefFetcher } from "./briefInfoSources";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import {
@@ -134,10 +133,12 @@ const startCampusApp = (): void => {
     registerDownloadHandlers();
     registerScheduleHandlers();
     registerAiAssistantHandlers();
+    const briefVault = createAiAssistantVault();
     registerBriefHandlers(createBriefService({
       store: createBriefStore({ database: getOfficialDatabaseService() }),
-      runtime: createAiRuntime(createAiAssistantVault()),
-      fetchSources: createBriefFetcher()
+      fetchSources: createBriefFetcher(),
+      encryptSecret: (value) => briefVault.encrypt(value),
+      decryptSecret: (value) => briefVault.decrypt(value)
     }));
     registerCampusWorkspaceHandlers();
     registerPluginRuntimeHandlers();

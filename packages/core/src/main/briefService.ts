@@ -6,6 +6,8 @@
  * strict validation -> snapshot persistence. No campus data is involved.
  */
 import type {
+  BriefAiConnection,
+  BriefAiInput,
   BriefCachedItem,
   BriefItem,
   BriefProfile,
@@ -15,13 +17,16 @@ import type {
   BriefState
 } from "@campusos/shared";
 import {
+  BRIEF_AI_PROVIDER_DEFAULTS,
   BRIEF_MAX_ITEMS_PER_SECTION,
   BRIEF_MAX_NOTE,
   BRIEF_MAX_ORIGINAL_TITLE,
   BRIEF_MAX_SECTIONS,
   BRIEF_MAX_SUMMARY,
   BRIEF_MAX_TITLE_ZH,
-  isBriefProfile
+  isBriefProfile,
+  type BriefAiProtocol,
+  type BriefAiProvider
 } from "@campusos/shared";
 import {
   BRIEF_PROMPT_VERSION,
@@ -34,7 +39,6 @@ import {
   type AiProviderAdapter,
   type AiProviderProfile
 } from "./aiProviderAdapters";
-import type { AiRuntime } from "./aiRuntime";
 import {
   BRIEF_SOURCE_IDS,
   BRIEF_SOURCE_DEFINITIONS,
@@ -68,9 +72,12 @@ export class BriefServiceError extends Error {
 
 export interface BriefServiceDependencies {
   store: BriefStore;
-  runtime: AiRuntime;
   fetchSources: BriefFetcher;
   createAdapter?: (profile: AiProviderProfile, apiKey: string) => AiProviderAdapter;
+  /** Encrypts a secret for storage in the brief profile (vault-backed). */
+  encryptSecret?: (value: string) => string;
+  /** Decrypts a secret stored in the brief profile. */
+  decryptSecret?: (value: string) => string;
   now?: () => Date;
   timezone?: string;
 }
@@ -92,6 +99,59 @@ const defaultProfile = (): BriefProfile => ({
   ),
   savedAt: null
 });
+
+/** AI connection as persisted inside the brief profile (key never plaintext). */
+interface StoredBriefAi {
+  provider: BriefAiProvider;
+  protocol: BriefAiProtocol;
+  baseUrl: string;
+  model: string;
+  encryptedApiKey: string | null;
+}
+
+const isStoredBriefAi = (value: unknown): value is StoredBriefAi => {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.provider === "openai" ||
+      candidate.provider === "deepseek" ||
+      candidate.provider === "anthropic" ||
+      candidate.provider === "gemini" ||
+      candidate.provider === "openai-compatible") &&
+    typeof candidate.protocol === "string" &&
+    typeof candidate.baseUrl === "string" &&
+    typeof candidate.model === "string" &&
+    (candidate.encryptedApiKey === null ||
+      typeof candidate.encryptedApiKey === "string")
+  );
+};
+
+const briefAiToConnection = (stored: StoredBriefAi | null): BriefAiConnection | null =>
+  stored
+    ? {
+        provider: stored.provider,
+        protocol: stored.protocol,
+        baseUrl: stored.baseUrl,
+        model: stored.model,
+        apiKeyConfigured: Boolean(stored.encryptedApiKey)
+      }
+    : null;
+
+const isBriefAiInput = (value: unknown): value is BriefAiInput => {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.provider === "openai" ||
+      candidate.provider === "deepseek" ||
+      candidate.provider === "anthropic" ||
+      candidate.provider === "gemini" ||
+      candidate.provider === "openai-compatible") &&
+    typeof candidate.protocol === "string" &&
+    typeof candidate.baseUrl === "string" &&
+    typeof candidate.model === "string" &&
+    candidate.model.trim().length > 0
+  );
+};
 
 const shanghaiParts = (value: Date, timezone: string): Record<string, string> =>
   Object.fromEntries(
@@ -254,10 +314,11 @@ export const validateBrief = (
 
 export const createBriefService = ({
   store,
-  runtime,
   fetchSources,
   createAdapter = (profile: AiProviderProfile, apiKey: string) =>
     createAiProviderAdapter({ profile, apiKey }),
+  encryptSecret,
+  decryptSecret,
   now = () => new Date(),
   timezone = "Asia/Shanghai"
 }: BriefServiceDependencies): BriefService => {
@@ -347,18 +408,25 @@ export const createBriefService = ({
         return state;
       }
 
-      const connection = await runtime.load();
-      if (!connection.configured) {
+      const storedAi = isStoredBriefAi(profile.ai) ? profile.ai : null;
+      if (!storedAi?.encryptedApiKey || !decryptSecret) {
         setState({
           status: "error",
           snapshot: state.snapshot,
-          error: "请先在 AI 助手设置中配置 API Key。"
+          error: "请在早报设置中配置 API Key。"
         });
         return state;
       }
 
       setState({ status: "generating", snapshot: state.snapshot, error: null });
-      const adapter = createAdapter(connection.profile, connection.apiKey);
+      const aiProfile: AiProviderProfile = {
+        provider: storedAi.provider,
+        protocol: storedAi.protocol,
+        baseUrl: storedAi.baseUrl.trim() ||
+          BRIEF_AI_PROVIDER_DEFAULTS[storedAi.provider].baseUrl,
+        model: storedAi.model.trim()
+      };
+      const adapter = createAdapter(aiProfile, decryptSecret(storedAi.encryptedApiKey));
       const itemMap = new Map(freshItems.map((item) => [item.fingerprint, item]));
       const grouped = freshItems.reduce<Map<string, BriefCachedItem[]>>(
         (acc, item) => {
@@ -444,12 +512,20 @@ export const createBriefService = ({
     },
 
     loadSettings: async () => {
-      return (await store.loadProfile()) ?? defaultProfile();
+      const profile = (await store.loadProfile()) ?? defaultProfile();
+      return {
+        ...profile,
+        ai: briefAiToConnection(isStoredBriefAi(profile.ai) ? profile.ai : null)
+      };
     },
 
     saveSettings: async (input) => {
       if (!isBriefProfile(input)) {
         throw new BriefServiceError("invalid-input", "早报设置格式无效。");
+      }
+      const aiInput = (input as { ai?: unknown }).ai;
+      if (aiInput !== undefined && aiInput !== null && !isBriefAiInput(aiInput)) {
+        throw new BriefServiceError("invalid-input", "早报 AI 连接设置格式无效。");
       }
       const sourceEnabled = Object.fromEntries(
         BRIEF_SOURCE_IDS.map((id) => [
@@ -457,7 +533,33 @@ export const createBriefService = ({
           input.sourceEnabled[id] === true
         ])
       );
-      const profile: BriefProfile = {
+      const existing = (await store.loadProfile()) ?? defaultProfile();
+      const existingAi = isStoredBriefAi(existing.ai) ? existing.ai : null;
+      let storedAi: StoredBriefAi | null = existingAi;
+      if (aiInput) {
+        const nextKey = aiInput.clearApiKey
+          ? null
+          : typeof aiInput.apiKey === "string" && aiInput.apiKey.trim().length > 0
+            ? encryptSecret
+              ? encryptSecret(aiInput.apiKey.trim())
+              : (() => {
+                  throw new BriefServiceError(
+                    "not-configured",
+                    "安全存储不可用，无法保存 API Key。"
+                  );
+                })()
+            : existingAi?.encryptedApiKey ?? null;
+        storedAi = {
+          provider: aiInput.provider,
+          protocol: aiInput.protocol,
+          baseUrl: aiInput.baseUrl.trim(),
+          model: aiInput.model.trim(),
+          encryptedApiKey: nextKey
+        };
+      } else if (aiInput === null) {
+        storedAi = null;
+      }
+      const storedProfile: BriefProfile = {
         interests: input.interests.map((interest) => ({
           name: interest.name.trim(),
           weight: Math.round(interest.weight),
@@ -466,9 +568,14 @@ export const createBriefService = ({
             : null
         })),
         sourceEnabled,
+        ai: storedAi as BriefProfile["ai"],
         savedAt: null
       };
-      return store.saveProfile(profile);
+      await store.saveProfile(storedProfile);
+      return {
+        ...storedProfile,
+        ai: briefAiToConnection(storedAi)
+      };
     },
 
     subscribe: (listener) => {

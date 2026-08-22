@@ -60,7 +60,19 @@ const createBridge = (overrides: Partial<NonNullable<PluginComponentProps["brief
   refresh: vi.fn(async (): Promise<BriefState> => ({ status: "idle", snapshot: null, error: null })),
   openExternal: vi.fn(async () => undefined),
   loadSettings: vi.fn(async () => settings),
-  saveSettings: vi.fn(async (input: BriefProfileInput): Promise<BriefProfile> => ({ ...input, savedAt: "2026-08-22T00:00:00.000Z" })),
+  saveSettings: vi.fn(async (input: BriefProfileInput): Promise<BriefProfile> => ({
+    ...input,
+    ai: input.ai
+      ? {
+          provider: input.ai.provider,
+          protocol: input.ai.protocol,
+          baseUrl: input.ai.baseUrl,
+          model: input.ai.model,
+          apiKeyConfigured: Boolean(input.ai.apiKey)
+        }
+      : input.ai ?? null,
+    savedAt: "2026-08-22T00:00:00.000Z"
+  })),
   subscribe: vi.fn(() => () => undefined),
   ...overrides
 });

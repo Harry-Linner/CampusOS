@@ -5,20 +5,68 @@
  * extraction, no discovery/breakout, no archive (those are later phases).
  */
 
+import type { AiAssistantProtocol, AiAssistantProvider } from "./pluginCapabilities";
+
 export interface BriefInterest {
   name: string;
   weight: number;
   note?: string | null;
 }
 
+export type BriefAiProvider = AiAssistantProvider;
+export type BriefAiProtocol = AiAssistantProtocol;
+
+/** Brief-specific AI connection, independent of the AI Assistant settings. */
+export interface BriefAiConnection {
+  provider: BriefAiProvider;
+  protocol: BriefAiProtocol;
+  baseUrl: string;
+  model: string;
+  apiKeyConfigured: boolean;
+}
+
+/** User-editable AI connection; `apiKey` is transient over IPC only. */
+export interface BriefAiInput {
+  provider: BriefAiProvider;
+  protocol: BriefAiProtocol;
+  baseUrl: string;
+  model: string;
+  /** Present when the user re-enters a key; omitting keeps the stored one. */
+  apiKey?: string;
+  /** True clears the stored key. */
+  clearApiKey?: boolean;
+}
+
+export const BRIEF_AI_PROVIDER_DEFAULTS: Record<
+  BriefAiProvider,
+  { protocol: BriefAiProtocol; baseUrl: string }
+> = {
+  openai: { protocol: "openai-responses", baseUrl: "https://api.openai.com/v1" },
+  deepseek: { protocol: "openai-chat-completions", baseUrl: "https://api.deepseek.com/v1" },
+  anthropic: { protocol: "anthropic-messages", baseUrl: "https://api.anthropic.com/v1" },
+  gemini: { protocol: "gemini-generate-content", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+  "openai-compatible": { protocol: "openai-chat-completions", baseUrl: "" }
+};
+
+export const BRIEF_AI_PROVIDER_LABELS: Record<BriefAiProvider, string> = {
+  openai: "OpenAI",
+  deepseek: "DeepSeek",
+  anthropic: "Anthropic",
+  gemini: "Gemini",
+  "openai-compatible": "OpenAI 兼容服务"
+};
+
 export interface BriefProfile {
   interests: BriefInterest[];
   sourceEnabled: Record<string, boolean>;
+  ai?: BriefAiConnection | null;
   savedAt: string | null;
 }
 
 /** User-editable part of a profile; `savedAt` is always server-assigned. */
-export type BriefProfileInput = Omit<BriefProfile, "savedAt">;
+export type BriefProfileInput = Omit<BriefProfile, "savedAt" | "ai"> & {
+  ai?: BriefAiInput | null;
+};
 
 export interface BriefCachedItem {
   fingerprint: string;
