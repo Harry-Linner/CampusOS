@@ -311,6 +311,87 @@ describe("briefService", () => {
     expect(saved.sourceEnabled).toEqual({ arxiv: true, "hacker-news": false, infoq: false, solidot: false });
   });
 
+  it("encrypts the brief API key on save and never returns it", async () => {
+    const { service, store } = createHarness();
+    const saved = await service.saveSettings({
+      interests: [{ name: "数学", weight: 5 }],
+      sourceEnabled: { arxiv: true },
+      ai: {
+        provider: "deepseek",
+        protocol: "openai-chat-completions",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        apiKey: "sk-test"
+      }
+    });
+    expect(saved.ai).toEqual({
+      provider: "deepseek",
+      protocol: "openai-chat-completions",
+      baseUrl: "https://api.deepseek.com/v1",
+      model: "deepseek-chat",
+      apiKeyConfigured: true
+    });
+    const stored = (store.saveProfile as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(stored.ai.encryptedApiKey).toBe("enc:sk-test");
+    expect(JSON.stringify(saved)).not.toContain("sk-test");
+  });
+
+  it("loadSettings reports configured without leaking the stored key", async () => {
+    const harness = createHarness({
+      profileOverride: {
+        interests: [{ name: "数学", weight: 5 }],
+        sourceEnabled: { arxiv: true },
+        ai: storedAi as unknown as BriefProfile["ai"],
+        savedAt: null
+      }
+    });
+    const loaded = await harness.service.loadSettings();
+    expect(loaded.ai).toEqual({
+      provider: "deepseek",
+      protocol: "openai-chat-completions",
+      baseUrl: "https://api.deepseek.com/v1",
+      model: "deepseek-chat",
+      apiKeyConfigured: true
+    });
+    expect(JSON.stringify(loaded)).not.toContain("enc-mock");
+  });
+
+  it("keeps the stored key when saving without a new apiKey", async () => {
+    const { service, store } = createHarness();
+    const saved = await service.saveSettings({
+      interests: [{ name: "数学", weight: 5 }],
+      sourceEnabled: { arxiv: true },
+      ai: {
+        provider: "deepseek",
+        protocol: "openai-chat-completions",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat"
+      }
+    });
+    expect(saved.ai?.apiKeyConfigured).toBe(true);
+    const stored = (store.saveProfile as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(stored.ai.encryptedApiKey).toBe("enc-mock");
+  });
+
+  it("clears the stored key when the clear flag is set", async () => {
+    const { service, store } = createHarness();
+    const saved = await service.saveSettings({
+      interests: [{ name: "数学", weight: 5 }],
+      sourceEnabled: { arxiv: true },
+      ai: {
+        provider: "deepseek",
+        protocol: "openai-chat-completions",
+        baseUrl: "https://api.deepseek.com/v1",
+        model: "deepseek-chat",
+        clearApiKey: true
+      }
+    });
+    // The provider/model stay; only the key is cleared.
+    expect(saved.ai).toMatchObject({ provider: "deepseek", apiKeyConfigured: false });
+    const stored = (store.saveProfile as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(stored.ai.encryptedApiKey).toBeNull();
+  });
+
   it("notifies subscribers when the state changes", async () => {
     const { service } = createHarness();
     const states: BriefState[] = [];
