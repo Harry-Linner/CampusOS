@@ -48,6 +48,26 @@ const readVerifiedStudentId = async (): Promise<string | null> => {
     : null;
 };
 
+/**
+ * Latest data-bearing record for a provider regardless of account. Used by the
+ * connectors' "not verified" path so a startup sync never clobbers the last
+ * successful content: when the account is unknown, the previous cache is still
+ * found and republished as cache instead of unavailable.
+ */
+const latestCachedRecord = <T>(
+  records: readonly CapabilityRecord<T>[],
+  providerId: string
+): T | null => {
+  const candidates = records.filter(
+    (candidate) =>
+      candidate.providerId === providerId && candidate.data !== null
+  );
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt)
+  )[0].data;
+};
+
 const formatUndergraduateRequestFailure = (error: unknown): string => {
   if (error instanceof ZjuUnifiedAuthError) {
     const status = error.statusCode === undefined ? "" : `，HTTP ${error.statusCode}`;
@@ -248,6 +268,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           await capabilityRepository.read<LearningAssignmentsData>(
             "learning.assignments@1"
           );
+        if (accountId === null) return latestCachedRecord(records, zjuLearningManifest.id);
         const record = records.find(
           (candidate) =>
             candidate.providerId === zjuLearningManifest.id &&
@@ -261,6 +282,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           await capabilityRepository.read<LearningMaterialsData>(
             "learning.materials@1"
           );
+        if (accountId === null) return latestCachedRecord(records, zjuLearningManifest.id);
         const record = records.find(
           (candidate) =>
             candidate.providerId === zjuLearningManifest.id &&
@@ -350,6 +372,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicTimetableData>(
           "academic.timetable@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
         const record = records.find((candidate) =>
           candidate.providerId === zjuGraduateManifest.id &&
           candidate.accountId === accountId && candidate.data !== null
@@ -380,6 +403,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicExamsData>(
           "academic.exams@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
         const record = records.find((candidate) =>
           candidate.providerId === zjuGraduateManifest.id &&
           candidate.accountId === accountId && candidate.data !== null
@@ -403,6 +427,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicGradesData>(
           "academic.grades@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
         const record = records.find((candidate) =>
           candidate.providerId === zjuGraduateManifest.id &&
           candidate.accountId === accountId && candidate.data !== null
@@ -413,6 +438,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicCourseCatalogData>(
           "academic.course-catalog@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
         const record = records.find((candidate) =>
           candidate.providerId === zjuGraduateManifest.id &&
           candidate.accountId === accountId && candidate.data !== null
@@ -480,6 +506,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicTimetableData>(
           "academic.timetable@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
         const record = records.find(
           (candidate) =>
             candidate.providerId === zjuUndergraduateManifest.id &&
@@ -505,6 +532,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicExamsData>(
           "academic.exams@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
         const record = records.find(
           (candidate) =>
             candidate.providerId === zjuUndergraduateManifest.id &&
@@ -540,6 +568,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicGradesData>(
           "academic.grades@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
         const record = records.find(
           (candidate) =>
             candidate.providerId === zjuUndergraduateManifest.id &&
@@ -577,6 +606,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicPracticeData>(
           "practice.records@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
         const record = records.find(
           (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
             candidate.accountId === accountId && candidate.data !== null
@@ -587,6 +617,7 @@ export const createOfficialHeadlessPluginLoaders = ({
         const records = await capabilityRepository.read<AcademicCourseCatalogData>(
           "academic.course-catalog@1"
         );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
         const record = records.find(
           (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
             candidate.accountId === accountId && candidate.data !== null

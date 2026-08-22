@@ -69,14 +69,14 @@ export interface ZjuGraduateConnectorDependencies {
   fetchTimetableTerms: (
     queries: readonly GraduateTermQuery[]
   ) => Promise<TermFetchResult[]>;
-  loadCachedTimetable: (accountId: string) => Promise<AcademicTimetableData | null>;
+  loadCachedTimetable: (accountId: string | null) => Promise<AcademicTimetableData | null>;
   fetchExams: (
     queries: readonly { academicYearStart: number; term: 11 | 12 }[]
   ) => Promise<ExamFetchResult[]>;
-  loadCachedExams: (accountId: string) => Promise<AcademicExamsData | null>;
+  loadCachedExams: (accountId: string | null) => Promise<AcademicExamsData | null>;
   fetchGrades: () => Promise<FetchResult>;
-  loadCachedGrades: (accountId: string) => Promise<AcademicGradesData | null>;
-  loadCachedCourseCatalog?: (accountId: string) => Promise<AcademicCourseCatalogData | null>;
+  loadCachedGrades: (accountId: string | null) => Promise<AcademicGradesData | null>;
+  loadCachedCourseCatalog?: (accountId: string | null) => Promise<AcademicCourseCatalogData | null>;
   publish: <T>(publication: CapabilityPublication<T>) => Promise<void>;
   registerRefreshJob: (
     sourceId: string,
@@ -536,8 +536,34 @@ export const createZjuGraduateConnector = ({
   now = () => new Date()
 }: ZjuGraduateConnectorDependencies) => {
   const publishUnavailable = async (updatedAt: string, message: string) => {
+    // Preserve the last successful content instead of clobbering it with
+    // unavailable/null when the account is not verified (startup default:
+    // show the previous cache). academic.profile has no cache and stays
+    // unavailable.
+    const [cachedTimetable, cachedExams, cachedGrades, cachedCatalog] =
+      await Promise.all([
+        loadCachedTimetable(null).catch(() => null),
+        loadCachedExams(null).catch(() => null),
+        loadCachedGrades(null).catch(() => null),
+        loadCachedCourseCatalog?.(null).catch(() => null) ?? Promise.resolve(null)
+      ]);
+    const cachedByCapability: Record<string, unknown> = {
+      "academic.timetable@1": cachedTimetable,
+      "academic.exams@1": cachedExams,
+      "academic.grades@1": cachedGrades,
+      "academic.course-catalog@1": cachedCatalog
+    };
     for (const capability of manifest.provides) {
-      await publish({ capability, accountId: null, state: "unavailable", updatedAt, data: null, message });
+      if (capability === "academic.profile@1") continue;
+      const data = cachedByCapability[capability] ?? null;
+      await publish({
+        capability,
+        accountId: null,
+        state: data ? "cache" : "unavailable",
+        updatedAt,
+        data,
+        message: data ? "未连接账号，继续显示上次成功数据。" : message
+      });
     }
   };
 

@@ -68,15 +68,15 @@ export interface ZjuUndergraduateConnectorDependencies {
     queries: readonly TimetableQuery[]
   ) => Promise<TimetableTermFetchResult[]>;
   loadCachedTimetable: (
-    accountId: string
+    accountId: string | null
   ) => Promise<AcademicTimetableData | null>;
   fetchExams: () => Promise<ExamsFetchResult>;
-  loadCachedExams: (accountId: string) => Promise<AcademicExamsData | null>;
+  loadCachedExams: (accountId: string | null) => Promise<AcademicExamsData | null>;
   fetchGrades: () => Promise<GradesFetchResult>;
-  loadCachedGrades: (accountId: string) => Promise<AcademicGradesData | null>;
+  loadCachedGrades: (accountId: string | null) => Promise<AcademicGradesData | null>;
   fetchPractice?: () => Promise<PracticeFetchResult>;
-  loadCachedPractice?: (accountId: string) => Promise<AcademicPracticeData | null>;
-  loadCachedCourseCatalog?: (accountId: string) => Promise<AcademicCourseCatalogData | null>;
+  loadCachedPractice?: (accountId: string | null) => Promise<AcademicPracticeData | null>;
+  loadCachedCourseCatalog?: (accountId: string | null) => Promise<AcademicCourseCatalogData | null>;
   publish: (
     publication: CapabilityPublication<
       | AcademicProfileData
@@ -1157,46 +1157,36 @@ export const createZjuUndergraduateConnector = ({
         data: null,
         message: "尚未配置并验证浙大统一身份认证账号。"
       });
-      await publish({
-        capability: "academic.timetable@1",
-        accountId: null,
-        state: "unavailable",
-        updatedAt,
-        data: null,
-        message: "尚未配置并验证浙大统一身份认证账号。"
-      });
-      await publish({
-        capability: "academic.exams@1",
-        accountId: null,
-        state: "unavailable",
-        updatedAt,
-        data: null,
-        message: "尚未配置并验证浙大统一身份认证账号。"
-      });
-      await publish({
-        capability: "academic.grades@1",
-        accountId: null,
-        state: "unavailable",
-        updatedAt,
-        data: null,
-        message: "尚未配置并验证浙大统一身份认证账号。"
-      });
-      await publish({
-        capability: "academic.course-catalog@1",
-        accountId: null,
-        state: "unavailable",
-        updatedAt,
-        data: null,
-        message: "未配置并验证浙江大学统一身份认证账号。"
-      });
-      await publish({
-        capability: "practice.records@1",
-        accountId: null,
-        state: "unavailable",
-        updatedAt,
-        data: null,
-        message: "未配置并验证浙江大学统一身份认证账号。"
-      });
+      // Preserve the last successful content instead of clobbering it: a
+      // startup or degraded period with no verified account must still show
+      // the previous snapshot (user requirement: load last cache by default).
+      const degradedMessage = "未连接账号，继续显示上次成功数据。";
+      const [cachedTimetable, cachedExams, cachedGrades, cachedPractice, cachedCatalog] =
+        await Promise.all([
+          loadCachedTimetable(null).catch(() => null),
+          loadCachedExams(null).catch(() => null),
+          loadCachedGrades(null).catch(() => null),
+          loadCachedPractice?.(null).catch(() => null) ?? Promise.resolve(null),
+          loadCachedCourseCatalog?.(null).catch(() => null) ?? Promise.resolve(null)
+        ]);
+      const publishDegraded = async (
+        capability: PluginCapability,
+        data: AcademicProfileData | AcademicTimetableData | AcademicExamsData | AcademicGradesData | AcademicPracticeData | AcademicCourseCatalogData | null
+      ): Promise<void> => {
+        await publish({
+          capability,
+          accountId: null,
+          state: data ? "cache" : "unavailable",
+          updatedAt,
+          data,
+          message: data ? degradedMessage : "尚未配置并验证浙大统一身份认证账号。"
+        });
+      };
+      await publishDegraded("academic.timetable@1", cachedTimetable);
+      await publishDegraded("academic.exams@1", cachedExams);
+      await publishDegraded("academic.grades@1", cachedGrades);
+      await publishDegraded("practice.records@1", cachedPractice);
+      await publishDegraded("academic.course-catalog@1", cachedCatalog);
       return {
         sourceId: manifest.id,
         status: "unavailable",

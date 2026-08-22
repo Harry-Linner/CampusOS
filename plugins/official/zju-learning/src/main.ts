@@ -35,10 +35,10 @@ export interface ZjuLearningConnectorDependencies {
   fetchSemesters: () => Promise<LearningJsonFetchResult>;
   fetchCourseActivities: (courseId: string) => Promise<LearningJsonFetchResult>;
   loadCachedAssignments: (
-    accountId: string
+    accountId: string | null
   ) => Promise<LearningAssignmentsData | null>;
   loadCachedMaterials: (
-    accountId: string
+    accountId: string | null
   ) => Promise<LearningMaterialsData | null>;
   publish: (
     publication: CapabilityPublication<LearningAssignmentsData | LearningMaterialsData>
@@ -429,21 +429,27 @@ export const createZjuLearningConnector = ({
     const updatedAt = now().toISOString();
     if (!proof) {
       const message = "尚未配置并验证浙大统一身份认证账号。";
+      // Preserve the last successful content when the account is not verified
+      // so startup and degraded periods still show the previous cache.
+      const [cachedAssignments, cachedMaterials] = await Promise.all([
+        loadCachedAssignments(null).catch(() => null),
+        loadCachedMaterials(null).catch(() => null)
+      ]);
       await publish({
         capability: "learning.assignments@1",
         accountId: null,
-        state: "unavailable",
+        state: cachedAssignments ? "cache" : "unavailable",
         updatedAt,
-        data: null,
-        message
+        data: cachedAssignments,
+        message: cachedAssignments ? "未连接账号，继续显示上次成功数据。" : message
       });
       await publish({
         capability: "learning.materials@1",
         accountId: null,
-        state: "unavailable",
+        state: cachedMaterials ? "cache" : "unavailable",
         updatedAt,
-        data: null,
-        message
+        data: cachedMaterials,
+        message: cachedMaterials ? "未连接账号，继续显示上次成功数据。" : message
       });
       return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
     }
