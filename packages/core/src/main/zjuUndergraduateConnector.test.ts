@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type {
+  AcademicGradesData,
+  AcademicPracticeData,
+  AcademicTimetableData
+} from "@campusos/shared";
 import {
   buildCourseCatalog,
   calculatePracticeSummary,
@@ -235,6 +240,90 @@ describe("zju undergraduate connector", () => {
 
     await activation.deactivate();
     expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the last cached records when the account is not verified", async () => {
+    let refreshJob: (() => Promise<unknown>) | undefined;
+    const publish = vi.fn(async () => undefined);
+    const cachedGrades: AcademicGradesData = {
+      grades: [{
+        sourceId: "(2025-2026-2)-CS-1",
+        realId: "(2025-2026-2)-CS",
+        courseCode: "CS101",
+        courseName: "程序设计",
+        credit: 3,
+        originalScore: "90",
+        gradePoint: 4,
+        academicYearStart: 2025,
+        termNumber: 2,
+        isMajorCourse: true,
+        courseCategory: null
+      }]
+    };
+    const cachedTimetable: AcademicTimetableData = { terms: [] };
+    const cachedPractice: AcademicPracticeData = {
+      records: [],
+      detailsAvailable: true,
+      summary: {
+        secondClassPoints: 0,
+        thirdClassPoints: 0,
+        fourthClassPoints: 0,
+        totalPoints: 0,
+        myPassed: null,
+        lastYearPassed: null,
+        source: "calculatedFromRecords",
+        updatedAt: "2026-07-19T04:00:00.000Z",
+        stale: false
+      }
+    };
+    const connector = createZjuUndergraduateConnector({
+      loadAcademicProfileProof: vi.fn(async () => null),
+      fetchTimetableTerms: vi.fn(async () => []),
+      loadCachedTimetable: vi.fn(async (): Promise<AcademicTimetableData> => cachedTimetable),
+      fetchExams: vi.fn(async () => ({ ok: false as const, message: "no-auth" })),
+      loadCachedExams: vi.fn(async () => ({ exams: [] })),
+      fetchGrades: vi.fn(async () => ({ ok: false as const, message: "no-auth" })),
+      loadCachedGrades: vi.fn(async (): Promise<AcademicGradesData> => cachedGrades),
+      loadCachedPractice: vi.fn(async (): Promise<AcademicPracticeData> => cachedPractice),
+      loadCachedCourseCatalog: vi.fn(async () => ({ courses: [] })),
+      publish,
+      registerRefreshJob: (_sourceId, job) => {
+        refreshJob = job;
+        return vi.fn();
+      },
+      now: () => new Date("2026-07-19T04:00:00.000Z")
+    });
+
+    const activation = await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+    await refreshJob?.();
+
+    // profile has no cache and stays unavailable; every data capability is
+    // republished as cache with the last successful content instead of being
+    // clobbered by unavailable/null.
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.profile@1", state: "unavailable", data: null })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.timetable@1", state: "cache", data: cachedTimetable })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.exams@1", state: "cache", data: { exams: [] } })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.grades@1", state: "cache", data: cachedGrades })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "practice.records@1", state: "cache" })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.course-catalog@1", state: "cache", data: { courses: [] } })
+    );
+
+    await activation.deactivate();
   });
 
   it("keeps a live transcript when the independent major endpoint fails", async () => {

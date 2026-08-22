@@ -195,6 +195,53 @@ describe("zju graduate connector", () => {
     expect(unregister).toHaveBeenCalledTimes(1);
   });
 
+  it("preserves the last cached records when the account is not verified", async () => {
+    let refreshJob: (() => Promise<unknown>) | undefined;
+    const publish = vi.fn(async () => undefined);
+    const cachedGrades = parseGraduateGradesResponse(gradesBody);
+    const connector = createZjuGraduateConnector({
+      loadAcademicProfileProof: async () => null,
+      fetchTimetableTerms: async () => [],
+      loadCachedTimetable: async () => ({ terms: [] }),
+      fetchExams: async () => [],
+      loadCachedExams: async () => ({ exams: [] }),
+      fetchGrades: async () => ({ ok: false as const, message: "no-auth" }),
+      loadCachedGrades: async () => cachedGrades,
+      loadCachedCourseCatalog: async () => ({ courses: [] }),
+      publish,
+      registerRefreshJob: (_sourceId, job) => {
+        refreshJob = job;
+        return vi.fn();
+      },
+      now: () => new Date("2026-07-19T04:00:00.000Z")
+    });
+
+    const activation = await connector.activate({
+      pluginId: connector.manifest.id,
+      grantedPermissions: connector.manifest.permissions,
+      bindings: {}
+    });
+    await refreshJob?.();
+
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.profile@1", state: "unavailable", data: null })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.timetable@1", state: "cache", data: { terms: [] } })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.exams@1", state: "cache", data: { exams: [] } })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.grades@1", state: "cache", data: cachedGrades })
+    );
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({ capability: "academic.course-catalog@1", state: "cache", data: { courses: [] } })
+    );
+
+    await activation.deactivate();
+  });
+
   it("merges cached exams when only part of the live query set is usable", async () => {
     const publish = vi.fn(async () => undefined);
     const connector = createZjuGraduateConnector({

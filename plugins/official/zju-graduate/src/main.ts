@@ -540,6 +540,14 @@ export const createZjuGraduateConnector = ({
     // unavailable/null when the account is not verified (startup default:
     // show the previous cache). academic.profile has no cache and stays
     // unavailable.
+    await publish({
+      capability: "academic.profile@1",
+      accountId: null,
+      state: "unavailable",
+      updatedAt,
+      data: null,
+      message
+    });
     const [cachedTimetable, cachedExams, cachedGrades, cachedCatalog] =
       await Promise.all([
         loadCachedTimetable(null).catch(() => null),
