@@ -175,6 +175,17 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] 用户反馈的"字与字重叠"此前只修了日报；legacy 全库审计发现 10 处 CJK 标题负字距（`.page-heading h1` -0.065em、`.agenda-day-heading time strong` -0.06em、`.panel-card h2`/`.page-header h1` -0.04em、`.calendar-controls strong` -0.035em、`.academic-panel-heading h2`/`.academic-course-detail h3` -0.03em、`.update-prompt h2` -0.03em、`.settings-section-heading h2` -0.02em、`.day-event-title`/`.extension-title strong`/`.todo-content strong` -0.015em），全部移除；`.page-heading h1` 行高 0.95→1.2
 - [x] 保留有意负字距：`.brand-lockup`（拉丁 logo）、`.grade-summary-card strong`/`.onboarding-sync-stat strong`（数字）
 - [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**、构建成功
+
+### 用户七项修复轮（2026-08-23，commit 922a100/0aee65a/248080e，CI 全绿）
+
+1. **启动默认加载缓存**：定位根因——启动即同步（workspaceRefreshScheduler）且连接器"未验证账号"路径用 unavailable/null 覆写上次成功缓存；`loadCachedX(null)` 改为返回任意账号最新数据记录，本科/研究生/学在浙大连接器 no-proof 路径改为发布 `state=cache` 保留数据（`248080e`）
+2. **日程**：删除"全部课程"区块（含样式与 capability 声明），日/月/周/日程视图原样保留（`922a100`）
+3. **资料**：删除页头"学期 · n 门课程 · n 个文件"摘要行（`922a100`）
+4. **资料**：文件区课程名单行省略，切换课程时布局不再跳动（`922a100`）
+5. **早报独立 API Key**：设置页新增"AI 连接"区（服务商/模型/接口/Key），密钥经 vault 加密存于早报 profile，生成只用自身配置不再读 AI 助手（`0aee65a`）
+6. **学业固定布局**：成绩/考试视图统一为 `academic-panel` 结构，与课表/课程/素拓一致（`922a100`）
+7. **总览**："下学期XX预览"→"今日事项预览"，逻辑改今日课程（todayCourses），计数/空态同步更新（`922a100`）
+- 验收：typecheck/lint 零错误、受影响 84 个测试通过、CI（typecheck/lint/test:coverage/build/e2e）全绿
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
