@@ -45,7 +45,7 @@ try {
     await page.screenshot({ path: join(outputRoot, `dashboard-${theme}.png`), fullPage: true });
 
     await page.locator('[data-activity-id="daily-brief"]').click();
-    await page.locator(".brief-page").waitFor({ timeout: 15_000 });
+    await page.getByRole("heading", { name: "早报", exact: true }).waitFor({ timeout: 15_000 });
     // Let the auto-generated refresh finish (fetch + AI attempt).
     await page.waitForTimeout(4000);
     await page.screenshot({ path: join(outputRoot, `brief-${theme}.png`), fullPage: true });

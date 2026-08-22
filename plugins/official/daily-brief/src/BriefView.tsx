@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ExternalLink,
+  Newspaper,
+  RefreshCw
+} from "lucide-react";
 import type {
   BriefItem,
   BriefState,
   PluginComponentProps
 } from "@campusos/shared";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Toaster } from "@/components/ui/sonner";
 import { InterestSettings } from "./InterestSettings";
 
 type BriefTab = "daily" | "settings";
@@ -15,6 +33,9 @@ const statusLabel: Record<BriefState["status"], string> = {
   ready: "已生成",
   error: "生成失败"
 };
+
+const isLoading = (status: BriefState["status"]): boolean =>
+  status === "fetching" || status === "generating";
 
 export const BriefView = (props: PluginComponentProps): JSX.Element => {
   const brief = props.brief;
@@ -83,154 +104,209 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
 
   const snapshot = state.snapshot;
   const hasContent = (snapshot?.sections.length ?? 0) > 0;
+  const showContent = !isLoading(state.status) && !busy && Boolean(snapshot);
+  const showEmpty =
+    !isLoading(state.status) && !busy && !state.error && !snapshot;
 
   return (
-    <section className="page-shell brief-page">
-      <header className="page-heading brief-heading">
+    <div className="mx-auto w-full max-w-3xl">
+      <Toaster position="top-right" />
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Daily Brief</p>
-          <h1>早报</h1>
-          <p>按关注领域聚合外部资讯，生成全中文摘要日报。</p>
+          <div className="flex items-center gap-2">
+            <Newspaper className="size-5 text-primary" />
+            <h1 className="text-2xl font-semibold tracking-tight">早报</h1>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            按关注领域聚合外部资讯，生成全中文摘要日报。
+          </p>
         </div>
-        <nav className="module-tabs" aria-label="早报视图">
-          <button
-            type="button"
-            className={tab === "daily" ? "is-active" : undefined}
-            aria-pressed={tab === "daily"}
+        <div className="flex gap-1 rounded-lg bg-muted p-[3px]" role="tablist">
+          <Button
+            size="sm"
+            variant={tab === "daily" ? "default" : "ghost"}
+            role="tab"
+            aria-selected={tab === "daily"}
             onClick={() => setTab("daily")}
           >
             日报
-          </button>
-          <button
-            type="button"
-            className={tab === "settings" ? "is-active" : undefined}
-            aria-pressed={tab === "settings"}
+          </Button>
+          <Button
+            size="sm"
+            variant={tab === "settings" ? "default" : "ghost"}
+            role="tab"
+            aria-selected={tab === "settings"}
             onClick={() => setTab("settings")}
           >
             设置
-          </button>
-        </nav>
+          </Button>
+        </div>
       </header>
 
       {tab === "settings" ? (
         brief ? (
           <InterestSettings brief={brief} />
         ) : (
-          <div className="workspace-error-banner" role="alert">
-            早报桥接不可用，请重启 CampusOS。
-          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertTitle>桥接不可用</AlertTitle>
+            <AlertDescription>早报桥接不可用，请重启 CampusOS。</AlertDescription>
+          </Alert>
         )
       ) : (
-        <div className="brief-daily">
-          <header className="section-heading brief-toolbar">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="eyebrow">Today</p>
-              <h2>{snapshot?.date ?? "今日早报"}</h2>
+              <h2 className="text-lg font-semibold">
+                {snapshot?.date ?? "今日早报"}
+              </h2>
               {snapshot?.generatedAt ? (
-                <p className="brief-generated-at">
+                <p className="text-xs text-muted-foreground">
                   生成于 {new Date(snapshot.generatedAt).toLocaleTimeString("zh-CN")}
                 </p>
               ) : null}
             </div>
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!brief || busy}
+            <Button
               onClick={() => void refresh()}
+              disabled={!brief || busy}
             >
+              <RefreshCw className={busy ? "animate-spin" : undefined} />
               {busy ? "生成中…" : "刷新早报"}
-            </button>
-          </header>
+            </Button>
+          </div>
 
           {!brief ? (
-            <div className="workspace-error-banner" role="alert">
-              早报桥接不可用，请重启 CampusOS。
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertTitle>桥接不可用</AlertTitle>
+              <AlertDescription>早报桥接不可用，请重启 CampusOS。</AlertDescription>
+            </Alert>
           ) : null}
 
           {state.error ? (
-            <div className="workspace-error-banner" role="alert">
-              {state.error}
-              {state.snapshot ? (
-                <button className="text-button" type="button" onClick={() => void refresh()} disabled={busy}>
-                  重试
-                </button>
-              ) : null}
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertTitle>生成失败</AlertTitle>
+              <AlertDescription className="flex flex-wrap items-center gap-3">
+                <span>{state.error}</span>
+                {state.snapshot ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void refresh()}
+                    disabled={busy}
+                  >
+                    重试
+                  </Button>
+                ) : null}
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {isLoading(state.status) ? (
+            <div className="space-y-4" role="status">
+              <p className="text-sm text-muted-foreground">
+                {statusLabel[state.status]}
+              </p>
+              {[0, 1, 2].map((index) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <Skeleton className="h-5 w-40" />
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-8 w-28" />
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           ) : null}
 
-          {state.status === "fetching" || state.status === "generating" ? (
-            <p className="schedule-notice" role="status">
-              {statusLabel[state.status]}
-            </p>
-          ) : null}
-
           {(snapshot?.degradedSources.length ?? 0) > 0 ? (
-            <p className="schedule-notice" role="status">
+            <p className="text-sm text-muted-foreground">
               部分信息源暂不可用：{snapshot!.degradedSources.join("、")}
             </p>
           ) : null}
 
-          {!snapshot ? (
-            <div className="quiet-empty-state">
-              点击"刷新早报"抓取最新资讯并生成今日摘要。生成前请在 AI 助手设置中配置 API Key。
-            </div>
-          ) : !hasContent ? (
-            <div className="quiet-empty-state">{snapshot.note ?? "今日暂无新内容。"}</div>
-          ) : (
-            <div className="brief-sections">
-              {snapshot.sections.map((section) => (
-                <section className="brief-section" key={section.interest}>
-                  <header className="section-heading">
-                    <div>
-                      <p className="eyebrow">Section</p>
-                      <h2>{section.interest}</h2>
-                    </div>
-                    <span className="assistant-confidence">{section.items.length} 条</span>
-                  </header>
-                  <ul className="brief-item-list">
+          {showEmpty ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+                <p className="max-w-md text-sm text-muted-foreground">
+                  点击"刷新早报"抓取最新资讯并生成今日摘要。生成前请在 AI 助手设置中配置 API Key。
+                </p>
+                <Button onClick={() => void refresh()} disabled={busy}>
+                  <RefreshCw className={busy ? "animate-spin" : undefined} />
+                  刷新早报
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showContent && !hasContent ? (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                {snapshot!.note ?? "今日暂无新内容。"}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {showContent && hasContent ? (
+            <div className="space-y-6">
+              {snapshot!.sections.map((section) => (
+                <Card key={section.interest}>
+                  <CardHeader>
+                    <CardTitle>{section.interest}</CardTitle>
+                    <CardDescription>{section.items.length} 条摘要</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
                     {section.items.map((item) => (
-                      <li className="brief-item" key={item.fingerprint}>
-                        <h3>{item.titleZh}</h3>
-                        <p className="brief-item-summary">{item.summary}</p>
-                        <div className="brief-item-meta">
-                          <span>{item.sourceLabel}</span>
+                      <article key={item.fingerprint} className="space-y-2">
+                        <h3 className="font-medium leading-snug">
+                          {item.titleZh}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {item.summary}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="secondary">{item.sourceLabel}</Badge>
                           {item.relevance ? <span>{item.relevance}</span> : null}
                         </div>
                         {expanded[item.fingerprint] ? (
-                          <p className="brief-item-detail">
-                            <span>原标题：{item.originalTitle}</span>
+                          <p className="text-xs text-muted-foreground">
+                            原标题：{item.originalTitle}
                           </p>
                         ) : null}
-                        <div className="brief-actions">
-                          <button
-                            className="secondary-button"
-                            type="button"
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => openOriginal(item)}
                           >
+                            <ExternalLink className="size-3.5" />
                             阅读原文
-                          </button>
-                          <button
-                            className="text-button"
-                            type="button"
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => toggleExpanded(item.fingerprint)}
                           >
                             {expanded[item.fingerprint] ? "收起" : "详情"}
-                          </button>
+                          </Button>
                         </div>
-                      </li>
+                      </article>
                     ))}
-                  </ul>
-                </section>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          )}
+          ) : null}
 
           {snapshot?.note && hasContent ? (
-            <p className="brief-note">{snapshot.note}</p>
+            <p className="text-sm text-muted-foreground">{snapshot.note}</p>
           ) : null}
         </div>
       )}
-    </section>
+    </div>
   );
 };

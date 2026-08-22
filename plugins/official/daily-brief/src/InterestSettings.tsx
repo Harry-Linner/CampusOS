@@ -1,10 +1,25 @@
 import { useEffect, useState } from "react";
+import { AlertCircle, Plus, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import type { BriefProfile } from "@campusos/shared";
 import { BRIEF_MAX_WEIGHT, BRIEF_MIN_WEIGHT } from "@campusos/shared";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
 interface InterestSettingsProps {
   brief: NonNullable<import("@campusos/shared").PluginComponentProps["brief"]>;
-  onSaved?: (profile: BriefProfile) => void;
 }
 
 interface EditableInterest {
@@ -36,14 +51,12 @@ const normalizeWeight = (value: string): number => {
 };
 
 export const InterestSettings = ({
-  brief,
-  onSaved
+  brief
 }: InterestSettingsProps): JSX.Element => {
   const [interests, setInterests] = useState<EditableInterest[]>([]);
   const [sourceEnabled, setSourceEnabled] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<"load" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -96,7 +109,6 @@ export const InterestSettings = ({
     if (busy === "save") return;
     setBusy("save");
     setError(null);
-    setNotice(null);
     try {
       const saved = await brief.saveSettings({
         interests: interests
@@ -109,8 +121,9 @@ export const InterestSettings = ({
         sourceEnabled
       });
       setInterests(toEditable(saved));
-      setNotice("设置已保存，下一次刷新早报将按新的权重分配。");
-      onSaved?.(saved);
+      toast.success("设置已保存", {
+        description: "下一次刷新早报将按新的权重分配。"
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "保存失败。");
     } finally {
@@ -119,101 +132,121 @@ export const InterestSettings = ({
   };
 
   return (
-    <section className="brief-settings" aria-label="早报设置">
-      <header className="section-heading">
-        <div>
-          <p className="eyebrow">Interests</p>
-          <h2>关注领域</h2>
-        </div>
-        <span className="assistant-config-state">{busy === "load" ? "读取中" : `${interests.length} 个领域`}</span>
-      </header>
-      <p className="assistant-privacy-copy">
-        领域与权重决定各板块的摘要条数（高权重领域优先分配）。早报抓取仅限下方启用的公开信息源；AI 生成复用 AI 助手已配置的服务商与 API Key。
-      </p>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>关注领域</CardTitle>
+        <CardDescription>
+          领域与权重决定各板块的摘要条数（高权重领域优先分配）。早报抓取仅限下方启用的公开信息源；AI 生成复用 AI 助手已配置的服务商与 API Key。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {error ? (
+          <Alert variant="destructive">
+            <AlertCircle className="size-4" />
+            <AlertTitle>设置异常</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-      {error ? <div className="workspace-error-banner" role="alert">{error}</div> : null}
-      {notice ? <p className="schedule-notice" role="status">{notice}</p> : null}
-
-      <div className="interest-editor">
-        {interests.length === 0 ? (
-          <div className="quiet-empty-state">
-            还没有关注领域。添加一个领域（如"数学"），早报会优先为你聚合该领域的资讯。
+        {busy === "load" ? (
+          <div className="space-y-3">
+            {[0, 1, 2].map((index) => (
+              <Skeleton key={index} className="h-10 w-full" />
+            ))}
           </div>
         ) : (
-          interests.map((interest) => (
-            <div className="interest-row" key={interest.id}>
-              <input
-                aria-label="领域名称"
-                value={interest.name}
-                placeholder="领域名称，如：数学"
-                onChange={(event) => updateInterest(interest.id, { name: event.target.value })}
-              />
-              <input
-                aria-label="权重"
-                type="number"
-                min={BRIEF_MIN_WEIGHT}
-                max={BRIEF_MAX_WEIGHT}
-                value={interest.weight}
-                onChange={(event) => updateInterest(interest.id, { weight: event.target.value })}
-                title={`权重（${BRIEF_MIN_WEIGHT}-${BRIEF_MAX_WEIGHT}）`}
-              />
-              <input
-                aria-label="备注"
-                value={interest.note}
-                placeholder="备注（可选）"
-                onChange={(event) => updateInterest(interest.id, { note: event.target.value })}
-              />
-              <button
-                className="text-button is-danger"
-                type="button"
-                onClick={() => removeInterest(interest.id)}
-              >
-                删除
-              </button>
+          <>
+            <div className="space-y-3">
+              {interests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  还没有关注领域。添加一个领域（如"数学"），早报会优先为你聚合该领域的资讯。
+                </p>
+              ) : (
+                interests.map((interest) => (
+                  <div
+                    key={interest.id}
+                    className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1fr)_auto] items-center gap-2"
+                  >
+                    <Input
+                      aria-label="领域名称"
+                      value={interest.name}
+                      placeholder="领域名称，如：数学"
+                      onChange={(event) =>
+                        updateInterest(interest.id, { name: event.target.value })
+                      }
+                    />
+                    <Input
+                      aria-label="权重"
+                      type="number"
+                      min={BRIEF_MIN_WEIGHT}
+                      max={BRIEF_MAX_WEIGHT}
+                      value={interest.weight}
+                      title={`权重（${BRIEF_MIN_WEIGHT}-${BRIEF_MAX_WEIGHT}）`}
+                      onChange={(event) =>
+                        updateInterest(interest.id, { weight: event.target.value })
+                      }
+                    />
+                    <Input
+                      aria-label="备注"
+                      value={interest.note}
+                      placeholder="备注（可选）"
+                      onChange={(event) =>
+                        updateInterest(interest.id, { note: event.target.value })
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`删除领域 ${interest.name || "未命名"}`}
+                      onClick={() => removeInterest(interest.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={addInterest}>
+                <Plus className="size-4" />
+                添加领域
+              </Button>
             </div>
-          ))
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">信息源</h3>
+              {Object.entries(SOURCE_LABELS).map(([sourceId, label]) => (
+                <label
+                  key={sourceId}
+                  className="flex items-center justify-between rounded-md border px-3 py-2.5"
+                >
+                  <span className="text-sm">{label}</span>
+                  <Switch
+                    checked={sourceEnabled[sourceId] !== false}
+                    onCheckedChange={(checked) =>
+                      setSourceEnabled((current) => ({
+                        ...current,
+                        [sourceId]: checked
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+          </>
         )}
-        <button className="secondary-button" type="button" onClick={addInterest}>
-          添加领域
-        </button>
-      </div>
-
-      <header className="section-heading brief-source-heading">
-        <div>
-          <p className="eyebrow">Sources</p>
-          <h2>信息源</h2>
-        </div>
-      </header>
-      <ul className="source-toggle-list">
-        {Object.entries(SOURCE_LABELS).map(([sourceId, label]) => (
-          <li key={sourceId}>
-            <label>
-              <input
-                type="checkbox"
-                checked={sourceEnabled[sourceId] !== false}
-                onChange={(event) =>
-                  setSourceEnabled((current) => ({
-                    ...current,
-                    [sourceId]: event.target.checked
-                  }))
-                }
-              />
-              {label}
-            </label>
-          </li>
-        ))}
-      </ul>
-
-      <div className="assistant-actions">
-        <button
-          className="primary-button"
+      </CardContent>
+      <CardFooter className="justify-end">
+        <Button
           type="button"
-          disabled={busy === "save" || busy === "load"}
           onClick={() => void save()}
+          disabled={busy === "save" || busy === "load"}
         >
-          {busy === "save" ? "正在保存" : "保存设置"}
-        </button>
-      </div>
-    </section>
+          <Save className="size-4" />
+          {busy === "save" ? "正在保存…" : "保存设置"}
+        </Button>
+      </CardFooter>
+    </Card>
   );
 };

@@ -121,10 +121,16 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **481 passed / 1 skipped**、`test:coverage` 达阈值、build 成功
 - [x] 截图：`scripts/capture-ui.mjs` 生成三主题 dashboard + 早报截图至 `.tmp/ui-capture/`（供人工复核）
 
-### Phase B（待做）
+### Phase B — 已完成（2026-08-22）
 
-- [ ] 早报视图用 shadcn 重写（Card/Badge/Alert/Skeleton/Switch/Sonner），删 `brief-*` 旧 CSS
-- [ ] 三主题 + 空/载/错/成功四态验收
+- [x] `BriefView` 用 shadcn 重写：Card 分板块、Badge 来源标签、Alert 错误（生成失败/桥接不可用）、Skeleton 加载骨架（抓取/生成中）、分段 tab 控件（shadcn Button 变体，规避 radix Tabs 在 jsdom 合成事件不激活的问题）、Sonner 保存反馈、lucide 图标
+- [x] `InterestSettings` 用 shadcn 重写：Card + Input（名称/权重/备注）+ Switch 源开关 + 删除/添加按钮 + 保存 Sonner toast；错误用 Alert
+- [x] `sonner.tsx` 包装改为跟随 `data-theme`（MutationObserver），移除 `next-themes` 依赖
+- [x] styles.css 删除全部 `brief-*` / `interest-*` / `source-toggle-*` 旧 CSS（"替换即删"）
+- [x] 逻辑保持：自动生成、手动刷新、原文外开、设置保存、错误保留旧快照（错误态下旧快照内容仍展示）
+- [x] 测试：BriefView 7 用例全绿（空态/自动生成/内容渲染/错误+旧快照/加载骨架/手动刷新/设置保存+toast）
+- [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **482 passed / 1 skipped**、build 成功
+- [x] 截图：三主题早报视图已更新（`.tmp/ui-capture/brief-*.png`）；dashboard 截图尺寸与 Phase A 一致（无回归）
 
 ### Phase C（待做）
 

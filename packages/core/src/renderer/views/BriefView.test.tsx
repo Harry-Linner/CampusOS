@@ -95,6 +95,19 @@ describe("BriefView", () => {
     expect(screen.getByText("阿尔法")).toBeTruthy();
   });
 
+  it("shows the loading skeleton while the brief is being fetched", async () => {
+    const bridge = createBridge({
+      getState: vi.fn(async (): Promise<BriefState> => ({
+        status: "fetching",
+        snapshot: null,
+        error: null
+      }))
+    });
+    render(createElement(BriefView, { ...baseProps, brief: bridge }));
+    expect(await screen.findByText("正在抓取信息源…")).toBeTruthy();
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+
   it("auto-generates on first open when no snapshot exists", async () => {
     const bridge = createBridge({ refresh: vi.fn(async (): Promise<BriefState> => readyState) });
     render(createElement(BriefView, { ...baseProps, brief: bridge }));
@@ -108,6 +121,7 @@ describe("BriefView", () => {
       refresh: vi.fn(async (): Promise<BriefState> => readyState)
     });
     render(createElement(BriefView, { ...baseProps, brief: bridge }));
+    await screen.findByText("阿尔法");
     fireEvent.click(screen.getByText("刷新早报"));
     await waitFor(() => expect(screen.getByText("阿尔法")).toBeTruthy());
     expect(bridge.refresh).toHaveBeenCalledTimes(1);
@@ -116,7 +130,7 @@ describe("BriefView", () => {
   it("switches to the settings tab and saves the interest profile", async () => {
     const bridge = createBridge();
     render(createElement(BriefView, { ...baseProps, brief: bridge }));
-    fireEvent.click(screen.getByText("设置"));
+    fireEvent.click(screen.getByRole("tab", { name: "设置" }));
     expect(await screen.findByText("关注领域")).toBeTruthy();
     fireEvent.click(screen.getByText("保存设置"));
     await waitFor(() => expect(bridge.saveSettings).toHaveBeenCalledOnce());
