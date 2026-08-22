@@ -13,6 +13,7 @@ export default defineConfig({
       "/@vite/env": resolve(rootDir, "test/vite-env.ts"),
       "@vite/env": resolve(rootDir, "test/vite-env.ts"),
       "@renderer": resolve(rootDir, "src/renderer"),
+      "@": resolve(rootDir, "src/renderer"),
       "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
       "@campusos/plugin-academic/gradesModel": resolve(
         rootDir,
@@ -67,7 +68,12 @@ export default defineConfig({
       provider: "v8",
       all: true,
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/**/*.test.{ts,tsx}", "test/**"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "test/**",
+        // Vendored shadcn/ui source components (owned code, not app logic).
+        "src/renderer/components/ui/**"
+      ],
       reporter: ["text", "json-summary"],
       thresholds: {
         statements: 70,

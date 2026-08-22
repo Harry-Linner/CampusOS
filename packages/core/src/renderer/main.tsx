@@ -1,8 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
-import "./styles.css";
-import "./theme.css";
+import "./globals.css";
 
 // Apply persisted theme before first paint
 (function initTheme() {

@@ -21,6 +21,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@/*": [
+        "packages/core/src/renderer/*"
+      ],
       "@campusos/shared": [
         "packages/shared/src/index.ts"
       ],

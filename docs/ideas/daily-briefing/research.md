@@ -297,6 +297,36 @@
 
 ---
 
+### 11.9 插件化开源框架调研（2026-08-22，用户提出：有没有"以插件为功能单位"的开源项目可直接搬）
+
+用户对自建 UI 不满意，要求调研"与 CampusOS 思路类似、以插件为功能单位、可直接搬用的开源框架"。分四类：
+
+| 类别 | 项目 | 许可/技术 | 插件模型 | 能否"直接搬" |
+|---|---|---|---|---|
+| **uTools 系桌面工具箱** | [Rubick](https://github.com/zhoujianxuan/rubick)（MIT，Electron）；[活跃维护 fork wuchunfu/rubick](https://github.com/wuchunfu/rubick)（"utools 生态插件可无差异化使用"）；[ZTools](https://cloud.tencent.com.cn/developer/article/2670986)（uTools 免费平替）；ReFast（[Linux.do](https://linux.do/t/topic/1274155/71)） | Electron + 插件市场 | **插件 = 功能单位**，与 CampusOS 同构；uTools 插件协议已是事实标准 | ⚠️ 定位是"快速启动器 + 面板"（spotlight 式搜索框），**UI 不是左侧工作台心智**；可搬的是**插件协议**（中期让 CampusOS 复用 uTools 插件生态），UI 不匹配 |
+| **IDE 系工业级插件宿主** | [Eclipse Theia](https://github.com/bhufmann/theia)（EPL-2.0，TypeScript，云+桌面 IDE 框架）；VS Code 扩展模型 | VS Code 扩展 API | 行业标准插件宿主 | ❌ 终极重方案：放弃自研 campusmod 运行时改接 VS Code 扩展模型 = 巨大迁移，插件模型也不同（plan.md kill criterion 早已列为备选）；不建议为 UI 而做 |
+| **Web 门户系** | [Backstage](https://getdx.com/blog/spotify-backstage/)（Apache-2.0，Spotify 开发者门户） | React + Material UI，前后端插件架构 | 成熟、UI 精美 | ❌ 面向 Web 开发者门户，与"本地优先桌面校园工具"定位不符；可借鉴其**插件注册表/能力声明**设计 |
+| **Web 桌面系** | [OS.js](https://manual.os-js.org/resource/official/)（BSD-2，浏览器桌面 OS） | 网页版"桌面 + 应用/扩展" | 应用即插件 | ❌ 网页心智，非桌面本地应用 |
+| **组件库（解决"UI 太丑"的最短路径，非框架）** | [Mantine / Ant Design / shadcn+Tailwind / MUI / Chakra](https://makersden.io/blog/react-ui-libs-2025-comparing-shadcn-radix-mantine-mui-chakra) | React 组件 + CSS 变量主题 | — | ✅ **推荐**：不动插件架构，只换 UI 层 |
+
+**结论：**
+- **没有"整体搬一个框架"的完美匹配项**：uTools 系是启动器心智（非工作台），Theia 系过重，Backstage 是 Web 门户，OS.js 是网页桌面。
+- **UI 问题用组件库解决**：CampusOS 是 React + CSS 变量三主题（theme.css），**Mantine 最平滑**（无需 Tailwind，主题即 CSS 变量，组件全）；Ant Design 中文文档全、表单组件成熟（设置表单多）。可选 shadcn/ui（需引入 Tailwind）。
+- **架构层中期可评估"兼容 uTools 插件协议"**（复用其庞大插件生态），长期可评估 VS Code 扩展模型；两者都不该为 UI 美观而启动。
+- **现状 campusmod 运行时是已验证资产**（沙箱、签名、热更新、权限），不建议推倒重来。
+
+**风格对比（2026-08-22 用户追问）：**
+
+| | Ant Design | Mantine | shadcn/ui |
+|---|---|---|---|
+| 气质 | 企业后台管理系统（密集、方、蓝主色、表格/表单堆叠） | 中性现代 SaaS 产品（干净、圆角、柔和阴影；默认较"路人"，需自调） | 开发者工具高级感（Linear/Vercel 一挂：极简、精排版、细边框、无重阴影） |
+| 定制自由度 | 组件替你决定外观，改风格要对抗默认主题 | 主题=CSS 变量，CampusOS token 可直接映射 | 源码级组件，完全归自己，但要引入 Tailwind |
+| 与 CampusOS 暖纸审美（`#f3efe6`/`#f8f9f7`/哑光蓝 `#315f8e`） | 冲突最大（企业 OA 脸） | 最中性，视觉连续性最好 | 气质同构（"学生版 VS Code"品牌心智） |
+| 改动面 | 小 | 小-中 | 大（Tailwind + 全量视图重写） |
+| 结论 | 不推荐 | 稳健次选 | **首选**：品牌层面加分，契合工作台+插件定位 |
+
+---
+
 ### 11.8 补充调研：个人数据库整理方案 + 画像调整的松耦合路径（2026-08-22）
 
 用户补充两点：①自己个人信息零散，需要一个"AI 辅助整理的个人数据库"（独立于早报的个人需求，即"私心"）；②权重调整是否可以用"提示词往返"实现松耦合。

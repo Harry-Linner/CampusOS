@@ -1,0 +1,92 @@
+/*
+ * CampusOS renderer global stylesheet.
+ *
+ * Cascade-layer contract (Phase A of the shadcn/ui migration):
+ *   base       — Tailwind preflight reset (first, lowest priority)
+ *   legacy     — existing hand-rolled styles.css; AFTER base so legacy
+ *                component styles survive the reset, BEFORE theme so
+ *                theme.css's per-theme tokens win over styles.css's legacy
+ *                light-token :root block
+ *   theme      — Tailwind theme + CampusOS theme tokens (light/dark/high-contrast)
+ *   components
+ *   utilities  — Tailwind utilities + shadcn component classes ALWAYS win
+ *
+ * Order is fixed by the first @layer statement below; the single-name @import
+ * layer() forms below are chosen over the comma-list form so the CSS minifier
+ * (lightningcss) does not choke on it.
+ */
+@layer base, legacy, theme, components, utilities;
+@import "tailwindcss/preflight.css" layer(base);
+@import "./styles.css" layer(legacy);
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+@import "./theme.css" layer(theme);
+
+/*
+ * Map Tailwind's dark: variant onto CampusOS's persisted theme attribute so
+ * shadcn components follow the existing light/dark/high-contrast switch.
+ */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/*
+ * shadcn/ui CSS variables — values come from CampusOS theme tokens
+ * (theme.css), so light / dark / high-contrast switch for free and the new
+ * components share the app's visual language from day one.
+ */
+:root {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--card-bg);
+  --card-foreground: var(--ink);
+  --popover: var(--card-bg);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--paper);
+  --secondary: var(--paper-muted);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper-muted);
+  --muted-foreground: var(--ink-soft);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--paper);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--accent);
+  --radius: 0.375rem;
+}
+
+/*
+ * Expose the tokens to Tailwind's color/radius utilities (bg-background, ...).
+ * Names that collide with CampusOS tokens (--accent, --warning, --success)
+ * are mapped only here, so utilities inline the source token and the legacy
+ * custom properties are never overridden.
+ */
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--card-bg);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card-bg);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--paper-muted);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--paper-muted);
+  --color-muted-foreground: var(--ink-soft);
+  --color-accent: var(--accent-wash);
+  --color-accent-foreground: var(--accent-deep);
+  --color-destructive: var(--danger);
+  --color-destructive-foreground: var(--paper);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--ink);
+  --color-success: var(--success);
+  --color-success-foreground: var(--ink);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}

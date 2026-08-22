@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
@@ -138,6 +139,7 @@ export default defineConfig({
   },
   renderer: {
     plugins: [
+      tailwindcss(),
       react(),
       {
         name: "campusos-development-style-csp",
@@ -162,6 +164,7 @@ export default defineConfig({
     },
     resolve: {
       alias: {
+        "@": resolve(rootDir, "src/renderer"),
         "@renderer": resolve(rootDir, "src/renderer"),
         "@campusos/shared": resolve(rootDir, "../shared/src/index.ts"),
         "@campusos/plugin-academic/manifest": resolve(
