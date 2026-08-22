@@ -4900,3 +4900,39 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+/* 日程：全部课程（跨学期列表，沿用无框分隔线风格） */
+.schedule-courses-section {
+  margin-top: 28px;
+}
+.schedule-all-courses {
+  display: grid;
+  gap: 22px;
+}
+.schedule-course-term h3 {
+  margin: 0 0 2px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.schedule-course-list {
+  display: flex;
+  flex-direction: column;
+}
+.schedule-course-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-bottom: 1px solid var(--line);
+  padding: 9px 0 11px;
+}
+.schedule-course-row strong {
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.schedule-course-meta {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
