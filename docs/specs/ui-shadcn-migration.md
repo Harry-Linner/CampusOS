@@ -161,6 +161,14 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] **通知中心按键**：触发器补 `cursor:pointer` + hover + focus-visible；条目主按钮补 `cursor:pointer`、hover 底色与 focus-visible（此前完全无交互反馈）
 - [x] **桌面日历按键**：视图切换按钮补 hover 底色/文字变化与 focus-visible；菜单项补 focus-visible；`.text-button/.icon-button/.primary-button` 补普通主题 focus-visible
 - [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**；Electron 实机计算样式确认通知弹层 `background: rgba(255,255,255,0.86)`、阴影生效、按键 `cursor: pointer`
+
+### Phase B/C 前置 — shadcn 组件 CJK 排版与全局审美扫描（2026-08-23）
+
+- [x] **shadcn 组件 CJK 排版**：`CardTitle`/`DialogTitle` 行高 `leading-none`(1) → `leading-snug`(1.375)（中文标题行距过小、多行重叠）；`AlertTitle` 移除 `tracking-tight` 负字距；`Label` 行高 `leading-none` → `leading-normal`——影响全应用所有使用处，一处修复全局生效
+- [x] **legacy token 补全（第二批）**：`--accent-soft`/`--paper-soft`/`--text` 3 个未定义变量补齐（学业培养方案选中底色、AI 时间上下文背景、桌面日历菜单文字此前失效）；连同第一批共 9 个别名，全库 CSS 变量审计清零
+- [x] **按键交互扫描**：`.danger-button`/`.secondary-button` 补 cursor+过渡；`.academic-program-options` 选项补 hover+焦点环；`.search-trigger`/`.module-tabs`/`.academic-course-option`/`.materials-course-option` 补 focus-visible
+- [x] **日程全部课程列表样式**：此前新增的跨学期课程列表无 CSS，按无框分隔线风格补全（学期标题/课程行/次级元信息），实机验证生效
+- [x] 验收：typecheck/lint 零错误、`pnpm test` **479 passed / 1 skipped**、构建成功、Electron 实机计算样式验证（课程列表边框/内边距/颜色/字距）
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
