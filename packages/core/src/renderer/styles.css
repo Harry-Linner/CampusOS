@@ -406,8 +406,7 @@ input:focus-visible {
   font-family: var(--font-display);
   font-size: clamp(2rem, 3.2vw, 3rem);
   font-weight: 650;
-  letter-spacing: -0.065em;
-  line-height: 0.95;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
@@ -473,7 +472,6 @@ input:focus-visible {
   color: var(--ink);
   font-size: 1rem;
   font-weight: 650;
-  letter-spacing: -0.02em;
 }
 
 .section-heading span {
@@ -589,7 +587,6 @@ input:focus-visible {
   color: var(--ink);
   font-size: 0.96rem;
   font-weight: 650;
-  letter-spacing: -0.015em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -789,7 +786,6 @@ input:focus-visible {
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 650;
-  letter-spacing: -0.035em;
   text-align: center;
 }
 
@@ -1009,8 +1005,7 @@ input:focus-visible {
   font-family: var(--font-display);
   font-size: 1.7rem;
   font-weight: 650;
-  letter-spacing: -0.06em;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .agenda-day-heading time span,
@@ -1078,7 +1073,6 @@ input:focus-visible {
   color: var(--ink);
   font-size: 0.9rem;
   font-weight: 650;
-  letter-spacing: -0.015em;
   line-height: 1.28;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1612,7 +1606,6 @@ input:focus-visible {
   overflow: hidden;
   font-size: 0.96rem;
   font-weight: 650;
-  letter-spacing: -0.015em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2303,7 +2296,6 @@ input:focus-visible {
 .academic-course-detail h3 {
   margin: 0;
   font-family: var(--font-display);
-  letter-spacing: -0.03em;
 }
 
 .academic-select-label {
@@ -2511,7 +2503,6 @@ input:focus-visible {
 .panel-card h2 {
   margin: 0;
   font-family: var(--font-display);
-  letter-spacing: -0.04em;
 }
 
 .eyebrow,
@@ -4872,7 +4863,7 @@ input:focus-visible {
 .update-prompt-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgb(28 24 18 / 28%); backdrop-filter: blur(4px); }
 .update-prompt { width: min(520px, 100%); padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: 0 24px 70px rgb(52 40 22 / 22%); }
 .update-prompt header, .update-prompt footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.update-prompt h2 { margin: 6px 0 0; font-size: 1.45rem; letter-spacing: -.03em; }
+.update-prompt h2 { margin: 6px 0 0; font-size: 1.45rem; }
 .update-prompt p { margin: 22px 0; color: var(--ink-muted); line-height: 1.65; }
 .update-prompt-current { color: var(--ink-muted); font-size: .78rem; }
 .update-prompt-notes { margin: 0 0 22px; padding: 12px 14px; border-radius: 12px; background: var(--paper-muted); }
