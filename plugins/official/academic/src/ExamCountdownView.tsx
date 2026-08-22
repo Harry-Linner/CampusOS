@@ -37,16 +37,16 @@ export const Component = ({
   const busy = !loaded || workspaceLoading;
 
   return (
-    <section className="page">
-      <header className="page-header">
+    <section className="academic-panel" aria-label="考试">
+      <div className="academic-panel-heading">
         <div>
           <p className="eyebrow">Countdown</p>
-          <h1>考试倒计时</h1>
+          <h2>考试倒计时</h2>
         </div>
         <button className="primary-button" disabled={busy} type="button" onClick={() => void onRefresh()}>
           刷新
         </button>
-      </header>
+      </div>
 
       {error ? (
         <article className="panel-card" role="alert">

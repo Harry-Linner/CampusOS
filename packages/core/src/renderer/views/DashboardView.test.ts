@@ -79,18 +79,25 @@ const createUpcomingSnapshot = (): CampusWorkspaceSnapshot => ({
 });
 
 describe("DashboardView", () => {
-  it("previews the next semester's matching weekday outside teaching periods", () => {
+  it("previews today's courses as 今日事项预览 regardless of term phase", () => {
+    const snapshot = createUpcomingSnapshot();
+    snapshot.todayCourses = [snapshot.courses[0]];
+
+    render(createElement(DashboardView, { loading: false, snapshot }));
+
+    expect(screen.getByRole("heading", { name: "今日事项预览" })).toBeDefined();
+    expect(screen.getByText("历史课程")).toBeDefined();
+    expect(screen.queryByText("历史课程")?.closest("ol")).not.toBeNull();
+  });
+
+  it("shows the empty state when there are no courses today", () => {
     render(createElement(DashboardView, {
       loading: false,
       snapshot: createUpcomingSnapshot()
     }));
 
-    expect(screen.getByRole("heading", { name: "下学期周二预览" })).toBeDefined();
-    expect(screen.getByText("秋季周二课程")).toBeDefined();
-    expect(screen.queryByText("历史课程")).toBeNull();
-    expect(screen.queryByText("秋季开学周五课程")).toBeNull();
-    expect(screen.queryByText("秋季周三课程")).toBeNull();
-    expect(screen.queryByText("秋季第二周课程")).toBeNull();
+    expect(screen.getByRole("heading", { name: "今日事项预览" })).toBeDefined();
+    expect(screen.getByText("今日暂无课程安排")).toBeDefined();
   });
 
   it("does not expose a mock marker when an active term has no week number", () => {

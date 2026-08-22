@@ -85,11 +85,11 @@ export const Component = ({
   const availableRecords = records.filter((record) => record.data !== null);
 
   return (
-    <section className="page academic-grades-page">
-      <header className="page-header">
+    <section className="academic-panel" aria-label="成绩">
+      <div className="academic-panel-heading">
         <div>
           <p className="eyebrow">Academic records</p>
-          <h1>学业成绩</h1>
+          <h2>学业成绩</h2>
         </div>
         <div className="grade-header-actions">
           <label className="setting-switch" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>
@@ -112,7 +112,7 @@ export const Component = ({
             {refreshing ? "正在刷新" : "刷新成绩"}
           </button>
         </div>
-      </header>
+      </div>
 
       {error ? (
         <article className="panel-card" role="alert">

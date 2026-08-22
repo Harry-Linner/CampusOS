@@ -272,11 +272,6 @@ export const Component = ({
       <header className="page-heading materials-heading">
         <div>
           <h1>资料</h1>
-          <p>
-            {selectedSemester
-              ? `${selectedSemester.label} · ${selectedSemester.courses.length} 门课程 · ${snapshot.materials.length} 个文件`
-              : "当前没有可用的课程资料"}
-          </p>
         </div>
         <nav className="module-tabs" aria-label="资料视图">
           <button
