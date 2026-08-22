@@ -37,9 +37,8 @@ try {
     await page.locator(".app-shell").waitFor({ timeout: 15_000 });
     // Dismiss the first-use AI setup dialog when it appears (fresh userData).
     const setupDialog = page.locator(".assistant-setup-backdrop");
-    if (await setupDialog.isVisible().catch(() => false)) {
-      await page.getByRole("button", { name: "稍后配置" }).click().catch(() => undefined);
-    }
+    await setupDialog.waitFor({ state: "visible", timeout: 2_000 }).catch(() => undefined);
+    await page.getByRole("button", { name: "稍后配置" }).click().catch(() => undefined);
     // Let the dashboard settle after hydration.
     await page.waitForTimeout(1500);
     await page.screenshot({ path: join(outputRoot, `dashboard-${theme}.png`), fullPage: true });

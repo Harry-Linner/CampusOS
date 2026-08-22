@@ -23,6 +23,9 @@
 @import "tw-animate-css";
 @import "./theme.css" layer(theme);
 
+/* Official renderer plugins live outside packages/core/src/renderer. */
+@source "../../../../plugins/official";
+
 /*
  * Map Tailwind's dark: variant onto CampusOS's persisted theme attribute so
  * shadcn components follow the existing light/dark/high-contrast switch.

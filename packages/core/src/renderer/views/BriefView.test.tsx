@@ -70,7 +70,7 @@ describe("BriefView", () => {
     render(createElement(BriefView, { ...baseProps, brief: createBridge() }));
     expect(screen.getByText("早报")).toBeTruthy();
     expect(screen.getAllByText(/刷新早报/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/抓取最新资讯并生成今日摘要/)).toBeTruthy();
+    expect(screen.getByText(/点击刷新抓取公开资讯/)).toBeTruthy();
   });
 
   it("renders generated sections and resolves original links", async () => {
@@ -104,8 +104,7 @@ describe("BriefView", () => {
       }))
     });
     render(createElement(BriefView, { ...baseProps, brief: bridge }));
-    expect(await screen.findByText("正在抓取信息源…")).toBeTruthy();
-    expect(screen.getByRole("status")).toBeTruthy();
+    expect((await screen.findByRole("status")).textContent).toContain("正在抓取信息源");
   });
 
   it("auto-generates on first open when no snapshot exists", async () => {

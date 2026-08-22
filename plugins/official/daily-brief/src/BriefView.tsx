@@ -1,25 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AlertCircle,
-  ExternalLink,
-  Newspaper,
-  RefreshCw
-} from "lucide-react";
-import type {
-  BriefItem,
-  BriefState,
-  PluginComponentProps
-} from "@campusos/shared";
+import { AlertCircle, CheckCircle2, ExternalLink, Newspaper, RefreshCw, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+import type { BriefItem, BriefState, PluginComponentProps } from "@campusos/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { InterestSettings } from "./InterestSettings";
@@ -27,24 +13,15 @@ import { InterestSettings } from "./InterestSettings";
 type BriefTab = "daily" | "settings";
 
 const statusLabel: Record<BriefState["status"], string> = {
-  idle: "尚未生成",
-  fetching: "正在抓取信息源…",
-  generating: "AI 正在生成摘要…",
-  ready: "已生成",
-  error: "生成失败"
+  idle: "尚未生成", fetching: "正在抓取信息源", generating: "正在整理摘要", ready: "已更新", error: "更新失败"
 };
-
-const isLoading = (status: BriefState["status"]): boolean =>
-  status === "fetching" || status === "generating";
+const isLoading = (status: BriefState["status"]): boolean => status === "fetching" || status === "generating";
+const formatGeneratedAt = (value: string): string => new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }).format(new Date(value));
 
 export const BriefView = (props: PluginComponentProps): JSX.Element => {
   const brief = props.brief;
   const [tab, setTab] = useState<BriefTab>("daily");
-  const [state, setState] = useState<BriefState>({
-    status: "idle",
-    snapshot: null,
-    error: null
-  });
+  const [state, setState] = useState<BriefState>({ status: "idle", snapshot: null, error: null });
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const busyRef = useRef(false);
@@ -54,259 +31,74 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
     if (!brief || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
-    try {
-      setState(await brief.refresh());
-    } catch (cause) {
-      setState((current) => ({
-        status: "error",
-        snapshot: current.snapshot,
-        error: cause instanceof Error ? cause.message : "刷新失败。"
-      }));
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    try { setState(await brief.refresh()); } catch (cause) {
+      setState((current) => ({ status: "error", snapshot: current.snapshot, error: cause instanceof Error ? cause.message : "刷新失败。" }));
+    } finally { busyRef.current = false; setBusy(false); }
   }, [brief]);
 
   useEffect(() => {
     if (!brief) return;
     let active = true;
-    void brief
-      .getState()
-      .then((next) => {
-        if (!active) return;
-        setState(next);
-        // Generate on first open when nothing has been produced yet.
-        if (!autoRefreshed.current && next.status === "idle" && !next.snapshot) {
-          autoRefreshed.current = true;
-          void refresh();
-        }
-      })
-      .catch(() => undefined);
+    void brief.getState().then((next) => {
+      if (!active) return;
+      setState(next);
+      if (!autoRefreshed.current && next.status === "idle" && !next.snapshot) { autoRefreshed.current = true; void refresh(); }
+    }).catch(() => undefined);
     const unsubscribe = brief.subscribe((next) => setState(next));
-    return () => {
-      active = false;
-      unsubscribe();
-    };
+    return () => { active = false; unsubscribe(); };
   }, [brief, refresh]);
 
   const openOriginal = (item: BriefItem): void => {
     if (!brief) return;
-    void brief.openExternal(item.fingerprint).catch(() => undefined);
-  };
-
-  const toggleExpanded = (fingerprint: string): void => {
-    setExpanded((current) => ({
-      ...current,
-      [fingerprint]: !current[fingerprint]
-    }));
+    void brief.openExternal(item.fingerprint).catch((cause) => toast.error(cause instanceof Error ? cause.message : "无法打开原文。", { description: "条目链接未通过本地安全检查。" }));
   };
 
   const snapshot = state.snapshot;
   const hasContent = (snapshot?.sections.length ?? 0) > 0;
-  const showContent = !isLoading(state.status) && !busy && Boolean(snapshot);
-  const showEmpty =
-    !isLoading(state.status) && !busy && !state.error && !snapshot;
+  const loading = isLoading(state.status) || busy;
+  const showEmpty = !snapshot && !loading && !state.error;
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <section className="mx-auto w-full max-w-5xl px-1 pb-10 sm:px-2">
       <Toaster position="top-right" />
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Newspaper className="size-5 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight">早报</h1>
+      <header className="mb-8 border-b border-border/70 pb-6">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2 text-primary"><Newspaper className="size-5" aria-hidden="true" /><span className="text-xs font-semibold tracking-[0.16em]">DAILY BRIEF</span></div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">早报</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">把公开资讯整理成按关注领域分组的中文摘要，阅读原文仍回到来源网站。</p>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            按关注领域聚合外部资讯，生成全中文摘要日报。
-          </p>
-        </div>
-        <div className="flex gap-1 rounded-lg bg-muted p-[3px]" role="tablist">
-          <Button
-            size="sm"
-            variant={tab === "daily" ? "default" : "ghost"}
-            role="tab"
-            aria-selected={tab === "daily"}
-            onClick={() => setTab("daily")}
-          >
-            日报
-          </Button>
-          <Button
-            size="sm"
-            variant={tab === "settings" ? "default" : "ghost"}
-            role="tab"
-            aria-selected={tab === "settings"}
-            onClick={() => setTab("settings")}
-          >
-            设置
-          </Button>
+          <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
+            <div className="flex gap-1 rounded-lg border border-border bg-muted/60 p-1" role="tablist" aria-label="早报视图">
+              <Button size="sm" variant={tab === "daily" ? "default" : "ghost"} role="tab" aria-selected={tab === "daily"} onClick={() => setTab("daily")}>日报</Button>
+              <Button size="sm" variant={tab === "settings" ? "default" : "ghost"} role="tab" aria-selected={tab === "settings"} onClick={() => setTab("settings")}><Settings2 className="size-3.5" aria-hidden="true" />设置</Button>
+            </div>
+          </div>
         </div>
       </header>
 
-      {tab === "settings" ? (
-        brief ? (
-          <InterestSettings brief={brief} />
-        ) : (
-          <Alert variant="destructive">
-            <AlertCircle className="size-4" />
-            <AlertTitle>桥接不可用</AlertTitle>
-            <AlertDescription>早报桥接不可用，请重启 CampusOS。</AlertDescription>
-          </Alert>
-        )
-      ) : (
+      {tab === "settings" ? (brief ? <InterestSettings brief={brief} /> : <Alert variant="destructive"><AlertCircle className="size-4" /><AlertTitle>桥接不可用</AlertTitle><AlertDescription>早报桥接不可用，请重启 CampusOS。</AlertDescription></Alert>) : (
         <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold">
-                {snapshot?.date ?? "今日早报"}
-              </h2>
-              {snapshot?.generatedAt ? (
-                <p className="text-xs text-muted-foreground">
-                  生成于 {new Date(snapshot.generatedAt).toLocaleTimeString("zh-CN")}
-                </p>
-              ) : null}
-            </div>
-            <Button
-              onClick={() => void refresh()}
-              disabled={!brief || busy}
-            >
-              <RefreshCw className={busy ? "animate-spin" : undefined} />
-              {busy ? "生成中…" : "刷新早报"}
-            </Button>
+          <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/70 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold tracking-tight">{snapshot?.date ?? "今日早报"}</h2>{snapshot ? <Badge variant="secondary">{statusLabel[state.status]}</Badge> : null}</div><p className="mt-1 text-sm text-muted-foreground">{snapshot?.generatedAt ? `上次更新 ${formatGeneratedAt(snapshot.generatedAt)}` : "尚未生成今日摘要"}</p></div>
+            <Button onClick={() => void refresh()} disabled={!brief || loading} className="w-full sm:w-auto"><RefreshCw className={loading ? "animate-spin" : undefined} aria-hidden="true" />{loading ? statusLabel[state.status] : "刷新早报"}</Button>
           </div>
 
-          {!brief ? (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertTitle>桥接不可用</AlertTitle>
-              <AlertDescription>早报桥接不可用，请重启 CampusOS。</AlertDescription>
-            </Alert>
-          ) : null}
+          {state.error ? <Alert variant="destructive"><AlertCircle className="size-4" /><AlertTitle>早报没有更新</AlertTitle><AlertDescription className="flex flex-wrap items-center gap-3"><span>{state.error}</span>{snapshot ? <Button size="sm" variant="outline" onClick={() => void refresh()} disabled={loading}>重试</Button> : null}</AlertDescription></Alert> : null}
 
-          {state.error ? (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertTitle>生成失败</AlertTitle>
-              <AlertDescription className="flex flex-wrap items-center gap-3">
-                <span>{state.error}</span>
-                {state.snapshot ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void refresh()}
-                    disabled={busy}
-                  >
-                    重试
-                  </Button>
-                ) : null}
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          {loading ? <div className="space-y-3" role="status" aria-live="polite"><div className="flex items-center gap-2 text-sm text-muted-foreground"><RefreshCw className="size-4 animate-spin" aria-hidden="true" /><span>{statusLabel[state.status]}，旧内容仍可阅读</span></div>{!snapshot ? [0, 1].map((index) => <Card key={index} className="shadow-none"><CardHeader><Skeleton className="h-5 w-36" /></CardHeader><CardContent className="space-y-3"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>) : null}</div> : null}
 
-          {isLoading(state.status) ? (
-            <div className="space-y-4" role="status">
-              <p className="text-sm text-muted-foreground">
-                {statusLabel[state.status]}
-              </p>
-              {[0, 1, 2].map((index) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <Skeleton className="h-5 w-40" />
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-8 w-28" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : null}
+          {(snapshot?.degradedSources.length ?? 0) > 0 ? <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground"><AlertCircle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" /><span>部分信息源暂不可用：{snapshot!.degradedSources.join("、")}</span></div> : null}
 
-          {(snapshot?.degradedSources.length ?? 0) > 0 ? (
-            <p className="text-sm text-muted-foreground">
-              部分信息源暂不可用：{snapshot!.degradedSources.join("、")}
-            </p>
-          ) : null}
+          {showEmpty ? <Card className="border-dashed shadow-none"><CardContent className="flex flex-col items-center gap-4 px-6 py-16 text-center"><div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Newspaper className="size-5" aria-hidden="true" /></div><div><h2 className="font-semibold">今天还没有早报</h2><p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">点击刷新抓取公开资讯。生成摘要需要在 AI 助手中配置可用的模型连接。</p></div><Button onClick={() => void refresh()} disabled={!brief}><RefreshCw aria-hidden="true" />生成今日早报</Button></CardContent></Card> : null}
 
-          {showEmpty ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-                <p className="max-w-md text-sm text-muted-foreground">
-                  点击"刷新早报"抓取最新资讯并生成今日摘要。生成前请在 AI 助手设置中配置 API Key。
-                </p>
-                <Button onClick={() => void refresh()} disabled={busy}>
-                  <RefreshCw className={busy ? "animate-spin" : undefined} />
-                  刷新早报
-                </Button>
-              </CardContent>
-            </Card>
-          ) : null}
+          {snapshot && !hasContent && !loading ? <Card className="shadow-none"><CardContent className="py-14 text-center text-sm text-muted-foreground">{snapshot.note ?? "今日暂无新内容。"}</CardContent></Card> : null}
 
-          {showContent && !hasContent ? (
-            <Card>
-              <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                {snapshot!.note ?? "今日暂无新内容。"}
-              </CardContent>
-            </Card>
-          ) : null}
+          {snapshot && hasContent ? <div className="space-y-5">{snapshot.sections.map((section, sectionIndex) => <Card key={`${section.interest}-${sectionIndex}`} className="overflow-hidden shadow-sm"><CardHeader className="border-b border-border/60 bg-muted/20 px-5 py-4 sm:px-6"><div className="flex items-center justify-between gap-3"><div><CardTitle className="text-lg">{section.interest}</CardTitle><CardDescription className="mt-1">{section.items.length} 条摘要</CardDescription></div><span className="font-mono text-xs text-muted-foreground">{String(sectionIndex + 1).padStart(2, "0")}</span></div></CardHeader><CardContent className="divide-y divide-border/60 px-5 sm:px-6">{section.items.map((item) => <article key={item.fingerprint} className="py-5 first:pt-5 last:pb-5"><h3 className="text-base font-semibold leading-6 text-foreground">{item.titleZh}</h3><p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{item.summary}</p><div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Badge variant="secondary">{item.sourceLabel}</Badge>{item.relevance ? <span>{item.relevance}</span> : null}</div>{expanded[item.fingerprint] ? <p className="mt-3 border-l-2 border-primary/30 pl-3 text-xs leading-5 text-muted-foreground">原标题：{item.originalTitle}</p> : null}<div className="mt-4 flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button><Button size="sm" variant="ghost" onClick={() => setExpanded((current) => ({ ...current, [item.fingerprint]: !current[item.fingerprint] }))}>{expanded[item.fingerprint] ? "收起详情" : "查看详情"}</Button></div></article>)}</CardContent></Card>)}</div> : null}
 
-          {showContent && hasContent ? (
-            <div className="space-y-6">
-              {snapshot!.sections.map((section) => (
-                <Card key={section.interest}>
-                  <CardHeader>
-                    <CardTitle>{section.interest}</CardTitle>
-                    <CardDescription>{section.items.length} 条摘要</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-5">
-                    {section.items.map((item) => (
-                      <article key={item.fingerprint} className="space-y-2">
-                        <h3 className="font-medium leading-snug">
-                          {item.titleZh}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {item.summary}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="secondary">{item.sourceLabel}</Badge>
-                          {item.relevance ? <span>{item.relevance}</span> : null}
-                        </div>
-                        {expanded[item.fingerprint] ? (
-                          <p className="text-xs text-muted-foreground">
-                            原标题：{item.originalTitle}
-                          </p>
-                        ) : null}
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openOriginal(item)}
-                          >
-                            <ExternalLink className="size-3.5" />
-                            阅读原文
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => toggleExpanded(item.fingerprint)}
-                          >
-                            {expanded[item.fingerprint] ? "收起" : "详情"}
-                          </Button>
-                        </div>
-                      </article>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : null}
-
-          {snapshot?.note && hasContent ? (
-            <p className="text-sm text-muted-foreground">{snapshot.note}</p>
-          ) : null}
+          {snapshot?.note && hasContent ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="size-4 text-primary" aria-hidden="true" />{snapshot.note}</p> : null}
         </div>
       )}
-    </div>
+    </section>
   );
 };

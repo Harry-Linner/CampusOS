@@ -38,6 +38,7 @@ import type { AiRuntime } from "./aiRuntime";
 import {
   BRIEF_SOURCE_IDS,
   BRIEF_SOURCE_DEFINITIONS,
+  isBriefSourceUrl,
   type BriefFetcher
 } from "./briefInfoSources";
 import type { BriefStore } from "./briefStore";
@@ -118,10 +119,11 @@ const shanghaiNow = (value: Date, timezone: string): string => {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:00+08:00`;
 };
 
-const validateHttpsUrl = (value: string): string | null => {
+const validateHttpsUrl = (value: string, sourceId?: string): string | null => {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (sourceId && !isBriefSourceUrl(sourceId, value)) return null;
     return url.toString();
   } catch {
     return null;
@@ -162,7 +164,7 @@ const normalizeBriefItem = (
   const cached = itemMap.get(fingerprint)!;
   const url = typeof raw.url === "string" ? raw.url : "";
   if (url !== cached.url) return null;
-  if (!validateHttpsUrl(url)) return null;
+  if (!validateHttpsUrl(url, cached.sourceId)) return null;
   const titleZh = typeof raw.titleZh === "string" ? raw.titleZh.trim() : "";
   const summary = typeof raw.summary === "string" ? raw.summary.trim() : "";
   const originalTitle = typeof raw.originalTitle === "string" ? raw.originalTitle.trim() : "";
@@ -261,6 +263,9 @@ export const createBriefService = ({
 }: BriefServiceDependencies): BriefService => {
   let state: BriefState = { status: "idle", snapshot: null, error: null };
   const listeners = new Set<(state: BriefState) => void>();
+  let hydrated = false;
+  let hydration: Promise<void> | null = null;
+  let refreshInFlight: Promise<BriefState> | null = null;
 
   const setState = (next: BriefState): void => {
     state = next;
@@ -271,117 +276,156 @@ export const createBriefService = ({
     BRIEF_SOURCE_DEFINITIONS.map((source) => [source.id, source.label])
   );
 
-  return {
-    getState: async () => state,
-
-    refresh: async () => {
-      setState({ status: "fetching", snapshot: state.snapshot, error: null });
-      try {
-        const profile = (await store.loadProfile()) ?? defaultProfile();
-        const enabledSourceIds = BRIEF_SOURCE_IDS.filter(
-          (id) => profile.sourceEnabled[id] !== false
-        );
-        if (enabledSourceIds.length === 0) {
-          setState({
-            status: "error",
-            snapshot: state.snapshot,
-            error: "请先在早报设置中启用至少一个信息源。"
-          });
-          return state;
+  const hydrate = async (): Promise<void> => {
+    if (hydrated) return;
+    if (!hydration) {
+      hydration = store.loadSnapshot().then((stored) => {
+        hydrated = true;
+        if (stored?.snapshot) {
+          state = { status: "ready", snapshot: stored.snapshot, error: null };
         }
-        const outcome = await fetchSources({ enabledSourceIds });
-
-        for (const item of outcome.items) {
-          await store.upsertItem(item);
-        }
-
-        if (outcome.items.length === 0) {
-          if (outcome.degraded.length > 0) {
-            setState({
-              status: "error",
-              snapshot: state.snapshot,
-              error: "所有信息源抓取失败，请检查网络后重试。"
-            });
-            return state;
-          }
-          const empty: BriefSnapshot = {
-            date: shanghaiDate(now(), timezone),
-            generatedAt: now().toISOString(),
-            sections: [],
-            degradedSources: [],
-            note: "今日暂无新内容。"
-          };
-          await store.saveSnapshot(empty);
-          setState({ status: "ready", snapshot: empty, error: null });
-          return state;
-        }
-
-        const connection = await runtime.load();
-        if (!connection.configured) {
-          setState({
-            status: "error",
-            snapshot: state.snapshot,
-            error: "请先在 AI 助手设置中配置 API Key。"
-          });
-          return state;
-        }
-
-        setState({ status: "generating", snapshot: state.snapshot, error: null });
-        const adapter = createAdapter(connection.profile, connection.apiKey);
-        const itemMap = new Map(
-          outcome.items.map((item) => [item.fingerprint, item])
-        );
-        const grouped = outcome.items.reduce<Map<string, BriefCachedItem[]>>(
-          (acc, item) => {
-            const list = acc.get(item.sourceId) ?? [];
-            list.push(item);
-            acc.set(item.sourceId, list);
-            return acc;
-          },
-          new Map()
-        );
-
-        const raw = await adapter.generateStructured({
-          systemPrompt: BRIEF_SYSTEM_PROMPT,
-          input: {
-            now: shanghaiNow(now(), timezone),
-            promptVersion: BRIEF_PROMPT_VERSION,
-            profile: profile.interests,
-            sources: [...grouped.entries()].map(([sourceId, items]) => ({
-              sourceId,
-              label: sourceLabelById.get(sourceId) ?? sourceId,
-              items: items.map((item) => ({
-                fingerprint: item.fingerprint,
-                title: item.title,
-                summary: item.summary,
-                url: item.url,
-                publishedAt: item.publishedAt
-              }))
-            }))
-          },
-          schemaName: "daily_brief_v1",
-          schema: BRIEF_SCHEMA as unknown as Record<string, unknown>
+      }).catch((cause) => {
+        hydrated = true;
+        setState({
+          status: "error",
+          snapshot: null,
+          error: cause instanceof Error ? cause.message : "早报缓存读取失败。"
         });
+      }).finally(() => {
+        hydration = null;
+      });
+    }
+    await hydration;
+  };
 
-        const snapshot = validateBrief(
-          raw,
-          itemMap,
-          sourceLabelById,
-          outcome.degraded,
-          now(),
-          timezone
-        );
-        await store.saveSnapshot(snapshot);
-        setState({ status: "ready", snapshot, error: null });
-        return state;
-      } catch (cause) {
+  const performRefresh = async (): Promise<BriefState> => {
+    await hydrate();
+    setState({ status: "fetching", snapshot: state.snapshot, error: null });
+    try {
+      const profile = (await store.loadProfile()) ?? defaultProfile();
+      const enabledSourceIds = BRIEF_SOURCE_IDS.filter(
+        (id) => profile.sourceEnabled[id] !== false
+      );
+      if (enabledSourceIds.length === 0) {
         setState({
           status: "error",
           snapshot: state.snapshot,
-          error: mapProviderError(cause)
+          error: "请先在早报设置中启用至少一个信息源。"
         });
         return state;
       }
+      const outcome = await fetchSources({ enabledSourceIds });
+      const freshItems: BriefCachedItem[] = [];
+      for (const item of outcome.items) {
+        if (await store.upsertItem(item)) freshItems.push(item);
+      }
+
+      if (freshItems.length === 0) {
+        if (outcome.degraded.length === enabledSourceIds.length) {
+          setState({
+            status: "error",
+            snapshot: state.snapshot,
+            error: "所有信息源抓取失败，请检查网络后重试。"
+          });
+          return state;
+        }
+        if (state.snapshot) {
+          setState({ status: "ready", snapshot: state.snapshot, error: null });
+          return state;
+        }
+        const empty: BriefSnapshot = {
+          date: shanghaiDate(now(), timezone),
+          generatedAt: now().toISOString(),
+          sections: [],
+          degradedSources: outcome.degraded,
+          note: outcome.degraded.length > 0
+            ? "部分信息源暂不可用，当前没有新内容。"
+            : "今日暂无新内容。"
+        };
+        await store.saveSnapshot(empty);
+        setState({ status: "ready", snapshot: empty, error: null });
+        return state;
+      }
+
+      const connection = await runtime.load();
+      if (!connection.configured) {
+        setState({
+          status: "error",
+          snapshot: state.snapshot,
+          error: "请先在 AI 助手设置中配置 API Key。"
+        });
+        return state;
+      }
+
+      setState({ status: "generating", snapshot: state.snapshot, error: null });
+      const adapter = createAdapter(connection.profile, connection.apiKey);
+      const itemMap = new Map(freshItems.map((item) => [item.fingerprint, item]));
+      const grouped = freshItems.reduce<Map<string, BriefCachedItem[]>>(
+        (acc, item) => {
+          const list = acc.get(item.sourceId) ?? [];
+          list.push(item);
+          acc.set(item.sourceId, list);
+          return acc;
+        },
+        new Map()
+      );
+
+      const raw = await adapter.generateStructured({
+        systemPrompt: BRIEF_SYSTEM_PROMPT,
+        input: {
+          now: shanghaiNow(now(), timezone),
+          promptVersion: BRIEF_PROMPT_VERSION,
+          profile: profile.interests,
+          sources: [...grouped.entries()].map(([sourceId, items]) => ({
+            sourceId,
+            label: sourceLabelById.get(sourceId) ?? sourceId,
+            items: items.map((item) => ({
+              fingerprint: item.fingerprint,
+              title: item.title,
+              summary: item.summary,
+              url: item.url,
+              publishedAt: item.publishedAt
+            }))
+          }))
+        },
+        schemaName: "daily_brief_v1",
+        schema: BRIEF_SCHEMA as unknown as Record<string, unknown>
+      });
+
+      const snapshot = validateBrief(
+        raw,
+        itemMap,
+        sourceLabelById,
+        outcome.degraded,
+        now(),
+        timezone
+      );
+      await store.saveSnapshot(snapshot);
+      setState({ status: "ready", snapshot, error: null });
+      return state;
+    } catch (cause) {
+      setState({
+        status: "error",
+        snapshot: state.snapshot,
+        error: mapProviderError(cause)
+      });
+      return state;
+    }
+  };
+
+  return {
+    getState: async () => {
+      await hydrate();
+      return state;
+    },
+
+    refresh: async () => {
+      if (!refreshInFlight) {
+        refreshInFlight = performRefresh().finally(() => {
+          refreshInFlight = null;
+        });
+      }
+      return refreshInFlight;
     },
 
     openExternal: async (fingerprint) => {
@@ -392,7 +436,7 @@ export const createBriefService = ({
       if (!item) {
         throw new BriefServiceError("not-found", "该条目不在本地缓存中。");
       }
-      const url = validateHttpsUrl(item.url);
+      const url = validateHttpsUrl(item.url, item.sourceId);
       if (!url) {
         throw new BriefServiceError("invalid-input", "条目链接不是安全的 HTTPS 地址。");
       }

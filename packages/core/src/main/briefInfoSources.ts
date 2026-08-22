@@ -16,6 +16,7 @@ export interface BriefSourceDefinition {
   label: string;
   feedUrl: string;
   interestHint: string;
+  allowedHosts: readonly string[];
 }
 
 export const BRIEF_SOURCE_DEFINITIONS: BriefSourceDefinition[] = [
@@ -23,31 +24,51 @@ export const BRIEF_SOURCE_DEFINITIONS: BriefSourceDefinition[] = [
     id: "arxiv",
     label: "arXiv",
     feedUrl: "https://rss.arxiv.org/rss/cs",
-    interestHint: "学术/计算机"
+    interestHint: "学术/计算机",
+    allowedHosts: ["arxiv.org"]
   },
   {
     id: "hacker-news",
     label: "Hacker News",
     feedUrl: "https://hnrss.org/frontpage",
-    interestHint: "技术/创业"
+    interestHint: "技术/创业",
+    allowedHosts: ["news.ycombinator.com", "hnrss.org"]
   },
   {
     id: "infoq",
     label: "InfoQ",
     feedUrl: "https://www.infoq.cn/feed",
-    interestHint: "技术/工程"
+    interestHint: "技术/工程",
+    allowedHosts: ["infoq.cn", "www.infoq.cn"]
   },
   {
     id: "solidot",
     label: "Solidot",
     feedUrl: "https://www.solidot.org/index.rss",
-    interestHint: "技术/科学/中文"
+    interestHint: "技术/科学/中文",
+    allowedHosts: ["solidot.org", "www.solidot.org"]
   }
 ];
 
 export const BRIEF_SOURCE_IDS: readonly string[] = BRIEF_SOURCE_DEFINITIONS.map(
   (source) => source.id
 );
+
+export const isBriefSourceUrl = (sourceId: string, value: string): boolean => {
+  const source = BRIEF_SOURCE_DEFINITIONS.find((candidate) => candidate.id === sourceId);
+  if (!source) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      source.allowedHosts.includes(url.hostname.toLowerCase())
+    );
+  } catch {
+    return false;
+  }
+};
 
 export interface BriefFetchOutcome {
   items: BriefCachedItem[];
@@ -138,6 +159,7 @@ export const createBriefFetcher = ({
       const rawUrl = typeof raw.link === "string" ? raw.link : "";
       const url = canonicalUrl(rawUrl);
       if (!url) continue;
+      if (!isBriefSourceUrl(source.id, url)) continue;
       const fingerprint = fingerprintOf(url);
       if (seen.has(fingerprint)) continue;
       seen.add(fingerprint);

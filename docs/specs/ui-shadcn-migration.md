@@ -132,6 +132,16 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **482 passed / 1 skipped**、build 成功
 - [x] 截图：三主题早报视图已更新（`.tmp/ui-capture/brief-*.png`）；dashboard 截图尺寸与 Phase A 一致（无回归）
 
+### Phase B — 链路与视觉修复（2026-08-22）
+
+- [x] **构建边界**：`globals.css` 增加 `@source "../../../../plugins/official"`，官方插件的 Tailwind utility 在生产 CSS 中可见；构建产物抽样确认 `max-w-5xl`、`space-y-6`、响应式 grid 等页面关键 class 已生成。
+- [x] **快照恢复**：早报服务首次读取时从 SQLite 恢复最近快照，应用重启不会无条件重新生成。
+- [x] **状态广播**：IPC 订阅服务状态，`fetching` / `generating` 在真实刷新期间广播到 renderer；旧快照保留并展示加载提示。
+- [x] **缓存去重**：仅将本次新插入缓存的条目交给 AI；并发刷新请求合并为一次上游链路。
+- [x] **来源安全**：RSS 条目、AI 输出条目和外链均按来源 host 白名单及 HTTPS 校验。
+- [x] **视觉重排**：日报改为语义化头部、状态条、轻量条目流和响应式设置表单；空态、加载态、错误态和降级源提示保持可达。
+- [x] **回归测试**：新增快照恢复、缓存去重、并发刷新与真实状态订阅相关覆盖；早报 Core/renderer 定向测试通过。
+
 ### Phase C（待做）
 
 - [ ] Settings → Assistant → Dashboard → Academic/Schedule → Materials → shell 分批迁移，替换即删
