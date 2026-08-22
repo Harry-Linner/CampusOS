@@ -6,16 +6,16 @@ import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { addNotification, readNotificationRecords, restoreNotificationRecords } from "./notificationCenter";
 
-interface BackupPayload { schemaVersion: 1; exportedAt: string; tasks: unknown; planner: unknown; notifications: unknown[]; }
+interface BackupPayload { schemaVersion: 1; exportedAt: string; tasks: unknown; notifications: unknown[]; }
 let selectedImportPath: string | null = null;
 
 const readPayload = async (filePath: string): Promise<BackupPayload> => {
   const parsed = JSON.parse(await readFile(filePath, "utf8")) as Partial<BackupPayload>;
   if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.notifications)) throw new Error("备份文件版本或结构无效。");
-  return { schemaVersion: 1, exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(), tasks: parsed.tasks ?? { tasks: [] }, planner: parsed.planner ?? null, notifications: parsed.notifications };
+  return { schemaVersion: 1, exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(), tasks: parsed.tasks ?? { tasks: [] }, notifications: parsed.notifications };
 };
 
-const preview = (filePath: string, payload: BackupPayload): BackupPreview => ({ filePath, taskCount: payload.tasks && typeof payload.tasks === "object" && "tasks" in payload.tasks && Array.isArray((payload.tasks as { tasks: unknown[] }).tasks) ? (payload.tasks as { tasks: unknown[] }).tasks.length : 0, plannerIncluded: payload.planner !== null, notificationCount: payload.notifications.length, containsCredentials: false });
+const preview = (filePath: string, payload: BackupPayload): BackupPreview => ({ filePath, taskCount: payload.tasks && typeof payload.tasks === "object" && "tasks" in payload.tasks && Array.isArray((payload.tasks as { tasks: unknown[] }).tasks) ? (payload.tasks as { tasks: unknown[] }).tasks.length : 0, notificationCount: payload.notifications.length, containsCredentials: false });
 
 export const registerBackupHandlers = (): void => {
   ipcMain.handle("campusos:backup:export", async (event) => {
@@ -23,7 +23,7 @@ export const registerBackupHandlers = (): void => {
     const result = await dialog.showSaveDialog({ title: "导出 CampusOS 备份", defaultPath: "CampusOS-backup.json", filters: [{ name: "CampusOS 备份", extensions: ["json"] }] });
     if (result.canceled || !result.filePath) return null;
     const database = getOfficialDatabaseService();
-    const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), tasks: database.loadLocalTasks() ?? { tasks: [], savedAt: new Date(0).toISOString() }, planner: database.loadPlannerSchedule(), notifications: await readNotificationRecords() };
+    const payload: BackupPayload = { schemaVersion: 1, exportedAt: new Date().toISOString(), tasks: database.loadLocalTasks() ?? { tasks: [], savedAt: new Date(0).toISOString() }, notifications: await readNotificationRecords() };
     await writeFile(result.filePath, JSON.stringify(payload, null, 2), "utf8");
     return { filePath: result.filePath, taskCount: Array.isArray((payload.tasks as { tasks?: unknown[] }).tasks) ? ((payload.tasks as { tasks: unknown[] }).tasks).length : 0 };
   });

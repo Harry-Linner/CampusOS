@@ -142,7 +142,7 @@ describe("academic timetable events", () => {
     expect(week2Event.startAt).toBe("2026-09-21T08:00:00+08:00");
   });
 
-  it("falls back to the spring-summer term (including 小学期) during the summer break", () => {
+  it("projects courses from every term that has a matching calendar window", () => {
     const summerSession = {
       ...timetableRecord.data!.terms[0].sessions[0],
       sourceId: "summer-session",
@@ -158,10 +158,21 @@ describe("academic timetable events", () => {
       sourceId: "winter-session",
       courseName: "冬学期课程"
     };
+    const oldSession = {
+      ...timetableRecord.data!.terms[0].sessions[0],
+      sourceId: "old-session",
+      courseName: "两年前的课程"
+    };
     const multiSemesterRecord: CapabilityRecord<AcademicTimetableData> = {
       ...timetableRecord,
       data: {
         terms: [
+          {
+            academicYearStart: 2024,
+            season: "1|秋",
+            state: "live",
+            sessions: [oldSession]
+          },
           {
             academicYearStart: 2025,
             season: "2|夏",
@@ -204,27 +215,19 @@ describe("academic timetable events", () => {
       ]
     };
 
-    // 2026-07-15 is 10 days after the summer term ended: still inside the
-    // Celechron-aligned 14-day fallback window.
-    const insideFallback = deriveTimetableCalendarEvents(
-      [multiSemesterRecord],
-      multiSemesterCalendar,
-      "2026-07-15T04:00:00.000Z"
-    );
-    expect(new Set(insideFallback.events.map((event) => event.title))).toEqual(
-      new Set(["小学期课程"])
-    );
-
-    // 2026-08-15 is 41 days after the summer term ended: outside the fallback,
-    // so the workspace projects the next autumn-winter term.
-    const outsideFallback = deriveTimetableCalendarEvents(
+    // CampusOS diverges from Celechron (current-term-only schedule): every
+    // term with an official-calendar window is projected, whatever the date.
+    const result = deriveTimetableCalendarEvents(
       [multiSemesterRecord],
       multiSemesterCalendar,
       "2026-08-15T04:00:00.000Z"
     );
-    expect(new Set(outsideFallback.events.map((event) => event.title))).toEqual(
-      new Set(["秋学期课程", "冬学期课程"])
+    expect(new Set(result.events.map((event) => event.title))).toEqual(
+      new Set(["小学期课程", "秋学期课程", "冬学期课程"])
     );
+    // Terms without a calendar window (2024 autumn) stay out of the calendar;
+    // they remain visible in the schedule's "全部课程" term list instead.
+    expect(result.events.some((event) => event.title === "两年前的课程")).toBe(false);
   });
 
   it("deduplicates a full autumn-winter timetable and bounds each half by the calendar", () => {

@@ -1,3 +1,3 @@
 export type BackupRestoreMode = "merge" | "replace";
-export interface BackupPreview { filePath: string; taskCount: number; plannerIncluded: boolean; notificationCount: number; containsCredentials: false; }
+export interface BackupPreview { filePath: string; taskCount: number; notificationCount: number; containsCredentials: false; }
 export interface BackupBridge { export: () => Promise<{ filePath: string; taskCount: number } | null>; preview: () => Promise<BackupPreview | null>; restore: (mode: BackupRestoreMode) => Promise<BackupPreview | null>; }

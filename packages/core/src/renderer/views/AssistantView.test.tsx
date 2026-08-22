@@ -75,8 +75,6 @@ const createScheduleBridge = (overrides: Partial<NonNullable<PluginComponentProp
   loadTasks: vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-05T00:00:00.000Z" })),
   loadPeriods: vi.fn(async () => []),
   mutateTask: vi.fn(async () => ({ tasks: [], updatedAt: "2026-08-05T00:00:00.000Z" })),
-  generatePlan: vi.fn(),
-  loadPlan: vi.fn(),
   exportIcal: vi.fn(),
   subscribe: vi.fn(() => () => undefined),
   ...overrides

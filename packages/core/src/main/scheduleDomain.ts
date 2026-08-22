@@ -7,10 +7,7 @@ import type {
   LocalTaskRecord,
   LocalTaskRepeatType,
   LocalTaskStatus,
-  LocalTaskType,
-  PlannerSegment,
-  PlannerScheduleData,
-  PlannerSettings
+  LocalTaskType
 } from "@campusos/shared";
 
 const MINUTE_MS = 60_000;
@@ -39,29 +36,6 @@ export interface TaskRefreshResult {
 export interface ScheduleDomainOptions {
   now?: Date;
   idFactory?: () => string;
-}
-
-interface MutablePeriod {
-  uid: string;
-  startMs: number;
-  endMs: number;
-}
-
-interface DeadlineWork {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  endMs: number;
-  remainingMinutes: number;
-  breakable: boolean;
-}
-
-interface FindSolutionResult {
-  valid: boolean;
-  restMinutes: number;
-  segments: PlannerSegment[];
-  failedTaskId: string | null;
 }
 
 const getIdFactory = (options?: ScheduleDomainOptions): (() => string) =>
@@ -109,11 +83,6 @@ const fromShanghaiParts = (
 const startOfDay = (value: Date): Date => {
   const parts = getShanghaiDateParts(value);
   return fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day));
-};
-
-const dateAtShanghaiHour = (day: Date, hour: number): Date => {
-  const parts = getShanghaiDateParts(day);
-  return fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour);
 };
 
 const dateOnly = (value: Date): Date => startOfDay(value);
@@ -502,211 +471,6 @@ export const getTaskCalendarPeriods = (
   rangeStart: Date,
   rangeEnd: Date
 ): TaskPeriod[] => tasks.filter((task) => task.status !== "deleted").flatMap((task) => buildTaskInstances(task, rangeStart, rangeEnd));
-
-const subtractBlockedPeriods = (
-  availableStart: number,
-  availableEnd: number,
-  blocked: Array<{ start: number; end: number }>
-): Array<{ start: number; end: number }> => {
-  const merged = blocked
-    .map(({ start, end }) => ({
-      start: Math.max(availableStart, start),
-      end: Math.min(availableEnd, end)
-    }))
-    .filter(({ start, end }) => start < end)
-    .sort((left, right) => left.start - right.start || left.end - right.end);
-  const result: Array<{ start: number; end: number }> = [];
-  let cursor = availableStart;
-  for (const interval of merged) {
-    if (interval.start > cursor) result.push({ start: cursor, end: interval.start });
-    cursor = Math.max(cursor, interval.end);
-  }
-  if (cursor < availableEnd) result.push({ start: cursor, end: availableEnd });
-  return result;
-};
-
-const buildAvailablePeriods = (
-  snapshot: CampusWorkspaceSnapshot,
-  tasks: LocalTaskRecord[],
-  now: Date,
-  settings: PlannerSettings
-): MutablePeriod[] => {
-  const result: MutablePeriod[] = [];
-  const horizon = Math.max(1, Math.round(settings.horizonDays));
-  const startHour = Math.max(0, Math.min(23, settings.availableStartHour));
-  const endHour = Math.max(startHour + 1, Math.min(24, settings.availableEndHour));
-  const taskPeriods = getTaskCalendarPeriods(
-    tasks.filter((task) => task.type === "fixed" && task.blocksPlanning),
-    startOfDay(now),
-    addDays(startOfDay(now), horizon + 1)
-  );
-
-  for (let offset = 0; offset < horizon; offset += 1) {
-    const day = addDays(startOfDay(now), offset);
-    const dayStart = dateAtShanghaiHour(day, startHour).getTime();
-    const dayEnd = dateAtShanghaiHour(day, endHour).getTime();
-    const availableStart = Math.max(dayStart, offset === 0 ? now.getTime() : dayStart);
-    const blocked: Array<{ start: number; end: number }> = [];
-    const canonicalEventIds = new Set(
-      snapshot.calendarEvents?.map((event) => event.id) ?? []
-    );
-    for (const event of snapshot.calendarEvents ?? []) {
-      if (event.kind !== "course" && event.kind !== "exam") continue;
-      if (!event.endAt) continue;
-      const start = Date.parse(event.startAt);
-      const end = Date.parse(event.endAt);
-      if (Number.isFinite(start) && Number.isFinite(end) && start < end) {
-        blocked.push({ start, end });
-      }
-    }
-    // Keep legacy/base courses that are not represented by the canonical feed.
-    // This matters for partial refreshes and for snapshots written before
-    // calendar.events@1 existed.
-    for (const course of snapshot.courses) {
-      if (canonicalEventIds.has(course.id)) continue;
-      blocked.push({ start: Date.parse(course.startAt), end: Date.parse(course.endAt) });
-    }
-    for (const period of taskPeriods) {
-      blocked.push({ start: Date.parse(period.startAt), end: Date.parse(period.endAt) });
-    }
-    for (const interval of subtractBlockedPeriods(availableStart, dayEnd, blocked)) {
-      if (interval.end - interval.start <= Math.max(0, settings.restMinutes) * MINUTE_MS) continue;
-      result.push({
-        uid: `available-${offset}-${interval.start}`,
-        startMs: interval.start,
-        endMs: interval.end
-      });
-    }
-  }
-  return result;
-};
-
-const findSolution = (
-  workMinutes: number,
-  targetRestMinutes: number,
-  deadlines: DeadlineWork[],
-  sourcePeriods: MutablePeriod[]
-): FindSolutionResult => {
-  const deadlineList = deadlines.map((deadline) => ({ ...deadline }));
-  const ableList = sourcePeriods.map((period) => ({ ...period }));
-  ableList.sort((left, right) => left.startMs - right.startMs || left.endMs - right.endMs);
-  ableList.reverse();
-  const isFresh = new Map<string, boolean>();
-  for (const period of ableList) isFresh.set(period.uid, true);
-  const segments: PlannerSegment[] = [];
-  let segmentIndex = 0;
-
-  for (const task of deadlineList) {
-    if (targetRestMinutes <= 0) task.breakable = false;
-    let isStarting = task.breakable;
-    while (task.remainingMinutes > 0) {
-      if (ableList.length === 0) {
-        return { valid: false, restMinutes: targetRestMinutes, segments: [], failedTaskId: task.id };
-      }
-      const period = ableList.pop()!;
-      if (isStarting) {
-        if (!isFresh.get(period.uid)) period.startMs += targetRestMinutes * MINUTE_MS;
-        isStarting = false;
-      }
-      if (period.startMs >= period.endMs) continue;
-      const freeMinutes = (period.endMs - period.startMs) / MINUTE_MS;
-      let cut = Math.min(task.remainingMinutes, freeMinutes);
-      if (task.breakable) cut = Math.min(cut, workMinutes);
-      if (cut <= 0 || period.startMs + cut * MINUTE_MS > task.endMs) {
-        return { valid: false, restMinutes: targetRestMinutes, segments: [], failedTaskId: task.id };
-      }
-      const segmentStart = period.startMs;
-      const segmentEnd = segmentStart + cut * MINUTE_MS;
-      segments.push({
-        id: `flow-${task.id}-${segmentIndex++}`,
-        taskId: task.id,
-        title: task.title,
-        description: task.description,
-        location: task.location,
-        startAt: toIso(segmentStart),
-        endAt: toIso(segmentEnd)
-      });
-      task.remainingMinutes -= cut;
-      period.startMs = segmentEnd;
-      if (task.breakable) period.startMs += targetRestMinutes * MINUTE_MS;
-      isFresh.set(period.uid, task.breakable && task.remainingMinutes <= 0);
-      if (period.startMs < period.endMs) ableList.push(period);
-    }
-  }
-  return { valid: true, restMinutes: targetRestMinutes, segments, failedTaskId: null };
-};
-
-export const generatePlannerSchedule = (
-  snapshot: CampusWorkspaceSnapshot,
-  tasks: LocalTaskRecord[],
-  settings: PlannerSettings,
-  now = new Date()
-): PlannerScheduleData => {
-  const normalizedSettings: PlannerSettings = {
-    workMinutes: Math.max(1, Math.round(settings.workMinutes)),
-    restMinutes: Math.max(0, Math.round(settings.restMinutes)),
-    availableStartHour: Math.max(0, Math.min(23, Math.round(settings.availableStartHour))),
-    availableEndHour: Math.max(1, Math.min(24, Math.round(settings.availableEndHour))),
-    horizonDays: Math.max(1, Math.min(366, Math.round(settings.horizonDays)))
-  };
-  if (normalizedSettings.availableEndHour <= normalizedSettings.availableStartHour) {
-    normalizedSettings.availableEndHour = Math.min(24, normalizedSettings.availableStartHour + 1);
-  }
-  const deadlines: DeadlineWork[] = tasks
-    .filter((task) => task.type === "deadline" && task.status === "running")
-    .filter((task) => task.timeNeededMinutes > task.timeSpentMinutes)
-    .filter((task) => Date.parse(task.endAt) >= now.getTime())
-    .sort((left, right) => Date.parse(left.endAt) - Date.parse(right.endAt))
-    .map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      location: task.location,
-      endMs: Date.parse(task.endAt),
-      remainingMinutes: task.timeNeededMinutes - task.timeSpentMinutes,
-      breakable: task.breakable
-    }));
-  const available = buildAvailablePeriods(snapshot, tasks, now, normalizedSettings);
-  const initial = findSolution(
-    normalizedSettings.workMinutes,
-    normalizedSettings.restMinutes,
-    deadlines,
-    available
-  );
-  let answer = initial;
-  if (!initial.valid) {
-    let left = 0;
-    let right = normalizedSettings.restMinutes - 1;
-    while (right >= left) {
-      const middle = Math.floor((left + right) / 2);
-      const candidate = findSolution(
-        normalizedSettings.workMinutes,
-        middle,
-        deadlines,
-        available
-      );
-      if (candidate.valid) {
-        answer = candidate;
-        left = middle + 1;
-      } else {
-        right = middle - 1;
-      }
-    }
-  }
-  const reason = answer.valid
-    ? null
-    : answer.failedTaskId
-      ? `无法在截止时间前完成任务「${tasks.find((task) => task.id === answer.failedTaskId)?.title ?? "未命名任务"}」。`
-      : "当前可用时间不足，无法生成排程。";
-  return {
-    valid: answer.valid,
-    reason,
-    restMinutes: answer.valid ? answer.restMinutes : normalizedSettings.restMinutes,
-    generatedAt: now.toISOString(),
-    settings: normalizedSettings,
-    segments: answer.valid ? answer.segments : []
-  };
-};
 
 const toIcalLocal = (value: Date): string => {
   const parts = getShanghaiDateParts(value);

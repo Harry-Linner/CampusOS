@@ -1,10 +1,9 @@
-import type { CampusWorkspaceSnapshot, LocalTaskRecord, PlannerSettings } from "@campusos/shared";
+import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 import { describe, expect, it } from "vitest";
 import type { CalendarEventRecord } from "@campusos/shared";
 import {
   createIcalContent,
   createTaskRecord,
-  generatePlannerSchedule,
   getTaskCalendarPeriods,
   refreshLocalTasks
 } from "./scheduleDomain";
@@ -154,116 +153,6 @@ describe("schedule domain", () => {
     expect(periods).toHaveLength(2);
     expect(new Date(periods[0].endAt).getTime() - new Date(periods[0].startAt).getTime()).toBe(60 * 60_000);
     expect(new Date(periods[1].endAt).getTime() - new Date(periods[1].startAt).getTime()).toBe(2 * 60 * 60_000);
-  });
-
-  it("uses earliest deadline first, respects course blockers, and is deterministic", () => {
-    const settings: PlannerSettings = {
-      workMinutes: 60,
-      restMinutes: 15,
-      availableStartHour: 8,
-      availableEndHour: 12,
-      horizonDays: 1
-    };
-    const courses = [
-      {
-        id: "course-1",
-        title: "Class",
-        location: "Room",
-        startAt: "2026-08-04T09:00:00+08:00",
-        endAt: "2026-08-04T10:00:00+08:00",
-        sourceId: "academic-affairs" as const
-      }
-    ];
-    const tasks = [
-      task({
-        id: "early",
-        title: "Early",
-        timeNeededMinutes: 90,
-        endAt: "2026-08-04T12:00:00+08:00"
-      })
-    ];
-    const first = generatePlannerSchedule(snapshot(courses), tasks, settings, now);
-    const second = generatePlannerSchedule(snapshot(courses), tasks, settings, now);
-    expect(first).toEqual(second);
-    expect(first.valid).toBe(true);
-    expect(first.segments.map((segment) => segment.startAt.slice(11, 16))).toEqual(["02:00", "03:15"]);
-  });
-
-  it("returns a user-facing reason when no valid plan exists", () => {
-    const result = generatePlannerSchedule(
-      snapshot(),
-      [task({ title: "Impossible", timeNeededMinutes: 600, endAt: "2026-08-04T11:00:00+08:00" })],
-      {
-        workMinutes: 60,
-        restMinutes: 15,
-        availableStartHour: 8,
-        availableEndHour: 10,
-        horizonDays: 1
-      },
-      now
-    );
-    expect(result.valid).toBe(false);
-    expect(result.segments).toEqual([]);
-    expect(result.reason).toContain("Impossible");
-  });
-
-  it("blocks planner time with canonical exam events", () => {
-    const result = generatePlannerSchedule(
-      {
-        ...snapshot(),
-        calendarEvents: [calendarEvent()]
-      },
-      [task({
-        id: "exam-blocked",
-        title: "Study",
-        timeNeededMinutes: 120,
-        endAt: "2026-08-04T14:00:00+08:00"
-      })],
-      {
-        workMinutes: 120,
-        restMinutes: 0,
-        availableStartHour: 10,
-        availableEndHour: 14,
-        horizonDays: 1
-      },
-      now
-    );
-    expect(result.valid).toBe(true);
-    expect(result.segments.map((segment) => [segment.startAt.slice(11, 16), segment.endAt.slice(11, 16)])).toEqual([
-      ["02:00", "03:00"],
-      ["05:00", "06:00"]
-    ]);
-  });
-
-  it("keeps an unrepresented baseline course as a planner blocker", () => {
-    const result = generatePlannerSchedule(
-      {
-        ...snapshot([{
-          id: "baseline-course",
-          title: "Baseline course",
-          location: "Room 3",
-          startAt: "2026-08-04T13:00:00+08:00",
-          endAt: "2026-08-04T14:00:00+08:00",
-          sourceId: "cs-college"
-        }]),
-        calendarEvents: [calendarEvent()]
-      },
-      [task({
-        id: "blocked-by-baseline",
-        title: "Study",
-        timeNeededMinutes: 120,
-        endAt: "2026-08-04T14:00:00+08:00"
-      })],
-      {
-        workMinutes: 120,
-        restMinutes: 0,
-        availableStartHour: 10,
-        availableEndHour: 14,
-        horizonDays: 1
-      },
-      now
-    );
-    expect(result.valid).toBe(false);
   });
 
   it("exports canonical exam times and does not turn them into one-hour deadlines", () => {

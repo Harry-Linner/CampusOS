@@ -8,9 +8,7 @@ import type {
   LocalTaskMutation,
   LocalTaskRecord,
   LocalTaskPeriod,
-  LocalTasksData,
-  PlannerScheduleData,
-  PlannerSettings
+  LocalTasksData
 } from "@campusos/shared";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
@@ -23,7 +21,6 @@ import {
   applyTaskMutation,
   createIcalContent,
   createTaskRecord,
-  generatePlannerSchedule,
   getTaskCalendarPeriods,
   normalizeTaskRecord,
   refreshLocalTasks
@@ -129,26 +126,6 @@ export const mutateScheduleTask = async (input: LocalTaskMutation): Promise<Loca
   return result;
 };
 
-const generatePlan = async (settings: PlannerSettings): Promise<PlannerScheduleData> => {
-  const tasks = loadScheduleTasks().tasks;
-  const workspace = await hydrateCampusWorkspace();
-  const plan = generatePlannerSchedule(
-    workspace.snapshot,
-    tasks,
-    settings,
-    new Date()
-  );
-  getOfficialDatabaseService().savePlannerSchedule(plan, plan.generatedAt);
-  notifyScheduleChanged();
-  return plan;
-};
-
-const loadPlan = (): PlannerScheduleData | null => {
-  const stored = getOfficialDatabaseService().loadPlannerSchedule();
-  if (!stored || typeof stored.schedule !== "object" || stored.schedule === null) return null;
-  return stored.schedule as PlannerScheduleData;
-};
-
 const sanitizeFilePart = (value: string): string => {
   const normalized = value.trim().replace(/[^\p{L}\p{N}_-]+/gu, "-");
   return normalized.replace(/^-+|-+$/g, "").slice(0, 80) || "calendar";
@@ -202,14 +179,6 @@ export const registerScheduleHandlers = (): void => {
   ipcMain.handle("campusos:schedule:task:mutate", async (event, input: LocalTaskMutation) => {
     assertTrustedRenderer(event);
     return mutateScheduleTask(input);
-  });
-  ipcMain.handle("campusos:schedule:plan:generate", async (event, settings: PlannerSettings) => {
-    assertTrustedRenderer(event);
-    return generatePlan(settings);
-  });
-  ipcMain.handle("campusos:schedule:plan:load", async (event) => {
-    assertTrustedRenderer(event);
-    return loadPlan();
   });
   ipcMain.handle("campusos:schedule:ical:export", async (event, input: CalendarExportInput) => {
     assertTrustedRenderer(event);

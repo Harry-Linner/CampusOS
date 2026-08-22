@@ -4,9 +4,7 @@ import type {
   LocalTaskInput,
   LocalTaskMutation,
   LocalTaskPeriod,
-  LocalTasksData,
-  PlannerScheduleData,
-  PlannerSettings
+  LocalTasksData
 } from "@campusos/shared";
 import type { ScheduleBridge } from "../../shared/scheduleBridge";
 
@@ -28,12 +26,6 @@ export const saveLocalTask = (input: LocalTaskInput): Promise<LocalTasksData> =>
 
 export const mutateLocalTask = (input: LocalTaskMutation): Promise<LocalTasksData> =>
   requireScheduleBridge().mutateTask(input);
-
-export const generateSchedulePlan = (settings: PlannerSettings): Promise<PlannerScheduleData> =>
-  requireScheduleBridge().generatePlan(settings);
-
-export const loadSchedulePlan = (): Promise<PlannerScheduleData | null> =>
-  requireScheduleBridge().loadPlan();
 
 export const exportScheduleIcal = (input: CalendarExportInput): Promise<CalendarExportResult> =>
   requireScheduleBridge().exportIcal(input);

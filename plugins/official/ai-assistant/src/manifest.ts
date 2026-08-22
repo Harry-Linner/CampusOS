@@ -14,7 +14,7 @@ export const manifest: PluginManifestV2 = {
   releaseStage: "ready",
   provides: [],
   requires: ["core.workspace-snapshot@1"],
-  optionalRequires: ["tasks.local@1", "planner.schedule@1"],
+  optionalRequires: ["tasks.local@1"],
   contributes: {
     views: [
       {

@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  AcademicTimetableData,
+  AcademicTimetableSession,
+  CapabilityRecord,
   LocalTaskInput,
   LocalTaskPeriod,
   LocalTaskRecord,
-  PlannerScheduleData,
-  PlannerSettings,
   PluginComponentProps
+} from "@campusos/shared";
+import {
+  academicSemesterNumberForSeason,
+  formatAcademicSemesterLabel
 } from "@campusos/shared";
 import type { DeskCalendarView } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
@@ -353,6 +358,7 @@ const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Dat
 export const ScheduleView = ({
   loading,
   snapshot,
+  capabilities,
   schedule,
   deskCalendar,
   navigationTarget
@@ -362,14 +368,7 @@ export const ScheduleView = ({
   const [tasks, setTasks] = useState<LocalTaskRecord[]>([]);
   const [taskUpdatedAt, setTaskUpdatedAt] = useState<string | null>(null);
   const [periods, setPeriods] = useState<LocalTaskPeriod[]>([]);
-  const [plan, setPlan] = useState<PlannerScheduleData | null>(null);
-  const [settings, setSettings] = useState<PlannerSettings>({
-    workMinutes: 60,
-    restMinutes: 15,
-    availableStartHour: 8,
-    availableEndHour: 22,
-    horizonDays: 7
-  });
+  const [timetableRecords, setTimetableRecords] = useState<CapabilityRecord<AcademicTimetableData>[]>([]);
   const [form, setForm] = useState<TaskFormState | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [busy, setBusy] = useState(false);
@@ -439,11 +438,9 @@ export const ScheduleView = ({
   const loadTasks = useCallback(async (): Promise<void> => {
     if (!schedule) return;
     try {
-      const [data, savedPlan] = await Promise.all([schedule.loadTasks(), schedule.loadPlan()]);
+      const data = await schedule.loadTasks();
       setTasks(data.tasks);
       setTaskUpdatedAt(data.updatedAt);
-      setPlan(savedPlan);
-      if (savedPlan) setSettings(savedPlan.settings);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "无法读取本地任务。");
@@ -457,6 +454,18 @@ export const ScheduleView = ({
       void loadTasks();
     });
   }, [loadTasks, schedule]);
+
+  useEffect(() => {
+    let active = true;
+    void capabilities.read<AcademicTimetableData>("academic.timetable@1")
+      .then((records) => {
+        if (active) setTimetableRecords(records);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [capabilities]);
 
   const range = useMemo(() => eventRange(viewMode, selectedDate), [selectedDate, viewMode]);
 
@@ -498,6 +507,40 @@ export const ScheduleView = ({
     const first = startOfWeek(selectedDate);
     return Array.from({ length: 7 }, (_, index) => addDays(first, index));
   }, [selectedDate]);
+
+  const weekPatternLabel = (pattern: AcademicTimetableSession["weekPattern"]): string =>
+    pattern === "odd" ? "单周" : pattern === "even" ? "双周" : "全周";
+
+  const allTermCourses = useMemo(() => {
+    const groups = new Map<string, { label: string; sessions: AcademicTimetableSession[] }>();
+    for (const record of timetableRecords) {
+      for (const term of record.data?.terms ?? []) {
+        const semesterNumber = academicSemesterNumberForSeason(term.season);
+        if (semesterNumber === null) continue;
+        const key = `${term.academicYearStart}:${semesterNumber}`;
+        const group = groups.get(key) ?? {
+          label: formatAcademicSemesterLabel(term.academicYearStart, semesterNumber),
+          sessions: []
+        };
+        group.sessions.push(...term.sessions);
+        groups.set(key, group);
+      }
+    }
+    return [...groups.values()]
+      .map((group) => ({
+        ...group,
+        sessions: [...group.sessions].sort(
+          (left, right) =>
+            left.dayOfWeek - right.dayOfWeek ||
+            (left.periods[0] ?? 0) - (right.periods[0] ?? 0)
+        )
+      }))
+      .sort((left, right) => right.label.localeCompare(left.label));
+  }, [timetableRecords]);
+  const allCourseCount = allTermCourses.reduce(
+    (total, group) => total + group.sessions.length,
+    0
+  );
 
   const movePeriod = (delta: number): void => {
     setSelectedDate((current) => {
@@ -611,21 +654,6 @@ export const ScheduleView = ({
       setNotice(action === "restore" ? "任务已恢复" : "任务已永久删除");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "回收站操作失败。");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const generatePlan = async (): Promise<void> => {
-    if (!schedule) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await schedule.generatePlan(settings);
-      setPlan(next);
-      setNotice(next.valid ? "排程已生成" : "排程不可行");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "排程生成失败。");
     } finally {
       setBusy(false);
     }
@@ -802,6 +830,36 @@ export const ScheduleView = ({
         ) : <div className="quiet-empty-state">暂无即将发生的安排</div>}
       </section>
 
+      <section className="schedule-courses-section" aria-labelledby="schedule-courses-heading">
+        <div className="section-heading">
+          <h2 id="schedule-courses-heading">全部课程</h2>
+          <span>{allCourseCount} 门 · {allTermCourses.length} 个学期</span>
+        </div>
+        {allTermCourses.length === 0 ? (
+          <div className="quiet-empty-state">暂无课程数据。请先在设置页连接并验证统一身份认证账号。</div>
+        ) : (
+          <div className="schedule-all-courses">
+            {allTermCourses.map((group) => (
+              <section className="schedule-course-term" key={group.label}>
+                <h3>{group.label}</h3>
+                <div className="schedule-course-list">
+                  {group.sessions.map((session, index) => (
+                    <div className="schedule-course-row" key={`${group.label}:${session.sourceId ?? session.courseName}:${index}`}>
+                      <strong>{session.courseName}</strong>
+                      <span className="schedule-course-meta">
+                        周{session.dayOfWeek} · 第 {session.periods.join("、")} 节 · {weekPatternLabel(session.weekPattern)}
+                        {session.teacher ? ` · ${session.teacher}` : ""}
+                        {session.location ? ` · ${session.location}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </section>
+
       <div className="schedule-layout">
         <section className="schedule-calendar-section" aria-label="日历">
           <header className="schedule-calendar-toolbar">
@@ -953,10 +1011,9 @@ export const ScheduleView = ({
               <div className="section-heading"><h2>{form.id ? "编辑任务" : "新建任务"}</h2><button className="text-button" type="button" onClick={() => setForm(null)}>关闭</button></div>
               <label>标题<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
               <label>说明<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-              {form.type !== "floating" ? <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div> : <p className="schedule-form-hint">无日期待办不会出现在日历或自动排程中；可单独设置提醒时间。</p>}
+              {form.type !== "floating" ? <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div> : <p className="schedule-form-hint">无日期待办不会出现在日历中；可单独设置提醒时间。</p>}
               <div className="schedule-form-grid"><label>所需分钟<input type="number" min="1" value={form.timeNeededMinutes} onChange={(event) => setForm({ ...form, timeNeededMinutes: Number(event.target.value) })} /></label><label>已用分钟<input type="number" min="0" value={form.timeSpentMinutes} onChange={(event) => setForm({ ...form, timeSpentMinutes: Number(event.target.value) })} /></label></div>
               <label>地点<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
-              {form.type !== "floating" ? <><label className="schedule-check"><input type="checkbox" checked={form.breakable} onChange={(event) => setForm({ ...form, breakable: event.target.checked })} />允许拆分</label><label className="schedule-check"><input type="checkbox" checked={form.blocksPlanning} onChange={(event) => setForm({ ...form, blocksPlanning: event.target.checked })} />占用排程时间</label></> : null}
               <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option><option value="floating">无日期待办</option></select></label>
               <label>单项提醒<select value={form.reminderMode === "lead" ? `lead:${form.reminderLeadMinutes}` : form.reminderMode} onChange={(event) => { const value = event.target.value; if (value.startsWith("lead:")) setForm({ ...form, reminderMode: "lead", reminderLeadMinutes: Number(value.slice(5)) }); else setForm({ ...form, reminderMode: value as TaskFormState["reminderMode"] }); }}><option value="global">使用全局提前量</option><option value="none">不提醒</option><option value="at-time">开始/截止时</option><option value="lead:5">提前 5 分钟</option><option value="lead:15">提前 15 分钟</option><option value="lead:30">提前 30 分钟</option><option value="lead:60">提前 1 小时</option><option value="lead:1440">提前 1 天</option><option value="custom">自定义时间</option></select></label>
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" required value={form.reminderAt} onChange={(event) => setForm({ ...form, reminderAt: event.target.value })} /></label> : null}
@@ -968,18 +1025,6 @@ export const ScheduleView = ({
               <button className="primary-button" type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</button>
             </form>
           ) : null}
-
-          <section className="schedule-plan-section" aria-labelledby="schedule-plan-heading">
-            <div className="section-heading"><h2 id="schedule-plan-heading">自动排程</h2><span>{plan?.valid ? `休息 ${plan.restMinutes} 分钟` : ""}</span></div>
-            <div className="schedule-plan-guide">
-              <strong>它会怎么安排？</strong>
-              <ol><li>先新建 DDL，填写截止时间和预计所需分钟。</li><li>课程、固定日程和勾选“占用排程时间”的任务会被自动避开。</li><li>设置每天可用时段后生成建议；结果只供预览，不会改动原任务。</li></ol>
-            </div>
-            <div className="schedule-form-grid"><label>每段专注（分钟）<input type="number" min="1" value={settings.workMinutes} onChange={(event) => setSettings({ ...settings, workMinutes: Number(event.target.value) })} /></label><label>段间休息（分钟）<input type="number" min="0" value={settings.restMinutes} onChange={(event) => setSettings({ ...settings, restMinutes: Number(event.target.value) })} /></label><label>每天开始（整点）<input type="number" min="0" max="23" value={settings.availableStartHour} onChange={(event) => setSettings({ ...settings, availableStartHour: Number(event.target.value) })} /></label><label>每天结束（整点）<input type="number" min="1" max="24" value={settings.availableEndHour} onChange={(event) => setSettings({ ...settings, availableEndHour: Number(event.target.value) })} /></label><label>向后规划（天）<input type="number" min="1" max="366" value={settings.horizonDays} onChange={(event) => setSettings({ ...settings, horizonDays: Number(event.target.value) })} /></label></div>
-            <button className="primary-button" type="button" disabled={busy || !schedule} onClick={() => void generatePlan()}>{busy ? "处理中" : "生成排程建议"}</button>
-            {plan && !plan.valid ? <p className="schedule-plan-error" role="alert">{plan.reason}</p> : null}
-            {plan?.valid ? <div className="schedule-plan-list">{plan.segments.map((segment) => <div className="schedule-plan-row" key={segment.id}><time>{formatTimeRange(segment.startAt, segment.endAt)}</time><strong>{segment.title}</strong></div>)}</div> : null}
-          </section>
         </aside>
       </div>
     </section>

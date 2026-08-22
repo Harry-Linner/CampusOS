@@ -490,33 +490,6 @@ export interface LocalTaskPeriod {
   blocksPlanning: boolean;
 }
 
-export interface PlannerSettings {
-  workMinutes: number;
-  restMinutes: number;
-  availableStartHour: number;
-  availableEndHour: number;
-  horizonDays: number;
-}
-
-export interface PlannerSegment {
-  id: string;
-  taskId: string;
-  title: string;
-  description: string;
-  location: string;
-  startAt: string;
-  endAt: string;
-}
-
-export interface PlannerScheduleData {
-  valid: boolean;
-  reason: string | null;
-  restMinutes: number;
-  generatedAt: string;
-  settings: PlannerSettings;
-  segments: PlannerSegment[];
-}
-
 export interface CalendarExportInput {
   academicYearStart: number;
   termLabel: string;

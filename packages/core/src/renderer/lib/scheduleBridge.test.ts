@@ -5,10 +5,8 @@ import type { CampusosBridge } from "../../shared/campusBridge";
 import type { ScheduleBridge } from "../../shared/scheduleBridge";
 import {
   exportScheduleIcal,
-  generateSchedulePlan,
   loadLocalTaskPeriods,
   loadLocalTasks,
-  loadSchedulePlan,
   mutateLocalTask,
   saveLocalTask,
   subscribeToScheduleChanges
@@ -71,16 +69,6 @@ describe("scheduleBridge", () => {
     expect(saveTask).toHaveBeenCalledWith({ title: "写报告", durationMinutes: 60 });
     await mutateLocalTask({ id: "task-1", action: "complete" } as never);
     expect(mutateTask).toHaveBeenCalledWith({ id: "task-1", action: "complete" });
-  });
-
-  it("delegates planner generation and plan loading", async () => {
-    const generatePlan = vi.fn(async () => ({ plan: [] }));
-    const loadPlan = vi.fn(async () => null);
-    installBridge({ generatePlan, loadPlan } as unknown as ScheduleBridge);
-    await expect(
-      generateSchedulePlan({ avoidDays: [0] } as never)
-    ).resolves.toEqual({ plan: [] });
-    await expect(loadSchedulePlan()).resolves.toBeNull();
   });
 
   it("delegates iCal export and change subscription", async () => {

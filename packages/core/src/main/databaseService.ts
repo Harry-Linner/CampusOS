@@ -29,11 +29,6 @@ export interface StoredLocalTasks {
   savedAt: string;
 }
 
-export interface StoredPlannerSchedule {
-  schedule: unknown;
-  savedAt: string;
-}
-
 export interface StoredAcademicGpaStrategy {
   strategy: LegacyAcademicGpaStrategy;
   savedAt: string;
@@ -73,8 +68,6 @@ export interface DatabaseService {
   loadDownloadQueue: () => StoredDownloadQueue | null;
   saveLocalTasks: (tasks: unknown, savedAt: string) => void;
   loadLocalTasks: () => StoredLocalTasks | null;
-  savePlannerSchedule: (schedule: unknown, savedAt: string) => void;
-  loadPlannerSchedule: () => StoredPlannerSchedule | null;
   saveAcademicGpaStrategy: (
     accountId: string,
     strategy: LegacyAcademicGpaStrategy,
@@ -327,24 +320,6 @@ export const createDatabaseService = ({
         "SELECT tasks_json, saved_at FROM local_task_sets WHERE singleton = 1"
       ).get() as { tasks_json: string; saved_at: string } | undefined;
       return row ? { tasks: JSON.parse(row.tasks_json) as unknown, savedAt: row.saved_at } : null;
-    },
-    savePlannerSchedule: (schedule, savedAt) => {
-      if (!Number.isFinite(Date.parse(savedAt))) {
-        throw new Error("规划保存时间无效。");
-      }
-      database.prepare(`
-        INSERT INTO planner_schedules (singleton, schedule_json, saved_at)
-        VALUES (1, ?, ?)
-        ON CONFLICT(singleton) DO UPDATE SET
-          schedule_json = excluded.schedule_json,
-          saved_at = excluded.saved_at
-      `).run(JSON.stringify(schedule), savedAt);
-    },
-    loadPlannerSchedule: () => {
-      const row = database.prepare(
-        "SELECT schedule_json, saved_at FROM planner_schedules WHERE singleton = 1"
-      ).get() as { schedule_json: string; saved_at: string } | undefined;
-      return row ? { schedule: JSON.parse(row.schedule_json) as unknown, savedAt: row.saved_at } : null;
     },
     saveAcademicGpaStrategy: (accountId, strategy, savedAt) => {
       if (!accountId.trim()) throw new Error("GPA 策略账户不能为空。");

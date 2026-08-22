@@ -10,11 +10,11 @@ export const manifest: PluginManifestV2 = {
   description: "统一查看课程、考试、截止事项与个人安排。",
   icon: "Calendar",
   permissions: [],
-  sourceScope: ["capability:calendar.events", "workspace:calendar"],
+  sourceScope: ["capability:calendar.events", "capability:academic.timetable", "workspace:calendar"],
   releaseStage: "ready",
   provides: [],
   requires: ["core.workspace-snapshot@1"],
-  optionalRequires: ["calendar.events@1", "tasks.local@1", "planner.schedule@1"],
+  optionalRequires: ["calendar.events@1", "academic.timetable@1", "tasks.local@1"],
   contributes: {
     views: [
       {

@@ -183,8 +183,6 @@ describe("schedule IPC", () => {
       "campusos:schedule:periods:load",
       "campusos:schedule:task:save",
       "campusos:schedule:task:mutate",
-      "campusos:schedule:plan:generate",
-      "campusos:schedule:plan:load",
       "campusos:schedule:ical:export"
     ]);
 

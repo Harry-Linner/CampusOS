@@ -75,15 +75,6 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
       tasks = tasks.map((task) => task.id === id ? { ...task, status: status ?? task.status } : task);
       return { tasks, updatedAt: new Date().toISOString() };
     }),
-    generatePlan: vi.fn(async () => ({
-      valid: true,
-      reason: null,
-      restMinutes: 15,
-      generatedAt: new Date().toISOString(),
-      settings: { workMinutes: 60, restMinutes: 15, availableStartHour: 8, availableEndHour: 22, horizonDays: 7 },
-      segments: []
-    })),
-    loadPlan: vi.fn(async () => null),
     exportIcal: vi.fn(async () => ({ filePath: "calendar.ics", eventCount: 1, generatedAt: new Date().toISOString() })),
     subscribe: vi.fn(() => () => undefined)
   };
@@ -95,7 +86,7 @@ describe("ScheduleView", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule(),
       navigationTarget: {
@@ -112,26 +103,12 @@ describe("ScheduleView", () => {
     expect(screen.getAllByText("Read notes").length).toBeGreaterThan(0);
   });
 
-  it("explains how automatic scheduling uses tasks and blocked time", async () => {
-    render(createElement(ScheduleView, {
-      loading: false,
-      snapshot,
-      capabilities: { read: vi.fn() },
-      onRefresh: vi.fn(async () => undefined),
-      schedule: createSchedule()
-    }));
-
-    expect(await screen.findByText("它会怎么安排？")).toBeTruthy();
-    expect(screen.getByText(/结果只供预览，不会改动原任务/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "生成排程建议" })).toBeTruthy();
-  });
-
   it("loads formal task data, shows four views, and saves a new task through the bridge", async () => {
     const schedule = createSchedule();
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule
     }));
@@ -197,7 +174,7 @@ describe("ScheduleView", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule,
       deskCalendar
@@ -226,7 +203,7 @@ describe("ScheduleView", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule
     }));
@@ -239,7 +216,7 @@ describe("ScheduleView", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule()
     }));
@@ -274,7 +251,7 @@ describe("ScheduleView", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule
     }));
@@ -291,7 +268,7 @@ describe("ScheduleView", () => {
     const { container } = render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule([])
     }));
@@ -327,7 +304,7 @@ describe("ScheduleView", () => {
     const { container } = render(createElement(ScheduleView, {
       loading: false,
       snapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule([monthly])
     }));
@@ -360,7 +337,7 @@ describe("schedule event ranges", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot: examSnapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule([])
     }));
@@ -397,7 +374,7 @@ describe("schedule event ranges", () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot: partialSnapshot,
-      capabilities: { read: vi.fn() },
+      capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule([])
     }));

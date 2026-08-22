@@ -16,9 +16,10 @@ import type {
   PluginCapabilityBinding
 } from "@campusos/shared";
 import {
+  academicSemesterKey,
   academicSemesterNumberForSeason,
-  mergeAcademicTimetableSessions,
-  selectAcademicSemesterWindow
+  buildAcademicSemesterWindows,
+  mergeAcademicTimetableSessions
 } from "@campusos/shared";
 import { manifest } from "./manifest";
 
@@ -290,24 +291,17 @@ export const deriveTimetableCalendarEvents = (
     events: []
   };
 
-  const selectedSemester = selectAcademicSemesterWindow(
-    calendarConfig.quarters,
-    generatedAt
-  );
-
-  // Flatten the selected semester's sessions with their provider context.
+  // Flatten every term's sessions with their provider context. CampusOS
+  // deliberately diverges from Celechron here: Celechron exposes only the
+  // current semester's schedule (lib/model/scholar.dart:97-110), while the
+  // user-facing requirement is that courses from every term — including past
+  // and future semesters — stay visible in the calendar.
   const expanded: AcademicTimetableSessionContext[] = [];
   for (const record of timetableRecords) {
     const terms = record.data?.terms ?? [];
     for (const term of terms) {
       const semesterNumber = academicSemesterNumberForSeason(term.season);
-      if (
-        selectedSemester === null ||
-        term.academicYearStart !== selectedSemester.academicYearStart ||
-        semesterNumber !== selectedSemester.semesterNumber
-      ) {
-        continue;
-      }
+      if (semesterNumber === null) continue;
       for (const session of term.sessions) {
         expanded.push({
           session,
@@ -319,14 +313,30 @@ export const deriveTimetableCalendarEvents = (
     }
   }
 
-  const halfWindows = selectedSemester
-    ? buildHalfWindows(calendarConfig.quarters, selectedSemester)
-    : [];
+  const windowByTerm = new Map<string, AcademicSemesterWindow>();
+  for (const semesterWindow of buildAcademicSemesterWindows(calendarConfig.quarters)) {
+    windowByTerm.set(
+      academicSemesterKey(
+        semesterWindow.academicYearStart,
+        semesterWindow.semesterNumber
+      ),
+      semesterWindow
+    );
+  }
+
   const merged = mergeAcademicTimetableSessions(expanded);
   const events: CalendarEventRecord[] = [];
   let totalAttempted = 0;
-  for (const { session, providerId } of merged) {
+  for (const { session, providerId, academicYearStart, semesterNumber } of merged) {
     if (!session.confirmed) continue;
+    const termWindow = windowByTerm.get(
+      academicSemesterKey(academicYearStart, semesterNumber)
+    );
+    // Terms without a matching official-calendar window cannot be anchored to
+    // absolute dates; they remain listed in the schedule's "全部课程" view.
+    if (!termWindow) continue;
+    const halfWindows = buildHalfWindows(calendarConfig.quarters, termWindow);
+    if (halfWindows.length === 0) continue;
     const dates = sessionDates(session, halfWindows);
     totalAttempted += dates.length;
     for (const date of dates) {

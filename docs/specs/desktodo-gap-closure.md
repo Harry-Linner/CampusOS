@@ -60,7 +60,7 @@
 
 ### 2026-08-16：DTD-01、DTD-02、DTD-03 桌面操作与托盘
 
-- 代码入口与正式数据链：桌面日历通过受信任 IPC 调用 `saveScheduleTask` 和 `mutateScheduleTask`；新建、编辑、完成均写入既有本地任务库并触发任务变更与提醒重排。无日期待办使用同一 `LocalTaskRecord` 链路的 `floating` 类型，日历投影与自动排程显式跳过该类型，备份、任务加载和搜索仍消费同一持久化记录；若用户配置明确提醒时间，仍经既有提醒调度链发出。
+- 代码入口与正式数据链：桌面日历通过受信任 IPC 调用 `saveScheduleTask` 和 `mutateScheduleTask`；新建、编辑、完成均写入既有本地任务库并触发任务变更与提醒重排。无日期待办使用同一 `LocalTaskRecord` 链路的 `floating` 类型，日历投影显式跳过该类型，备份、任务加载和搜索仍消费同一持久化记录；若用户配置明确提醒时间，仍经既有提醒调度链发出。
 - 用户可见验收：悬浮日历可完成、自建任务可编辑、可按当前选中日期创建；课程、考试和上游作业保持只读。日程侧栏可创建、编辑、完成和删除无日期待办，并显示其独立提醒状态。系统托盘已验证主窗口显示、桌面日历显示/隐藏、月/周/日切换与退出，并会在日程插件停用时关闭桌面日历能力。
 - 测试/构建命令及结果：`pnpm typecheck`（通过）；`pnpm test:coverage`（通过，含 55 项测试）；`pnpm --filter @campusos/core test -- scheduleDomain.test.ts reminderScheduler.test.ts DeskCalendarApp.test.tsx deskCalendarWindow.test.ts scheduleIpc.test.ts appLifecycle.test.ts`（53 通过）。
 - 未完成项与下一步：DTD-05 至 DTD-10 仍未完成，不能视为本轮交付内容。
