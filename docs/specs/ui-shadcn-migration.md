@@ -11,6 +11,11 @@
 > **Design read:** 学生桌面工作台（dev-tool workbench 类产品 UI）for ZJU 工科生，采用"暖纸底 + 哑光蓝 + 精致克制排版"的开发工具语言，落在 **shadcn/ui + Tailwind v4 + 自持 token**。
 > Dials：`VARIANCE 5 / MOTION 4 / DENSITY 5`（产品工作台，非营销页；仅借用 skill 的审计优先、token 锁定、pre-flight 纪律）。
 
+### 设计雷点（减分项，禁止再犯）
+
+1. **设置类视图套冗余卡片框**：视图本身已是"设置"语境时，不得再包一层带标题的 Card（早报设置页曾出现「早报设置」CardHeader，属典型冗余）——外层框 + 重复标题 = 冗余；应由留白、分隔线与标题层级自然构成。
+2. **到处加框框**：用户明确反感嵌套卡片/边框堆叠。结构优先用文档流、间距、分隔线、字重与层级表达；Card 只用于真正的独立内容分组（如日报板块），且同层不嵌套。
+
 ## 1. 现状审计（2026-08-22 核对代码）
 
 - 构建：electron-vite renderer（`react()` + dev CSP 插件）；入口 `index.html` / `desk-calendar.html`
@@ -148,6 +153,7 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [x] **行高**：大标题 1.33（`leading-10` / `sm:leading-12`）、状态标题 1.6（`leading-8`）、板块标题 1.56（`leading-7`）、条目标题 16px 1.75（`leading-7`）、摘要 14px 2.0（`leading-7`）、元信息与设置说明 12px 1.67（`leading-5`）
 - [x] **纵向节奏**：条目 `py-5`→`py-6`，设置表单行 `gap-2`→`gap-3`
 - [x] **一致性收尾**：空态标题补 `leading-7`、底部备注补 `leading-6`（与条目排版对齐）
+- [x] **设置页去冗余**：移除 InterestSettings 外层 Card 与「早报设置」CardHeader，改为平铺布局（说明段 + 关注领域 + 分隔线 + 信息源 + 保存按钮）；板块标题升为页面级 `text-base`；两条设计雷点已记录于 §0（设置视图禁套冗余卡片框、全局禁到处加框框）
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 

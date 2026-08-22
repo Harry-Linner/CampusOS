@@ -5,7 +5,6 @@ import type { BriefProfile } from "@campusos/shared";
 import { BRIEF_MAX_INTERESTS, BRIEF_MAX_WEIGHT, BRIEF_MIN_WEIGHT } from "@campusos/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,21 +51,19 @@ export const InterestSettings = ({ brief }: InterestSettingsProps): JSX.Element 
   };
 
   return (
-    <Card className="border-border/80 shadow-sm">
-      <CardHeader className="border-b border-border/60 bg-muted/20 px-5 py-5 sm:px-6"><CardTitle>早报设置</CardTitle><CardDescription className="max-w-2xl leading-6">关注领域会帮助模型安排板块顺序；信息源只影响抓取范围。早报复用 AI 助手中已经验证过的服务商和模型连接。</CardDescription></CardHeader>
-      <CardContent className="space-y-7 px-5 py-6 sm:px-6">
-        {error ? <Alert variant="destructive"><AlertCircle className="size-4" /><AlertTitle>设置没有保存</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
-        {busy === "load" ? <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-10 w-full" />)}</div> : <>
-          <section aria-labelledby="interest-settings-heading" className="space-y-4">
-            <div className="flex items-end justify-between gap-3"><div><h2 id="interest-settings-heading" className="text-sm font-semibold">关注领域</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">最多 {BRIEF_MAX_INTERESTS} 个，权重范围 {BRIEF_MIN_WEIGHT} 到 {BRIEF_MAX_WEIGHT}</p></div><span className="font-mono text-xs text-muted-foreground">{interests.length}/{BRIEF_MAX_INTERESTS}</span></div>
-            {interests.length === 0 ? <p className="rounded-lg border border-dashed px-4 py-5 text-sm leading-6 text-muted-foreground">还没有关注领域。添加一个具体主题，早报会更容易筛出有用内容。</p> : <div className="space-y-3">{interests.map((interest) => <div key={interest.id} className="grid gap-3 rounded-lg border border-border/70 bg-background p-3 sm:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)_auto] sm:items-center sm:border-0 sm:bg-transparent sm:p-0"><Input aria-label="领域名称" value={interest.name} placeholder="领域名称，例如：数学" onChange={(event) => updateInterest(interest.id, { name: event.target.value })} /><Input aria-label="权重" type="number" min={BRIEF_MIN_WEIGHT} max={BRIEF_MAX_WEIGHT} value={interest.weight} title={`权重（${BRIEF_MIN_WEIGHT}-${BRIEF_MAX_WEIGHT}）`} onChange={(event) => updateInterest(interest.id, { weight: event.target.value })} /><Input aria-label="备注" value={interest.note} placeholder="备注（可选）" onChange={(event) => updateInterest(interest.id, { note: event.target.value })} /><Button type="button" variant="ghost" size="icon" aria-label={`删除领域 ${interest.name || "未命名"}`} onClick={() => removeInterest(interest.id)}><Trash2 className="size-4" /></Button></div>)}</div>}
-            <Button type="button" variant="outline" size="sm" disabled={interests.length >= BRIEF_MAX_INTERESTS} onClick={addInterest}><Plus className="size-4" />添加领域</Button>
-          </section>
-          <Separator />
-          <section aria-labelledby="source-settings-heading" className="space-y-4"><div><h2 id="source-settings-heading" className="text-sm font-semibold">信息源</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">只抓取公开 RSS 内容，不会读取校园账号数据。</p></div><div className="grid gap-2 sm:grid-cols-2">{Object.entries(SOURCE_LABELS).map(([sourceId, label]) => <label key={sourceId} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-4 py-3 transition-colors hover:bg-muted/40"><span className="text-sm">{label}</span><Switch checked={sourceEnabled[sourceId] !== false} onCheckedChange={(checked) => setSourceEnabled((current) => ({ ...current, [sourceId]: checked }))} /></label>)}</div></section>
-        </>}
-      </CardContent>
-      <CardFooter className="justify-end border-t border-border/60 px-5 py-4 sm:px-6"><Button type="button" onClick={() => void save()} disabled={busy !== null}><Save className="size-4" />{busy === "save" ? "正在保存" : "保存设置"}</Button></CardFooter>
-    </Card>
+    <div className="space-y-6">
+      {error ? <Alert variant="destructive"><AlertCircle className="size-4" /><AlertTitle>设置没有保存</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+      <p className="max-w-2xl text-sm leading-6 text-muted-foreground">关注领域会帮助模型安排板块顺序；信息源只影响抓取范围。早报复用 AI 助手中已经验证过的服务商和模型连接。</p>
+      {busy === "load" ? <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-10 w-full" />)}</div> : <>
+        <section aria-labelledby="interest-settings-heading" className="space-y-4">
+          <div className="flex items-end justify-between gap-3"><div><h2 id="interest-settings-heading" className="text-base font-semibold leading-7">关注领域</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">最多 {BRIEF_MAX_INTERESTS} 个，权重范围 {BRIEF_MIN_WEIGHT} 到 {BRIEF_MAX_WEIGHT}</p></div><span className="font-mono text-xs text-muted-foreground">{interests.length}/{BRIEF_MAX_INTERESTS}</span></div>
+          {interests.length === 0 ? <p className="rounded-lg border border-dashed px-4 py-5 text-sm leading-6 text-muted-foreground">还没有关注领域。添加一个具体主题，早报会更容易筛出有用内容。</p> : <div className="space-y-3">{interests.map((interest) => <div key={interest.id} className="grid gap-3 rounded-lg border border-border/70 bg-background p-3 sm:grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)_auto] sm:items-center sm:border-0 sm:bg-transparent sm:p-0"><Input aria-label="领域名称" value={interest.name} placeholder="领域名称，例如：数学" onChange={(event) => updateInterest(interest.id, { name: event.target.value })} /><Input aria-label="权重" type="number" min={BRIEF_MIN_WEIGHT} max={BRIEF_MAX_WEIGHT} value={interest.weight} title={`权重（${BRIEF_MIN_WEIGHT}-${BRIEF_MAX_WEIGHT}）`} onChange={(event) => updateInterest(interest.id, { weight: event.target.value })} /><Input aria-label="备注" value={interest.note} placeholder="备注（可选）" onChange={(event) => updateInterest(interest.id, { note: event.target.value })} /><Button type="button" variant="ghost" size="icon" aria-label={`删除领域 ${interest.name || "未命名"}`} onClick={() => removeInterest(interest.id)}><Trash2 className="size-4" /></Button></div>)}</div>}
+          <Button type="button" variant="outline" size="sm" disabled={interests.length >= BRIEF_MAX_INTERESTS} onClick={addInterest}><Plus className="size-4" />添加领域</Button>
+        </section>
+        <Separator />
+        <section aria-labelledby="source-settings-heading" className="space-y-4"><div><h2 id="source-settings-heading" className="text-base font-semibold leading-7">信息源</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">只抓取公开 RSS 内容，不会读取校园账号数据。</p></div><div className="grid gap-2 sm:grid-cols-2">{Object.entries(SOURCE_LABELS).map(([sourceId, label]) => <label key={sourceId} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-4 py-3 transition-colors hover:bg-muted/40"><span className="text-sm">{label}</span><Switch checked={sourceEnabled[sourceId] !== false} onCheckedChange={(checked) => setSourceEnabled((current) => ({ ...current, [sourceId]: checked }))} /></label>)}</div></section>
+      </>}
+      <div className="flex justify-end"><Button type="button" onClick={() => void save()} disabled={busy !== null}><Save className="size-4" />{busy === "save" ? "正在保存" : "保存设置"}</Button></div>
+    </div>
   );
 };
