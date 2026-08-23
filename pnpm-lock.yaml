@@ -45,6 +45,9 @@ importers:
       '@campusos/plugin-ai-assistant':
         specifier: workspace:*
         version: link:../../plugins/official/ai-assistant
+      '@campusos/plugin-campus-feed':
+        specifier: workspace:*
+        version: link:../../plugins/official/campus-feed
       '@campusos/plugin-daily-brief':
         specifier: workspace:*
         version: link:../../plugins/official/daily-brief
@@ -230,6 +233,28 @@ importers:
       react:
         specifier: ^18.3.1
         version: 18.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.31
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
+  plugins/official/campus-feed:
+    dependencies:
+      '@campusos/shared':
+        specifier: workspace:*
+        version: link:../../../packages/shared
+      lucide-react:
+        specifier: ^1.33.0
+        version: 1.33.0(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      sonner:
+        specifier: ^2.0.8
+        version: 2.0.8(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@types/react':
         specifier: ^18.3.18

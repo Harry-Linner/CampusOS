@@ -14,6 +14,7 @@ import type { NotificationCenterBridge } from "./notificationBridge";
 import type { BackupBridge } from "./backupBridge";
 import type { AppNavigationBridge } from "@campusos/shared";
 import type { BriefBridge } from "@campusos/shared";
+import type { CampusFeedBridge } from "@campusos/shared";
 import type { FeedbackBridge } from "@campusos/shared";
 import type { AnalyticsBridge } from "./analyticsBridge";
 
@@ -50,6 +51,7 @@ export interface CampusosBridge {
   schedule?: ScheduleBridge;
   assistant?: AiAssistantBridge;
   brief?: BriefBridge;
+  campusFeed?: CampusFeedBridge;
   deskCalendar?: DeskCalendarControlBridge;
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;

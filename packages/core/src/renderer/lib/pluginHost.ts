@@ -16,6 +16,8 @@ import { Component as AssistantView } from "@campusos/plugin-ai-assistant";
 import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
 import { Component as BriefView } from "@campusos/plugin-daily-brief";
 import { manifest as dailyBriefManifest } from "@campusos/plugin-daily-brief/manifest";
+import { Component as CampusFeedView } from "@campusos/plugin-campus-feed";
+import { manifest as campusFeedManifest } from "@campusos/plugin-campus-feed/manifest";
 
 type PluginModule = {
   manifest: PluginManifestV2;
@@ -64,6 +66,10 @@ const pluginDefinitions: PluginDefinition[] = [
   {
     id: dailyBriefManifest.id,
     load: async () => ({ manifest: dailyBriefManifest, Component: BriefView })
+  },
+  {
+    id: campusFeedManifest.id,
+    load: async () => ({ manifest: campusFeedManifest, Component: CampusFeedView })
   },
   {
     id: "org.campusos.materials",

@@ -32,6 +32,9 @@ const resolveActivityIcon = (icon: string): AppIconName => {
     case "brief":
     case "dailybrief":
       return "brief";
+    case "feed":
+    case "campusfeed":
+      return "feed";
     case "overview":
       return "overview";
     case "settings":

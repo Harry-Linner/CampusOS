@@ -168,6 +168,22 @@ contextBridge.exposeInMainWorld("campusos", {
       return () => ipcRenderer.removeListener(channel, handler);
     }
   },
+  campusFeed: {
+    getSnapshot: () => ipcRenderer.invoke("campusos:campus-feed:get"),
+    refreshSource: (sourceId: string) => ipcRenderer.invoke("campusos:campus-feed:refresh-source", sourceId),
+    refreshAll: () => ipcRenderer.invoke("campusos:campus-feed:refresh-all"),
+    updateSource: (id: string, patch: Record<string, unknown>) =>
+      ipcRenderer.invoke("campusos:campus-feed:update-source", { id, patch }),
+    removeSource: (id: string) => ipcRenderer.invoke("campusos:campus-feed:remove-source", id),
+    markRead: (ids: string[]) => ipcRenderer.invoke("campusos:campus-feed:mark-read", ids),
+    openExternal: (url: string) => ipcRenderer.invoke("campusos:campus-feed:open-external", url),
+    subscribe: (listener: (snapshot: unknown) => void) => {
+      const channel = "campusos:campus-feed:changed";
+      const handler = (_event: Electron.IpcRendererEvent, snapshot: unknown) => listener(snapshot);
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    }
+  },
   plugins: {
     load: () => ipcRenderer.invoke("campusos:plugins:load"),
     subscribe: (listener: (snapshot: unknown) => void) => {

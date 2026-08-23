@@ -1,6 +1,7 @@
 import type { CampusDownloadRequest, CampusWorkspaceSnapshot } from "./campus";
 import type { AppNavigationRequest } from "./appNavigationBridge";
 import type { BriefBridge } from "./brief";
+import type { CampusFeedBridge } from "./campusFeed";
 import type {
   AiAssistantExtractionResult,
   AiAssistantConnectionTestInput,
@@ -22,6 +23,7 @@ import type {
 export * from "./campus";
 export * from "./academicSemester";
 export * from "./brief";
+export * from "./campusFeed";
 export * from "./pluginCapabilities";
 export * from "./deskCalendarBridge";
 export * from "./appNavigationBridge";
@@ -181,6 +183,7 @@ export interface PluginComponentProps {
     discoverModels: (input: AiAssistantModelDiscoveryInput) => Promise<AiAssistantModelDiscoveryResult>;
   };
   brief?: BriefBridge;
+  campusFeed?: CampusFeedBridge;
   deskCalendar?: {
     loadSettings: () => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
     setEnabled: (enabled: boolean) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;

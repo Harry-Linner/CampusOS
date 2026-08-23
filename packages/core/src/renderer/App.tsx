@@ -202,6 +202,7 @@ export const App = (): JSX.Element => {
         schedule={window.campusos?.schedule}
         assistant={window.campusos?.assistant}
         brief={window.campusos?.brief}
+        campusFeed={window.campusos?.campusFeed}
         deskCalendar={window.campusos?.deskCalendar}
         navigationTarget={navigationTarget?.viewId === activeView ? navigationTarget : null}
       />

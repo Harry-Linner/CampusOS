@@ -41,6 +41,7 @@ describe("loadPlugins", () => {
       "ai-assistant",
       "daily-brief",
       "materials",
+      "campus-feed",
       "extensions",
       "settings"
     ]);
@@ -63,6 +64,7 @@ describe("loadPlugins", () => {
       "ai-assistant",
       "daily-brief",
       "materials",
+      "campus-feed",
       "extensions",
       "settings"
     ]);

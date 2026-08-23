@@ -10,6 +10,8 @@ afterEach(cleanup);
 const ALL_ICONS: AppIconName[] = [
   "calendar",
   "assistant",
+  "brief",
+  "feed",
   "chevron-left",
   "chevron-right",
   "extensions",

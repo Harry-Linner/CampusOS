@@ -15,6 +15,7 @@ import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
 import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
 import { manifest as dailyBriefManifest } from "@campusos/plugin-daily-brief/manifest";
+import { manifest as campusFeedManifest } from "@campusos/plugin-campus-feed/manifest";
 
 /** User-selectable Modules. Each contributes exactly one activity entry. */
 export const officialUserPluginManifests: PluginManifestV2[] = [
@@ -22,6 +23,7 @@ export const officialUserPluginManifests: PluginManifestV2[] = [
   scheduleManifest,
   assistantManifest,
   dailyBriefManifest,
+  campusFeedManifest,
   materialsManifest
 ];
 
