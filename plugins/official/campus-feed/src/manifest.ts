@@ -9,10 +9,7 @@ export const manifest: PluginManifestV2 = {
   kind: "feature",
   description: "聚合评奖评优、出国境项目、校园活动与学院通知等分散网站的信息。",
   icon: "feed",
-  permissions: [
-    "network:https://*.zju.edu.cn",
-    "network:https://zjuers.com"
-  ],
+  permissions: [],
   sourceScope: ["campus-websites"],
   releaseStage: "ready",
   provides: [],
