@@ -2271,8 +2271,7 @@ input:focus-visible {
   font-size: 0.78rem;
 }
 
-.academic-select-label select,
-.academic-search {
+.academic-select-label select {
   min-height: 34px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
@@ -2294,10 +2293,6 @@ input:focus-visible {
   height: 16px;
   margin: 0;
   accent-color: var(--accent);
-}
-
-.academic-search {
-  width: min(280px, 42vw);
 }
 
 .academic-record-list {
@@ -2683,10 +2678,6 @@ input:focus-visible {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
-  }
-
-  .academic-search {
-    width: 100%;
   }
 
   .academic-stat-strip {

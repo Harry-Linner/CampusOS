@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { CalendarEventsData, CapabilityRecord, PluginComponentProps } from "@campusos/shared";
 import { computeExamCountdowns, type ExamCountdownEntry } from "./examCountdown";
+import { Button } from "@/components/ui/button";
 
 export const Component = ({
   capabilities,
@@ -42,9 +43,9 @@ export const Component = ({
         <div>
           <h2>考试倒计时</h2>
         </div>
-        <button className="primary-button" disabled={busy} type="button" onClick={() => void onRefresh()}>
+        <Button disabled={busy} type="button" onClick={() => void onRefresh()}>
           刷新
-        </button>
+        </Button>
       </div>
 
       {error ? (

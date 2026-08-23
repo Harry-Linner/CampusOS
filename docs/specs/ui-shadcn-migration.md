@@ -240,6 +240,14 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 内容态（今日事项预览/待办）与布局类（`dashboard-layout`/`course-timeline`/`todo-list` 等）保留
 - 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（DashboardView 3 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/dashboard-migrated-*.png`，内容态 1 课程项 + 1 待办项）、CI 全绿
 
+**Academic 批 — 已完成（2026-08-23）**：
+- `GradesView.tsx`：隐私遮罩 `setting-switch` → shadcn `Switch`+`Label`（修复上一批删 CSS 时漏检插件导致的成绩页开关无样式回归——教训：删共享类前须全仓 grep 含插件），刷新按钮 → `Button`
+- `ExamCountdownView.tsx`：刷新按钮 → `Button`
+- `AcademicView.tsx`：课程目录搜索 `input.academic-search` → shadcn `Input`（`w-[min(280px,42vw)]` 保持宽度）
+- 删除 CSS：`.academic-search`（含媒体查询块；`.academic-select-label select` 共用规则保留）
+- module-tabs（课表/课程/考试/成绩/素拓切换）保留自定义（共享布局类，shell 批处理）
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（Academic 6 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/academic-grades-*.png`，隐私遮罩 Switch + 刷新 Button 就位；课程搜索 Input 280px）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e

@@ -5,6 +5,9 @@ import type {
   PluginComponentProps
 } from "@campusos/shared";
 import { inferGpaScale, summarizeAcademicGrades } from "./gradesModel";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 const numberFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2
@@ -91,25 +94,19 @@ export const Component = ({
           <h2>学业成绩</h2>
         </div>
         <div className="grade-header-actions">
-          <label className="setting-switch" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>
-            <input
-              type="checkbox"
-              checked={privacyMask}
-              onChange={(event) => setPrivacyMask(event.target.checked)}
-            />
-            <span className="switch-track" aria-hidden="true">
-              <span />
-            </span>
-            <span>隐私遮罩</span>
-          </label>
-          <button
-            className="primary-button"
+          <Label htmlFor="privacy-mask" title={privacyMask ? "点击显示成绩与绩点" : "点击隐藏成绩与绩点"}>隐私遮罩</Label>
+          <Switch
+            id="privacy-mask"
+            checked={privacyMask}
+            onCheckedChange={setPrivacyMask}
+          />
+          <Button
             disabled={busy}
             type="button"
             onClick={() => void handleRefresh()}
           >
             {refreshing ? "正在刷新" : "刷新成绩"}
-          </button>
+          </Button>
         </div>
       </div>
 

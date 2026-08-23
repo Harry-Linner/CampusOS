@@ -18,6 +18,7 @@ import {
 } from "@campusos/shared";
 import { Component as AcademicGradesView } from "./GradesView";
 import { Component as ExamCountdownView } from "./ExamCountdownView";
+import { Input } from "@/components/ui/input";
 
 type AcademicSection = "timetable" | "courses" | "exams" | "grades" | "practice";
 
@@ -305,8 +306,8 @@ const CourseCatalogPanel = ({
         <div>
           <h2>课程目录</h2>
         </div>
-        <input
-          className="academic-search"
+        <Input
+          className="w-[min(280px,42vw)]"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜索课程、代码或学期"
