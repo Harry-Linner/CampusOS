@@ -186,6 +186,13 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 6. **学业固定布局**：成绩/考试视图统一为 `academic-panel` 结构，与课表/课程/素拓一致（`922a100`）
 7. **总览**："下学期XX预览"→"今日事项预览"，逻辑改今日课程（todayCourses），计数/空态同步更新（`922a100`）
 - 验收：typecheck/lint 零错误、受影响 84 个测试通过、CI（typecheck/lint/test:coverage/build/e2e）全绿
+
+### 用户三项修复轮（2026-08-23，commit 961b340/14427be）
+
+1. **删摘要行与摘要英文**：移除全部 `eyebrow` 装饰标签（Timetable/Course catalog/Course detail/Practice/Academic records/Countdown/Task message/Provider/Review/时间上下文/Course files/AI Assistant/更新/本地插件包）与日程头部摘要行"0 项安排在接下来 48 小时内"（`961b340`）
+2. **AI 助手时间上下文框鲁棒性**：原双列 grid 在窄窗口下弹性列塌缩成"一行一字"；改为 flex-wrap 布局（copy 列保底 14rem、输入框 max-width 约束），窄窗口优雅堆叠（`961b340`）
+3. **设置页重构（方案 A，用户确认）**：左栏导航（账号/外观/通知/数据与备份/更新/关于/高级）+ 右侧面板切换；主题/关闭行为/培养层次改单行分段控件（3 主题不再两行）；日志/分析/开发工具/钉钉收进"高级"；移除 720px 宽度收窄，页面随窗口填充、内容列保留可读上限；<900px 侧栏变横向导航（`14427be`）
+- 验收：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、构建成功、Electron 实机验证（7 分类导航/两列布局/单行主题控件/面板切换）、CI 全绿
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
