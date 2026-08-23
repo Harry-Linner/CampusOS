@@ -2795,6 +2795,7 @@ input:focus-visible {
     padding: 10px 14px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    overflow-x: auto;
   }
 
   .brand-lockup {
@@ -4988,5 +4989,21 @@ input:focus-visible {
     justify-content: center;
     min-height: 34px;
     padding: 0 10px;
+  }
+}
+
+/* The fixed notification trigger sits at top-right; on narrow layouts the rail
+ * becomes a horizontal top bar, so the trigger must drop below it instead of
+ * overlapping the rail's rightmost item (settings). Declared after the base
+ * .notification-center rule so the cascade wins. */
+@media (max-width: 920px) {
+  .notification-center {
+    top: 108px;
+  }
+}
+
+@media (max-width: 620px) {
+  .notification-center {
+    top: 168px;
   }
 }
