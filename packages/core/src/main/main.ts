@@ -11,7 +11,7 @@ import {
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
-import { registerNotificationHandlers } from "./notificationCenter";
+import { addNotification, registerNotificationHandlers } from "./notificationCenter";
 import { registerBackupHandlers } from "./backupStore";
 import {
   CAMPUSMOD_RENDERER_SCHEME
@@ -29,6 +29,8 @@ import { registerAiAssistantHandlers, createAiAssistantVault } from "./aiAssista
 import { registerBriefHandlers } from "./briefIpc";
 import { createBriefService } from "./briefService";
 import { createBriefStore } from "./briefStore";
+import { createCampusFeedService } from "./campusFeedService";
+import { registerCampusFeedHandlers } from "./campusFeedIpc";
 import { createBriefFetcher } from "./briefInfoSources";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import {
@@ -139,6 +141,10 @@ const startCampusApp = (): void => {
       fetchSources: createBriefFetcher(),
       encryptSecret: (value) => briefVault.encrypt(value),
       decryptSecret: (value) => briefVault.decrypt(value)
+    }));
+    registerCampusFeedHandlers(createCampusFeedService({
+      database: getOfficialDatabaseService(),
+      notify: (input) => addNotification({ kind: "system", ...input })
     }));
     registerCampusWorkspaceHandlers();
     registerPluginRuntimeHandlers();

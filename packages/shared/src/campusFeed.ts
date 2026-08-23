@@ -41,6 +41,8 @@ export interface FeedSourceDescriptor {
   tags: string[];
   /** Site base origin used to resolve relative links. */
   baseUrl: string;
+  /** Additional hosts whose item links are allowed to open (e.g. mp.weixin.qq.com). */
+  extraHosts?: string[];
   /** List page URL. */
   listUrl: string;
   /** Declarative selectors; absent when a code adapter handles this source. */

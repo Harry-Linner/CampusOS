@@ -88,6 +88,14 @@ export interface DatabaseService {
   /** Returns true when the item was newly inserted (dedupe across days). */
   upsertBriefItem: (item: BriefCachedItem) => boolean;
   findBriefItem: (fingerprint: string) => BriefCachedItem | null;
+  listCampusFeedSources: () => { config: unknown; savedAt: string }[];
+  saveCampusFeedSource: (id: string, config: unknown, savedAt: string) => void;
+  deleteCampusFeedSource: (id: string) => void;
+  /** Returns true when the item was newly inserted (canonical-URL dedupe). */
+  upsertCampusFeedItem: (item: unknown) => boolean;
+  listCampusFeedItems: (limit: number) => { item: unknown; savedAt: string }[];
+  markCampusFeedItemsRead: (ids: string[]) => void;
+  findCampusFeedItem: (id: string) => unknown | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -192,6 +200,26 @@ const migrate = (database: Database.Database): void => {
     );
     CREATE INDEX brief_item_cache_fetched
       ON brief_item_cache (fetched_at);
+  `);
+  applyMigration(8, `
+    CREATE TABLE campus_feed_sources (
+      id TEXT PRIMARY KEY,
+      config_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+    CREATE TABLE campus_feed_items (
+      id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT,
+      published_at TEXT,
+      content_hash TEXT NOT NULL,
+      fetched_at TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT 'new' CHECK (state IN ('new', 'read'))
+    );
+    CREATE INDEX campus_feed_items_fetched
+      ON campus_feed_items (fetched_at);
   `);
 };
 
@@ -487,6 +515,134 @@ export const createDatabaseService = ({
         summary: row.summary,
         publishedAt: row.published_at,
         fetchedAt: row.fetched_at
+      };
+    },
+    listCampusFeedSources: () => {
+      const rows = database.prepare(
+        "SELECT config_json, saved_at FROM campus_feed_sources ORDER BY saved_at ASC"
+      ).all() as { config_json: string; saved_at: string }[];
+      return rows.map((row) => ({
+        config: JSON.parse(row.config_json) as unknown,
+        savedAt: row.saved_at
+      }));
+    },
+    saveCampusFeedSource: (id, config, savedAt) => {
+      if (!id || !Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯订阅源保存参数无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_sources (id, config_json, saved_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          config_json = excluded.config_json,
+          saved_at = excluded.saved_at
+      `).run(id, JSON.stringify(config), savedAt);
+    },
+    deleteCampusFeedSource: (id) => {
+      database.prepare("DELETE FROM campus_feed_sources WHERE id = ?").run(id);
+      database.prepare("DELETE FROM campus_feed_items WHERE source_id = ?").run(id);
+    },
+    upsertCampusFeedItem: (item) => {
+      const candidate = item as {
+        id: string;
+        sourceId: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        publishedAt: string | null;
+        contentHash: string;
+        fetchedAt: string;
+      };
+      if (!candidate.id || !candidate.sourceId || !candidate.url || !candidate.title || !candidate.contentHash) {
+        throw new Error("校园资讯条目缺少必要字段。");
+      }
+      if (!Number.isFinite(Date.parse(candidate.fetchedAt))) {
+        throw new Error("校园资讯条目抓取时间无效。");
+      }
+      const result = database.prepare(`
+        INSERT OR IGNORE INTO campus_feed_items (
+          id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')
+      `).run(
+        candidate.id,
+        candidate.sourceId,
+        candidate.url,
+        candidate.title,
+        candidate.summary,
+        candidate.publishedAt,
+        candidate.contentHash,
+        candidate.fetchedAt
+      );
+      return result.changes === 1;
+    },
+    listCampusFeedItems: (limit) => {
+      const rows = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        ORDER BY fetched_at DESC, id ASC
+        LIMIT ?
+      `).all(limit) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      }[];
+      return rows.map((row) => ({
+        item: {
+          id: row.id,
+          sourceId: row.source_id,
+          url: row.url,
+          title: row.title,
+          summary: row.summary,
+          publishedAt: row.published_at,
+          contentHash: row.content_hash,
+          fetchedAt: row.fetched_at,
+          state: row.state
+        },
+        savedAt: row.fetched_at
+      }));
+    },
+    markCampusFeedItemsRead: (ids) => {
+      if (ids.length === 0) return;
+      const statement = database.prepare(
+        "UPDATE campus_feed_items SET state = 'read' WHERE id = ?"
+      );
+      database.transaction(() => {
+        for (const id of ids) statement.run(id);
+      })();
+    },
+    findCampusFeedItem: (id) => {
+      const row = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        WHERE id = ?
+      `).get(id) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      } | undefined;
+      if (!row) return null;
+      return {
+        id: row.id,
+        sourceId: row.source_id,
+        url: row.url,
+        title: row.title,
+        summary: row.summary,
+        publishedAt: row.published_at,
+        contentHash: row.content_hash,
+        fetchedAt: row.fetched_at,
+        state: row.state
       };
     }
   };

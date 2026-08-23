@@ -12,6 +12,7 @@
     "test:coverage": "npm --prefix packages/core rebuild better-sqlite3 && pnpm --filter @campusos/core test:coverage",
     "capture:development-baselines": "node scripts/capture-development-baselines.mjs",
     "verify:zju-auth": "node scripts/run-zju-auth-live.mjs",
+    "verify:campus-feed": "pnpm --filter @campusos/core verify:campus-feed",
     "measure:performance": "node scripts/measure-performance.mjs",
     "lint": "pnpm --filter @campusos/core lint"
   },
