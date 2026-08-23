@@ -278,3 +278,11 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 保留（误报/在用）：`extension-entry`/`onboarding-eyebrow`/`campusmod-sandbox-frame`（e2e 依赖）/`calendar-controls`（ScheduleView 在用）/动态类
 - 剩余大块（旧日历 670 行 + schedule-plan 250 行）因与共享选择器/媒体查询交织，留待专门轮次系统删除
 - 验证：全量 **486 passed / 1 skipped**、e2e **7/7**、构建成功、CI 全绿
+
+**Phase D 第二批 — 旧日历与旧自动排程大块删除（2026-08-23）**：
+- 旧日历视图（`calendar-*`/`agenda-*`/`day-*`/`week-*`/`popover-details` 等）：主区块 **609 行** + 媒体查询死块 **61 行**（含 `.page-heading, .calendar-page-heading` 共享选择器拆分、`calendar-page-tools` 删除）
+- 旧自动排程（`schedule-plan-*`）：约 **40 行**（`.schedule-task-list, .schedule-plan-list` 等 4 处共享选择器拆分）
+- `secondary-button` 全部（独立块 + `.danger-button, .secondary-button` 共享块拆分，`danger-button` 在用保留）；`card-grid` 媒体查询残留
+- **保留（在用/误判）**：`.calendar-controls`/`.schedule-calendar-toolbar .calendar-view-switcher`（ScheduleView 780 在用）、`.onboarding-eyebrow`（引导品牌字，用户决定保留）、`.assistant-settings-form`（AI 助手在用）
+- styles.css 累计从 4900+ 行降至约 **4100 行**；括号平衡校验 621/621；删除全程每步全量 486/1 skipped + e2e 7/7 + 构建成功
+- 剩余 Phase D：统一半径/阴影/动效规范、a11y 复查、截图基线入 e2e
