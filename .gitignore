@@ -14,3 +14,7 @@ live-auth.env
 !.env.example
 .agents/
 .claude/
+
+# CC98 handoff (user-provided scripts + raw scrape data, not committed)
+cc98-handoff/
+cc98-handoff.zip
