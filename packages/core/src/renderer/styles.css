@@ -2017,6 +2017,7 @@ input:focus-visible {
   max-height: 260px;
   margin: 14px 0 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -2431,6 +2432,7 @@ input:focus-visible {
 .academic-course-list {
   max-height: 55vh;
   overflow: auto;
+  scrollbar-gutter: stable;
   border-top: 1px solid var(--line-strong);
 }
 
