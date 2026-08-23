@@ -248,6 +248,11 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - module-tabs（课表/课程/考试/成绩/素拓切换）保留自定义（共享布局类，shell 批处理）
 - 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（Academic 6 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/academic-grades-*.png`，隐私遮罩 Switch + 刷新 Button 就位；课程搜索 Input 280px）、CI 全绿
 
+**Schedule 批 — 已完成（2026-08-23）**：
+- `ScheduleView.tsx`：约 20 处共享原语按钮迁移——`text-button` → shadcn `Button` ghost（含 `is-danger` → `text-destructive`：删除/整个系列/永久删除/详情删除）、`primary-button` → `Button`（恢复此实例/保存任务）；覆盖头部操作（新建任务/新建无日期待办/导出 iCal）、删除/恢复确认条、日历导航"今天"、任务行操作（完成/删除/暂停/继续）、详情与表单（关闭/编辑/保存）
+- 保留原生：桌面日历控制按钮（`.desk-calendar-control` 样式耦合 `text-button` 类）、`icon-button` 日历导航箭头、事件格子按钮、`schedule-task-main`（非共享原语）；内联编辑表单字段（`label>input/select`，`.schedule-form-grid` 布局）与 `module-tabs`（月历/周视图/日程/日视图）保留
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（ScheduleView 12 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/schedule-migrated-*.png`，4 个 shadcn Button + 1 个桌面日历保留控件）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e
