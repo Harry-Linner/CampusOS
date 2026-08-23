@@ -206,8 +206,8 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 
 ### Phase C（待做）
 
-- [ ] Settings → Assistant → Dashboard → Academic/Schedule → Materials → shell 分批迁移，替换即删
-- [ ] 每批三主题截图 + 全绿
+- [x] Settings → Assistant → Dashboard → Academic/Schedule → Materials → shell 分批迁移，替换即删（2026-08-23 全部 7 批完成，`3d01eed`→`b8e9f43`）
+- [x] 每批三主题截图 + 全绿（7 批全部满足）
 
 **Settings 批施工图（2026-08-23 盘点，待用户拍板启动）**：
 - 共享原语已齐备（18 个 shadcn 组件含 Button/Input/Switch/Label/Card/Dialog/Separator 等），无需先补组件
@@ -269,7 +269,8 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 
 ### Phase D（待做）
 
-- [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e
+- [x] styles.css 死代码归零清理（`efaa0c6`/`a4d0681`，4900+ → 约 4100 行）；统一半径/阴影/动效、a11y 复查（`0b79118` 审计通过）；desk-calendar 悬浮窗保持独立设计（`d545efe`）
+- [ ] 截图基线入 e2e（可选增强，待用户决定）
 
 **Phase D 起步 — 死代码盘点与首批清理（2026-08-23）**：
 - 盘点脚本（`packages/.tmp/css-dead-classes.mjs`）：styles.css 364 个类中约 100 个疑似无使用（含动态拼接 `is-*`/`course-tone-*`/`priority-*` 与表达式 className 误报，人工核实）
