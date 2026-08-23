@@ -44,6 +44,11 @@ const service = {
   removeSource: vi.fn(async () => undefined),
   markRead: vi.fn(async () => undefined),
   openExternal: vi.fn(async () => "https://xgb.zju.edu.cn/a"),
+  loadAiSettings: vi.fn(async () => null),
+  saveAiSettings: vi.fn(async (input: unknown) => input),
+  testAiConnection: vi.fn(async () => ({ ok: true, message: "连接成功。" })),
+  extractScheduleCandidates: vi.fn(async () => []),
+  createScheduleTasks: vi.fn(async () => ({ created: 1, deduplicated: 0 })),
   subscribe: vi.fn(() => () => undefined)
 } as unknown as CampusFeedService;
 
@@ -62,7 +67,7 @@ const invoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
 };
 
 describe("campusFeedIpc", () => {
-  it("registers exactly the seven formal channels", () => {
+  it("registers exactly the twelve formal channels", () => {
     process.env.ELECTRON_RENDERER_URL = "http://localhost:5173/";
     registerCampusFeedHandlers(service);
     expect([...electronState.handlers.keys()]).toEqual([
@@ -72,7 +77,12 @@ describe("campusFeedIpc", () => {
       "campusos:campus-feed:update-source",
       "campusos:campus-feed:remove-source",
       "campusos:campus-feed:mark-read",
-      "campusos:campus-feed:open-external"
+      "campusos:campus-feed:open-external",
+      "campusos:campus-feed:ai-settings-load",
+      "campusos:campus-feed:ai-settings-save",
+      "campusos:campus-feed:ai-test",
+      "campusos:campus-feed:ai-extract",
+      "campusos:campus-feed:ai-create-tasks"
     ]);
   });
 
@@ -89,6 +99,19 @@ describe("campusFeedIpc", () => {
   it("opens a validated external URL through the shell", async () => {
     await invoke("campusos:campus-feed:open-external", "https://xgb.zju.edu.cn/a");
     expect(electronState.openedUrls).toEqual(["https://xgb.zju.edu.cn/a"]);
+  });
+
+  it("forwards AI settings / test / extract / create to the service", async () => {
+    const settings = { provider: "deepseek", protocol: "openai-chat-completions", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat", apiKeyConfigured: false };
+    expect(await invoke("campusos:campus-feed:ai-settings-load")).toBeNull();
+    expect(await invoke("campusos:campus-feed:ai-settings-save", settings)).toBe(settings);
+    expect(service.saveAiSettings).toHaveBeenCalledWith(settings);
+    await invoke("campusos:campus-feed:ai-test", settings);
+    expect(service.testAiConnection).toHaveBeenCalledWith(settings);
+    await invoke("campusos:campus-feed:ai-extract", ["item-1"]);
+    expect(service.extractScheduleCandidates).toHaveBeenCalledWith(["item-1"]);
+    await invoke("campusos:campus-feed:ai-create-tasks", []);
+    expect(service.createScheduleTasks).toHaveBeenCalledWith([]);
   });
 
   it("rejects malformed arguments", async () => {

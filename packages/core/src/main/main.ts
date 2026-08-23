@@ -31,6 +31,7 @@ import { createBriefService } from "./briefService";
 import { createBriefStore } from "./briefStore";
 import { createCampusFeedService } from "./campusFeedService";
 import { registerCampusFeedHandlers } from "./campusFeedIpc";
+import { saveScheduleTask } from "./scheduleIpc";
 import { createBriefFetcher } from "./briefInfoSources";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import {
@@ -144,7 +145,16 @@ const startCampusApp = (): void => {
     }));
     registerCampusFeedHandlers(createCampusFeedService({
       database: getOfficialDatabaseService(),
-      notify: (input) => addNotification({ kind: "system", ...input })
+      notify: (input) => addNotification({ kind: "system", ...input }),
+      encryptSecret: (value) => briefVault.encrypt(value),
+      decryptSecret: (value) => briefVault.decrypt(value),
+      saveTask: async (input) => {
+        const result = await saveScheduleTask(input);
+        return {
+          created: result.operation?.kind === "created" ? 1 : 0,
+          deduplicated: result.operation?.kind === "deduplicated" ? 1 : 0
+        };
+      }
     }));
     registerCampusWorkspaceHandlers();
     registerPluginRuntimeHandlers();

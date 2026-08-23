@@ -177,6 +177,15 @@ contextBridge.exposeInMainWorld("campusos", {
     removeSource: (id: string) => ipcRenderer.invoke("campusos:campus-feed:remove-source", id),
     markRead: (ids: string[]) => ipcRenderer.invoke("campusos:campus-feed:mark-read", ids),
     openExternal: (url: string) => ipcRenderer.invoke("campusos:campus-feed:open-external", url),
+    loadAiSettings: () => ipcRenderer.invoke("campusos:campus-feed:ai-settings-load"),
+    saveAiSettings: (input: Record<string, unknown> | null) =>
+      ipcRenderer.invoke("campusos:campus-feed:ai-settings-save", input),
+    testAiConnection: (input: Record<string, unknown>) =>
+      ipcRenderer.invoke("campusos:campus-feed:ai-test", input),
+    extractScheduleCandidates: (itemIds: string[]) =>
+      ipcRenderer.invoke("campusos:campus-feed:ai-extract", itemIds),
+    createScheduleTasks: (candidates: Record<string, unknown>[]) =>
+      ipcRenderer.invoke("campusos:campus-feed:ai-create-tasks", candidates),
     subscribe: (listener: (snapshot: unknown) => void) => {
       const channel = "campusos:campus-feed:changed";
       const handler = (_event: Electron.IpcRendererEvent, snapshot: unknown) => listener(snapshot);

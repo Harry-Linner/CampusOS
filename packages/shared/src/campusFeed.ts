@@ -6,7 +6,11 @@
  * declarative list selectors (RSSHub-style) or a code adapter id; the core
  * service fetches on a per-source interval, dedupes by canonical URL, stores
  * history locally, and pushes new items into the notification center.
+ * Notices can be AI-processed (plugin-independent AI connection) into schedule
+ * entries.
  */
+
+import type { AiAssistantProtocol, AiAssistantProvider } from "./pluginCapabilities";
 
 /** Declarative scraping rule for a static list page (RSSHub-style). */
 export interface FeedListSelectorConfig {
@@ -86,5 +90,57 @@ export interface CampusFeedBridge {
   removeSource: (id: string) => Promise<void>;
   markRead: (ids: string[]) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  loadAiSettings: () => Promise<CampusFeedAiConnection | null>;
+  saveAiSettings: (input: CampusFeedAiInput | null) => Promise<CampusFeedAiConnection | null>;
+  testAiConnection: (input: CampusFeedAiInput) => Promise<CampusFeedAiTestResult>;
+  extractScheduleCandidates: (itemIds: string[]) => Promise<CampusFeedScheduleCandidate[]>;
+  createScheduleTasks: (candidates: CampusFeedScheduleCandidate[]) => Promise<CampusFeedScheduleImportResult>;
   subscribe: (listener: (snapshot: CampusFeedSnapshot) => void) => () => void;
+}
+
+export type CampusFeedAiProvider = AiAssistantProvider;
+export type CampusFeedAiProtocol = AiAssistantProtocol;
+
+/** Campus-feed AI connection, independent of the AI Assistant settings. */
+export interface CampusFeedAiConnection {
+  provider: CampusFeedAiProvider;
+  protocol: CampusFeedAiProtocol;
+  baseUrl: string;
+  model: string;
+  apiKeyConfigured: boolean;
+}
+
+/** User-editable AI connection; `apiKey` is transient over IPC only. */
+export interface CampusFeedAiInput {
+  provider: CampusFeedAiProvider;
+  protocol: CampusFeedAiProtocol;
+  baseUrl: string;
+  model: string;
+  /** Present when the user re-enters a key; omitting keeps the stored one. */
+  apiKey?: string;
+  /** True clears the stored key. */
+  clearApiKey?: boolean;
+}
+
+export interface CampusFeedAiTestResult {
+  ok: boolean;
+  message: string;
+}
+
+/** A schedule entry extracted from a notice by AI. */
+export interface CampusFeedScheduleCandidate {
+  /** Feed item id the candidate was extracted from. */
+  itemId: string;
+  title: string;
+  startAt: string;
+  endAt: string | null;
+  location: string | null;
+  note: string | null;
+  /** "deadline" = 截止类 (no time block), "fixed" = 固定时间活动. */
+  type: "deadline" | "fixed";
+}
+
+export interface CampusFeedScheduleImportResult {
+  created: number;
+  deduplicated: number;
 }

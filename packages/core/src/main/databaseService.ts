@@ -96,6 +96,8 @@ export interface DatabaseService {
   listCampusFeedItems: (limit: number) => { item: unknown; savedAt: string }[];
   markCampusFeedItemsRead: (ids: string[]) => void;
   findCampusFeedItem: (id: string) => unknown | null;
+  saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
+  loadCampusFeedAiSettings: () => { settings: unknown; savedAt: string } | null;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -220,6 +222,13 @@ const migrate = (database: Database.Database): void => {
     );
     CREATE INDEX campus_feed_items_fetched
       ON campus_feed_items (fetched_at);
+  `);
+  applyMigration(9, `
+    CREATE TABLE campus_feed_ai_settings (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      settings_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
   `);
 };
 
@@ -644,6 +653,26 @@ export const createDatabaseService = ({
         fetchedAt: row.fetched_at,
         state: row.state
       };
+    },
+    saveCampusFeedAiSettings: (settings, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯 AI 设置保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_ai_settings (singleton, settings_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          settings_json = excluded.settings_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(settings), savedAt);
+    },
+    loadCampusFeedAiSettings: () => {
+      const row = database.prepare(
+        "SELECT settings_json, saved_at FROM campus_feed_ai_settings WHERE singleton = 1"
+      ).get() as { settings_json: string; saved_at: string } | undefined;
+      return row
+        ? { settings: JSON.parse(row.settings_json) as unknown, savedAt: row.saved_at }
+        : null;
     }
   };
 };

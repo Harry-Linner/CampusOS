@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
+  CalendarClock,
   Check,
   ExternalLink,
   Plus,
@@ -10,14 +11,16 @@ import {
   Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import type { CampusFeedSnapshot, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
+import type { CampusFeedScheduleCandidate, CampusFeedSnapshot, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/sonner";
+import { CampusFeedAiSettings } from "./CampusFeedAiSettings";
 
 type FeedTab = "feed" | "sources" | "settings";
 
@@ -40,12 +43,30 @@ const formatTime = (value: string | null): string => {
 const formatLastRefresh = (value: string): string =>
   new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" }).format(new Date(value));
 
+const formatCandidateTime = (value: string | null): string => {
+  if (!value) return "时间待定";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "时间待定";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai"
+  }).format(date);
+};
+
 export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const feed = props.campusFeed;
   const [tab, setTab] = useState<FeedTab>("feed");
   const [snapshot, setSnapshot] = useState<CampusFeedSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<Set<string>>(new Set());
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleCandidates, setScheduleCandidates] = useState<CampusFeedScheduleCandidate[]>([]);
+  const [importing, setImporting] = useState(false);
   const busyRef = useRef(false);
 
   const refreshAll = useCallback(async (): Promise<void> => {
@@ -120,6 +141,36 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
     }
   };
 
+  const extractItem = async (item: FeedItemRecord): Promise<void> => {
+    if (!feed || extractingId) return;
+    setExtractingId(item.id);
+    try {
+      const candidates = await feed.extractScheduleCandidates([item.id]);
+      setScheduleCandidates(candidates);
+      setScheduleOpen(true);
+    } catch (cause) {
+      toast.error("AI 处理失败", { description: cause instanceof Error ? cause.message : "请先在「设置」中配置校园资讯的 AI 连接。" });
+    } finally {
+      setExtractingId(null);
+    }
+  };
+
+  const importCandidates = async (): Promise<void> => {
+    if (!feed || importing) return;
+    setImporting(true);
+    try {
+      const result = await feed.createScheduleTasks(scheduleCandidates);
+      const parts = [`已加入日程 ${result.created} 条`];
+      if (result.deduplicated > 0) parts.push(`${result.deduplicated} 条已存在`);
+      toast.success(parts.join("，"), { description: "可以在「日程」中查看和编辑。" });
+      setScheduleOpen(false);
+    } catch (cause) {
+      toast.error("加入日程失败", { description: cause instanceof Error ? cause.message : "无法保存日程条目。" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const sources = snapshot?.sources ?? [];
   const enabledSources = sources.filter((source) => source.enabled);
   const items = snapshot?.items ?? [];
@@ -180,6 +231,13 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                 </div>
               ))}
             </CardContent>
+          </Card>
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="text-lg leading-7">AI 处理</CardTitle>
+              <CardDescription>把有明确时间的通知（评选答辩、报名截止、活动讲座）转成日程条目。校园资讯独立使用这里的服务商与模型，不读取 AI 助手的配置。</CardDescription>
+            </CardHeader>
+            <CardContent><CampusFeedAiSettings feed={feed} /></CardContent>
           </Card>
           <Card className="shadow-none">
             <CardHeader>
@@ -289,7 +347,10 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                               </div>
                               {item.summary ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{item.summary}</p> : null}
                             </div>
-                            <Button size="sm" variant="outline" className="shrink-0" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Button size="sm" variant="outline" onClick={() => void extractItem(item)} disabled={extractingId !== null} title="AI 提取时间信息后加入日程"><CalendarClock className={extractingId === item.id ? "animate-pulse" : undefined} aria-hidden="true" />转为日程</Button>
+                              <Button size="sm" variant="outline" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button>
+                            </div>
                           </div>
                         </article>
                       ))}
@@ -301,6 +362,38 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
           )}
         </div>
       )}
+
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><CalendarClock className="size-4" aria-hidden="true" />AI 提取的日程</DialogTitle>
+            <DialogDescription>以下事件由 AI 从通知中提取，确认后加入「日程」。</DialogDescription>
+          </DialogHeader>
+          {scheduleCandidates.length === 0 ? (
+            <p className="py-6 text-center text-sm leading-6 text-muted-foreground">这条通知里没有识别到明确时间的事件，没有可加入的日程。</p>
+          ) : (
+            <div className="space-y-3">
+              {scheduleCandidates.map((candidate, index) => (
+                <div key={`${candidate.itemId}-${index}`} className="rounded-lg border border-border/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium leading-6">{candidate.title}</p>
+                    <Badge variant="secondary">{candidate.type === "deadline" ? "截止" : "活动"}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {formatCandidateTime(candidate.startAt)}{candidate.endAt ? ` → ${formatCandidateTime(candidate.endAt)}` : ""}
+                    {candidate.location ? ` · ${candidate.location}` : ""}
+                  </p>
+                  {candidate.note ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{candidate.note}</p> : null}
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleOpen(false)}>取消</Button>
+            <Button onClick={() => void importCandidates()} disabled={importing || scheduleCandidates.length === 0}><CalendarClock className="size-4" aria-hidden="true" />{importing ? "正在加入" : "加入日程"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };

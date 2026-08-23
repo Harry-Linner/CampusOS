@@ -1,5 +1,10 @@
 import { BrowserWindow, ipcMain, shell } from "electron";
-import type { CampusFeedSnapshot, FeedSourceDescriptor } from "@campusos/shared";
+import type {
+  CampusFeedAiInput,
+  CampusFeedScheduleCandidate,
+  CampusFeedSnapshot,
+  FeedSourceDescriptor
+} from "@campusos/shared";
 import type { CampusFeedService } from "./campusFeedService";
 import { assertTrustedRenderer } from "./ipcSecurity";
 
@@ -63,5 +68,42 @@ export const registerCampusFeedHandlers = (service: CampusFeedService): void => 
     assertTrustedRenderer(event);
     const target = await service.openExternal(url);
     await shell.openExternal(target);
+  });
+
+  ipcMain.handle("campusos:campus-feed:ai-settings-load", async (event) => {
+    assertTrustedRenderer(event);
+    return service.loadAiSettings();
+  });
+
+  ipcMain.handle("campusos:campus-feed:ai-settings-save", async (event, input: CampusFeedAiInput | null) => {
+    assertTrustedRenderer(event);
+    if (input !== null && (typeof input !== "object" || input === undefined)) {
+      throw new Error("AI 连接设置参数无效。");
+    }
+    return service.saveAiSettings(input as CampusFeedAiInput | null);
+  });
+
+  ipcMain.handle("campusos:campus-feed:ai-test", async (event, input: CampusFeedAiInput) => {
+    assertTrustedRenderer(event);
+    if (typeof input !== "object" || input === null) {
+      throw new Error("AI 连接测试参数无效。");
+    }
+    return service.testAiConnection(input);
+  });
+
+  ipcMain.handle("campusos:campus-feed:ai-extract", async (event, itemIds: string[]) => {
+    assertTrustedRenderer(event);
+    if (!isStringArray(itemIds)) {
+      throw new Error("AI 处理参数无效。");
+    }
+    return service.extractScheduleCandidates(itemIds);
+  });
+
+  ipcMain.handle("campusos:campus-feed:ai-create-tasks", async (event, candidates: CampusFeedScheduleCandidate[]) => {
+    assertTrustedRenderer(event);
+    if (!Array.isArray(candidates)) {
+      throw new Error("加入日程参数无效。");
+    }
+    return service.createScheduleTasks(candidates);
   });
 };
