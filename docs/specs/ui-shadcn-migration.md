@@ -270,3 +270,11 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e
+
+**Phase D 起步 — 死代码盘点与首批清理（2026-08-23）**：
+- 盘点脚本（`packages/.tmp/css-dead-classes.mjs`）：styles.css 364 个类中约 100 个疑似无使用（含动态拼接 `is-*`/`course-tone-*`/`priority-*` 与表达式 className 误报，人工核实）
+- **确认真死清单**（迁移后遗留 + 历史遗留）：旧日历/agenda/day/week 视图约 40 类（`calendar-*`/`agenda-*`/`day-*`/`week-*`，685-1354 约 670 行）、旧自动排程 `schedule-plan-*`（约 250 行）、`secondary-button`、`settings-form`、`eyebrow`、`card-grid`、`badge-row`、`grade-method-note`、`grade-privacy-notice`、`popover-details`、`calendar-view-switcher`（待核）
+- **首批已删**（`eyebrow` 从 `.eyebrow,.page-copy,.muted` 共享选择器拆出）：`settings-form`/`card-grid`/`badge-row`/`grade-method-note`/`grade-privacy-notice` 共 6 类
+- 保留（误报/在用）：`extension-entry`/`onboarding-eyebrow`/`campusmod-sandbox-frame`（e2e 依赖）/`calendar-controls`（ScheduleView 在用）/动态类
+- 剩余大块（旧日历 670 行 + schedule-plan 250 行）因与共享选择器/媒体查询交织，留待专门轮次系统删除
+- 验证：全量 **486 passed / 1 skipped**、e2e **7/7**、构建成功、CI 全绿

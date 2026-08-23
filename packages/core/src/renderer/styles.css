@@ -1766,10 +1766,6 @@ input:focus-visible {
   max-width: 860px;
 }
 
-.settings-form {
-  border-top: 1px solid var(--line-strong);
-}
-
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -2441,23 +2437,15 @@ input:focus-visible {
   font-family: var(--font-display);
 }
 
-.eyebrow,
 .page-copy,
 .muted {
   color: var(--ink-soft);
 }
 
-.eyebrow,
 .page-copy,
 .muted {
   margin: 0;
   font-size: 0.82rem;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
 }
 
 .panel-card {
@@ -2499,13 +2487,6 @@ input:focus-visible {
   font-size: 0.76rem;
 }
 
-.badge-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 12px;
-}
-
 .badge {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -2514,27 +2495,10 @@ input:focus-visible {
   padding: 4px 7px;
 }
 
-.grade-method-note {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.55;
-  color: var(--ink-faint);
-}
-
 .grade-header-actions {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.grade-privacy-notice {
-  margin: 0;
-  padding: 8px 11px;
-  border-left: 2px solid var(--warning);
-  background: #fdf6ed;
-  color: #805f1f;
-  font-size: 0.78rem;
-  line-height: 1.5;
 }
 
 .grade-major-tag {
