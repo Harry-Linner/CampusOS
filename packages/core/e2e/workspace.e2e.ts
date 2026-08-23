@@ -342,6 +342,32 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await expect(page.getByLabel("设置分类")).toBeVisible();
     await expect(page.getByRole("heading", { name: "账号" })).toBeVisible();
     await expectNoRootOverflow(page);
+
+    // Regression: at narrow widths the document root is the scroll container,
+    // so the reserved document gutter must keep the layout width constant when
+    // the scrollbar appears/disappears between categories.
+    const stageWidths = await page.evaluate(async () => {
+      const measure = () => Math.round(
+        document.querySelector(".view-stage")?.getBoundingClientRect().width ?? 0
+      );
+      const nav = document.querySelector(".settings-nav");
+      if (!nav) return null;
+      const go = (label: string): void => {
+        const button = [...nav.querySelectorAll("button")].find(
+          (candidate) => (candidate.textContent ?? "").trim() === label
+        );
+        button?.click();
+      };
+      go("高级");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const advanced = measure();
+      go("账号");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const account = measure();
+      return { advanced, account };
+    });
+    expect(stageWidths).not.toBeNull();
+    expect(Math.abs(stageWidths!.advanced - stageWidths!.account)).toBeLessThanOrEqual(2);
   } finally {
     await app.close();
     await new Promise<void>((resolveClose, rejectClose) =>
