@@ -196,13 +196,15 @@ describe("SettingsView", () => {
       onRefresh: vi.fn().mockResolvedValue(undefined)
     }));
 
+    fireEvent.click(screen.getByRole("button", { name: "更新" }));
     expect(await screen.findByText("v0.1.0")).toBeDefined();
     expect(
       (screen.getByRole("button", {
         name: "开发版本不检查更新"
       }) as HTMLButtonElement).disabled
     ).toBe(true);
-    expect(screen.getByText("MIT")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "关于" }));
+    expect(await screen.findByText("MIT")).toBeDefined();
     fireEvent.click(screen.getByText("查看 MIT 许可证"));
     expect(screen.getByText(/Permission is hereby granted/)).toBeDefined();
   });
@@ -212,10 +214,12 @@ describe("SettingsView", () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined);
 
     render(createElement(SettingsView, { onRefresh }));
+    fireEvent.click(screen.getByRole("button", { name: "数据与备份" }));
     fireEvent.click(screen.getByRole("button", { name: "刷新数据" }));
 
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("刷新完成")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "高级" }));
     expect(await screen.findByText("zju-undergraduate")).toBeDefined();
     expect(screen.getByText("live · 320ms")).toBeDefined();
   });
@@ -230,7 +234,8 @@ describe("SettingsView", () => {
       onRestartOnboarding
     }));
 
-    fireEvent.click(screen.getByRole("button", { name: "跳回初始引导界面" }));
+    fireEvent.click(screen.getByRole("button", { name: "高级" }));
+    fireEvent.click(await screen.findByRole("button", { name: "跳回初始引导界面" }));
     expect(onRestartOnboarding).toHaveBeenCalledTimes(1);
   });
 
@@ -342,6 +347,7 @@ describe("SettingsView", () => {
     installBridge(vi.fn(async () => connectedRecord));
 
     render(createElement(SettingsView, { onRefresh: vi.fn().mockResolvedValue(undefined) }));
+    fireEvent.click(screen.getByRole("button", { name: "通知" }));
     await screen.findByRole("button", { name: "保存提醒" });
 
     expect(screen.queryByText(/GPA/)).toBeNull();
@@ -352,6 +358,7 @@ describe("SettingsView", () => {
     installBridge(vi.fn(async () => connectedRecord));
     const onRefresh = vi.fn().mockRejectedValue(new Error("offline"));
     render(createElement(SettingsView, { onRefresh }));
+    fireEvent.click(screen.getByRole("button", { name: "通知" }));
     await screen.findByRole("button", { name: "保存提醒" });
 
     fireEvent.click(screen.getByRole("checkbox", { name: "启用桌面通知" }));

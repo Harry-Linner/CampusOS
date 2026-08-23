@@ -20,6 +20,25 @@ interface SettingsViewProps {
   onRestartOnboarding?: () => void;
 }
 
+type SettingsCategory =
+  | "account"
+  | "appearance"
+  | "notifications"
+  | "data"
+  | "update"
+  | "about"
+  | "advanced";
+
+const settingsCategories: ReadonlyArray<{ id: SettingsCategory; label: string }> = [
+  { id: "account", label: "账号" },
+  { id: "appearance", label: "外观" },
+  { id: "notifications", label: "通知" },
+  { id: "data", label: "数据与备份" },
+  { id: "update", label: "更新" },
+  { id: "about", label: "关于" },
+  { id: "advanced", label: "高级" }
+];
+
 const reminderLeadOptions = [15, 60, 120];
 
 const formatVerificationTime = (value: string): string =>
@@ -74,6 +93,7 @@ export const SettingsView = ({
   const [analyticsConsent, setAnalyticsConsent] = useState(false);
   const [analyticsAvailable, setAnalyticsAvailable] = useState(false);
   const [analyticsMessage, setAnalyticsMessage] = useState("");
+  const [category, setCategory] = useState<SettingsCategory>("account");
   const authenticatedProfile =
     academicCredential.record?.verificationState === "verified" &&
     academicCredential.record.username === username.trim() &&
@@ -273,600 +293,636 @@ export const SettingsView = ({
         </div>
       </header>
 
-      <div className="settings-form">
-        <section className="settings-section" aria-labelledby="appearance-heading">
-          <header className="settings-section-heading">
-            <h2 id="appearance-heading">外观</h2>
-          </header>
-
-          <fieldset className="academic-program-fieldset">
-            <legend>主题</legend>
-            <div className="academic-program-options">
-              {(["light", "dark", "high-contrast"] as ThemeMode[]).map((mode) => (
-                <label key={mode} className={theme === mode ? "selected" : undefined}>
-                  <input
-                    type="radio"
-                    name="theme"
-                    value={mode}
-                    checked={theme === mode}
-                    onChange={() => setTheme(mode)}
-                  />
-                  <span>
-                    <strong>
-                      {mode === "light" ? "亮色" : mode === "dark" ? "暗色" : "高对比度"}
-                    </strong>
-                    <small>
-                      {mode === "light"
-                        ? "默认浅色主题"
-                        : mode === "dark"
-                          ? "深色背景，护眼"
-                          : "最大对比度，无障碍"}
-                    </small>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </section>
-
-        <section className="settings-section" aria-labelledby="lifecycle-heading">
-          <header className="settings-section-heading"><h2 id="lifecycle-heading">后台与启动</h2></header>
-          <p className="page-copy">桌面日历与提醒随 CampusOS 运行，不会注册独立开机项。</p>
-          <div className="settings-toggle-list">
-            <label><input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} /><span>登录系统时启动 CampusOS</span></label>
-            <label><input type="checkbox" checked={notificationPermissionEnabled} onChange={(event) => setNotificationPermissionEnabled(event.target.checked)} /><span>允许桌面通知</span></label>
-          </div>
-          <fieldset className="academic-program-fieldset">
-            <legend>关闭主窗口时</legend>
-            <div className="academic-program-options">
-              {([ ["ask", "每次询问"], ["hide-to-tray", "隐藏到托盘"], ["quit", "退出 CampusOS"] ] as const).map(([value, label]) => (
-                <label key={value} className={closeBehavior === value ? "selected" : undefined}><input type="radio" name="close-behavior" value={value} checked={closeBehavior === value} onChange={() => setCloseBehavior(value)} /><span>{label}</span></label>
-              ))}
-            </div>
-          </fieldset>
-          <div className="settings-actions"><button className="primary-button" type="button" disabled={lifecycleSaving} onClick={() => void saveLifecycleSettings()}>{lifecycleSaving ? "保存中" : "保存后台设置"}</button></div>
-          {lifecycleMessage ? <p className="save-note" role="status">{lifecycleMessage}</p> : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="backup-heading">
-          <header className="settings-section-heading"><h2 id="backup-heading">备份与恢复</h2></header>
-          <p className="page-copy">手动导出本地任务、排程和通知索引。备份不加密，请只保存到可信位置，不包含密码、Cookie、Session、Token 或 AI Key。</p>
-          <div className="settings-actions"><button className="text-button" type="button" onClick={() => void exportBackup()}>导出备份</button><button className="text-button" type="button" onClick={() => void restoreBackup()}>预览并恢复</button></div>
-          {backupMessage ? <p className="save-note" role="status">{backupMessage}</p> : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="data-heading">
-          <header className="settings-section-heading">
-            <h2 id="data-heading">数据</h2>
-          </header>
-
-          <p className="page-copy">重新同步当前数据源，并更新日历中的测试数据。</p>
-          <div className="settings-actions">
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="设置分类">
+          {settingsCategories.map((item) => (
             <button
-              className="primary-button"
+              key={item.id}
               type="button"
-              disabled={refreshState === "refreshing"}
-              onClick={() => void refreshData()}
+              className={category === item.id ? "is-active" : undefined}
+              aria-pressed={category === item.id}
+              onClick={() => setCategory(item.id)}
             >
-              {refreshState === "refreshing" ? "刷新中…" : "刷新数据"}
+              {item.label}
             </button>
-            {refreshState === "success" ? (
-              <span className="save-note" role="status" aria-live="polite">
-                刷新完成
-              </span>
-            ) : null}
-          </div>
+          ))}
+        </nav>
 
-          {refreshState === "error" ? (
-            <p className="error-copy" role="alert">
-              {refreshError}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="diagnostic-heading">
-          <header className="settings-section-heading">
-            <h2 id="diagnostic-heading">诊断与测试</h2>
-            <span className="diagnostic-count">
-              {diagnostics ? `${diagnostics.totalCount} 条` : "未读取"}
-            </span>
-          </header>
-
-          <p className="page-copy">
-            记录各连接器刷新状态、耗时与异常类别；不记录响应正文、密码、Cookie、Session 或 ticket。
-          </p>
-          <div className="settings-actions">
-            <button
-              className="text-button"
-              type="button"
-              disabled={diagnosticState === "loading"}
-              onClick={() => void reloadDiagnostics()}
-            >
-              刷新日志
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              disabled={diagnosticState === "loading"}
-              onClick={() => {
-                void (async () => {
-                  setDiagnosticState("loading");
-                  setDiagnosticMessage("");
-                  try {
-                    const result = await exportDiagnostics();
-                    setDiagnosticState(result.canceled ? "idle" : "exported");
-                    setDiagnosticMessage(
-                      result.canceled ? "" : `已导出到 ${result.path}`
-                    );
-                  } catch (error) {
-                    setDiagnosticState("error");
-                    setDiagnosticMessage(
-                      error instanceof Error ? error.message : "诊断日志导出失败。"
-                    );
-                  }
-                })();
-              }}
-            >
-              导出 TXT
-            </button>
-            <button
-              className="text-button"
-              type="button"
-              disabled={diagnosticState === "loading" || !diagnostics?.totalCount}
-              onClick={() => {
-                void (async () => {
-                  setDiagnosticState("loading");
-                  setDiagnosticMessage("");
-                  try {
-                    setDiagnostics(await clearDiagnostics());
-                    setDiagnosticState("idle");
-                  } catch (error) {
-                    setDiagnosticState("error");
-                    setDiagnosticMessage(
-                      error instanceof Error ? error.message : "诊断日志清空失败。"
-                    );
-                  }
-                })();
-              }}
-            >
-              清空日志
-            </button>
-          </div>
-
-          {diagnosticMessage ? (
-            <p
-              className={diagnosticState === "error" ? "error-copy" : "save-note"}
-              role={diagnosticState === "error" ? "alert" : "status"}
-            >
-              {diagnosticMessage}
-            </p>
-          ) : null}
-
-          {diagnostics?.entries.length ? (
-            <ol className="diagnostic-list">
-              {diagnostics.entries.map((entry) => (
-                <li key={entry.id}>
-                  <div className="diagnostic-entry-heading">
-                    <strong>{entry.module}</strong>
-                    <span data-state={entry.state}>
-                      {entry.state} · {entry.durationMs}ms
-                    </span>
-                  </div>
-                  <div className="diagnostic-entry-meta">
-                    <time dateTime={entry.timestamp}>
-                      {formatVerificationTime(entry.timestamp)}
-                    </time>
-                    <span>{entry.errorCategory ?? "refresh"}</span>
-                  </div>
-                  {entry.message ? <p>{entry.message}</p> : null}
-                </li>
-              ))}
-            </ol>
-          ) : diagnosticState !== "loading" ? (
-            <div className="quiet-empty-state quiet-empty-compact">暂无刷新日志</div>
-          ) : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="update-heading">
-          <header className="settings-section-heading">
-            <h2 id="update-heading">更新</h2>
-            <span className="diagnostic-count">
-              {appInfo ? `v${appInfo.version}` : "正在读取版本"}
-            </span>
-          </header>
-          <p className="page-copy">
-            {updateStatus.state === "available"
-              ? `发现新版本 v${updateStatus.version ?? ""}`
-              : updateStatus.state === "ready"
-                ? `v${updateStatus.version ?? "新版本"} 已准备好安装`
-                : updateStatus.state === "up-to-date"
-                  ? "当前已是最新版本"
-                  : "通过 GitHub Releases 检查并安装 CampusOS 更新。"}
-          </p>
-          {updateStatus.releaseNotes?.length ? (
-            <details className="update-notes-disclosure">
-              <summary>查看更新内容</summary>
-              <ul className="update-notes-list">
-                {updateStatus.releaseNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
-              </ul>
-            </details>
-          ) : null}
-          <div className="settings-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={updateAction.disabled}
-              onClick={() => void runUpdateAction()}
-            >
-              {updateAction.label}
-            </button>
-          </div>
-          {updateStatus.state === "error" ? (
-            <p className="error-copy" role="alert">
-              {updateStatus.error ?? "更新操作失败，请稍后重试。"}
-            </p>
-          ) : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="analytics-heading">
-          <header className="settings-section-heading"><h2 id="analytics-heading">匿名使用分析</h2></header>
-          <p className="page-copy">默认关闭。开启后仅发送功能漏斗事件，不包含账号、课程、任务内容、文件名、私有 URL、Cookie、Token 或 AI Key。</p>
-          <label className="setting-switch">
-            <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={async (event) => {
-              const next = event.target.checked;
-              const record = await window.campusos?.analytics?.setConsent(next);
-              if (record) { setAnalyticsConsent(record.consent); setAnalyticsAvailable(record.available); setAnalyticsMessage(next ? "已开启匿名分析" : "已关闭匿名分析"); }
-            }} />
-            <span className="switch-track" aria-hidden="true"><span /></span>
-            <span>{analyticsAvailable ? "允许发送匿名功能事件" : "分析服务未配置"}</span>
-          </label>
-          {analyticsMessage ? <p className="save-note">{analyticsMessage}</p> : null}
-        </section>
-
-        <section className="settings-section" aria-labelledby="about-heading">
-          <header className="settings-section-heading">
-            <h2 id="about-heading">关于</h2>
-          </header>
-          <dl className="about-data">
-            <div>
-              <dt>应用</dt>
-              <dd>{appInfo?.name ?? "CampusOS"}</dd>
-            </div>
-            <div>
-              <dt>版本</dt>
-              <dd>{appInfo ? appInfo.version : "正在读取"}</dd>
-            </div>
-            <div>
-              <dt>许可证</dt>
-              <dd>{appInfo?.licenseName ?? "MIT"}</dd>
-            </div>
-          </dl>
-          <details className="license-disclosure">
-            <summary>查看 MIT 许可证</summary>
-            <pre>{`${appInfo?.copyright ?? "Copyright (c) 2026 Harry-Linner"}\n\n${mitLicenseText}`}</pre>
-          </details>
-          <div className="settings-actions">
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => void window.campusos?.feedback?.openIssue()}
-            >
-              提交问题反馈
-            </button>
-          </div>
-          <p className="page-copy">反馈会打开 GitHub Issues，不会自动附带账号、课程、文件或本地诊断数据。</p>
-        </section>
-
-        {showDevelopmentTools && onRestartOnboarding ? (
-          <section className="settings-section" aria-labelledby="development-heading">
-            <header className="settings-section-heading">
-              <h2 id="development-heading">开发工具</h2>
-            </header>
-            <p className="page-copy">
-              仅重置首次引导完成状态，保留账号、插件和本地数据。
-            </p>
-            <div className="settings-actions">
-              <button
-                className="text-button"
-                type="button"
-                onClick={onRestartOnboarding}
-              >
-                跳回初始引导界面
-              </button>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="settings-section" aria-labelledby="dingtalk-heading">
-          <header className="settings-section-heading"><h2 id="dingtalk-heading">钉钉</h2></header>
-          <p className="page-copy">钉钉登录与消息导入入口已预留，当前不会读取钉钉数据，也不会发起登录或后台连接。</p>
-          <button className="text-button" type="button" disabled aria-disabled="true">钉钉导入（即将支持）</button>
-        </section>
-
-        <section className="settings-section" aria-labelledby="account-heading">
-          <header className="settings-section-heading">
-            <h2 id="account-heading">账号</h2>
-          </header>
-
-          <fieldset
-            className="academic-program-fieldset"
-            disabled={academicCredential.loading}
-          >
-            <legend>培养层次</legend>
-            <div className="academic-program-options">
-              <label
-                className={program === "undergraduate" ? "selected" : undefined}
-              >
-                <input
-                  type="radio"
-                  name="academic-program"
-                  value="undergraduate"
-                  checked={program === "undergraduate"}
-                  onChange={() => setProgram("undergraduate")}
-                />
-                <span>
-                  <strong>本科生</strong>
-                  <small>验证本科教务与素拓业务数据</small>
-                </span>
-              </label>
-              <label className={program === "graduate" ? "selected" : undefined}>
-                <input
-                  type="radio"
-                  name="academic-program"
-                  value="graduate"
-                  checked={program === "graduate"}
-                  onChange={() => setProgram("graduate")}
-                />
-                <span>
-                  <strong>研究生</strong>
-                  <small>验证研究生院 token 与成绩数据</small>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
-          <div className="settings-fields">
-            <label className="field-stack">
-              <span>学号 / 统一认证账号</span>
-              <input
-                className="text-field"
-                type="text"
-                autoComplete="username"
-                disabled={academicCredential.loading}
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="输入账号"
-              />
-            </label>
-
-            <label className="field-stack">
-              <span>密码</span>
-              <input
-                className="text-field"
-                type="password"
-                autoComplete="current-password"
-                disabled={academicCredential.loading}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={academicCredential.record?.configured ? "输入新密码" : "输入密码"}
-              />
-            </label>
-          </div>
-          <div className="settings-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={
-                academicCredential.loading ||
-                username.trim().length === 0 ||
-                password.length === 0
-              }
-              onClick={() => {
-                void (async () => {
-                  try {
-                    await academicCredential.connect({
-                      username,
-                      password,
-                      program
-                    });
-                    setPassword("");
-                    await refreshData();
-                  } catch {
-                    // The hook renders the sanitized main-process error below.
-                  }
-                })();
-              }}
-            >
-              {academicCredential.loading
-                ? academicCredential.record === null
-                  ? "读取账号…"
-                  : "连接中…"
-                : "连接并保存"}
-            </button>
-            {academicCredential.record?.verificationState === "verified" &&
-            academicCredential.record.username === username.trim() &&
-            academicCredential.record.program === program &&
-            password.length === 0 ? (
-              <span className="save-note" role="status" aria-live="polite">
-                已验证并安全保存
-              </span>
-            ) : null}
-          </div>
-
-          <div className="settings-actions">
-            <button className="text-button is-danger" type="button" disabled={academicCredential.loading} onClick={() => { if (!window.confirm("退出当前账号并清除认证缓存？本地任务、通知和日历设置会保留。")) return; void academicCredential.clear().then(() => { setUsername(""); setPassword(""); }); }}>退出当前账号</button>
-          </div>
-
-          {authenticatedProfile ? (
-            <section
-              className="credential-proof"
-              aria-label="统一认证业务数据回执"
-            >
-              <header className="credential-proof-heading">
-                <div>
-                  <strong>认证后业务数据已返回</strong>
-                  <span>
-                    {authenticatedProfile.source === "zju-quality-development"
-                      ? "浙江大学素质拓展平台 · getMyInfo"
-                      : "浙江大学研究生院 · 成绩数据接口"}
-                  </span>
-                </div>
-                <time dateTime={authenticatedProfile.fetchedAt}>
-                  {formatVerificationTime(authenticatedProfile.fetchedAt)}
-                </time>
+        <div className="settings-panel">
+          {category === "account" ? (
+            <section className="settings-section" aria-labelledby="account-heading">
+              <header className="settings-section-heading">
+                <h2 id="account-heading">账号</h2>
               </header>
 
-              <dl className="credential-proof-data">
-                <div>
-                  <dt>
-                    {authenticatedProfile.source === "zju-quality-development"
-                      ? "返回学号"
-                      : "认证账号"}
-                  </dt>
-                  <dd>{authenticatedProfile.studentId}</dd>
+              <fieldset
+                className="academic-program-fieldset"
+                disabled={academicCredential.loading}
+              >
+                <legend>培养层次</legend>
+                <div className="academic-program-options">
+                  <label
+                    className={program === "undergraduate" ? "selected" : undefined}
+                  >
+                    <input
+                      type="radio"
+                      name="academic-program"
+                      value="undergraduate"
+                      checked={program === "undergraduate"}
+                      onChange={() => setProgram("undergraduate")}
+                    />
+                    <span>
+                      <strong>本科生</strong>
+                      <small>验证本科教务与素拓业务数据</small>
+                    </span>
+                  </label>
+                  <label className={program === "graduate" ? "selected" : undefined}>
+                    <input
+                      type="radio"
+                      name="academic-program"
+                      value="graduate"
+                      checked={program === "graduate"}
+                      onChange={() => setProgram("graduate")}
+                    />
+                    <span>
+                      <strong>研究生</strong>
+                      <small>验证研究生院 token 与成绩数据</small>
+                    </span>
+                  </label>
                 </div>
-                {authenticatedProfile.source === "zju-quality-development" ? (
-                  <>
-                    <div>
-                      <dt>第二课堂</dt>
-                      <dd>{formatPoints(authenticatedProfile.secondClassPoints)}</dd>
-                    </div>
-                    <div>
-                      <dt>第三课堂</dt>
-                      <dd>{formatPoints(authenticatedProfile.thirdClassPoints)}</dd>
-                    </div>
-                    <div>
-                      <dt>第四课堂</dt>
-                      <dd>{formatPoints(authenticatedProfile.fourthClassPoints)}</dd>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <dt>验证数据</dt>
-                      <dd>研究生成绩记录</dd>
-                    </div>
-                    <div>
-                      <dt>返回记录</dt>
-                      <dd>{authenticatedProfile.recordCount} 条</dd>
-                    </div>
-                  </>
-                )}
-              </dl>
+              </fieldset>
 
-              <p>
-                {authenticatedProfile.source === "zju-quality-development"
-                  ? "以上数值来自本次认证后的业务接口返回，不是客户端生成的连接提示。"
-                  : "以上记录数来自本次认证后的研究生院响应；token 与成绩正文不会进入页面。"}
-              </p>
+              <div className="settings-fields">
+                <label className="field-stack">
+                  <span>学号 / 统一认证账号</span>
+                  <input
+                    className="text-field"
+                    type="text"
+                    autoComplete="username"
+                    disabled={academicCredential.loading}
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="输入账号"
+                  />
+                </label>
+
+                <label className="field-stack">
+                  <span>密码</span>
+                  <input
+                    className="text-field"
+                    type="password"
+                    autoComplete="current-password"
+                    disabled={academicCredential.loading}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={academicCredential.record?.configured ? "输入新密码" : "输入密码"}
+                  />
+                </label>
+              </div>
+              <div className="settings-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={
+                    academicCredential.loading ||
+                    username.trim().length === 0 ||
+                    password.length === 0
+                  }
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await academicCredential.connect({
+                          username,
+                          password,
+                          program
+                        });
+                        setPassword("");
+                        await refreshData();
+                      } catch {
+                        // The hook renders the sanitized main-process error below.
+                      }
+                    })();
+                  }}
+                >
+                  {academicCredential.loading
+                    ? academicCredential.record === null
+                      ? "读取账号…"
+                      : "连接中…"
+                    : "连接并保存"}
+                </button>
+                {academicCredential.record?.verificationState === "verified" &&
+                academicCredential.record.username === username.trim() &&
+                academicCredential.record.program === program &&
+                password.length === 0 ? (
+                  <span className="save-note" role="status" aria-live="polite">
+                    已验证并安全保存
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="settings-actions">
+                <button className="text-button is-danger" type="button" disabled={academicCredential.loading} onClick={() => { if (!window.confirm("退出当前账号并清除认证缓存？本地任务、通知和日历设置会保留。")) return; void academicCredential.clear().then(() => { setUsername(""); setPassword(""); }); }}>退出当前账号</button>
+              </div>
+
+              {authenticatedProfile ? (
+                <section
+                  className="credential-proof"
+                  aria-label="统一认证业务数据回执"
+                >
+                  <header className="credential-proof-heading">
+                    <div>
+                      <strong>认证后业务数据已返回</strong>
+                      <span>
+                        {authenticatedProfile.source === "zju-quality-development"
+                          ? "浙江大学素质拓展平台 · getMyInfo"
+                          : "浙江大学研究生院 · 成绩数据接口"}
+                      </span>
+                    </div>
+                    <time dateTime={authenticatedProfile.fetchedAt}>
+                      {formatVerificationTime(authenticatedProfile.fetchedAt)}
+                    </time>
+                  </header>
+
+                  <dl className="credential-proof-data">
+                    <div>
+                      <dt>
+                        {authenticatedProfile.source === "zju-quality-development"
+                          ? "返回学号"
+                          : "认证账号"}
+                      </dt>
+                      <dd>{authenticatedProfile.studentId}</dd>
+                    </div>
+                    {authenticatedProfile.source === "zju-quality-development" ? (
+                      <>
+                        <div>
+                          <dt>第二课堂</dt>
+                          <dd>{formatPoints(authenticatedProfile.secondClassPoints)}</dd>
+                        </div>
+                        <div>
+                          <dt>第三课堂</dt>
+                          <dd>{formatPoints(authenticatedProfile.thirdClassPoints)}</dd>
+                        </div>
+                        <div>
+                          <dt>第四课堂</dt>
+                          <dd>{formatPoints(authenticatedProfile.fourthClassPoints)}</dd>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <dt>验证数据</dt>
+                          <dd>研究生成绩记录</dd>
+                        </div>
+                        <div>
+                          <dt>返回记录</dt>
+                          <dd>{authenticatedProfile.recordCount} 条</dd>
+                        </div>
+                      </>
+                    )}
+                  </dl>
+
+                  <p>
+                    {authenticatedProfile.source === "zju-quality-development"
+                      ? "以上数值来自本次认证后的业务接口返回，不是客户端生成的连接提示。"
+                      : "以上记录数来自本次认证后的研究生院响应；token 与成绩正文不会进入页面。"}
+                  </p>
+                </section>
+              ) : null}
+
+              {academicCredential.record?.verificationState === "unverified" ? (
+                <p className="error-copy" role="status">
+                  旧版保存的账号尚未经过统一认证验证，请重新连接。
+                </p>
+              ) : null}
+
+              {academicCredential.error ? (
+                <p className="error-copy" role="alert">
+                  {academicCredential.error}
+                </p>
+              ) : null}
             </section>
           ) : null}
 
-          {academicCredential.record?.verificationState === "unverified" ? (
-            <p className="error-copy" role="status">
-              旧版保存的账号尚未经过统一认证验证，请重新连接。
-            </p>
+          {category === "appearance" ? (
+            <section className="settings-section" aria-labelledby="appearance-heading">
+              <header className="settings-section-heading">
+                <h2 id="appearance-heading">外观</h2>
+              </header>
+
+              <fieldset className="academic-program-fieldset">
+                <legend>主题</legend>
+                <div className="academic-program-options">
+                  {(["light", "dark", "high-contrast"] as ThemeMode[]).map((mode) => (
+                    <label key={mode} className={theme === mode ? "selected" : undefined}>
+                      <input
+                        type="radio"
+                        name="theme"
+                        value={mode}
+                        checked={theme === mode}
+                        onChange={() => setTheme(mode)}
+                      />
+                      <span>
+                        <strong>
+                          {mode === "light" ? "亮色" : mode === "dark" ? "暗色" : "高对比度"}
+                        </strong>
+                        <small>
+                          {mode === "light"
+                            ? "默认浅色主题"
+                            : mode === "dark"
+                              ? "深色背景，护眼"
+                              : "最大对比度，无障碍"}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </section>
           ) : null}
 
-          {academicCredential.error ? (
-            <p className="error-copy" role="alert">
-              {academicCredential.error}
-            </p>
-          ) : null}
-        </section>
+          {category === "notifications" ? (
+            <>
+              <section className="settings-section" aria-labelledby="reminder-heading">
+                <header className="settings-section-heading">
+                  <h2 id="reminder-heading">提醒</h2>
+                </header>
 
-        <section className="settings-section" aria-labelledby="reminder-heading">
-          <header className="settings-section-heading">
-            <h2 id="reminder-heading">提醒</h2>
-          </header>
+                <label className="setting-switch">
+                  <input
+                    type="checkbox"
+                    checked={reminderEnabled}
+                    onChange={(event) => {
+                      setReminderSaved(false);
+                      setReminderEnabled(event.target.checked);
+                    }}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span />
+                  </span>
+                  <span>启用桌面通知</span>
+                </label>
 
-          <label className="setting-switch">
-            <input
-              type="checkbox"
-              checked={reminderEnabled}
-              onChange={(event) => {
-                setReminderSaved(false);
-                setReminderEnabled(event.target.checked);
-              }}
-            />
-            <span className="switch-track" aria-hidden="true">
-              <span />
-            </span>
-            <span>启用桌面通知</span>
-          </label>
+                <label className="setting-switch">
+                  <input
+                    type="checkbox"
+                    checked={gradeChangesEnabled}
+                    onChange={(event) => {
+                      setReminderSaved(false);
+                      setGradeChangesEnabled(event.target.checked);
+                    }}
+                  />
+                  <span className="switch-track" aria-hidden="true">
+                    <span />
+                  </span>
+                  <span>启用成绩变化通知</span>
+                </label>
 
-          <label className="setting-switch">
-            <input
-              type="checkbox"
-              checked={gradeChangesEnabled}
-              onChange={(event) => {
-                setReminderSaved(false);
-                setGradeChangesEnabled(event.target.checked);
-              }}
-            />
-            <span className="switch-track" aria-hidden="true">
-              <span />
-            </span>
-            <span>启用成绩变化通知</span>
-          </label>
+                <fieldset className="reminder-options" disabled={!reminderEnabled}>
+                  <legend>提醒时间</legend>
+                  <div>
+                    {reminderLeadOptions.map((option) => {
+                      const selected = selectedLeadMinutes.includes(option);
 
-          <fieldset className="reminder-options" disabled={!reminderEnabled}>
-            <legend>提醒时间</legend>
-            <div>
-              {reminderLeadOptions.map((option) => {
-                const selected = selectedLeadMinutes.includes(option);
-
-                return (
-                  <label
-                    key={option}
-                    className={selected ? "reminder-option is-selected" : "reminder-option"}
+                      return (
+                        <label
+                          key={option}
+                          className={selected ? "reminder-option is-selected" : "reminder-option"}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={(event) => {
+                              setReminderSaved(false);
+                              setSelectedLeadMinutes((current) =>
+                                event.target.checked
+                                  ? [...current, option].sort((left, right) => left - right)
+                                  : current.filter((value) => value !== option)
+                              );
+                            }}
+                          />
+                          <span>{option === 60 ? "1 小时前" : `${option} 分钟前`}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+                <div className="settings-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={
+                      reminderSettings.loading ||
+                      (reminderEnabled && selectedLeadMinutes.length === 0)
+                    }
+                    onClick={() => {
+                      void (async () => {
+                        const saved = await reminderSettings.save({
+                          enabled: reminderEnabled,
+                          leadMinutes: selectedLeadMinutes,
+                          gradeChangesEnabled
+                        });
+                        setReminderSaved(saved);
+                      })();
+                    }}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={(event) => {
-                        setReminderSaved(false);
-                        setSelectedLeadMinutes((current) =>
-                          event.target.checked
-                            ? [...current, option].sort((left, right) => left - right)
-                            : current.filter((value) => value !== option)
-                        );
-                      }}
-                    />
-                    <span>{option === 60 ? "1 小时前" : `${option} 分钟前`}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-          <div className="settings-actions">
-            <button
-              className="primary-button"
-              type="button"
-              disabled={
-                reminderSettings.loading ||
-                (reminderEnabled && selectedLeadMinutes.length === 0)
-              }
-              onClick={() => {
-                void (async () => {
-                  const saved = await reminderSettings.save({
-                    enabled: reminderEnabled,
-                    leadMinutes: selectedLeadMinutes,
-                    gradeChangesEnabled
-                  });
-                  setReminderSaved(saved);
-                })();
-              }}
-            >
-              {reminderSettings.loading ? "保存中" : "保存提醒"}
-            </button>
-            {reminderSaved ? <span className="save-note">已保存</span> : null}
-          </div>
+                    {reminderSettings.loading ? "保存中" : "保存提醒"}
+                  </button>
+                  {reminderSaved ? <span className="save-note">已保存</span> : null}
+                </div>
 
-          {reminderSettings.error ? (
-            <p className="error-copy">{reminderSettings.error}</p>
+                {reminderSettings.error ? (
+                  <p className="error-copy">{reminderSettings.error}</p>
+                ) : null}
+              </section>
+
+              <section className="settings-section" aria-labelledby="lifecycle-heading">
+                <header className="settings-section-heading"><h2 id="lifecycle-heading">后台与启动</h2></header>
+                <p className="page-copy">桌面日历与提醒随 CampusOS 运行，不会注册独立开机项。</p>
+                <div className="settings-toggle-list">
+                  <label><input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} /><span>登录系统时启动 CampusOS</span></label>
+                  <label><input type="checkbox" checked={notificationPermissionEnabled} onChange={(event) => setNotificationPermissionEnabled(event.target.checked)} /><span>允许桌面通知</span></label>
+                </div>
+                <fieldset className="academic-program-fieldset">
+                  <legend>关闭主窗口时</legend>
+                  <div className="academic-program-options">
+                    {([ ["ask", "每次询问"], ["hide-to-tray", "隐藏到托盘"], ["quit", "退出 CampusOS"] ] as const).map(([value, label]) => (
+                      <label key={value} className={closeBehavior === value ? "selected" : undefined}><input type="radio" name="close-behavior" value={value} checked={closeBehavior === value} onChange={() => setCloseBehavior(value)} /><span>{label}</span></label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="settings-actions"><button className="primary-button" type="button" disabled={lifecycleSaving} onClick={() => void saveLifecycleSettings()}>{lifecycleSaving ? "保存中" : "保存后台设置"}</button></div>
+                {lifecycleMessage ? <p className="save-note" role="status">{lifecycleMessage}</p> : null}
+              </section>
+            </>
           ) : null}
-        </section>
+
+          {category === "data" ? (
+            <>
+              <section className="settings-section" aria-labelledby="data-heading">
+                <header className="settings-section-heading">
+                  <h2 id="data-heading">数据</h2>
+                </header>
+
+                <p className="page-copy">重新同步当前数据源，并更新日历中的测试数据。</p>
+                <div className="settings-actions">
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={refreshState === "refreshing"}
+                    onClick={() => void refreshData()}
+                  >
+                    {refreshState === "refreshing" ? "刷新中…" : "刷新数据"}
+                  </button>
+                  {refreshState === "success" ? (
+                    <span className="save-note" role="status" aria-live="polite">
+                      刷新完成
+                    </span>
+                  ) : null}
+                </div>
+
+                {refreshState === "error" ? (
+                  <p className="error-copy" role="alert">
+                    {refreshError}
+                  </p>
+                ) : null}
+              </section>
+
+              <section className="settings-section" aria-labelledby="backup-heading">
+                <header className="settings-section-heading"><h2 id="backup-heading">备份与恢复</h2></header>
+                <p className="page-copy">手动导出本地任务、排程和通知索引。备份不加密，请只保存到可信位置，不包含密码、Cookie、Session、Token 或 AI Key。</p>
+                <div className="settings-actions"><button className="text-button" type="button" onClick={() => void exportBackup()}>导出备份</button><button className="text-button" type="button" onClick={() => void restoreBackup()}>预览并恢复</button></div>
+                {backupMessage ? <p className="save-note" role="status">{backupMessage}</p> : null}
+              </section>
+            </>
+          ) : null}
+
+          {category === "update" ? (
+            <section className="settings-section" aria-labelledby="update-heading">
+              <header className="settings-section-heading">
+                <h2 id="update-heading">更新</h2>
+                <span className="diagnostic-count">
+                  {appInfo ? `v${appInfo.version}` : "正在读取版本"}
+                </span>
+              </header>
+              <p className="page-copy">
+                {updateStatus.state === "available"
+                  ? `发现新版本 v${updateStatus.version ?? ""}`
+                  : updateStatus.state === "ready"
+                    ? `v${updateStatus.version ?? "新版本"} 已准备好安装`
+                    : updateStatus.state === "up-to-date"
+                      ? "当前已是最新版本"
+                      : "通过 GitHub Releases 检查并安装 CampusOS 更新。"}
+              </p>
+              {updateStatus.releaseNotes?.length ? (
+                <details className="update-notes-disclosure">
+                  <summary>查看更新内容</summary>
+                  <ul className="update-notes-list">
+                    {updateStatus.releaseNotes.map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}
+                  </ul>
+                </details>
+              ) : null}
+              <div className="settings-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={updateAction.disabled}
+                  onClick={() => void runUpdateAction()}
+                >
+                  {updateAction.label}
+                </button>
+              </div>
+              {updateStatus.state === "error" ? (
+                <p className="error-copy" role="alert">
+                  {updateStatus.error ?? "更新操作失败，请稍后重试。"}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
+          {category === "about" ? (
+            <section className="settings-section" aria-labelledby="about-heading">
+              <header className="settings-section-heading">
+                <h2 id="about-heading">关于</h2>
+              </header>
+              <dl className="about-data">
+                <div>
+                  <dt>应用</dt>
+                  <dd>{appInfo?.name ?? "CampusOS"}</dd>
+                </div>
+                <div>
+                  <dt>版本</dt>
+                  <dd>{appInfo ? appInfo.version : "正在读取"}</dd>
+                </div>
+                <div>
+                  <dt>许可证</dt>
+                  <dd>{appInfo?.licenseName ?? "MIT"}</dd>
+                </div>
+              </dl>
+              <details className="license-disclosure">
+                <summary>查看 MIT 许可证</summary>
+                <pre>{`${appInfo?.copyright ?? "Copyright (c) 2026 Harry-Linner"}\n\n${mitLicenseText}`}</pre>
+              </details>
+              <div className="settings-actions">
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => void window.campusos?.feedback?.openIssue()}
+                >
+                  提交问题反馈
+                </button>
+              </div>
+              <p className="page-copy">反馈会打开 GitHub Issues，不会自动附带账号、课程、文件或本地诊断数据。</p>
+            </section>
+          ) : null}
+
+          {category === "advanced" ? (
+            <>
+              <section className="settings-section" aria-labelledby="diagnostic-heading">
+                <header className="settings-section-heading">
+                  <h2 id="diagnostic-heading">诊断与测试</h2>
+                  <span className="diagnostic-count">
+                    {diagnostics ? `${diagnostics.totalCount} 条` : "未读取"}
+                  </span>
+                </header>
+
+                <p className="page-copy">
+                  记录各连接器刷新状态、耗时与异常类别；不记录响应正文、密码、Cookie、Session 或 ticket。
+                </p>
+                <div className="settings-actions">
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={diagnosticState === "loading"}
+                    onClick={() => void reloadDiagnostics()}
+                  >
+                    刷新日志
+                  </button>
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={diagnosticState === "loading"}
+                    onClick={() => {
+                      void (async () => {
+                        setDiagnosticState("loading");
+                        setDiagnosticMessage("");
+                        try {
+                          const result = await exportDiagnostics();
+                          setDiagnosticState(result.canceled ? "idle" : "exported");
+                          setDiagnosticMessage(
+                            result.canceled ? "" : `已导出到 ${result.path}`
+                          );
+                        } catch (error) {
+                          setDiagnosticState("error");
+                          setDiagnosticMessage(
+                            error instanceof Error ? error.message : "诊断日志导出失败。"
+                          );
+                        }
+                      })();
+                    }}
+                  >
+                    导出 TXT
+                  </button>
+                  <button
+                    className="text-button"
+                    type="button"
+                    disabled={diagnosticState === "loading" || !diagnostics?.totalCount}
+                    onClick={() => {
+                      void (async () => {
+                        setDiagnosticState("loading");
+                        setDiagnosticMessage("");
+                        try {
+                          setDiagnostics(await clearDiagnostics());
+                          setDiagnosticState("idle");
+                        } catch (error) {
+                          setDiagnosticState("error");
+                          setDiagnosticMessage(
+                            error instanceof Error ? error.message : "诊断日志清空失败。"
+                          );
+                        }
+                      })();
+                    }}
+                  >
+                    清空日志
+                  </button>
+                </div>
+
+                {diagnosticMessage ? (
+                  <p
+                    className={diagnosticState === "error" ? "error-copy" : "save-note"}
+                    role={diagnosticState === "error" ? "alert" : "status"}
+                  >
+                    {diagnosticMessage}
+                  </p>
+                ) : null}
+
+                {diagnostics?.entries.length ? (
+                  <ol className="diagnostic-list">
+                    {diagnostics.entries.map((entry) => (
+                      <li key={entry.id}>
+                        <div className="diagnostic-entry-heading">
+                          <strong>{entry.module}</strong>
+                          <span data-state={entry.state}>
+                            {entry.state} · {entry.durationMs}ms
+                          </span>
+                        </div>
+                        <div className="diagnostic-entry-meta">
+                          <time dateTime={entry.timestamp}>
+                            {formatVerificationTime(entry.timestamp)}
+                          </time>
+                          <span>{entry.errorCategory ?? "refresh"}</span>
+                        </div>
+                        {entry.message ? <p>{entry.message}</p> : null}
+                      </li>
+                    ))}
+                  </ol>
+                ) : diagnosticState !== "loading" ? (
+                  <div className="quiet-empty-state quiet-empty-compact">暂无刷新日志</div>
+                ) : null}
+              </section>
+
+              <section className="settings-section" aria-labelledby="analytics-heading">
+                <header className="settings-section-heading"><h2 id="analytics-heading">匿名使用分析</h2></header>
+                <p className="page-copy">默认关闭。开启后仅发送功能漏斗事件，不包含账号、课程、任务内容、文件名、私有 URL、Cookie、Token 或 AI Key。</p>
+                <label className="setting-switch">
+                  <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={async (event) => {
+                    const next = event.target.checked;
+                    const record = await window.campusos?.analytics?.setConsent(next);
+                    if (record) { setAnalyticsConsent(record.consent); setAnalyticsAvailable(record.available); setAnalyticsMessage(next ? "已开启匿名分析" : "已关闭匿名分析"); }
+                  }} />
+                  <span className="switch-track" aria-hidden="true"><span /></span>
+                  <span>{analyticsAvailable ? "允许发送匿名功能事件" : "分析服务未配置"}</span>
+                </label>
+                {analyticsMessage ? <p className="save-note">{analyticsMessage}</p> : null}
+              </section>
+
+              {showDevelopmentTools && onRestartOnboarding ? (
+                <section className="settings-section" aria-labelledby="development-heading">
+                  <header className="settings-section-heading">
+                    <h2 id="development-heading">开发工具</h2>
+                  </header>
+                  <p className="page-copy">
+                    仅重置首次引导完成状态，保留账号、插件和本地数据。
+                  </p>
+                  <div className="settings-actions">
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={onRestartOnboarding}
+                    >
+                      跳回初始引导界面
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="settings-section" aria-labelledby="dingtalk-heading">
+                <header className="settings-section-heading"><h2 id="dingtalk-heading">钉钉</h2></header>
+                <p className="page-copy">钉钉登录与消息导入入口已预留，当前不会读取钉钉数据，也不会发起登录或后台连接。</p>
+                <button className="text-button" type="button" disabled aria-disabled="true">钉钉导入（即将支持）</button>
+              </section>
+            </>
+          ) : null}
+        </div>
       </div>
     </section>
   );
