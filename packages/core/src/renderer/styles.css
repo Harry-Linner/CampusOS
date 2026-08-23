@@ -4932,7 +4932,7 @@ input:focus-visible {
   outline-offset: 2px;
 }
 .notification-badge { display: inline-flex; min-width: 18px; justify-content: center; margin-left: 6px; border-radius: 999px; background: var(--accent); color: white; font-size: 11px; }
-.notification-popover { width: min(380px, calc(100vw - 32px)); margin-top: 8px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
+.notification-popover { width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-gutter: stable; margin-top: 8px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
 .notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .notification-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
 .notification-item > button:first-child { flex: 1; display: grid; gap: 3px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: 8px; padding: 4px 6px; transition: background-color 160ms ease; }
