@@ -361,7 +361,6 @@ export const Component = ({
             <section className="materials-file-pane" aria-label="资料文件">
               <header className="materials-file-heading">
                 <div>
-                  <p className="eyebrow">Course files</p>
                   <h2>{selectedCourse?.name ?? "没有匹配的课程"}</h2>
                 </div>
                 {selectableMaterials.length > 0 ? (

@@ -175,7 +175,6 @@ const TimetablePanel = ({
     <section className="academic-panel" aria-label="课表">
       <div className="academic-panel-heading">
         <div>
-          <p className="eyebrow">Timetable</p>
           <h2>课表</h2>
         </div>
         {semesters.length > 0 ? (
@@ -304,7 +303,6 @@ const CourseCatalogPanel = ({
     <section className="academic-panel" aria-label="课程目录">
       <div className="academic-panel-heading">
         <div>
-          <p className="eyebrow">Course catalog</p>
           <h2>课程目录</h2>
         </div>
         <input
@@ -345,7 +343,6 @@ const CourseCatalogPanel = ({
         </ul>
         {selected ? (
           <article className="academic-course-detail">
-            <p className="eyebrow">Course detail</p>
             <h3>{selected.courseName}</h3>
             <dl className="academic-detail-list">
               <div>
@@ -419,7 +416,6 @@ const PracticePanel = ({
     <section className="academic-panel" aria-label="素质拓展实践">
       <div className="academic-panel-heading">
         <div>
-          <p className="eyebrow">Practice</p>
           <h2>素拓实践</h2>
         </div>
       </div>

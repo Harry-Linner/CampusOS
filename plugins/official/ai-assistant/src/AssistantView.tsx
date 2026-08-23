@@ -218,7 +218,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
   return (
     <section className="page-shell assistant-page">
       <header className="page-heading assistant-heading">
-        <div><p className="eyebrow">Task message</p><h1>AI 助手</h1><p>把群聊消息整理成可确认的日程事项。</p></div>
+        <div><h1>AI 助手</h1><p>把群聊消息整理成可确认的日程事项。</p></div>
         <nav className="module-tabs" aria-label="AI 助手视图">
           <button type="button" className={section === "message" ? "is-active" : undefined} aria-pressed={section === "message"} onClick={() => setSection("message")}>消息</button>
           <button type="button" className={section === "settings" ? "is-active" : undefined} aria-pressed={section === "settings"} onClick={() => setSection("settings")}>连接</button>
@@ -228,7 +228,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
       {notice ? <p className="schedule-notice" role="status">{notice}</p> : null}
       {section === "settings" ? (
         <section className="assistant-settings" aria-label="AI 助手连接配置">
-          <header className="section-heading"><div><p className="eyebrow">Provider</p><h2>模型连接</h2></div><span className={`assistant-config-state ${settings?.configured ? "is-configured" : ""}`}>{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span></header>
+          <header className="section-heading"><div><h2>模型连接</h2></div><span className={`assistant-config-state ${settings?.configured ? "is-configured" : ""}`}>{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span></header>
           <form className="assistant-settings-form" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
             <AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} protocol={protocol} baseUrl={baseUrl} model={model} discoveredModels={discoveredModels} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); setDiscoveredModels([]); }} onProtocolChange={(value) => { setProtocol(value); setDiscoveredModels([]); }} onBaseUrlChange={(value) => { setBaseUrl(value); setDiscoveredModels([]); }} onModelChange={setModel} />
             <p className="assistant-privacy-copy">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
@@ -247,7 +247,6 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
             <textarea id="assistant-message" className="assistant-message-input" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="粘贴需要安排到日程的群聊消息" />
             <div className="assistant-time-context">
               <div className="assistant-time-copy">
-                <span className="eyebrow">时间上下文</span>
                 <label htmlFor="assistant-sent-at">消息发送时间</label>
                 <p>消息里有“明天、下周五”时填写；没有相对日期可以留空。</p>
               </div>
@@ -260,7 +259,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
             <div className="assistant-actions"><button className="primary-button" type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>{busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}</button>{!settings?.configured ? <button className="text-button" type="button" onClick={() => setSection("settings")}>先配置 AI 连接</button> : null}</div>
           </section>
           <section className="assistant-draft-panel" aria-label="提取结果">
-            <header className="section-heading"><div><p className="eyebrow">Review</p><h2>待确认事项</h2></div>{extraction ? <span className="assistant-confidence">{extraction.intents.length} 个候选 · Schema {extraction.schemaVersion}</span> : null}</header>
+            <header className="section-heading"><div><h2>待确认事项</h2></div>{extraction ? <span className="assistant-confidence">{extraction.intents.length} 个候选 · Schema {extraction.schemaVersion}</span> : null}</header>
             {extraction?.unresolvedQuestions.length ? <div className="assistant-warning-block"><strong>需要补充</strong>{extraction.unresolvedQuestions.map((question) => <p key={question}>{question}</p>)}</div> : null}
             {!extraction ? <div className="quiet-empty-state">AI 返回的多个候选事项会显示在这里，确认后才会写入日程。</div> : editable.length === 0 ? <div className="quiet-empty-state">没有识别出可确认的日程事项。</div> : <div className="assistant-candidate-list">{editable.map((item) => {
               const original = extraction.intents.find((candidate) => candidate.id === item.id);

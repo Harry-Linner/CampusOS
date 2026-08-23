@@ -4604,17 +4604,20 @@ input:focus-visible {
 }
 
 .assistant-time-context {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 10px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--paper-soft) 72%, var(--paper));
   padding: 14px;
 }
 
-.assistant-time-copy { min-width: 0; }
+.assistant-time-copy {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
 
 .assistant-time-copy label {
   display: block;
@@ -4633,6 +4636,8 @@ input:focus-visible {
 
 .assistant-time-control {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -4641,6 +4646,7 @@ input:focus-visible {
 
 .assistant-time-control input {
   min-height: 36px;
+  max-width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--paper);
@@ -4787,8 +4793,6 @@ input:focus-visible {
   .assistant-form-grid {
     grid-template-columns: 1fr;
   }
-
-  .assistant-time-context { grid-template-columns: 1fr; }
 
   .assistant-time-control { justify-content: flex-start; }
 }

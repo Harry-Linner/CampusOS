@@ -33,7 +33,6 @@ export const UpdatePrompt = (): JSX.Element | null => {
       <section className="update-prompt" role="dialog" aria-modal="true" aria-labelledby="update-prompt-heading">
         <header>
           <div>
-            <span className="eyebrow">\u66f4\u65b0</span>
             <h2 id="update-prompt-heading">\u53d1\u73b0\u65b0\u7248\u672c v{status.version}</h2>
           </div>
           <span className="update-prompt-current">\u5f53\u524d v{currentVersion ?? "—"}</span>

@@ -349,7 +349,6 @@ const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Dat
 };
 
 export const ScheduleView = ({
-  loading,
   snapshot,
   schedule,
   deskCalendar,
@@ -678,7 +677,6 @@ export const ScheduleView = ({
       <header className="page-heading schedule-heading">
         <div>
           <h1>日程</h1>
-          <p>{loading ? "正在同步课程与提醒" : `${next48Hours.length} 项安排在接下来 48 小时内`}</p>
         </div>
         <div className="schedule-actions">
           <button className="text-button" type="button" disabled={busy || !schedule} onClick={() => setForm(defaultTaskForm(selectedDate))}>

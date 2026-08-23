@@ -40,7 +40,6 @@ export const Component = ({
     <section className="academic-panel" aria-label="考试">
       <div className="academic-panel-heading">
         <div>
-          <p className="eyebrow">Countdown</p>
           <h2>考试倒计时</h2>
         </div>
         <button className="primary-button" disabled={busy} type="button" onClick={() => void onRefresh()}>

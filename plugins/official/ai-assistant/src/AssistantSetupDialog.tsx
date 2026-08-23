@@ -63,7 +63,6 @@ export const AssistantSetupDialog = ({ assistant, onConfigured, onDismiss }: Ass
     <div className="assistant-setup-backdrop" role="presentation">
       <section className="assistant-setup-dialog" role="dialog" aria-modal="true" aria-labelledby="assistant-setup-title">
         <header>
-          <p className="eyebrow">AI Assistant</p>
           <h2 id="assistant-setup-title">先配置 AI 连接</h2>
           <p>请选择服务商、API 地址和模型。密钥只保存在这台设备的系统安全存储中。</p>
         </header>

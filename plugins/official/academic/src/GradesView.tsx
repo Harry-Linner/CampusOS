@@ -88,7 +88,6 @@ export const Component = ({
     <section className="academic-panel" aria-label="成绩">
       <div className="academic-panel-heading">
         <div>
-          <p className="eyebrow">Academic records</p>
           <h2>学业成绩</h2>
         </div>
         <div className="grade-header-actions">

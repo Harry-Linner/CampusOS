@@ -285,7 +285,6 @@ export const ExtensionsView = ({
         <section className="package-review" aria-label="插件安装确认">
           <header>
             <div>
-              <span className="eyebrow">本地插件包</span>
               <h2>{packageInspection.manifest.displayName}</h2>
               <p>{packageInspection.manifest.description}</p>
             </div>

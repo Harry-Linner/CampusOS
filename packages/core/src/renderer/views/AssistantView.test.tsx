@@ -86,7 +86,7 @@ describe("AssistantView", () => {
     render(createElement(AssistantView, { ...baseProps, assistant }));
     await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
 
-    expect(screen.getByText("时间上下文")).toBeTruthy();
+    expect(screen.getByText("消息发送时间")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "使用当前时间" }));
     expect((screen.getByLabelText("消息发送时间") as HTMLInputElement).value).not.toBe("");
     fireEvent.click(screen.getByRole("button", { name: "清除" }));
