@@ -25,6 +25,7 @@ export const ActivityBar = ({
     <button
       key={item.id}
       className={item.id === activeView ? "nav-item is-active" : "nav-item"}
+      aria-label={item.label}
       aria-current={item.id === activeView ? "page" : undefined}
       data-activity-id={item.id}
       type="button"

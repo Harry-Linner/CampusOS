@@ -2755,6 +2755,13 @@ input:focus-visible {
 }
 
 @media (max-width: 920px) {
+  /* Narrow layouts scroll at the document level (.main-pane stops scrolling),
+   * so reserve the document gutter to keep the scrollbar appearance from
+   * shifting the layout. */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   .app-shell {
     height: auto;
     min-height: 100dvh;
