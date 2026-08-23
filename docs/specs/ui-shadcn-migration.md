@@ -149,7 +149,8 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 
 ### Phase B — 排版硬伤修复（2026-08-22）
 
-- [x] **字距**：中文标题移除 `tracking-tight`（-0.025em 负字距挤压全角字，是"字与字重叠"主因）；拉丁眉题 `DAILY BRIEF` 保留 `tracking-[0.16em]`
+- [x] **字距**：中文标题移除 `tracking-tight`（-0.025em 负字距挤压全角字，是"字与字重叠"主因）；拉丁眉题 `DAILY BRIEF` 原保留 `tracking-[0.16em]`，后在「用户三项修复轮」（2026-08-23）随"删摘要英文"指示一并移除（用户后来指示优先，见下）
+- [x] **行高**：大标题 1.33（`leading-10` / `sm:leading-12`）、状态标题 1.6（`leading-8`）、板块标题 1.56（`leading-7`）、条目标题 16px 1.75（`leading-7`）、摘要 14px 2.0（`leading-7`）、元信息与设置说明 12px 1.67（`leading-5`）
 - [x] **行高**：大标题 1.33（`leading-10` / `sm:leading-12`）、状态标题 1.6（`leading-8`）、板块标题 1.56（`leading-7`）、条目标题 16px 1.75（`leading-7`）、摘要 14px 2.0（`leading-7`）、元信息与设置说明 12px 1.67（`leading-5`）
 - [x] **纵向节奏**：条目 `py-5`→`py-6`，设置表单行 `gap-2`→`gap-3`
 - [x] **一致性收尾**：空态标题补 `leading-7`、底部备注补 `leading-6`（与条目排版对齐）
@@ -195,6 +196,7 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 验收：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、构建成功、Electron 实机验证（7 分类导航/两列布局/单行主题控件/面板切换）、CI 全绿
 - e2e 修正（`a22a5d8`）：`workspace.e2e.ts` 设置块改为先经 `getByLabel("设置分类")` 定位导航再点分类，修复「通知」按钮命中全局 `notification-trigger` 的 strict-mode 冲突；`AssistantView.test.tsx` 断言语料随 eyebrow 删除同步改为「消息发送时间」；ScheduleView 移除头部摘要行后清理未用 `loading` 解构。CI 该提交起全绿。
 - 窄窗口复验（`packages/.tmp/settings-capture.mjs` 截图入 `packages/.tmp/ui-capture/`）：时间上下文框 @820px 下 copy 列宽 321px（约 15+ 全角字符/行，不再逐字换行）、输入框 187px、无横向溢出；设置页 @820px 侧栏折叠为横向导航、单列 757px、无溢出。
+- 补漏（`67cfbbd` 后续）：早报视图头部残留的拉丁眉题 `DAILY BRIEF`（`tracking-[0.16em]`，Phase B 曾记录"保留"）随"删摘要英文"指示一并移除——用户后来的明确指示优先于早前设计决定，Phase B 记录已同步修订；全仓 `tracking-[0.1x]`/`uppercase` 眉标模式复查无其他残留（引导页品牌字 `Zhejiang University` 与步骤标签「首次配置」不属视图摘要，保留待用户确认）。
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 

@@ -64,7 +64,6 @@ export const BriefView = (props: PluginComponentProps): JSX.Element => {
       <header className="mb-8 border-b border-border/70 pb-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <div className="mb-3 flex items-center gap-2 text-primary"><Newspaper className="size-5" aria-hidden="true" /><span className="text-xs font-semibold tracking-[0.16em]">DAILY BRIEF</span></div>
             <h1 className="text-3xl font-semibold leading-10 text-foreground sm:text-4xl sm:leading-12">早报</h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">把公开资讯整理成按关注领域分组的中文摘要，阅读原文仍回到来源网站。</p>
           </div>
