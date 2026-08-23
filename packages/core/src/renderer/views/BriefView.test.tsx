@@ -83,6 +83,7 @@ describe("BriefView", () => {
     expect(screen.getByText("早报")).toBeTruthy();
     expect(screen.getAllByText(/刷新早报/).length).toBeGreaterThan(0);
     expect(screen.getByText(/点击刷新抓取公开资讯/)).toBeTruthy();
+    expect(screen.getByText(/生成摘要需要在设置页的「AI 连接」中配置早报自己的服务商与模型/)).toBeTruthy();
   });
 
   it("renders generated sections and resolves original links", async () => {

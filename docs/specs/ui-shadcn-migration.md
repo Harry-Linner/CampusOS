@@ -197,6 +197,7 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - e2e 修正（`a22a5d8`）：`workspace.e2e.ts` 设置块改为先经 `getByLabel("设置分类")` 定位导航再点分类，修复「通知」按钮命中全局 `notification-trigger` 的 strict-mode 冲突；`AssistantView.test.tsx` 断言语料随 eyebrow 删除同步改为「消息发送时间」；ScheduleView 移除头部摘要行后清理未用 `loading` 解构。CI 该提交起全绿。
 - 窄窗口复验（`packages/.tmp/settings-capture.mjs` 截图入 `packages/.tmp/ui-capture/`）：时间上下文框 @820px 下 copy 列宽 321px（约 15+ 全角字符/行，不再逐字换行）、输入框 187px、无横向溢出；设置页 @820px 侧栏折叠为横向导航、单列 757px、无溢出。
 - 补漏（`67cfbbd` 后续）：早报视图头部残留的拉丁眉题 `DAILY BRIEF`（`tracking-[0.16em]`，Phase B 曾记录"保留"）随"删摘要英文"指示一并移除——用户后来的明确指示优先于早前设计决定，Phase B 记录已同步修订；全仓 `tracking-[0.1x]`/`uppercase` 眉标模式复查无其他残留（引导页品牌字 `Zhejiang University` 与步骤标签「首次配置」不属视图摘要，保留待用户确认）。
+- 早报空态指引修正：旧文案"生成摘要需要在 AI 助手中配置可用的模型连接"是独立 API Key（`0aee65a`）改动前的遗留，与设置页"早报独立使用这里的服务商与模型"矛盾；改为"在设置页的「AI 连接」中配置早报自己的服务商与模型"，BriefView 空态测试断言同步收紧到完整新句（原断言只匹配前半句，漏检旧文案）。
 - [x] **依据**：ui-ux-pro-max skill（E-Ink/Paper 阅读风格 + 中文排版规则：正文行高 1.5–1.75+、行宽受限、CJK 禁用负字距）；字体保持系统 CJK 栈（未采用 skill 的 Noto Sans SC——中文字体体积过大，桌面应用不值得，记录为有意偏离）
 - [x] 验收：typecheck 零错误、lint 零告警、`pnpm test` **485 passed / 1 skipped**；`pnpm build` 成功且产物 CSS 含 `leading-5/7/8/10/12`；Electron 实机计算样式确认 H1 36px/48px 且 `letter-spacing: normal`、H2 20px/32px、设置说明 12px/20px；三主题截图已更新（`packages/.tmp/ui-capture/brief-*.png`；抓取环境未配置 AI，截图呈现错误/空态，内容态排版由 BriefView 7 用例覆盖）
 
