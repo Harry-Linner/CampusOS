@@ -158,9 +158,9 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
         return 0;
       }
     }).toBeGreaterThan(0);
-    // AI connection is configured in the AI assistant view's 连接 tab.
+    // AI connection is configured in the AI assistant view's 设置 tab.
     await page.getByRole("button", { name: "AI 助手" }).click();
-    await page.getByRole("button", { name: "连接", exact: true }).click();
+    await page.getByLabel("AI 助手视图").getByRole("button", { name: "设置" }).click();
     await expect(page.getByRole("heading", { name: "模型连接" })).toBeVisible();
     await expect(page.getByLabel("协议")).toBeDisabled();
     await page.screenshot({
@@ -182,8 +182,8 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.getByLabel("自定义模型名称").fill("fixture-model");
     await page.getByRole("button", { name: "测试结构化能力" }).click();
     await expect(page.getByText(/结构化能力可用/)).toBeVisible();
-    await page.getByRole("button", { name: "保存连接" }).click();
-    await page.getByRole("button", { name: "消息" }).click();
+    await page.getByRole("button", { name: "保存设置" }).click();
+    await page.getByLabel("AI 助手视图").getByRole("button", { name: "消息" }).click();
 
     await expect(page.getByRole("heading", { name: "AI 助手" })).toBeVisible();
     const assistantMessage = "Submit report by Aug 20 at 20:00. Review meeting Aug 21 from 10:00 to 11:00 in Room 101.";
@@ -209,7 +209,7 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.setViewportSize({ width: 1440, height: 960 });
 
     await page.getByLabel("主导航").getByRole("button", { name: "AI 助手" }).click();
-    await page.getByRole("button", { name: "连接", exact: true }).click();
+    await page.getByLabel("AI 助手视图").getByRole("button", { name: "设置" }).click();
     await expect(page.locator('select:has(option[value="__custom__"])')).toHaveValue("__custom__");
     await expect(page.getByLabel("自定义模型名称")).toHaveValue("fixture-model");
     await expect(page.getByRole("option", { name: /其他模型/ })).toBeAttached();
@@ -238,7 +238,7 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
         page.getByLabel("日历视图").getByRole("button", { name: label, exact: true })
       ).toBeVisible();
     }
-    await expect(page.getByRole("heading", { name: "接下来 48 小时" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "新建" })).toBeVisible();
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({

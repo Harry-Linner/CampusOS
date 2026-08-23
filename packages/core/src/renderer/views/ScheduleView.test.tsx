@@ -55,18 +55,22 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
   let tasks = initialTasks;
   const bridge: NonNullable<PluginComponentProps["schedule"]> = {
     loadTasks: vi.fn(async () => ({ tasks, updatedAt: now.toISOString() })),
-    loadPeriods: vi.fn(async (): Promise<LocalTaskPeriod[]> => [{
-      id: "period-1",
-      taskId: "task-1",
-      title: "Read notes",
-      description: "",
-      location: "Room 1",
-      startAt: start.toISOString(),
-      endAt: end.toISOString(),
-      type: "deadline",
-      status: "running",
-      blocksPlanning: true
-    }]),
+    loadPeriods: vi.fn(async (): Promise<LocalTaskPeriod[]> =>
+      tasks
+        .filter((task) => task.type !== "floating" && task.type !== "fixedlegacy")
+        .map((task) => ({
+          id: `period-${task.id}`,
+          taskId: task.id,
+          title: task.title,
+          description: task.description,
+          location: task.location,
+          startAt: task.startAt,
+          endAt: task.endAt,
+          type: task.type === "fixed" ? "fixed" : "deadline",
+          status: task.status,
+          blocksPlanning: task.blocksPlanning
+        }))
+    ),
     saveTask: vi.fn(async (input) => {
       tasks = [{ ...record, ...input, id: input.id ?? "task-new" }];
       return { tasks, updatedAt: new Date().toISOString() };
@@ -92,15 +96,17 @@ describe("ScheduleView", () => {
       navigationTarget: {
         requestId: "request-1",
         viewId: "schedule",
-        entityId: "task:period-1"
+        entityId: "task:period-task-1"
       }
     }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "日视图" }).getAttribute("aria-pressed")).toBe("true");
-      expect(screen.getByRole("heading", { name: "安排详情" })).toBeTruthy();
+      expect(screen.getByRole("dialog")).toBeTruthy();
     });
     expect(screen.getAllByText("Read notes").length).toBeGreaterThan(0);
+    // Close the detail dialog so the (inert) calendar background becomes reachable.
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("button", { name: "日视图" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("loads formal task data, shows four views, and saves a new task through the bridge", async () => {
@@ -117,7 +123,7 @@ describe("ScheduleView", () => {
     fireEvent.click(screen.getByRole("button", { name: "周视图" }));
     expect(screen.getByRole("button", { name: "周视图" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "月历" }));
-    fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "New task" } });
     fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
 
@@ -207,7 +213,8 @@ describe("ScheduleView", () => {
       onRefresh: vi.fn(async () => undefined),
       schedule
     }));
-    await screen.findAllByText("Read notes");
+    const taskButtons = await screen.findAllByRole("button", { name: "Read notes" });
+    fireEvent.click(taskButtons[0]);
     fireEvent.click(screen.getByRole("button", { name: "完成" }));
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "task-1", status: "completed" }));
   });
@@ -223,12 +230,12 @@ describe("ScheduleView", () => {
 
     const taskButtons = await screen.findAllByRole("button", { name: "Read notes" });
     fireEvent.click(taskButtons[0]);
-    expect(screen.getByRole("heading", { name: "安排详情" })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(screen.getByRole("heading", { name: "编辑任务" })).toBeTruthy();
   });
 
-  it("shows fixed schedules and keeps fixed legacy history read-only", async () => {
+  it("deletes a repeating fixed task from the calendar with series scope", async () => {
     const fixed: LocalTaskRecord = {
       ...record,
       id: "fixed-1",
@@ -238,16 +245,7 @@ describe("ScheduleView", () => {
       repeatPeriod: 7,
       repeatEndsOn: "2026-12-31"
     };
-    const history: LocalTaskRecord = {
-      ...fixed,
-      id: "fixed-history-1",
-      title: "Weekly review（过去日程）",
-      type: "fixedlegacy",
-      repeatType: "norepeat",
-      fromId: fixed.id,
-      status: "outdated"
-    };
-    const schedule = createSchedule([fixed, history]);
+    const schedule = createSchedule([fixed]);
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
@@ -257,15 +255,14 @@ describe("ScheduleView", () => {
     }));
 
     expect((await screen.findAllByText("Weekly review")).length).toBeGreaterThan(0);
-    expect(screen.getByText("历史日程（1 项）")).toBeTruthy();
-    expect(screen.getByText("只读")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Weekly review" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
     fireEvent.click(screen.getByRole("button", { name: "整个系列" }));
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "fixed-1", status: "deleted", scope: "series", includeCompleted: false }));
   });
 
   it("only exposes a repeat interval for Celechron's day-based recurrence", async () => {
-    const { container } = render(createElement(ScheduleView, {
+    render(createElement(ScheduleView, {
       loading: false,
       snapshot,
       capabilities: { read: vi.fn(async () => []) },
@@ -273,16 +270,14 @@ describe("ScheduleView", () => {
       schedule: createSchedule([])
     }));
 
-    const createButton = container.querySelector<HTMLButtonElement>(".schedule-actions button");
-    expect(createButton).not.toBeNull();
-    fireEvent.click(createButton!);
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
     fireEvent.change(screen.getAllByRole("combobox")[0], {
       target: { value: "fixed" }
     });
     fireEvent.change(screen.getByLabelText("重复"), {
       target: { value: "days" }
     });
-    const form = container.querySelector(".schedule-task-form");
+    const form = document.body.querySelector(".schedule-task-form");
     expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(3);
 
     fireEvent.change(screen.getByLabelText("重复"), {
@@ -291,7 +286,7 @@ describe("ScheduleView", () => {
     expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(2);
   });
 
-  it("describes monthly recurrence without the ignored day interval", async () => {
+  it("keeps a monthly repeating task visible on the calendar with month recurrence", async () => {
     const monthly: LocalTaskRecord = {
       ...record,
       id: "monthly-1",
@@ -301,7 +296,7 @@ describe("ScheduleView", () => {
       repeatPeriod: 7,
       repeatEndsOn: "2026-12-31"
     };
-    const { container } = render(createElement(ScheduleView, {
+    render(createElement(ScheduleView, {
       loading: false,
       snapshot,
       capabilities: { read: vi.fn(async () => []) },
@@ -310,8 +305,9 @@ describe("ScheduleView", () => {
     }));
 
     await screen.findAllByText("Monthly review");
-    expect(container.textContent).toContain("\u6bcf\u6708");
-    expect(container.textContent).not.toContain("\u6bcf\u9694 7 \u6708");
+    fireEvent.click(screen.getAllByRole("button", { name: "Monthly review" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect((screen.getByLabelText("重复") as HTMLSelectElement).value).toBe("month");
   });
 });
 

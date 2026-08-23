@@ -172,6 +172,69 @@ const TimetablePanel = ({
     ({ session }) => !summerOnly || session.secondHalf
   ) ?? [];
 
+  // Merge the same course (same provider + course + teacher) that meets at
+  // different times into one row; slots are ordered by weekday then period,
+  // and rows by their earliest slot.
+  const mergedRows = useMemo(() => {
+    interface MergedSlot {
+      dayOfWeek: number;
+      periods: number[];
+      weekPattern: string;
+    }
+    interface MergedRow {
+      key: string;
+      courseName: string;
+      teacher: string;
+      locations: Set<string>;
+      weekPatterns: Set<string>;
+      slots: MergedSlot[];
+    }
+    const groups = new Map<string, MergedRow>();
+    for (const { providerId, session } of visibleSessions) {
+      const key = `${providerId}::${session.courseName}::${session.teacher}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          key,
+          courseName: session.courseName,
+          teacher: session.teacher,
+          locations: new Set(),
+          weekPatterns: new Set(),
+          slots: []
+        };
+        groups.set(key, group);
+      }
+      group.locations.add(session.location ?? "地点待定");
+      group.weekPatterns.add(session.weekPattern);
+      group.slots.push({
+        dayOfWeek: session.dayOfWeek,
+        periods: session.periods,
+        weekPattern: session.weekPattern
+      });
+    }
+    const rows = [...groups.values()];
+    for (const row of rows) {
+      row.slots.sort(
+        (left, right) =>
+          left.dayOfWeek - right.dayOfWeek ||
+          Math.min(...left.periods) - Math.min(...right.periods)
+      );
+    }
+    rows.sort((left, right) => {
+      const leftFirst = left.slots[0];
+      const rightFirst = right.slots[0];
+      if (!leftFirst || !rightFirst) return 0;
+      return (
+        leftFirst.dayOfWeek - rightFirst.dayOfWeek ||
+        Math.min(...leftFirst.periods) - Math.min(...rightFirst.periods)
+      );
+    });
+    return rows;
+  }, [visibleSessions]);
+
+  const weekPatternLabel = (value: string): string =>
+    value === "all" ? "全周" : value === "odd" ? "单周" : "双周";
+
   return (
     <section className="academic-panel" aria-label="课表">
       <div className="academic-panel-heading">
@@ -221,25 +284,20 @@ const TimetablePanel = ({
         </p>
       ) : (
         <ul className="academic-record-list">
-          {visibleSessions.map(({ providerId, session }) => (
-            <li
-              key={`${providerId}:${session.sourceId}:${session.periods.join("-")}`}
-              className="academic-record-row"
-            >
+          {mergedRows.map((row) => (
+            <li key={row.key} className="academic-record-row">
               <div>
-                <strong>{session.courseName}</strong>
+                <strong>{row.courseName}</strong>
                 <span className="meta-line">
-                  周{session.dayOfWeek} · 第 {session.periods.join(", ")} 节 · {" "}
-                  {session.weekPattern === "all"
-                    ? "全周"
-                    : session.weekPattern === "odd"
-                      ? "单周"
-                      : "双周"}
+                  {row.slots.map((slot) => `周${slot.dayOfWeek} · 第 ${slot.periods.join(", ")} 节`).join("、")}
+                  {row.weekPatterns.size === 1
+                    ? ` · ${weekPatternLabel([...row.weekPatterns][0]!)}`
+                    : ""}
                 </span>
               </div>
               <div className="row-side">
-                <strong>{session.teacher}</strong>
-                <span className="meta-line">{session.location ?? "地点待定"}</span>
+                <strong>{row.teacher}</strong>
+                <span className="meta-line">{[...row.locations].join("、")}</span>
               </div>
             </li>
           ))}

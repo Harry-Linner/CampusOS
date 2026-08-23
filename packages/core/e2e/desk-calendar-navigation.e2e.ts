@@ -41,11 +41,15 @@ test("opens the exact desktop-calendar event in the main schedule view", async (
     await expect(floatingPage.getByLabel("安排详情")).toBeVisible();
     await floatingPage.getByRole("button", { name: "打开 CampusOS 日程" }).click();
 
+    const detailDialog = mainPage.getByRole("dialog");
+    await expect(detailDialog).toBeVisible();
+    await expect(detailDialog.getByText("软件工程课程设计", { exact: true })).toBeVisible();
+    // Close the detail dialog so the (inert) calendar background becomes reachable.
+    await mainPage.getByRole("button", { name: "Close" }).click();
+    await expect(mainPage.getByRole("dialog")).toBeHidden();
     await expect(
       mainPage.getByLabel("日历视图", { exact: true }).getByRole("button", { name: "日视图" })
     ).toHaveAttribute("aria-pressed", "true");
-    await expect(mainPage.getByRole("heading", { name: "安排详情" })).toBeVisible();
-    await expect(mainPage.locator(".schedule-detail-section").getByText("软件工程课程设计", { exact: true })).toBeVisible();
 
     await floatingPage.getByRole("button", { name: "关闭桌面日历" }).click();
     await expect.poll(() => app.windows().length).toBe(1);

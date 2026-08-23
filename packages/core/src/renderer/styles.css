@@ -247,7 +247,6 @@ input:focus-visible {
 .view-stage {
   width: min(1320px, 100%);
   margin: 0 auto;
-  animation: view-enter 240ms ease-out both;
 }
 
 .sr-only {
@@ -375,18 +374,6 @@ input:focus-visible {
   margin: 0;
   padding: 28px 18px;
   text-align: center;
-}
-
-@keyframes view-enter {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .page-shell {
@@ -3158,13 +3145,13 @@ input:focus-visible {
 .schedule-layout {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.42fr);
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--line-strong);
 }
 
 .schedule-calendar-section {
   min-width: 0;
-  padding: 18px clamp(18px, 3vw, 34px) 0 0;
+  padding: 18px 0 0;
   overflow-x: auto;
 }
 

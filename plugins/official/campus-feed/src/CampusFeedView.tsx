@@ -183,7 +183,6 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
             <h1 className="text-3xl font-semibold leading-10 text-foreground sm:text-4xl sm:leading-12">校园资讯</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">聚合评奖评优、出国境项目、校园活动与学院通知，阅读原文仍回到来源网站。</p>
           </div>
           <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
             <div className="flex gap-1 rounded-lg border border-border bg-muted/60 p-1" role="tablist" aria-label="校园资讯视图">
@@ -205,7 +204,6 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
         <div className="settings-panel">
           <section className="settings-section" aria-labelledby="feed-interval-heading">
             <header className="settings-section-heading"><h2 id="feed-interval-heading">刷新频率</h2></header>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">每个订阅源可单独设置抓取间隔，默认 1 小时。</p>
             {sources.length === 0 ? <p className="text-sm text-muted-foreground">还没有订阅任何信息源。</p> : (
               <div className="divide-y divide-border/60">
                 {sources.map((source) => (
@@ -233,12 +231,7 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
           </section>
           <section className="settings-section" aria-labelledby="feed-ai-heading">
             <header className="settings-section-heading"><h2 id="feed-ai-heading">AI 处理</h2></header>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">把有明确时间的通知（评选答辩、报名截止、活动讲座）转成日程条目。校园资讯独立使用这里的服务商与模型，不读取 AI 助手的配置。</p>
             <CampusFeedAiSettings feed={feed} />
-          </section>
-          <section className="settings-section" aria-labelledby="feed-notify-heading">
-            <header className="settings-section-heading"><h2 id="feed-notify-heading">新内容提醒</h2></header>
-            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">新抓取到的通知会进入系统通知与应用内通知中心，可在系统设置中关闭。</p>
           </section>
         </div>
       ) : tab === "sources" ? (

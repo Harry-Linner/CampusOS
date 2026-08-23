@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   LocalTaskInput,
   LocalTaskPeriod,
@@ -9,6 +9,7 @@ import type { DeskCalendarView } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type ScheduleViewMode = "month" | "week" | "agenda" | "day";
 
@@ -371,7 +372,6 @@ export const ScheduleView = ({
   const [deskCalendarBusy, setDeskCalendarBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
-  const [pendingRestore, setPendingRestore] = useState<LocalTaskRecord | null>(null);
   const selectedTask = useMemo(
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
@@ -474,13 +474,6 @@ export const ScheduleView = ({
 
   const events = useMemo(() => buildEvents(snapshot, periods), [periods, snapshot]);
   const eventsByDay = useMemo(() => groupEventsByDay(events, range), [events, range]);
-  const next48Hours = useMemo(() => {
-    const start = Date.now();
-    const end = start + 48 * 60 * 60 * 1000;
-    return events
-      .filter((event) => Date.parse(event.endAt) > start && Date.parse(event.startAt) < end)
-      .sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
-  }, [events]);
   const monthDays = useMemo(() => buildMonthDays(selectedDate), [selectedDate]);
   const weekDays = useMemo(() => {
     const first = startOfWeek(selectedDate);
@@ -500,14 +493,32 @@ export const ScheduleView = ({
     setSelectedEvent(event);
   };
 
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  const pendingNavigation = useRef<NonNullable<PluginComponentProps["navigationTarget"]> | null>(null);
+
+  const applyNavigationTarget = (target: NonNullable<PluginComponentProps["navigationTarget"]>): void => {
+    const event = eventsRef.current.find((candidate) => candidate.id === target.entityId);
+    if (!event) return;
+    pendingNavigation.current = null;
+    setSelectedDate(new Date(event.startAt));
+    setViewMode("day");
+    setSelectedEvent(event);
+  };
+
   useEffect(() => {
     if (navigationTarget?.viewId !== "schedule" || !navigationTarget.entityId) return;
-    const target = events.find((event) => event.id === navigationTarget.entityId);
-    if (!target) return;
-    setSelectedDate(new Date(target.startAt));
-    setViewMode("day");
-    setSelectedEvent(target);
-  }, [events, navigationTarget]);
+    pendingNavigation.current = navigationTarget;
+    applyNavigationTarget(navigationTarget);
+  }, [navigationTarget]);
+
+  // Events load asynchronously; apply a pending navigation once they arrive
+  // without reopening the detail on later event refreshes.
+  useEffect(() => {
+    const pending = pendingNavigation.current;
+    if (!pending) return;
+    applyNavigationTarget(pending);
+  }, [events]);
 
   const saveForm = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -571,6 +582,7 @@ export const ScheduleView = ({
 
   const deleteTask = async (task: LocalTaskRecord): Promise<void> => {
     if ((task.type === "fixed" && task.repeatType !== "norepeat") || task.status === "completed") {
+      setSelectedEvent(null);
       setPendingDelete(task);
       setDeleteCompletedHistory(false);
       return;
@@ -583,25 +595,6 @@ export const ScheduleView = ({
     const task = pendingDelete;
     setPendingDelete(null);
     await mutate(task, "deleted", { scope, includeCompleted: deleteCompletedHistory });
-  };
-  const mutateDeleted = async (task: LocalTaskRecord, action: "restore" | "purge", allowExpired = false): Promise<void> => {
-    if (!schedule) return;
-    if (action === "restore" && Date.parse(task.endAt) < Date.now() && !allowExpired) {
-      setPendingRestore(task);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const data = await schedule.mutateTask({ id: task.id, action });
-      setTasks(data.tasks);
-      setTaskUpdatedAt(data.updatedAt);
-      setNotice(action === "restore" ? "任务已恢复" : "任务已永久删除");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "回收站操作失败。");
-    } finally {
-      setBusy(false);
-    }
   };
 
   const exportIcal = async (): Promise<void> => {
@@ -629,50 +622,6 @@ export const ScheduleView = ({
       ? formatWeek(selectedDate)
       : formatMonth(selectedDate);
 
-  const currentTasks = useMemo(
-    () => tasks.filter((task) => task.status !== "deleted" && task.type !== "fixedlegacy" && task.type !== "floating"),
-    [tasks]
-  );
-  const floatingTasks = useMemo(
-    () => tasks.filter((task) => task.status !== "deleted" && task.type === "floating"),
-    [tasks]
-  );
-  const historicalTasks = useMemo(
-    () => tasks.filter((task) => task.status !== "deleted" && task.type === "fixedlegacy"),
-    [tasks]
-  );
-  const deletedTasks = useMemo(
-    () => tasks.filter((task) => task.status === "deleted"),
-    [tasks]
-  );
-  const deletedGroups = useMemo(() => {
-    const groups = new Map<string, LocalTaskRecord[]>();
-    for (const task of deletedTasks) {
-      const key = task.fromId ?? task.id;
-      groups.set(key, [...(groups.get(key) ?? []), task]);
-    }
-    return [...groups.entries()];
-  }, [deletedTasks]);
-
-  const formatTaskMeta = (task: LocalTaskRecord): string => {
-    if (task.type === "floating") {
-      return task.reminderAt ? `提醒：${formatDateTime(task.reminderAt)}` : "未安排日期";
-    }
-    if (task.type === "fixed") {
-      const repeat = task.repeatType === "norepeat"
-        ? "不重复"
-        : task.repeatType === "days"
-          ? `每隔 ${task.repeatPeriod} 天`
-          : task.repeatType === "weeks"
-            ? `每隔 ${task.repeatPeriod} 周`
-          : task.repeatType === "month"
-            ? "每月"
-            : "每年";
-      return `${formatTimeRange(task.startAt, task.endAt)} · ${repeat}`;
-    }
-    return `${formatDateTime(task.endAt)} · ${task.timeSpentMinutes}/${task.timeNeededMinutes} 分钟`;
-  };
-
   return (
     <section className="page-shell schedule-page">
       <header className="page-heading schedule-heading">
@@ -681,10 +630,7 @@ export const ScheduleView = ({
         </div>
         <div className="schedule-actions">
           <Button variant="ghost" type="button" disabled={busy || !schedule} onClick={() => setForm(defaultTaskForm(selectedDate))}>
-            新建任务
-          </Button>
-          <Button variant="ghost" type="button" disabled={busy || !schedule} onClick={() => setForm({ ...defaultTaskForm(selectedDate), type: "floating", blocksPlanning: false, reminderMode: "none" })}>
-            新建无日期待办
+            新建
           </Button>
           <Button variant="ghost" type="button" disabled={busy || !schedule} onClick={() => void exportIcal()}>
             导出 iCal
@@ -737,12 +683,6 @@ export const ScheduleView = ({
 
       {error ? <div className="workspace-error-banner" role="alert">{error}</div> : null}
       {notice ? <div className="schedule-notice" role="status">{notice}</div> : null}
-      {pendingRestore ? (
-        <section className="schedule-delete-decision" role="dialog" aria-modal="true" aria-label="恢复过期任务">
-          <strong>“{pendingRestore.title}”已经过期</strong><p>是否恢复这个过期实例？过期提醒不会补发；未来实例仍按原规则注册。</p>
-          <div className="settings-actions"><Button variant="ghost" type="button" onClick={() => setPendingRestore(null)}>取消</Button><Button type="button" onClick={() => { const task = pendingRestore; setPendingRestore(null); void mutateDeleted(task, "restore", true); }}>恢复此实例</Button></div>
-        </section>
-      ) : null}
       {pendingDelete ? (
         <section className="schedule-delete-decision" role="dialog" aria-modal="true" aria-label="删除任务">
           <div><strong>删除“{pendingDelete.title}”</strong><p>{pendingDelete.type === "fixed" && pendingDelete.repeatType !== "norepeat" ? "请选择重复任务的删除范围。" : "这是已完成任务，请确认是否移入最近删除。"}</p></div>
@@ -755,24 +695,6 @@ export const ScheduleView = ({
         </section>
       ) : null}
       {!schedule ? <div className="quiet-empty-state">日程服务尚未连接。</div> : null}
-
-      <section className="schedule-next-section" aria-labelledby="schedule-next-heading">
-        <div className="section-heading">
-          <h2 id="schedule-next-heading">接下来 48 小时</h2>
-          <span>{next48Hours.length} 项</span>
-        </div>
-        {next48Hours.length > 0 ? (
-          <div className="schedule-next-list">
-            {next48Hours.slice(0, 12).map((event) => (
-              <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}>
-                <span className="schedule-event-time">{formatEventMeta(event)}</span>
-                <strong>{event.title}</strong>
-                <small>{event.location || (event.kind === "task" ? "任务" : event.kind === "course" ? "课程" : "截止事项")}</small>
-              </button>
-            ))}
-          </div>
-        ) : <div className="quiet-empty-state">暂无即将发生的安排</div>}
-      </section>
 
       <div className="schedule-layout">
         <section className="schedule-calendar-section" aria-label="日历">
@@ -805,10 +727,10 @@ export const ScheduleView = ({
                 const items = eventsByDay.get(dayKey(day)) ?? [];
                 const outside = monthKey(day) !== monthKey(selectedDate);
                 return (
-                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)}>
+                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)} onClick={() => setForm(defaultTaskForm(day))}>
                     <time dateTime={day.toISOString()}>{getShanghaiDayNumber(day)}</time>
                     <div className="schedule-event-list">
-                      {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}>{event.title}</button>)}
+                      {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)}
                       {items.length > 5 ? <small>+{items.length - 5} 项</small> : null}
                     </div>
                   </section>
@@ -820,9 +742,9 @@ export const ScheduleView = ({
           {viewMode === "week" ? (
             <div className="schedule-week-grid">
               {weekDays.map((day) => (
-                <section className={`schedule-week-column${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)}>
+                <section className={`schedule-week-column${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)} onClick={() => setForm(defaultTaskForm(day))}>
                   <header><span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span><strong>{getShanghaiDayNumber(day)}</strong></header>
-                  <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
+                  <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
                 </section>
               ))}
             </div>
@@ -844,85 +766,47 @@ export const ScheduleView = ({
             <div className="schedule-day-timeline">
               {Array.from({ length: 24 }, (_, hour) => {
                 const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => getShanghaiHour(event.startAt) === hour);
-                return <section className="schedule-hour" key={hour}><time>{pad(hour)}:00</time><div className="schedule-hour-events">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div></section>;
+                const formForHour = (): TaskFormState => {
+                  const parts = getShanghaiDateParts(selectedDate);
+                  const start = fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour, 0);
+                  const end = new Date(start.getTime() + 60 * 60 * 1000);
+                  return { ...defaultTaskForm(selectedDate), startAt: toDateTimeInput(start), endAt: toDateTimeInput(end) };
+                };
+                return <section className="schedule-hour" key={hour} onClick={() => setForm(formForHour())}><time>{pad(hour)}:00</time><div className="schedule-hour-events">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div></section>;
               })}
             </div>
           ) : null}
         </section>
+      </div>
 
-        <aside className="schedule-sidebar">
-          <section className="schedule-task-section" aria-labelledby="schedule-floating-heading">
-            <div className="section-heading"><h2 id="schedule-floating-heading">无日期待办</h2><span>{floatingTasks.length} 项</span></div>
-            <div className="schedule-task-list">
-              {floatingTasks.map((task) => (
-                <article className={`schedule-task-row is-${task.status}`} key={task.id}>
-                  <button className="schedule-task-main" type="button" onClick={() => setForm(taskToForm(task))}><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></button>
-                  <div className="schedule-task-actions">
-                    {task.status !== "completed" ? <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutate(task, "completed")}>完成</Button> : null}
-                    <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(task)}>删除</Button>
-                  </div>
-                </article>
-              ))}
-              {floatingTasks.length === 0 ? <div className="quiet-empty-state">可收集尚未安排日期的事项</div> : null}
-            </div>
-          </section>
-          <section className="schedule-task-section" aria-labelledby="schedule-task-heading">
-            <div className="section-heading"><h2 id="schedule-task-heading">任务</h2><span>{currentTasks.length} 项</span></div>
-            <div className="schedule-task-list">
-              {currentTasks.map((task) => (
-                <article className={`schedule-task-row is-${task.status}`} key={task.id}>
-                  <button className="schedule-task-main" type="button" onClick={() => setForm(taskToForm(task))}><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></button>
-                  <div className="schedule-task-actions">
-                    {task.type === "deadline" && (task.status === "running" || task.status === "overdue") ? <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutate(task, "suspended")}>暂停</Button> : null}
-                    {task.type === "deadline" && task.status === "suspended" ? <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutate(task, "running")}>继续</Button> : null}
-                    {task.type === "deadline" && task.status !== "completed" && task.status !== "deleted" ? <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutate(task, "completed")}>完成</Button> : null}
-                    <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(task)}>删除</Button>
-                  </div>
-                </article>
-              ))}
-              {currentTasks.length === 0 ? <div className="quiet-empty-state">还没有任务</div> : null}
-            </div>
-            {historicalTasks.length > 0 ? (
-              <details className="schedule-history-section">
-                <summary>历史日程（{historicalTasks.length} 项）</summary>
-                <div className="schedule-task-list">
-                  {historicalTasks.map((task) => (
-                    <article className="schedule-task-row is-outdated" key={task.id}>
-                      <div className="schedule-task-main"><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></div>
-                      <span className="schedule-task-history-label">只读</span>
-                    </article>
-                  ))}
+      {selectedEvent ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}>
+          <DialogContent aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle>{selectedEvent.title}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm leading-6 text-muted-foreground">{formatEventMeta(selectedEvent)}</p>
+              {selectedEvent.location || selectedEvent.note ? <p className="text-sm leading-6">{selectedEvent.location || selectedEvent.note}</p> : null}
+              {selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? (
+                <div className="settings-actions">
+                  <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask))}>编辑</Button>
+                  {selectedTask.type === "deadline" && selectedTask.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed")}>完成</Button> : null}
+                  <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask)}>删除</Button>
                 </div>
-              </details>
-            ) : null}
-            {deletedTasks.length > 0 ? (
-              <details className="schedule-history-section">
-                <summary>最近删除（{deletedTasks.length} 项）</summary>
-                <div className="schedule-task-list">
-                  {deletedGroups.map(([groupId, group]) => (
-                    <div className="schedule-deleted-group" key={groupId}>
-                      <div className="schedule-deleted-group-heading"><strong>{group[0]?.fromId ? "重复任务系列" : "单次任务"}</strong><span>{group.length} 项</span></div>
-                      {group.map((task) => (
-                        <article className="schedule-task-row is-deleted" key={task.id}>
-                          <div className="schedule-task-main"><strong>{task.title}</strong><small>{formatTaskMeta(task)}</small></div>
-                          <div className="schedule-task-actions">
-                            <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "restore")}>恢复</Button>
-                            <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void mutateDeleted(task, "purge")}>永久删除</Button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </details>
-            ) : null}
-          </section>
+              ) : <p className="text-xs leading-5 text-muted-foreground">课程、考试和上游作业为只读；需要修改自建任务时请在 CampusOS 主窗口操作。</p>}
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
-          {selectedEvent ? <section className="schedule-detail-section"><div className="section-heading"><h2>安排详情</h2><Button variant="ghost" type="button" onClick={() => setSelectedEvent(null)}>关闭</Button></div><strong>{selectedEvent.title}</strong><p>{formatEventMeta(selectedEvent)}</p><p>{selectedEvent.location || selectedEvent.note || ""}</p>{selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? <div className="schedule-detail-actions"><Button variant="ghost" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask))}>编辑</Button>{selectedTask.type === "deadline" && selectedTask.status !== "completed" ? <Button variant="ghost" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed")}>完成</Button> : null}<Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask)}>删除</Button></div> : <small>课程、考试和上游作业为只读；需要修改自建任务时请在 CampusOS 主窗口操作。</small>}</section> : null}
-
-          {form ? (
+      {form ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setForm(null); }}>
+          <DialogContent aria-describedby={undefined} className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{form.id ? "编辑任务" : "新建任务"}</DialogTitle>
+            </DialogHeader>
             <form className="schedule-task-form" onSubmit={(event) => void saveForm(event)}>
-              <div className="section-heading"><h2>{form.id ? "编辑任务" : "新建任务"}</h2><Button variant="ghost" type="button" onClick={() => setForm(null)}>关闭</Button></div>
               <label>标题<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
               <label>说明<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
               {form.type !== "floating" ? <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div> : <p className="schedule-form-hint">无日期待办不会出现在日历中；可单独设置提醒时间。</p>}
@@ -936,11 +820,11 @@ export const ScheduleView = ({
                 {form.repeatType === "days" || form.repeatType === "weeks" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
                 {form.repeatType !== "norepeat" ? <label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label> : null}
               </> : null}
-              <Button type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</Button>
+              <div className="settings-actions"><Button type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</Button></div>
             </form>
-          ) : null}
-        </aside>
-      </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </section>
   );
 };
