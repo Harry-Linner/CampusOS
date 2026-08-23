@@ -280,8 +280,8 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.getByLabel("应用设置").getByRole("button", { name: "设置" }).click();
     const settingsNav = page.getByLabel("设置分类");
     await settingsNav.getByRole("button", { name: "通知" }).click();
-    await page.getByRole("checkbox", { name: "启用桌面通知" }).uncheck();
-    await page.getByRole("checkbox", { name: "启用成绩变化通知" }).uncheck();
+    await page.getByRole("switch", { name: "启用桌面通知" }).click();
+    await page.getByRole("switch", { name: "启用成绩变化通知" }).click();
     await page.getByRole("button", { name: "保存提醒" }).click();
     await expect(page.getByText("已保存", { exact: true })).toBeVisible();
     await expect.poll(async () => page.evaluate(async () =>

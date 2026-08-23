@@ -13,6 +13,10 @@ import {
   exportDiagnostics,
   loadDiagnostics
 } from "../lib/diagnosticBridge";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Switch } from "../components/ui/switch";
 
 interface SettingsViewProps {
   onRefresh: () => Promise<void>;
@@ -353,10 +357,10 @@ export const SettingsView = ({
               </fieldset>
 
               <div className="settings-fields">
-                <label className="field-stack">
-                  <span>学号 / 统一认证账号</span>
-                  <input
-                    className="text-field"
+                <div className="field-stack">
+                  <Label htmlFor="account-username">学号 / 统一认证账号</Label>
+                  <Input
+                    id="account-username"
                     type="text"
                     autoComplete="username"
                     disabled={academicCredential.loading}
@@ -364,12 +368,12 @@ export const SettingsView = ({
                     onChange={(event) => setUsername(event.target.value)}
                     placeholder="输入账号"
                   />
-                </label>
+                </div>
 
-                <label className="field-stack">
-                  <span>密码</span>
-                  <input
-                    className="text-field"
+                <div className="field-stack">
+                  <Label htmlFor="account-password">密码</Label>
+                  <Input
+                    id="account-password"
                     type="password"
                     autoComplete="current-password"
                     disabled={academicCredential.loading}
@@ -377,11 +381,10 @@ export const SettingsView = ({
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder={academicCredential.record?.configured ? "输入新密码" : "输入密码"}
                   />
-                </label>
+                </div>
               </div>
               <div className="settings-actions">
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   disabled={
                     academicCredential.loading ||
@@ -409,7 +412,7 @@ export const SettingsView = ({
                       ? "读取账号…"
                       : "连接中…"
                     : "连接并保存"}
-                </button>
+                </Button>
                 {academicCredential.record?.verificationState === "verified" &&
                 academicCredential.record.username === username.trim() &&
                 academicCredential.record.program === program &&
@@ -421,7 +424,7 @@ export const SettingsView = ({
               </div>
 
               <div className="settings-actions">
-                <button className="text-button is-danger" type="button" disabled={academicCredential.loading} onClick={() => { if (!window.confirm("退出当前账号并清除认证缓存？本地任务、通知和日历设置会保留。")) return; void academicCredential.clear().then(() => { setUsername(""); setPassword(""); }); }}>退出当前账号</button>
+                <Button variant="ghost" className="text-destructive" type="button" disabled={academicCredential.loading} onClick={() => { if (!window.confirm("退出当前账号并清除认证缓存？本地任务、通知和日历设置会保留。")) return; void academicCredential.clear().then(() => { setUsername(""); setPassword(""); }); }}>退出当前账号</Button>
               </div>
 
               {authenticatedProfile ? (
@@ -547,35 +550,29 @@ export const SettingsView = ({
                   <h2 id="reminder-heading">提醒</h2>
                 </header>
 
-                <label className="setting-switch">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <Label htmlFor="reminder-enabled">启用桌面通知</Label>
+                  <Switch
+                    id="reminder-enabled"
                     checked={reminderEnabled}
-                    onChange={(event) => {
+                    onCheckedChange={(checked) => {
                       setReminderSaved(false);
-                      setReminderEnabled(event.target.checked);
+                      setReminderEnabled(checked);
                     }}
                   />
-                  <span className="switch-track" aria-hidden="true">
-                    <span />
-                  </span>
-                  <span>启用桌面通知</span>
-                </label>
+                </div>
 
-                <label className="setting-switch">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <Label htmlFor="grade-changes-enabled">启用成绩变化通知</Label>
+                  <Switch
+                    id="grade-changes-enabled"
                     checked={gradeChangesEnabled}
-                    onChange={(event) => {
+                    onCheckedChange={(checked) => {
                       setReminderSaved(false);
-                      setGradeChangesEnabled(event.target.checked);
+                      setGradeChangesEnabled(checked);
                     }}
                   />
-                  <span className="switch-track" aria-hidden="true">
-                    <span />
-                  </span>
-                  <span>启用成绩变化通知</span>
-                </label>
+                </div>
 
                 <fieldset className="reminder-options" disabled={!reminderEnabled}>
                   <legend>提醒时间</legend>
@@ -607,8 +604,7 @@ export const SettingsView = ({
                   </div>
                 </fieldset>
                 <div className="settings-actions">
-                  <button
-                    className="primary-button"
+                  <Button
                     type="button"
                     disabled={
                       reminderSettings.loading ||
@@ -626,7 +622,7 @@ export const SettingsView = ({
                     }}
                   >
                     {reminderSettings.loading ? "保存中" : "保存提醒"}
-                  </button>
+                  </Button>
                   {reminderSaved ? <span className="save-note">已保存</span> : null}
                 </div>
 
@@ -639,8 +635,14 @@ export const SettingsView = ({
                 <header className="settings-section-heading"><h2 id="lifecycle-heading">后台与启动</h2></header>
                 <p className="page-copy">桌面日历与提醒随 CampusOS 运行，不会注册独立开机项。</p>
                 <div className="settings-toggle-list">
-                  <label><input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} /><span>登录系统时启动 CampusOS</span></label>
-                  <label><input type="checkbox" checked={notificationPermissionEnabled} onChange={(event) => setNotificationPermissionEnabled(event.target.checked)} /><span>允许桌面通知</span></label>
+                  <div className="flex items-center justify-between gap-3 py-1">
+                    <Label htmlFor="launch-at-login">登录系统时启动 CampusOS</Label>
+                    <Switch id="launch-at-login" checked={launchAtLogin} onCheckedChange={setLaunchAtLogin} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-1">
+                    <Label htmlFor="notification-permission">允许桌面通知</Label>
+                    <Switch id="notification-permission" checked={notificationPermissionEnabled} onCheckedChange={setNotificationPermissionEnabled} />
+                  </div>
                 </div>
                 <fieldset className="academic-program-fieldset">
                   <legend>关闭主窗口时</legend>
@@ -650,7 +652,7 @@ export const SettingsView = ({
                     ))}
                   </div>
                 </fieldset>
-                <div className="settings-actions"><button className="primary-button" type="button" disabled={lifecycleSaving} onClick={() => void saveLifecycleSettings()}>{lifecycleSaving ? "保存中" : "保存后台设置"}</button></div>
+                <div className="settings-actions"><Button type="button" disabled={lifecycleSaving} onClick={() => void saveLifecycleSettings()}>{lifecycleSaving ? "保存中" : "保存后台设置"}</Button></div>
                 {lifecycleMessage ? <p className="save-note" role="status">{lifecycleMessage}</p> : null}
               </section>
             </>
@@ -665,14 +667,13 @@ export const SettingsView = ({
 
                 <p className="page-copy">重新同步当前数据源，并更新日历中的测试数据。</p>
                 <div className="settings-actions">
-                  <button
-                    className="primary-button"
+                  <Button
                     type="button"
                     disabled={refreshState === "refreshing"}
                     onClick={() => void refreshData()}
                   >
                     {refreshState === "refreshing" ? "刷新中…" : "刷新数据"}
-                  </button>
+                  </Button>
                   {refreshState === "success" ? (
                     <span className="save-note" role="status" aria-live="polite">
                       刷新完成
@@ -690,7 +691,7 @@ export const SettingsView = ({
               <section className="settings-section" aria-labelledby="backup-heading">
                 <header className="settings-section-heading"><h2 id="backup-heading">备份与恢复</h2></header>
                 <p className="page-copy">手动导出本地任务、排程和通知索引。备份不加密，请只保存到可信位置，不包含密码、Cookie、Session、Token 或 AI Key。</p>
-                <div className="settings-actions"><button className="text-button" type="button" onClick={() => void exportBackup()}>导出备份</button><button className="text-button" type="button" onClick={() => void restoreBackup()}>预览并恢复</button></div>
+                <div className="settings-actions"><Button variant="ghost" type="button" onClick={() => void exportBackup()}>导出备份</Button><Button variant="ghost" type="button" onClick={() => void restoreBackup()}>预览并恢复</Button></div>
                 {backupMessage ? <p className="save-note" role="status">{backupMessage}</p> : null}
               </section>
             </>
@@ -722,14 +723,13 @@ export const SettingsView = ({
                 </details>
               ) : null}
               <div className="settings-actions">
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   disabled={updateAction.disabled}
                   onClick={() => void runUpdateAction()}
                 >
                   {updateAction.label}
-                </button>
+                </Button>
               </div>
               {updateStatus.state === "error" ? (
                 <p className="error-copy" role="alert">
@@ -763,13 +763,13 @@ export const SettingsView = ({
                 <pre>{`${appInfo?.copyright ?? "Copyright (c) 2026 Harry-Linner"}\n\n${mitLicenseText}`}</pre>
               </details>
               <div className="settings-actions">
-                <button
-                  className="text-button"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => void window.campusos?.feedback?.openIssue()}
                 >
                   提交问题反馈
-                </button>
+                </Button>
               </div>
               <p className="page-copy">反馈会打开 GitHub Issues，不会自动附带账号、课程、文件或本地诊断数据。</p>
             </section>
@@ -789,16 +789,16 @@ export const SettingsView = ({
                   记录各连接器刷新状态、耗时与异常类别；不记录响应正文、密码、Cookie、Session 或 ticket。
                 </p>
                 <div className="settings-actions">
-                  <button
-                    className="text-button"
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={diagnosticState === "loading"}
                     onClick={() => void reloadDiagnostics()}
                   >
                     刷新日志
-                  </button>
-                  <button
-                    className="text-button"
+                  </Button>
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={diagnosticState === "loading"}
                     onClick={() => {
@@ -821,9 +821,9 @@ export const SettingsView = ({
                     }}
                   >
                     导出 TXT
-                  </button>
-                  <button
-                    className="text-button"
+                  </Button>
+                  <Button
+                    variant="ghost"
                     type="button"
                     disabled={diagnosticState === "loading" || !diagnostics?.totalCount}
                     onClick={() => {
@@ -843,7 +843,7 @@ export const SettingsView = ({
                     }}
                   >
                     清空日志
-                  </button>
+                  </Button>
                 </div>
 
                 {diagnosticMessage ? (
@@ -883,15 +883,20 @@ export const SettingsView = ({
               <section className="settings-section" aria-labelledby="analytics-heading">
                 <header className="settings-section-heading"><h2 id="analytics-heading">匿名使用分析</h2></header>
                 <p className="page-copy">默认关闭。开启后仅发送功能漏斗事件，不包含账号、课程、任务内容、文件名、私有 URL、Cookie、Token 或 AI Key。</p>
-                <label className="setting-switch">
-                  <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={async (event) => {
-                    const next = event.target.checked;
-                    const record = await window.campusos?.analytics?.setConsent(next);
-                    if (record) { setAnalyticsConsent(record.consent); setAnalyticsAvailable(record.available); setAnalyticsMessage(next ? "已开启匿名分析" : "已关闭匿名分析"); }
-                  }} />
-                  <span className="switch-track" aria-hidden="true"><span /></span>
-                  <span>{analyticsAvailable ? "允许发送匿名功能事件" : "分析服务未配置"}</span>
-                </label>
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <Label htmlFor="analytics-consent">{analyticsAvailable ? "允许发送匿名功能事件" : "分析服务未配置"}</Label>
+                  <Switch
+                    id="analytics-consent"
+                    checked={analyticsConsent}
+                    disabled={!analyticsAvailable}
+                    onCheckedChange={(next) => {
+                      void (async () => {
+                        const record = await window.campusos?.analytics?.setConsent(next);
+                        if (record) { setAnalyticsConsent(record.consent); setAnalyticsAvailable(record.available); setAnalyticsMessage(next ? "已开启匿名分析" : "已关闭匿名分析"); }
+                      })();
+                    }}
+                  />
+                </div>
                 {analyticsMessage ? <p className="save-note">{analyticsMessage}</p> : null}
               </section>
 
@@ -904,13 +909,13 @@ export const SettingsView = ({
                     仅重置首次引导完成状态，保留账号、插件和本地数据。
                   </p>
                   <div className="settings-actions">
-                    <button
-                      className="text-button"
+                    <Button
+                      variant="ghost"
                       type="button"
                       onClick={onRestartOnboarding}
                     >
                       跳回初始引导界面
-                    </button>
+                    </Button>
                   </div>
                 </section>
               ) : null}
@@ -918,7 +923,7 @@ export const SettingsView = ({
               <section className="settings-section" aria-labelledby="dingtalk-heading">
                 <header className="settings-section-heading"><h2 id="dingtalk-heading">钉钉</h2></header>
                 <p className="page-copy">钉钉登录与消息导入入口已预留，当前不会读取钉钉数据，也不会发起登录或后台连接。</p>
-                <button className="text-button" type="button" disabled aria-disabled="true">钉钉导入（即将支持）</button>
+                <Button variant="ghost" type="button" disabled aria-disabled="true">钉钉导入（即将支持）</Button>
               </section>
             </>
           ) : null}

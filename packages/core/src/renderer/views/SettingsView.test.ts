@@ -361,7 +361,7 @@ describe("SettingsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "通知" }));
     await screen.findByRole("button", { name: "保存提醒" });
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "启用桌面通知" }));
+    fireEvent.click(screen.getByRole("switch", { name: "启用桌面通知" }));
     fireEvent.click(screen.getByRole("button", { name: "保存提醒" }));
 
     expect(await screen.findByText("已保存")).toBeDefined();

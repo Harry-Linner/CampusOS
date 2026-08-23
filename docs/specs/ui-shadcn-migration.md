@@ -219,6 +219,13 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 待拍板：①分段控件保持现样式 vs 对齐早报 Button 变体；②左栏导航保持 vs ghost 按钮；③区块标题层级保持 h2 现状
 - 工作量：1 笔提交（重写组件 + 同提交删 CSS + 三主题截图 + 全量回归 + CI）
 
+**Settings 批 — 已完成（用户确认启动 C，2026-08-23）**：
+- `SettingsView.tsx` 表现层迁移：`primary-button`/`text-button` → shadcn `Button`（default/ghost，危险操作 `text-destructive`）；`field-stack`+`text-field` → shadcn `Label`+`Input`（保留 `field-stack` 列布局容器与 `settings-fields` 两列 grid）；提醒/后台/分析 5 处 `setting-switch` → shadcn `Switch`
+- 保留自定义（无 shadcn 对应 / OnboardingWizard 共享）：`academic-program-options` 分段单选、`reminder-options` 多选芯片、`settings-nav` 左栏导航、`details` 折叠、`credential-proof`、`diagnostic-list`、`about-data` 及 `settings-section` 布局（不套 Card，遵守雷点 #1）
+- 删除 CSS：`.setting-switch`/`.switch-track` 全部（`reminder-option input` 隐藏规则独立保留）
+- 测试同步：`SettingsView.test.ts` 与 `workspace.e2e.ts` 的 `getByRole("checkbox")` → `getByRole("switch")`（组件语义变化，e2e `.uncheck()` → `.click()`）
+- 验收：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、e2e **7/7**、构建成功、三主题设置页截图（`.tmp/ui-capture/settings-migrated-*-{account,notifications}.png`，通知分类 4 个 Switch 就位）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e
