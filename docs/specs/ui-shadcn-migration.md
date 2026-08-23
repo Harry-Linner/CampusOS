@@ -234,6 +234,12 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 删除 CSS：`.assistant-label`/`.assistant-message-input`（draft-form 部分保留）
 - 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、e2e **7/7**、三主题截图（`.tmp/ui-capture/assistant-migrated-*.png`，1 Textarea + 3 Button + 1 Input 就位）、CI 全绿
 
+**Dashboard 批 — 已完成（2026-08-23）**：
+- `DashboardView.tsx` 为纯展示视图（无按钮/输入/开关），唯一迁移面为加载骨架：自定义 `skeleton-line/skeleton-block/title/copy/section/tall` → shadcn `Skeleton`（tailwind 尺寸类，观感一致）
+- 删除 CSS：`.skeleton-*` 全部（含死代码 `.skeleton-calendar`，无任何视图使用）
+- 内容态（今日事项预览/待办）与布局类（`dashboard-layout`/`course-timeline`/`todo-list` 等）保留
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（DashboardView 3 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/dashboard-migrated-*.png`，内容态 1 课程项 + 1 待办项）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e

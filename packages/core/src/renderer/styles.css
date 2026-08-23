@@ -682,58 +682,6 @@ input:focus-visible {
   border-top: 0;
 }
 
-.skeleton-line,
-.skeleton-block {
-  position: relative;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #e1e5e1;
-}
-
-.skeleton-line::after,
-.skeleton-block::after {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  content: "";
-  transform: translateX(-100%);
-  animation: skeleton-shimmer 1.3s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  to {
-    transform: translateX(100%);
-  }
-}
-
-.skeleton-title {
-  width: 118px;
-  height: 38px;
-}
-
-.skeleton-copy {
-  width: 96px;
-  height: 13px;
-  margin-top: 12px;
-}
-
-.skeleton-section {
-  width: 65px;
-  height: 18px;
-}
-
-.skeleton-block {
-  margin-top: 19px;
-}
-
-.skeleton-tall {
-  height: 350px;
-}
-
-.skeleton-calendar {
-  height: min(66vh, 680px);
-}
-
 .calendar-page {
   gap: 24px;
 }

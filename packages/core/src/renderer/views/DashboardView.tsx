@@ -9,6 +9,7 @@ import {
   formatRelativeToNow,
   formatTimeRange
 } from "../lib/formatters";
+import { Skeleton } from "../components/ui/skeleton";
 
 interface DashboardViewProps {
   loading: boolean;
@@ -75,18 +76,18 @@ const DashboardSkeleton = (): JSX.Element => (
   <section className="page-shell" aria-busy="true" aria-label="正在加载总览">
     <header className="page-heading">
       <div>
-        <div className="skeleton-line skeleton-title" />
-        <div className="skeleton-line skeleton-copy" />
+        <Skeleton className="h-9 w-28" />
+        <Skeleton className="mt-3 h-4 w-40" />
       </div>
     </header>
     <div className="dashboard-layout">
       <div className="content-section">
-        <div className="skeleton-line skeleton-section" />
-        <div className="skeleton-block skeleton-tall" />
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="mt-4 h-80 w-full" />
       </div>
       <div className="content-section">
-        <div className="skeleton-line skeleton-section" />
-        <div className="skeleton-block skeleton-tall" />
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="mt-4 h-80 w-full" />
       </div>
     </div>
   </section>
