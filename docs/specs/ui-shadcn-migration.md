@@ -258,6 +258,15 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 保留原生：学期 `select`、全选与文件行 `checkbox`（表单控件）、课程目录选项按钮、`module-tabs`（资料视图/下载队列切换）
 - 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（MaterialsView 4 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/materials-migrated-*.png`，下载按钮 + 搜索 Input 就位）、CI 全绿
 
+**Shell 批 — 已完成（2026-08-23）**：
+- `GlobalSearch.tsx`：搜索 `input[type=search]` → shadcn `Input`
+- `NotificationCenter.tsx`：清理过期/已处理 → shadcn `Button` ghost（通知触发按钮保留原生——窄窗定位样式耦合）
+- `UpdatePrompt.tsx`：查看完整日志/稍后 → `Button` ghost，现在更新 → `Button`
+- `OnboardingWizard.tsx`：**14 处按钮 → shadcn `Button`**（primary→default、text→ghost，保留 `onboarding-development-skip`/`onboarding-enter-button` 附加类）；账号输入 `field-stack`+`text-field` → `Label`+`Input`；培养层次分段与偏好 checkbox 保留原生
+- 删除 CSS：`.text-field` 全部（迁移后无使用者，死代码）；`.field-stack > span` 规则保留（无害）
+- e2e 同步：`campusmod.e2e.ts` 引导流程 `.primary-button` 类选择器 → 语义 `getByRole` name（「开始配置/开始同步/确认，继续/安装选中插件」）
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（shell 组件 23 用例）、e2e **7/7**（含修复后的 campusmod）、三主题截图（`.tmp/ui-capture/onboarding-migrated-*.png`）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e

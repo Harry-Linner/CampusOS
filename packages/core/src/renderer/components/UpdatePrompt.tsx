@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { UpdateStatus } from "../../shared/updateBridge";
+import { Button } from "../components/ui/button";
 
 export const UpdatePrompt = (): JSX.Element | null => {
   const bridge = window.campusos?.updates;
@@ -41,15 +42,15 @@ export const UpdatePrompt = (): JSX.Element | null => {
         {status.releaseNotes?.length ? (
           <div className="update-prompt-notes">
             <ul>{status.releaseNotes.slice(0, 5).map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}</ul>
-            {status.releaseNotes.length > 5 ? <button className="text-button" type="button" onClick={() => setShowNotes((value) => !value)}>
+            {status.releaseNotes.length > 5 ? <Button variant="ghost" type="button" onClick={() => setShowNotes((value) => !value)}>
               {showNotes ? "\u6536\u8d77\u5b8c\u6574\u65e5\u5fd7" : "\u67e5\u770b\u5b8c\u6574\u65e5\u5fd7"}
-            </button> : null}
+            </Button> : null}
             {showNotes ? <ul>{status.releaseNotes.slice(5).map((note, index) => <li key={`${index + 5}-${note}`}>{note}</li>)}</ul> : null}
           </div>
         ) : null}
         <footer>
-          <button className="text-button" type="button" disabled={busy} onClick={() => void dismiss()}>\u7a0d\u540e</button>
-          <button className="primary-button" type="button" disabled={busy} onClick={() => void download()}>{busy ? "\u51c6\u5907\u4e2d" : "\u73b0\u5728\u66f4\u65b0"}</button>
+          <Button variant="ghost" type="button" disabled={busy} onClick={() => void dismiss()}>\u7a0d\u540e</Button>
+          <Button type="button" disabled={busy} onClick={() => void download()}>{busy ? "\u51c6\u5907\u4e2d" : "\u73b0\u5728\u66f4\u65b0"}</Button>
         </footer>
       </section>
     </div>

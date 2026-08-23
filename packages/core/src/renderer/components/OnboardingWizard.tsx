@@ -7,6 +7,9 @@ import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/man
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useCampusWorkspace } from "../hooks/useCampusWorkspace";
 import { usePluginHost } from "../hooks/usePluginHost";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -357,13 +360,12 @@ export const OnboardingWizard = ({
             </p>
 
             <div className="settings-actions onboarding-actions">
-              <button
-                className="primary-button"
+              <Button
                 type="button"
                 onClick={() => goTo("account")}
               >
                 开始配置
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -417,10 +419,10 @@ export const OnboardingWizard = ({
             </fieldset>
 
             <div className="settings-fields">
-              <label className="field-stack">
-                <span>学号 / 统一认证账号</span>
-                <input
-                  className="text-field"
+              <div className="field-stack">
+                <Label htmlFor="onboarding-username">学号 / 统一认证账号</Label>
+                <Input
+                  id="onboarding-username"
                   type="text"
                   autoComplete="username"
                   disabled={academicCredential.loading}
@@ -428,12 +430,12 @@ export const OnboardingWizard = ({
                   onChange={(event) => setUsername(event.target.value)}
                   placeholder="输入账号"
                 />
-              </label>
+              </div>
 
-              <label className="field-stack">
-                <span>密码</span>
-                <input
-                  className="text-field"
+              <div className="field-stack">
+                <Label htmlFor="onboarding-password">密码</Label>
+                <Input
+                  id="onboarding-password"
                   type="password"
                   autoComplete="current-password"
                   disabled={academicCredential.loading}
@@ -441,7 +443,7 @@ export const OnboardingWizard = ({
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="输入密码"
                 />
-              </label>
+              </div>
             </div>
 
             {authProfile ? (
@@ -519,35 +521,34 @@ export const OnboardingWizard = ({
             ) : null}
 
             <div className="settings-actions onboarding-actions">
-              <button
-                className="text-button"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => goTo("welcome")}
               >
                 返回
-              </button>
+              </Button>
 
               {allowDevelopmentAuthSkip ? (
-                <button
-                  className="text-button onboarding-development-skip"
+                <Button
+                  variant="ghost"
+                  className="onboarding-development-skip"
                   type="button"
                   onClick={handleDevelopmentAuthSkip}
                 >
                   开发模式跳过认证
-                </button>
+                </Button>
               ) : null}
 
               {verified ? (
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   onClick={() => goTo("sync")}
                 >
                   继续同步
-                </button>
+                </Button>
               ) : (
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   disabled={
                     academicCredential.loading ||
@@ -561,7 +562,7 @@ export const OnboardingWizard = ({
                       ? "读取账号…"
                       : "连接中…"
                     : "连接并保存"}
-                </button>
+                </Button>
               )}
             </div>
 
@@ -584,13 +585,12 @@ export const OnboardingWizard = ({
 
             {!syncStarted ? (
               <div className="onboarding-sync-placeholder">
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   onClick={() => void handleSync()}
                 >
                   开始同步
-                </button>
+                </Button>
               </div>
             ) : workspace.loading ? (
               <div className="onboarding-sync-progress">
@@ -656,30 +656,28 @@ export const OnboardingWizard = ({
             ) : null}
 
             <div className="settings-actions onboarding-actions">
-              <button
-                className="text-button"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => goTo("account")}
               >
                 返回
-              </button>
+              </Button>
               {syncStarted && !workspace.loading && !syncError ? (
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   onClick={() => goTo("plugins")}
                 >
                   确认，继续
-                </button>
+                </Button>
               ) : null}
               {syncError ? (
-                <button
-                  className="primary-button"
+                <Button
                   type="button"
                   onClick={() => void handleSync()}
                 >
                   重试
-                </button>
+                </Button>
               ) : null}
             </div>
           </div>
@@ -727,15 +725,14 @@ export const OnboardingWizard = ({
             ) : null}
 
             <div className="settings-actions onboarding-actions">
-              <button
-                className="text-button"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={() => goTo("sync")}
               >
                 返回
-              </button>
-              <button
-                className="primary-button"
+              </Button>
+              <Button
                 type="button"
                 disabled={pluginConfiguring}
                 onClick={() => void handleConfigurePlugins()}
@@ -745,7 +742,7 @@ export const OnboardingWizard = ({
                   : pluginConfigured
                     ? "已完成"
                     : "安装选中插件"}
-              </button>
+              </Button>
             </div>
 
             <p className="page-copy onboarding-skip-note">
@@ -775,8 +772,8 @@ export const OnboardingWizard = ({
             </div>
             {preferenceError ? <p className="error-copy" role="alert">{preferenceError}</p> : null}
             <div className="settings-actions onboarding-actions">
-              <button className="text-button" type="button" onClick={() => goTo("plugins")}>返回</button>
-              <button className="primary-button" type="button" disabled={preferenceSaving} onClick={() => void handleSavePreferences()}>{preferenceSaving ? "保存中…" : "保存并继续"}</button>
+              <Button variant="ghost" type="button" onClick={() => goTo("plugins")}>返回</Button>
+              <Button type="button" disabled={preferenceSaving} onClick={() => void handleSavePreferences()}>{preferenceSaving ? "保存中…" : "保存并继续"}</Button>
             </div>
           </div>
         ) : null}
@@ -818,13 +815,13 @@ export const OnboardingWizard = ({
             </div>
 
             <div className="settings-actions onboarding-actions">
-              <button
-                className="primary-button onboarding-enter-button"
+              <Button
+                className="onboarding-enter-button"
                 type="button"
                 onClick={handleFinish}
               >
                 进入 CampusOS
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}

@@ -5,6 +5,7 @@ import {
   searchGlobalIndex,
   type GlobalSearchKind
 } from "../lib/globalSearch";
+import { Input } from "../components/ui/input";
 
 interface GlobalSearchProps {
   open: boolean;
@@ -63,7 +64,7 @@ export const GlobalSearch = ({
       >
         <label className="global-search-field">
           <span className="sr-only">搜索课程、事项和资料</span>
-          <input
+          <Input
             ref={inputRef}
             type="search"
             value={query}

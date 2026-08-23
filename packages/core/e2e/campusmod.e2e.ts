@@ -107,11 +107,11 @@ test("renders an installed campusmod through the real Electron sandbox origin", 
     const page = await app.firstWindow({ timeout: 10_000 });
     page.setDefaultTimeout(15_000);
     await page.waitForLoadState("domcontentloaded");
-    await page.locator(".onboarding-actions .primary-button").click();
+    await page.getByRole("button", { name: "开始配置" }).click();
     await page.locator(".onboarding-development-skip").click();
-    await page.locator(".onboarding-sync-placeholder .primary-button").click();
-    await page.locator(".onboarding-actions .primary-button").click();
-    await page.locator(".onboarding-actions .primary-button").click();
+    await page.getByRole("button", { name: "开始同步" }).click();
+    await page.getByRole("button", { name: "确认，继续" }).click();
+    await page.getByRole("button", { name: /安装选中插件|已完成/ }).click();
     await page.getByRole("button", { name: "保存并继续" }).click();
     await page.locator(".onboarding-enter-button").click();
     const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });

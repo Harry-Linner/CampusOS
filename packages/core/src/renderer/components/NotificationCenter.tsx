@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { NotificationRecord } from "../../shared/notificationBridge";
+import { Button } from "../components/ui/button";
 
 export const NotificationCenter = (): JSX.Element | null => {
   const bridge = window.campusos?.notifications;
@@ -23,11 +24,11 @@ export const NotificationCenter = (): JSX.Element | null => {
       </button>
       {open ? (
         <section className="notification-popover" aria-label="通知中心">
-          <header><strong>通知中心</strong><button className="text-button" type="button" onClick={() => void bridge.clearExpired().then(setRecords)}>清理过期</button></header>
+          <header><strong>通知中心</strong><Button variant="ghost" type="button" onClick={() => void bridge.clearExpired().then(setRecords)}>清理过期</Button></header>
           {records.length === 0 ? <p className="quiet-empty-state">暂无通知</p> : records.map((record) => (
             <article className={`notification-item is-${record.state}`} key={record.id}>
               <button type="button" onClick={() => void bridge.markRead(record.id).then(setRecords)}><strong>{record.title}</strong><span>{record.body}</span><time>{new Date(record.createdAt).toLocaleString("zh-CN", { hour12: false })}</time></button>
-              {record.state !== "handled" ? <button className="text-button" type="button" onClick={() => void bridge.markHandled(record.id).then(setRecords)}>已处理</button> : null}
+              {record.state !== "handled" ? <Button variant="ghost" type="button" onClick={() => void bridge.markHandled(record.id).then(setRecords)}>已处理</Button> : null}
             </article>
           ))}
         </section>
