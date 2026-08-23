@@ -253,6 +253,11 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 保留原生：桌面日历控制按钮（`.desk-calendar-control` 样式耦合 `text-button` 类）、`icon-button` 日历导航箭头、事件格子按钮、`schedule-task-main`（非共享原语）；内联编辑表单字段（`label>input/select`，`.schedule-form-grid` 布局）与 `module-tabs`（月历/周视图/日程/日视图）保留
 - 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（ScheduleView 12 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/schedule-migrated-*.png`，4 个 shadcn Button + 1 个桌面日历保留控件）、CI 全绿
 
+**Materials 批 — 已完成（2026-08-23）**：
+- `materials/src/index.tsx`：课程搜索 `input[type=search]` → shadcn `Input`；7 处共享原语按钮 → shadcn `Button`（下载选中 `default`、文件下载/打开/在文件夹中显示/继续/暂停 `ghost`、取消 `ghost`+`text-destructive`）
+- 保留原生：学期 `select`、全选与文件行 `checkbox`（表单控件）、课程目录选项按钮、`module-tabs`（资料视图/下载队列切换）
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**（MaterialsView 4 用例）、e2e **7/7**、三主题截图（`.tmp/ui-capture/materials-migrated-*.png`，下载按钮 + 搜索 Input 就位）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e

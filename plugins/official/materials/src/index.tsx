@@ -6,6 +6,8 @@ import type {
   CampusWorkspaceSnapshot,
   PluginComponentProps
 } from "@campusos/shared";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export { manifest } from "./manifest";
 
@@ -331,7 +333,7 @@ export const Component = ({
                     </select>
                   </label>
                 ) : null}
-                <input
+                <Input
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
@@ -388,8 +390,7 @@ export const Component = ({
                       />
                       全选
                     </label>
-                    <button
-                      className="primary-button"
+                    <Button
                       type="button"
                       disabled={
                         !downloads ||
@@ -401,7 +402,7 @@ export const Component = ({
                       {busyId === "selected"
                         ? "正在入队"
                         : `下载选中${selectedMaterials.length > 0 ? ` ${selectedMaterials.length}` : ""}`}
-                    </button>
+                    </Button>
                   </div>
                 ) : null}
               </header>
@@ -445,8 +446,8 @@ export const Component = ({
                           ) : null}
                         </div>
                         {material.downloadUrl && downloads ? (
-                          <button
-                            className="text-button"
+                          <Button
+                            variant="ghost"
                             type="button"
                             disabled={busyId === material.id}
                             onClick={() =>
@@ -460,7 +461,7 @@ export const Component = ({
                               : download?.status === "ready"
                                 ? "校验文件"
                                 : "下载"}
-                          </button>
+                          </Button>
                         ) : (
                           <span className="meta-line">不可下载</span>
                         )}
@@ -507,8 +508,8 @@ export const Component = ({
                   </div>
                   {downloads && download.status === "ready" ? (
                     <div className="inline-actions">
-                      <button
-                        className="text-button"
+                      <Button
+                        variant="ghost"
                         type="button"
                         disabled={busyId === download.id}
                         onClick={() =>
@@ -518,9 +519,9 @@ export const Component = ({
                         }
                       >
                         打开
-                      </button>
-                      <button
-                        className="text-button"
+                      </Button>
+                      <Button
+                        variant="ghost"
                         type="button"
                         disabled={busyId === download.id}
                         onClick={() =>
@@ -530,13 +531,13 @@ export const Component = ({
                         }
                       >
                         在文件夹中显示
-                      </button>
+                      </Button>
                     </div>
                   ) : downloads ? (
                     <div className="inline-actions">
                       {download.status === "paused" || download.status === "failed" ? (
-                        <button
-                          className="text-button"
+                        <Button
+                          variant="ghost"
                           type="button"
                           disabled={busyId === download.id}
                           onClick={() =>
@@ -546,10 +547,10 @@ export const Component = ({
                           }
                         >
                           {download.status === "failed" ? "重试" : "继续"}
-                        </button>
+                        </Button>
                       ) : (
-                        <button
-                          className="text-button"
+                        <Button
+                          variant="ghost"
                           type="button"
                           disabled={busyId === download.id}
                           onClick={() =>
@@ -559,10 +560,11 @@ export const Component = ({
                           }
                         >
                           暂停
-                        </button>
+                        </Button>
                       )}
-                      <button
-                        className="text-button is-danger"
+                      <Button
+                        variant="ghost"
+                        className="text-destructive"
                         type="button"
                         disabled={busyId === download.id}
                         onClick={() =>
@@ -572,7 +574,7 @@ export const Component = ({
                         }
                       >
                         取消
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </li>
