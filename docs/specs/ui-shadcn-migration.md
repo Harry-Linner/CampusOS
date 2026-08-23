@@ -286,3 +286,9 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - **保留（在用/误判）**：`.calendar-controls`/`.schedule-calendar-toolbar .calendar-view-switcher`（ScheduleView 780 在用）、`.onboarding-eyebrow`（引导品牌字，用户决定保留）、`.assistant-settings-form`（AI 助手在用）
 - styles.css 累计从 4900+ 行降至约 **4100 行**；括号平衡校验 621/621；删除全程每步全量 486/1 skipped + e2e 7/7 + 构建成功
 - 剩余 Phase D：统一半径/阴影/动效规范、a11y 复查、截图基线入 e2e
+
+**Phase D 第三批 — 半径/阴影/动效与 a11y 规范审计（2026-08-23）**：
+- **半径审计**：`--radius-sm 6px`/`--radius-md 10px` token 覆盖常规元素（40+ 处引用）；硬编码梯度 2-4px（细线/小标记）、999px（胶囊/徽章）、12-20px（弹层大圆角）均为**有意的层级差异**，无需激进统一
+- **阴影审计**：`--shadow-soft`/`--shadow-elevated` token 用于常规卡片/弹层；硬编码 rgba 阴影（is-active 轻浮起、蓝调卡片、暖色 update-prompt）为**有意的层级/色调设计**，保留——现状即规范，避免无意义 churn
+- **颜色对比度**：硬编码 hex 集中在状态色板（红 `#9c3937` 系 / 绿 `#a8cbb6` 系 / 琥珀 `#d8b46a` 系），三系深浅系统化非随机色；状态场景对比度达标；焦点环（`focus-visible` 全局）+ 三主题 token 已在早期轮次落地
+- **结论**：统一规范审计通过，无强制改动项；「截图基线入 e2e」（pixel-diff 视觉回归）为唯一待做项——成本较高、现有 e2e 已覆盖 DOM 语义断言 + 无溢出 + 截图保存，标记为**可选增强**，待用户决定是否投入
