@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, screen } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { registerAcademicCredentialHandlers } from "./academicCredentialStore";
@@ -65,10 +65,26 @@ const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
 
 const createMainWindow = async (): Promise<BrowserWindow> => {
   const savedState = await loadWindowState();
+  const defaultWidth = 1340;
+  const defaultHeight = 900;
+  // Without a saved position, prefer a secondary display so the primary
+  // screen stays free for the user; fall back to the primary display.
+  let position: { x?: number; y?: number } = {};
+  if (!savedState) {
+    const primary = screen.getPrimaryDisplay();
+    const secondary = screen.getAllDisplays().find((display) => display.id !== primary.id);
+    if (secondary) {
+      const { x, y, width, height } = secondary.workArea;
+      position = {
+        x: x + Math.max(0, Math.round((width - defaultWidth) / 2)),
+        y: y + Math.max(0, Math.round((height - defaultHeight) / 2))
+      };
+    }
+  }
   const window = new BrowserWindow({
-    width: savedState?.bounds.width ?? 1340,
-    height: savedState?.bounds.height ?? 900,
-    ...(savedState ? { x: savedState.bounds.x, y: savedState.bounds.y } : {}),
+    width: savedState?.bounds.width ?? defaultWidth,
+    height: savedState?.bounds.height ?? defaultHeight,
+    ...(savedState ? { x: savedState.bounds.x, y: savedState.bounds.y } : position),
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#f3efe6",

@@ -144,7 +144,7 @@ describe("app lifecycle", () => {
     expect(initial).toMatchObject({
       launchAtLogin: false,
       closeBehavior: "ask",
-      notificationEnabled: true,
+      notificationEnabled: false,
       notificationPrompted: false
     });
 

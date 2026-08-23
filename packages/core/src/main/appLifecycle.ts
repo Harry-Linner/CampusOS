@@ -36,7 +36,7 @@ const settingsPath = (): string => join(app.getPath("userData"), "settings", SET
 const defaults = (): AppLifecycleSettings => ({
   launchAtLogin: false,
   closeBehavior: "ask",
-  notificationEnabled: true,
+  notificationEnabled: false,
   notificationPrompted: false,
   updatedAt: new Date(0).toISOString()
 });
@@ -49,7 +49,7 @@ const normalizeSettings = (value: unknown): AppLifecycleSettings => {
   return {
     launchAtLogin: source.launchAtLogin === true,
     closeBehavior: normalizeCloseBehavior(source.closeBehavior),
-    notificationEnabled: source.notificationEnabled !== false,
+    notificationEnabled: source.notificationEnabled === true,
     notificationPrompted: source.notificationPrompted === true,
     updatedAt: typeof source.updatedAt === "string" && Number.isFinite(Date.parse(source.updatedAt))
       ? source.updatedAt
