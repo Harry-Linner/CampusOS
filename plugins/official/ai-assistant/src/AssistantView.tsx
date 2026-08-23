@@ -231,19 +231,24 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
       {error ? <p className="workspace-error-banner" role="alert">{error}</p> : null}
       {notice ? <p className="schedule-notice" role="status">{notice}</p> : null}
       {section === "settings" ? (
-        <section className="assistant-settings" aria-label="AI 助手连接配置">
-          <header className="section-heading"><div><h2>模型连接</h2></div><span className={`assistant-config-state ${settings?.configured ? "is-configured" : ""}`}>{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span></header>
-          <form className="assistant-settings-form" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
-            <AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} protocol={protocol} baseUrl={baseUrl} model={model} discoveredModels={discoveredModels} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); setDiscoveredModels([]); }} onProtocolChange={(value) => { setProtocol(value); setDiscoveredModels([]); }} onBaseUrlChange={(value) => { setBaseUrl(value); setDiscoveredModels([]); }} onModelChange={setModel} />
-            <p className="assistant-privacy-copy">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
-            <div className="assistant-actions">
-              <Button type="submit" disabled={!assistant || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save-settings" ? "正在保存" : "保存连接"}</Button>
-              <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试结构化能力"}</Button>
-              <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !baseUrl.trim() || busy !== null} onClick={() => void discoverModels()}>{busy === "discover-models" ? "正在获取模型" : "获取模型列表"}</Button>
-              {settings?.configured ? <Button variant="ghost" className="text-destructive" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</Button> : null}
-            </div>
-          </form>
-        </section>
+        <div className="settings-panel">
+          <section className="settings-section" aria-labelledby="assistant-model-heading">
+            <header className="settings-section-heading">
+              <h2 id="assistant-model-heading">模型连接</h2>
+              <span className="text-xs text-muted-foreground">{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span>
+            </header>
+            <form className="grid gap-5" onSubmit={(event) => { event.preventDefault(); void saveSettings(); }}>
+              <div className="settings-fields"><AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} protocol={protocol} baseUrl={baseUrl} model={model} discoveredModels={discoveredModels} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); setDiscoveredModels([]); }} onProtocolChange={(value) => { setProtocol(value); setDiscoveredModels([]); }} onBaseUrlChange={(value) => { setBaseUrl(value); setDiscoveredModels([]); }} onModelChange={setModel} /></div>
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
+              <div className="settings-actions">
+                <Button type="submit" disabled={!assistant || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save-settings" ? "正在保存" : "保存连接"}</Button>
+                <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试结构化能力"}</Button>
+                <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !baseUrl.trim() || busy !== null} onClick={() => void discoverModels()}>{busy === "discover-models" ? "正在获取模型" : "获取模型列表"}</Button>
+                {settings?.configured ? <Button variant="ghost" className="text-destructive" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</Button> : null}
+              </div>
+            </form>
+          </section>
+        </div>
       ) : (
         <div className="assistant-layout">
           <section className="assistant-input-panel" aria-label="消息输入">

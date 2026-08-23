@@ -24,7 +24,6 @@ import {
 } from "./lib/downloadBridge";
 import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 import { subscribeToPluginRuntimeChanges } from "./lib/pluginBridge";
-import { AssistantSetupDialog } from "@campusos/plugin-ai-assistant";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 
@@ -38,8 +37,6 @@ export const App = (): JSX.Element => {
   const [activeView, setActiveView] = useState<ActivityItemId>("dashboard");
   const [navigationTarget, setNavigationTarget] = useState<AppNavigationRequest | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [assistantSetupOpen, setAssistantSetupOpen] = useState(false);
-  const [assistantSetupDismissed, setAssistantSetupDismissed] = useState(false);
   const pluginHost = usePluginHost();
   const workspace = useCampusWorkspace();
 
@@ -64,24 +61,6 @@ export const App = (): JSX.Element => {
     setNavigationTarget(request);
   }), []);
 
-  useEffect(() => {
-    if (!onboardingComplete || !pluginHost.ready || assistantSetupDismissed) return;
-    const assistantActive = pluginHost.plugins.some(
-      (plugin) => plugin.manifest.id === "org.campusos.ai-assistant" && plugin.runtime.status === "active"
-    );
-    const assistant = window.campusos?.assistant;
-    if (!assistantActive || !assistant) return;
-    let active = true;
-    void assistant.loadSettings().then((settings) => {
-      if (active) setAssistantSetupOpen(!settings.configured);
-    }).catch(() => {
-      if (active) setAssistantSetupOpen(false);
-    });
-    return () => {
-      active = false;
-    };
-  }, [assistantSetupDismissed, onboardingComplete, pluginHost.plugins, pluginHost.ready]);
-
   useEffect(() => subscribeToDownloadChanges(() => {
     void workspace.refreshDownloads();
   }), []);
@@ -103,7 +82,6 @@ export const App = (): JSX.Element => {
 
   const handleRestartOnboarding = useCallback(() => {
     resetOnboardingCompleted();
-    setAssistantSetupOpen(false);
     setOnboardingComplete(false);
   }, []);
 
@@ -245,19 +223,6 @@ export const App = (): JSX.Element => {
         onClose={() => setSearchOpen(false)}
         onNavigate={setActiveView}
       />
-      {assistantSetupOpen && window.campusos?.assistant ? (
-        <AssistantSetupDialog
-          assistant={window.campusos.assistant}
-          onConfigured={() => {
-            setAssistantSetupOpen(false);
-            setActiveView("ai-assistant");
-          }}
-          onDismiss={() => {
-            setAssistantSetupDismissed(true);
-            setAssistantSetupOpen(false);
-          }}
-        />
-      ) : null}
     </div>
   );
 };

@@ -114,9 +114,6 @@ test("renders an installed campusmod through the real Electron sandbox origin", 
     await page.getByRole("button", { name: /安装选中插件|已完成/ }).click();
     await page.getByRole("button", { name: "保存并继续" }).click();
     await page.locator(".onboarding-enter-button").click();
-    const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
-    await expect(assistantSetup).toBeVisible();
-    await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
     await page.locator('[data-activity-id="extensions"]').click();
 
     const pluginButton = page.getByRole("button", { name: "Hello CampusOS" });

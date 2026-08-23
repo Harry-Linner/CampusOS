@@ -5,7 +5,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AiAssistantExtractionResult, LocalTaskRecord, PluginCapabilityClient, PluginComponentProps } from "@campusos/shared";
 import { AssistantView } from "../../../../../plugins/official/ai-assistant/src/AssistantView";
-import { AssistantSetupDialog } from "../../../../../plugins/official/ai-assistant/src/AssistantSetupDialog";
 
 afterEach(cleanup);
 
@@ -141,20 +140,5 @@ describe("AssistantView", () => {
       expect(mutateTask).toHaveBeenCalledWith({ id: existingTask.id, status: "deleted" });
       expect(saveTask).not.toHaveBeenCalled();
     }
-  });
-
-  it("configures and tests an explicit DeepSeek connection in the first-use dialog", async () => {
-    const assistant = createAssistantBridge();
-    const onConfigured = vi.fn();
-    render(createElement(AssistantSetupDialog, { assistant, onConfigured, onDismiss: vi.fn() }));
-    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "must-be-cleared" } });
-    fireEvent.change(screen.getByLabelText("服务商"), { target: { value: "deepseek" } });
-    expect((screen.getByLabelText("API Key") as HTMLInputElement).value).toBe("");
-    expect((screen.getByLabelText("协议") as HTMLSelectElement).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("API Key"), { target: { value: "deepseek-key" } });
-    fireEvent.click(screen.getByRole("button", { name: "测试结构化能力" }));
-    await waitFor(() => expect(assistant.testConnection).toHaveBeenCalledWith(expect.objectContaining({ apiKey: "deepseek-key", provider: "deepseek", protocol: "openai-chat-completions", baseUrl: "https://api.deepseek.com/v1" })));
-    fireEvent.click(screen.getByRole("button", { name: "保存并开始使用" }));
-    await waitFor(() => expect(onConfigured).toHaveBeenCalled());
   });
 });

@@ -50,7 +50,7 @@ export const AssistantModelFields = ({
 
   return (
     <>
-      <div className="assistant-model-field">
+      <div className="field-stack">
         <Label htmlFor="assistant-model-provider">服务商</Label>
         <select
           id="assistant-model-provider"
@@ -68,7 +68,7 @@ export const AssistantModelFields = ({
           {AI_ASSISTANT_PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </div>
-      <div className="assistant-model-field">
+      <div className="field-stack">
         <Label htmlFor="assistant-model-api-key">API Key</Label>
         <Input
           id="assistant-model-api-key"
@@ -80,7 +80,7 @@ export const AssistantModelFields = ({
           placeholder={configured ? "留空以使用已保存的密钥" : "输入当前服务商的 API Key"}
         />
       </div>
-      <div className="assistant-model-field">
+      <div className="field-stack">
         <Label htmlFor="assistant-model-base-url">API 地址</Label>
         <Input
           id="assistant-model-base-url"
@@ -90,13 +90,13 @@ export const AssistantModelFields = ({
           placeholder="例如 https://api.example.com/v1"
         />
       </div>
-      <div className="assistant-model-field">
+      <div className="field-stack">
         <Label htmlFor="assistant-model-protocol">协议</Label>
         <select id="assistant-model-protocol" disabled={provider !== "openai-compatible"} value={protocol} onChange={(event) => onProtocolChange(event.target.value as AiAssistantProtocol)}>
           {protocolOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </div>
-      <div className="assistant-model-field">
+      <div className="field-stack">
         <Label htmlFor="assistant-model-select">模型</Label>
         <select
           id="assistant-model-select"
@@ -109,7 +109,7 @@ export const AssistantModelFields = ({
         </select>
       </div>
       {selectedModel === AI_ASSISTANT_CUSTOM_MODEL ? (
-        <div className="assistant-model-field">
+        <div className="field-stack">
           <Label htmlFor="assistant-model-custom">自定义模型名称</Label>
           <Input id="assistant-model-custom" value={model} onChange={(event) => onModelChange(event.target.value)} placeholder="填写服务商返回的模型 ID" />
         </div>

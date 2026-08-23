@@ -115,8 +115,6 @@ const completeOnboarding = async (page: Awaited<ReturnType<Awaited<ReturnType<ty
   await page.getByRole("button", { name: "安装选中插件" }).click();
   await page.getByRole("button", { name: "保存并继续" }).click();
   await page.getByRole("button", { name: "进入 CampusOS" }).click();
-  const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
-  if (await assistantSetup.isVisible()) await assistantSetup.getByRole("button", { name: "稍后配置" }).click();
 };
 
 test("updates a signed campusmod through a real local feed and preserves it on digest failure", async () => {

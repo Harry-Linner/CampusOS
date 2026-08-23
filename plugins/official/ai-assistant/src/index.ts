@@ -1,5 +1,4 @@
 export { AssistantView, AssistantView as Component } from "./AssistantView";
-export { AssistantSetupDialog } from "./AssistantSetupDialog";
 export { manifest } from "./manifest";
 export {
   AI_ASSISTANT_SCHEMA_VERSION,

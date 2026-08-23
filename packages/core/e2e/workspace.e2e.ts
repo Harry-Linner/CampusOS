@@ -158,29 +158,32 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
         return 0;
       }
     }).toBeGreaterThan(0);
-    const assistantSetup = page.getByRole("dialog", { name: "先配置 AI 连接" });
-    await expect(assistantSetup).toBeVisible();
-    await expect(assistantSetup.getByLabel("协议")).toBeDisabled();
+    // AI connection is configured in the AI assistant view's 连接 tab.
+    await page.getByRole("button", { name: "AI 助手" }).click();
+    await page.getByRole("button", { name: "连接", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "模型连接" })).toBeVisible();
+    await expect(page.getByLabel("协议")).toBeDisabled();
     await page.screenshot({
-      path: testInfo.outputPath("assistant-setup-desktop.png"),
+      path: testInfo.outputPath("assistant-settings-desktop.png"),
       fullPage: true
     });
     await page.setViewportSize({ width: 820, height: 900 });
     await expectNoRootOverflow(page);
     await page.screenshot({
-      path: testInfo.outputPath("assistant-setup-narrow.png"),
+      path: testInfo.outputPath("assistant-settings-narrow.png"),
       fullPage: true
     });
     await page.setViewportSize({ width: 1440, height: 960 });
-    await assistantSetup.getByLabel("服务商").selectOption("openai-compatible");
-    await expect(assistantSetup.getByLabel("协议")).toBeEnabled();
-    await assistantSetup.getByLabel("API Key").fill("fixture-key");
-    await assistantSetup.getByLabel("API 地址").fill(assistantBaseUrl);
-    await assistantSetup.locator('select:has(option[value="__custom__"])').selectOption("__custom__");
-    await assistantSetup.getByLabel("自定义模型名称").fill("fixture-model");
-    await assistantSetup.getByRole("button", { name: "测试结构化能力" }).click();
-    await expect(assistantSetup.getByText(/结构化能力可用/)).toBeVisible();
-    await assistantSetup.getByRole("button", { name: "保存并开始使用" }).click();
+    await page.getByLabel("服务商").selectOption("openai-compatible");
+    await expect(page.getByLabel("协议")).toBeEnabled();
+    await page.getByLabel("API Key").fill("fixture-key");
+    await page.getByLabel("API 地址").fill(assistantBaseUrl);
+    await page.locator('select:has(option[value="__custom__"])').selectOption("__custom__");
+    await page.getByLabel("自定义模型名称").fill("fixture-model");
+    await page.getByRole("button", { name: "测试结构化能力" }).click();
+    await expect(page.getByText(/结构化能力可用/)).toBeVisible();
+    await page.getByRole("button", { name: "保存连接" }).click();
+    await page.getByRole("button", { name: "消息" }).click();
 
     await expect(page.getByRole("heading", { name: "AI 助手" })).toBeVisible();
     const assistantMessage = "Submit report by Aug 20 at 20:00. Review meeting Aug 21 from 10:00 to 11:00 in Room 101.";
