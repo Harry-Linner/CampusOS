@@ -145,7 +145,7 @@ const startCampusApp = (): void => {
     }));
     registerCampusFeedHandlers(createCampusFeedService({
       database: getOfficialDatabaseService(),
-      notify: (input) => addNotification({ kind: "system", ...input }),
+      notify: (input) => addNotification({ kind: "system", ...input, showDesktop: false }),
       encryptSecret: (value) => briefVault.encrypt(value),
       decryptSecret: (value) => briefVault.decrypt(value),
       saveTask: async (input) => {
