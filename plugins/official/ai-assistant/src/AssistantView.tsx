@@ -10,6 +10,10 @@ import type {
   PluginComponentProps
 } from "@campusos/shared";
 import { AssistantModelFields } from "./AssistantModelFields";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AI_ASSISTANT_DEFAULT_BASE_URL,
   AI_ASSISTANT_DEFAULT_MODEL,
@@ -233,30 +237,30 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
             <AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} protocol={protocol} baseUrl={baseUrl} model={model} discoveredModels={discoveredModels} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); setDiscoveredModels([]); }} onProtocolChange={(value) => { setProtocol(value); setDiscoveredModels([]); }} onBaseUrlChange={(value) => { setBaseUrl(value); setDiscoveredModels([]); }} onModelChange={setModel} />
             <p className="assistant-privacy-copy">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
             <div className="assistant-actions">
-              <button className="primary-button" type="submit" disabled={!assistant || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save-settings" ? "正在保存" : "保存连接"}</button>
-              <button className="secondary-button" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试结构化能力"}</button>
-              <button className="secondary-button" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !baseUrl.trim() || busy !== null} onClick={() => void discoverModels()}>{busy === "discover-models" ? "正在获取模型" : "获取模型列表"}</button>
-              {settings?.configured ? <button className="text-button is-danger" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</button> : null}
+              <Button type="submit" disabled={!assistant || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save-settings" ? "正在保存" : "保存连接"}</Button>
+              <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试结构化能力"}</Button>
+              <Button variant="secondary" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !baseUrl.trim() || busy !== null} onClick={() => void discoverModels()}>{busy === "discover-models" ? "正在获取模型" : "获取模型列表"}</Button>
+              {settings?.configured ? <Button variant="ghost" className="text-destructive" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</Button> : null}
             </div>
           </form>
         </section>
       ) : (
         <div className="assistant-layout">
           <section className="assistant-input-panel" aria-label="消息输入">
-            <label className="assistant-label" htmlFor="assistant-message">粘贴消息</label>
-            <textarea id="assistant-message" className="assistant-message-input" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="粘贴需要安排到日程的群聊消息" />
+            <Label htmlFor="assistant-message">粘贴消息</Label>
+            <Textarea id="assistant-message" className="min-h-[220px]" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="粘贴需要安排到日程的群聊消息" />
             <div className="assistant-time-context">
               <div className="assistant-time-copy">
-                <label htmlFor="assistant-sent-at">消息发送时间</label>
+                <Label htmlFor="assistant-sent-at">消息发送时间</Label>
                 <p>消息里有“明天、下周五”时填写；没有相对日期可以留空。</p>
               </div>
               <div className="assistant-time-control">
-                <input id="assistant-sent-at" type="datetime-local" value={sourceSentAt} onChange={(event) => setSourceSentAt(event.target.value)} />
-                <button className="text-button" type="button" onClick={() => setSourceSentAt(toDateTimeInput(new Date().toISOString()))}>使用当前时间</button>
-                {sourceSentAt ? <button className="text-button" type="button" onClick={() => setSourceSentAt("")}>清除</button> : null}
+                <Input id="assistant-sent-at" type="datetime-local" value={sourceSentAt} onChange={(event) => setSourceSentAt(event.target.value)} />
+                <Button variant="ghost" type="button" onClick={() => setSourceSentAt(toDateTimeInput(new Date().toISOString()))}>使用当前时间</Button>
+                {sourceSentAt ? <Button variant="ghost" type="button" onClick={() => setSourceSentAt("")}>清除</Button> : null}
               </div>
             </div>
-            <div className="assistant-actions"><button className="primary-button" type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>{busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}</button>{!settings?.configured ? <button className="text-button" type="button" onClick={() => setSection("settings")}>先配置 AI 连接</button> : null}</div>
+            <div className="assistant-actions"><Button type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>{busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}</Button>{!settings?.configured ? <Button variant="ghost" type="button" onClick={() => setSection("settings")}>先配置 AI 连接</Button> : null}</div>
           </section>
           <section className="assistant-draft-panel" aria-label="提取结果">
             <header className="section-heading"><div><h2>待确认事项</h2></div>{extraction ? <span className="assistant-confidence">{extraction.intents.length} 个候选 · Schema {extraction.schemaVersion}</span> : null}</header>
@@ -274,7 +278,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
                   <div className="assistant-form-grid"><label><span>课程</span><input value={item.courseName} list="assistant-course-candidates" onChange={(event) => update(item.id, "courseName", event.target.value)} /></label><label><span>描述</span><input value={item.description} onChange={(event) => update(item.id, "description", event.target.value)} /></label></div>
                   {evidence.length ? <p className="assistant-evidence"><span>原文证据：</span><span className="assistant-evidence-list">{[...new Set(evidence)].map((text) => <mark key={text}>{text}</mark>)}</span></p> : null}
                   {original?.warnings.map((warning) => <p className="assistant-warning" key={warning}>{warning}</p>)}
-                  <div className="assistant-actions assistant-save-actions"><button className="primary-button" type="submit" disabled={!schedule || busy !== null}>{busy === "save-task" ? "正在写入" : item.intent === "create" ? "确认并写入" : item.intent === "update" ? "确认更新" : "确认取消"}</button></div>
+                  <div className="assistant-actions assistant-save-actions"><Button type="submit" disabled={!schedule || busy !== null}>{busy === "save-task" ? "正在写入" : item.intent === "create" ? "确认并写入" : item.intent === "update" ? "确认更新" : "确认取消"}</Button></div>
                 </form>
               </article>;
             })}</div>}

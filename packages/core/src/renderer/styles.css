@@ -4440,7 +4440,8 @@ input:focus-visible {
   padding-top: 18px;
 }
 
-.assistant-settings-form label {
+.assistant-settings-form label,
+.assistant-model-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4449,7 +4450,8 @@ input:focus-visible {
 }
 
 .assistant-settings-form input,
-.assistant-settings-form select {
+.assistant-settings-form select,
+.assistant-model-field select {
   width: 100%;
   min-height: 38px;
   border: 1px solid var(--line-strong);
@@ -4602,7 +4604,6 @@ input:focus-visible {
   gap: 10px;
 }
 
-.assistant-label,
 .assistant-draft-form label {
   display: flex;
   min-width: 0;
@@ -4612,7 +4613,6 @@ input:focus-visible {
   font-size: 0.76rem;
 }
 
-.assistant-message-input,
 .assistant-draft-form input,
 .assistant-draft-form textarea,
 .assistant-draft-form select {
@@ -4623,12 +4623,6 @@ input:focus-visible {
   background: var(--paper);
   color: var(--ink);
   padding: 8px 10px;
-}
-
-.assistant-message-input {
-  min-height: 220px;
-  resize: vertical;
-  line-height: 1.6;
 }
 
 .assistant-time-context {

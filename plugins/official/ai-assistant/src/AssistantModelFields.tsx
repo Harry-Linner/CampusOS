@@ -4,6 +4,8 @@ import {
   AI_ASSISTANT_MODEL_OPTIONS,
   AI_ASSISTANT_PROVIDER_OPTIONS
 } from "./prompt";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface AssistantModelFieldsProps {
   apiKey: string;
@@ -48,9 +50,10 @@ export const AssistantModelFields = ({
 
   return (
     <>
-      <label>
-        <span>服务商</span>
+      <div className="assistant-model-field">
+        <Label htmlFor="assistant-model-provider">服务商</Label>
         <select
+          id="assistant-model-provider"
           value={provider}
           onChange={(event) => {
             const next = AI_ASSISTANT_PROVIDER_OPTIONS.find((option) => option.value === event.target.value);
@@ -64,10 +67,11 @@ export const AssistantModelFields = ({
         >
           {AI_ASSISTANT_PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
-      </label>
-      <label>
-        <span>API Key</span>
-        <input
+      </div>
+      <div className="assistant-model-field">
+        <Label htmlFor="assistant-model-api-key">API Key</Label>
+        <Input
+          id="assistant-model-api-key"
           type="password"
           autoFocus={autoFocusApiKey}
           autoComplete="off"
@@ -75,25 +79,27 @@ export const AssistantModelFields = ({
           onChange={(event) => onApiKeyChange(event.target.value)}
           placeholder={configured ? "留空以使用已保存的密钥" : "输入当前服务商的 API Key"}
         />
-      </label>
-      <label>
-        <span>API 地址</span>
-        <input
+      </div>
+      <div className="assistant-model-field">
+        <Label htmlFor="assistant-model-base-url">API 地址</Label>
+        <Input
+          id="assistant-model-base-url"
           type="url"
           value={baseUrl}
           onChange={(event) => onBaseUrlChange(event.target.value)}
           placeholder="例如 https://api.example.com/v1"
         />
-      </label>
-      <label>
-        <span>协议</span>
-        <select disabled={provider !== "openai-compatible"} value={protocol} onChange={(event) => onProtocolChange(event.target.value as AiAssistantProtocol)}>
+      </div>
+      <div className="assistant-model-field">
+        <Label htmlFor="assistant-model-protocol">协议</Label>
+        <select id="assistant-model-protocol" disabled={provider !== "openai-compatible"} value={protocol} onChange={(event) => onProtocolChange(event.target.value as AiAssistantProtocol)}>
           {protocolOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
-      </label>
-      <label>
-        <span>模型</span>
+      </div>
+      <div className="assistant-model-field">
+        <Label htmlFor="assistant-model-select">模型</Label>
         <select
+          id="assistant-model-select"
           value={selectedModel}
           onChange={(event) => onModelChange(event.target.value === AI_ASSISTANT_CUSTOM_MODEL ? "" : event.target.value)}
         >
@@ -101,12 +107,12 @@ export const AssistantModelFields = ({
           {discoveredModels.filter((value) => !presets.some((option) => option.value === value)).map((value) => <option key={value} value={value}>{value} · 已发现</option>)}
           <option value={AI_ASSISTANT_CUSTOM_MODEL}>其他模型</option>
         </select>
-      </label>
+      </div>
       {selectedModel === AI_ASSISTANT_CUSTOM_MODEL ? (
-        <label>
-          <span>自定义模型名称</span>
-          <input value={model} onChange={(event) => onModelChange(event.target.value)} placeholder="填写服务商返回的模型 ID" />
-        </label>
+        <div className="assistant-model-field">
+          <Label htmlFor="assistant-model-custom">自定义模型名称</Label>
+          <Input id="assistant-model-custom" value={model} onChange={(event) => onModelChange(event.target.value)} placeholder="填写服务商返回的模型 ID" />
+        </div>
       ) : null}
     </>
   );

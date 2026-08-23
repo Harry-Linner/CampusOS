@@ -226,6 +226,14 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - 测试同步：`SettingsView.test.ts` 与 `workspace.e2e.ts` 的 `getByRole("checkbox")` → `getByRole("switch")`（组件语义变化，e2e `.uncheck()` → `.click()`）
 - 验收：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、e2e **7/7**、构建成功、三主题设置页截图（`.tmp/ui-capture/settings-migrated-*-{account,notifications}.png`，通知分类 4 个 Switch 就位）、CI 全绿
 
+**Assistant 批 — 已完成（2026-08-23）**：
+- `AssistantView.tsx`：`primary-button`/`secondary-button`/`text-button`（含 `is-danger` → `text-destructive`）→ shadcn `Button`；粘贴消息 `textarea` → shadcn `Textarea`（`min-h-[220px]` 保持原高度）；消息发送时间 `input` → shadcn `Input`；时间上下文两个 `text-button` → `Button` ghost
+- `AssistantModelFields.tsx`（跨对话框/视图共享）：`label>span+input` → shadcn `Label`+`Input`（`assistant-model-field` 容器 + `assistant-model-field select` 样式保持原生 select 观感）
+- `AssistantSetupDialog.tsx`：三个按钮 → shadcn `Button`（submit/secondary/ghost）
+- draft 编辑表单字段保留原生 `label>span+input`（`.assistant-draft-form` 内联统一样式，非全局原语），仅保存按钮换 `Button`
+- 删除 CSS：`.assistant-label`/`.assistant-message-input`（draft-form 部分保留）
+- 验证：typecheck/lint 零错误、全量 **486 passed / 1 skipped**、e2e **7/7**、三主题截图（`.tmp/ui-capture/assistant-migrated-*.png`，1 Textarea + 3 Button + 1 Input 就位）、CI 全绿
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e

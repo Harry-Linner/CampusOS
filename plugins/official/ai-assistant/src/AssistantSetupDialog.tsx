@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AiAssistantProvider, AiAssistantProtocol, PluginComponentProps } from "@campusos/shared";
 import { AssistantModelFields } from "./AssistantModelFields";
+import { Button } from "@/components/ui/button";
 import {
   AI_ASSISTANT_DEFAULT_BASE_URL,
   AI_ASSISTANT_DEFAULT_MODEL,
@@ -85,9 +86,9 @@ export const AssistantSetupDialog = ({ assistant, onConfigured, onDismiss }: Ass
           {feedback ? <p className="assistant-connection-result is-success" role="status">{feedback}</p> : null}
           <p className="assistant-privacy-copy">只有点击解析或连接测试时，当前请求才会发送给所选服务商；输入和粘贴本身不会上传。</p>
           <div className="assistant-actions">
-            <button className="primary-button" type="submit" disabled={!apiKey.trim() || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save" ? "正在保存" : "保存并开始使用"}</button>
-            <button className="secondary-button" type="button" disabled={!apiKey.trim() || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test" ? "正在测试" : "测试结构化能力"}</button>
-            <button className="text-button" type="button" disabled={busy !== null} onClick={onDismiss}>稍后配置</button>
+            <Button type="submit" disabled={!apiKey.trim() || !model.trim() || !baseUrl.trim() || busy !== null}>{busy === "save" ? "正在保存" : "保存并开始使用"}</Button>
+            <Button variant="secondary" type="button" disabled={!apiKey.trim() || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test" ? "正在测试" : "测试结构化能力"}</Button>
+            <Button variant="ghost" type="button" disabled={busy !== null} onClick={onDismiss}>稍后配置</Button>
           </div>
         </form>
       </section>
