@@ -209,6 +209,16 @@ dark / high-contrast：同一组 shadcn 变量用 `[data-theme="dark"]` / `[data
 - [ ] Settings → Assistant → Dashboard → Academic/Schedule → Materials → shell 分批迁移，替换即删
 - [ ] 每批三主题截图 + 全绿
 
+**Settings 批施工图（2026-08-23 盘点，待用户拍板启动）**：
+- 共享原语已齐备（18 个 shadcn 组件含 Button/Input/Switch/Label/Card/Dialog/Separator 等），无需先补组件
+- `SettingsView.tsx` 929 行、41 处 legacy 元素、0 个 shadcn 导入；逻辑零改动，只换表现层
+- 映射：按钮→shadcn Button（含 destructive）、输入→Input+Label、开关→Switch（早报已用同款）、分段单选（主题/关闭行为/培养层次）与左栏导航与 `details` 折叠保留自定义（shadcn 无对应）
+- **不套 Card**（雷点 #1：设置视图禁冗余卡片框），区块保持平铺+分隔线+标题层级
+- 删除 legacy CSS：`settings-*` + `academic-program-*` 约 280 行；`page-copy`/`quiet-empty-state`/`save-note`/`error-copy` 为共享类单独处理
+- 布局外壳 `page-shell`/`page-heading` 属 shell 阶段，本批保留
+- 待拍板：①分段控件保持现样式 vs 对齐早报 Button 变体；②左栏导航保持 vs ghost 按钮；③区块标题层级保持 h2 现状
+- 工作量：1 笔提交（重写组件 + 同提交删 CSS + 三主题截图 + 全量回归 + CI）
+
 ### Phase D（待做）
 
 - [ ] styles.css 归零、统一半径/阴影/动效、a11y 复查、截图基线入 e2e
