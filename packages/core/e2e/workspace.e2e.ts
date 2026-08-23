@@ -278,9 +278,8 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.keyboard.press("Escape");
 
     await page.getByLabel("应用设置").getByRole("button", { name: "设置" }).click();
-    await expect(page.getByRole("heading", { name: "更新" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "关于" })).toBeVisible();
-    await expect(page.getByText("MIT", { exact: true })).toBeVisible();
+    const settingsNav = page.getByLabel("设置分类");
+    await settingsNav.getByRole("button", { name: "通知" }).click();
     await page.getByRole("checkbox", { name: "启用桌面通知" }).uncheck();
     await page.getByRole("checkbox", { name: "启用成绩变化通知" }).uncheck();
     await page.getByRole("button", { name: "保存提醒" }).click();
@@ -297,6 +296,11 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     )).toMatchObject({
       gradeChangesEnabled: false
     });
+    await settingsNav.getByRole("button", { name: "更新" }).click();
+    await expect(page.getByRole("heading", { name: "更新" })).toBeVisible();
+    await settingsNav.getByRole("button", { name: "关于" }).click();
+    await expect(page.getByRole("heading", { name: "关于" })).toBeVisible();
+    await expect(page.getByText("MIT", { exact: true })).toBeVisible();
     await settleView(page);
     await expectNoRootOverflow(page);
     await page.screenshot({
