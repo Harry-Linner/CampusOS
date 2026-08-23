@@ -335,6 +335,13 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
       path: testInfo.outputPath("schedule-narrow.png"),
       fullPage: true
     });
+
+    // Regression: the fixed notification trigger must not cover the settings
+    // button once the rail collapses into a horizontal top bar at narrow widths.
+    await page.getByLabel("应用设置").getByRole("button", { name: "设置" }).click();
+    await expect(page.getByLabel("设置分类")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "账号" })).toBeVisible();
+    await expectNoRootOverflow(page);
   } finally {
     await app.close();
     await new Promise<void>((resolveClose, rejectClose) =>
