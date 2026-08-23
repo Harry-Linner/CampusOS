@@ -189,6 +189,7 @@ input:focus-visible {
 .primary-navigation {
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .utility-navigation {
@@ -239,6 +240,7 @@ input:focus-visible {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 34px clamp(24px, 4vw, 60px) 54px;
 }
 
@@ -306,6 +308,7 @@ input:focus-visible {
 .global-search-results {
   max-height: min(540px, calc(100dvh - 190px));
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 8px;
 }
 
@@ -2065,6 +2068,7 @@ input:focus-visible {
   gap: 0;
   margin: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 0;
   list-style: none;
   border-top: 1px solid var(--line);
@@ -3085,6 +3089,7 @@ input:focus-visible {
   max-height: 58vh;
   flex-direction: column;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .materials-course-option {
@@ -4527,6 +4532,7 @@ input:focus-visible {
   width: min(540px, 100%);
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  scrollbar-gutter: stable;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-md);
   background: var(--paper);
