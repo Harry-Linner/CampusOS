@@ -27,7 +27,10 @@ import {
   type CampusmodRegistrySnapshot,
   type InstalledCampusmodPackage
 } from "./campusmodPackageRegistry";
-import { preparePluginRuntimeStartupCache } from "./pluginRuntimeCache";
+import {
+  augmentStartupCacheWithOfficialPlugins,
+  preparePluginRuntimeStartupCache
+} from "./pluginRuntimeCache";
 import { createPluginUpdateService, type PluginUpdateCandidate } from "./pluginUpdateService";
 
 export interface PluginPackageMutationResult {
@@ -159,9 +162,17 @@ export const getOfficialPluginRuntimeService =
     const readRuntimeCache = async (): Promise<PluginRuntimeSnapshot | null> => {
       try {
         const parsed = JSON.parse(await readFile(runtimeCachePath, "utf8")) as unknown;
-        return isCachedRuntimeSnapshot(parsed)
-          ? preparePluginRuntimeStartupCache(parsed, officialRuntimeIds)
-          : null;
+        if (!isCachedRuntimeSnapshot(parsed)) return null;
+        // A cache written before an upgrade (which added a new official
+        // plugin) must not delay that plugin from appearing in the sidebar:
+        // append the missing official plugins with their default config
+        // instead of discarding the cache and forcing a slow full load.
+        return augmentStartupCacheWithOfficialPlugins(
+          parsed,
+          officialRuntimeIds,
+          officialRuntimeManifests,
+          corePluginCapabilities
+        );
       } catch (error) {
         if (isMissingFileError(error)) return null;
         return null;

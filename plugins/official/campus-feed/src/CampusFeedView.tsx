@@ -15,7 +15,6 @@ import type { CampusFeedScheduleCandidate, CampusFeedSnapshot, FeedItemRecord, F
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
@@ -203,88 +202,86 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
           <AlertDescription>校园资讯桥接不可用，请重启 CampusOS。</AlertDescription>
         </Alert>
       ) : tab === "settings" ? (
-        <div className="space-y-5">
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle className="text-lg leading-7">刷新频率</CardTitle>
-              <CardDescription>每个订阅源可单独设置抓取间隔，默认 1 小时。</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {sources.length === 0 ? <p className="text-sm text-muted-foreground">还没有订阅任何信息源。</p> : sources.map((source) => (
-                <div key={source.id} className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium leading-6">{source.name}</p>
-                    <p className="text-xs leading-5 text-muted-foreground">间隔 {source.intervalMinutes} 分钟</p>
+        <div className="settings-panel">
+          <section className="settings-section" aria-labelledby="feed-interval-heading">
+            <header className="settings-section-heading"><h2 id="feed-interval-heading">刷新频率</h2></header>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">每个订阅源可单独设置抓取间隔，默认 1 小时。</p>
+            {sources.length === 0 ? <p className="text-sm text-muted-foreground">还没有订阅任何信息源。</p> : (
+              <div className="divide-y divide-border/60">
+                {sources.map((source) => (
+                  <div key={source.id} className="flex items-center justify-between gap-4 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium leading-6">{source.name}</p>
+                      <p className="text-xs leading-5 text-muted-foreground">间隔 {source.intervalMinutes} 分钟</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {[30, 60, 180, 720].map((minutes) => (
+                        <Button
+                          key={minutes}
+                          size="sm"
+                          variant={source.intervalMinutes === minutes ? "default" : "outline"}
+                          onClick={() => void feed.updateSource(source.id, { intervalMinutes: minutes }).catch((cause) => toast.error("操作失败", { description: cause instanceof Error ? cause.message : "无法更新间隔。" }))}
+                        >
+                          {minutes < 60 ? `${minutes}分` : `${minutes / 60}时`}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {[30, 60, 180, 720].map((minutes) => (
-                      <Button
-                        key={minutes}
-                        size="sm"
-                        variant={source.intervalMinutes === minutes ? "default" : "outline"}
-                        onClick={() => void feed.updateSource(source.id, { intervalMinutes: minutes }).catch((cause) => toast.error("操作失败", { description: cause instanceof Error ? cause.message : "无法更新间隔。" }))}
-                      >
-                        {minutes < 60 ? `${minutes}分` : `${minutes / 60}时`}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle className="text-lg leading-7">AI 处理</CardTitle>
-              <CardDescription>把有明确时间的通知（评选答辩、报名截止、活动讲座）转成日程条目。校园资讯独立使用这里的服务商与模型，不读取 AI 助手的配置。</CardDescription>
-            </CardHeader>
-            <CardContent><CampusFeedAiSettings feed={feed} /></CardContent>
-          </Card>
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle className="text-lg leading-7">新内容提醒</CardTitle>
-              <CardDescription>新抓取到的通知会进入系统通知与应用内通知中心，可在系统设置中关闭。</CardDescription>
-            </CardHeader>
-          </Card>
+                ))}
+              </div>
+            )}
+          </section>
+          <section className="settings-section" aria-labelledby="feed-ai-heading">
+            <header className="settings-section-heading"><h2 id="feed-ai-heading">AI 处理</h2></header>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">把有明确时间的通知（评选答辩、报名截止、活动讲座）转成日程条目。校园资讯独立使用这里的服务商与模型，不读取 AI 助手的配置。</p>
+            <CampusFeedAiSettings feed={feed} />
+          </section>
+          <section className="settings-section" aria-labelledby="feed-notify-heading">
+            <header className="settings-section-heading"><h2 id="feed-notify-heading">新内容提醒</h2></header>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">新抓取到的通知会进入系统通知与应用内通知中心，可在系统设置中关闭。</p>
+          </section>
         </div>
       ) : tab === "sources" ? (
-        <div className="space-y-5">
-          <Card className="shadow-none">
-            <CardHeader>
-              <CardTitle className="text-lg leading-7">我的订阅</CardTitle>
-              <CardDescription>{enabledSources.length} 个订阅源已启用，共 {sources.length} 个可用。</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {sources.length === 0 ? (
-                <div className="flex flex-col items-center gap-4 px-6 py-14 text-center">
-                  <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Rss className="size-5" aria-hidden="true" /></div>
-                  <div>
-                    <h2 className="font-semibold leading-7">还没有订阅信息源</h2>
-                    <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">首次使用会按你的学院身份推荐订阅源，之后可以随时自由增删。</p>
-                  </div>
+        <div className="settings-panel">
+          <section className="settings-section" aria-labelledby="feed-sources-heading">
+            <header className="settings-section-heading">
+              <h2 id="feed-sources-heading">我的订阅</h2>
+              <span className="text-xs text-muted-foreground">{enabledSources.length} 个已启用 · 共 {sources.length} 个</span>
+            </header>
+            {sources.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 px-6 py-14 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Rss className="size-5" aria-hidden="true" /></div>
+                <div>
+                  <h2 className="font-semibold leading-7">还没有订阅信息源</h2>
+                  <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">首次使用会按你的学院身份推荐订阅源，之后可以随时自由增删。</p>
                 </div>
-              ) : sources.map((source) => (
-                <div key={source.id} className="flex items-center justify-between gap-4 rounded-lg border border-border/70 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-medium leading-6">{source.name}</p>
-                      <Badge variant="secondary">{categoryLabel[source.category]}</Badge>
-                      {source.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+              </div>
+            ) : (
+              <div className="divide-y divide-border/60">
+                {sources.map((source) => (
+                  <div key={source.id} className="flex items-center justify-between gap-4 py-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium leading-6">{source.name}</p>
+                        <Badge variant="secondary">{categoryLabel[source.category]}</Badge>
+                        {source.tags.map((tag) => <Badge key={tag} variant="outline">{tag}</Badge>)}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs leading-5 text-muted-foreground">{source.listUrl}</p>
                     </div>
-                    <p className="mt-0.5 truncate text-xs leading-5 text-muted-foreground">{source.listUrl}</p>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Switch checked={source.enabled} onCheckedChange={() => void toggleSource(source)} aria-label={`启用 ${source.name}`} />
+                      <Button size="icon" variant="ghost" onClick={() => void removeSource(source)} aria-label={`取消订阅 ${source.name}`}><Trash2 className="size-4" aria-hidden="true" /></Button>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Switch checked={source.enabled} onCheckedChange={() => void toggleSource(source)} aria-label={`启用 ${source.name}`} />
-                    <Button size="icon" variant="ghost" onClick={() => void removeSource(source)} aria-label={`取消订阅 ${source.name}`}><Trash2 className="size-4" aria-hidden="true" /></Button>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-          <p className="flex items-center gap-2 px-1 text-xs leading-5 text-muted-foreground"><Plus className="size-3.5" aria-hidden="true" />更多信息源（含各学院院网）将在后续版本分批加入。</p>
+                ))}
+              </div>
+            )}
+            <p className="flex items-center gap-2 text-xs leading-5 text-muted-foreground"><Plus className="size-3.5" aria-hidden="true" />更多信息源（含各学院院网）将在后续版本分批加入。</p>
+          </section>
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-card/70 p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex flex-col gap-3 pb-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-semibold leading-8">最新通知</h2>
@@ -303,41 +300,37 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
           {error ? <Alert variant="destructive"><AlertCircle className="size-4" aria-hidden="true" /><AlertTitle>部分信息源没有更新</AlertTitle><AlertDescription className="flex flex-wrap items-center gap-3"><span>{error}</span><Button size="sm" variant="outline" onClick={() => { setError(null); void refreshAll(); }}>重试</Button></AlertDescription></Alert> : null}
 
           {sources.length === 0 ? (
-            <Card className="border-dashed shadow-none">
-              <CardContent className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Rss className="size-5" aria-hidden="true" /></div>
-                <div>
-                  <h2 className="font-semibold leading-7">还没有订阅信息源</h2>
-                  <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">前往「订阅」页管理信息源，或直接点击刷新开始抓取默认订阅。</p>
-                </div>
-                <Button onClick={() => void refreshAll()} disabled={loading}><RefreshCw aria-hidden="true" />抓取默认订阅</Button>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Rss className="size-5" aria-hidden="true" /></div>
+              <div>
+                <h2 className="font-semibold leading-7">还没有订阅信息源</h2>
+                <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">前往「订阅」页管理信息源，或直接点击刷新开始抓取默认订阅。</p>
+              </div>
+              <Button onClick={() => void refreshAll()} disabled={loading}><RefreshCw aria-hidden="true" />抓取默认订阅</Button>
+            </div>
           ) : loading && items.length === 0 ? (
-            <div className="space-y-3" role="status" aria-live="polite">
-              {[0, 1, 2].map((index) => <Card key={index} className="shadow-none"><CardHeader><Skeleton className="h-5 w-2/3" /></CardHeader><CardContent><Skeleton className="h-4 w-1/3" /></CardContent></Card>)}
+            <div className="space-y-4" role="status" aria-live="polite">
+              {[0, 1, 2].map((index) => <div key={index} className="space-y-2"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/3" /></div>)}
             </div>
           ) : items.length === 0 ? (
-            <Card className="shadow-none"><CardContent className="py-14 text-center text-sm text-muted-foreground">该订阅源暂无新内容。</CardContent></Card>
+            <p className="py-14 text-center text-sm text-muted-foreground">该订阅源暂无新内容。</p>
           ) : (
-            <div className="space-y-5">
+            <div>
               {enabledSources.map((source) => {
                 const sourceItems = items.filter((item) => item.sourceId === source.id);
                 if (sourceItems.length === 0) return null;
                 return (
-                  <Card key={source.id} className="overflow-hidden shadow-sm">
-                    <CardHeader className="border-b border-border/60 bg-muted/20 px-5 py-4 sm:px-6">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-lg leading-7">{source.name}</CardTitle>
-                          <CardDescription className="mt-1">{sourceItems.length} 条通知</CardDescription>
-                        </div>
-                        <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
+                  <section key={source.id} aria-labelledby={`feed-source-${source.id}-heading`} className="border-t border-border/60 pt-5 pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h2 id={`feed-source-${source.id}-heading`} className="text-lg font-semibold leading-7">{source.name}</h2>
+                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{sourceItems.length} 条通知</p>
                       </div>
-                    </CardHeader>
-                    <CardContent className="divide-y divide-border/60 px-5 sm:px-6">
+                      <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
+                    </div>
+                    <div className="divide-y divide-border/60">
                       {sourceItems.map((item) => (
-                        <article key={item.id} className={`py-4 first:pt-5 last:pb-5 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
+                        <article key={item.id} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <h3 className="text-base font-semibold leading-7 text-foreground">{item.title}</h3>
@@ -354,8 +347,8 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                           </div>
                         </article>
                       ))}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </section>
                 );
               })}
             </div>
@@ -372,9 +365,9 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
           {scheduleCandidates.length === 0 ? (
             <p className="py-6 text-center text-sm leading-6 text-muted-foreground">这条通知里没有识别到明确时间的事件，没有可加入的日程。</p>
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-border/60">
               {scheduleCandidates.map((candidate, index) => (
-                <div key={`${candidate.itemId}-${index}`} className="rounded-lg border border-border/70 px-4 py-3">
+                <div key={`${candidate.itemId}-${index}`} className="py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium leading-6">{candidate.title}</p>
                     <Badge variant="secondary">{candidate.type === "deadline" ? "截止" : "活动"}</Badge>
