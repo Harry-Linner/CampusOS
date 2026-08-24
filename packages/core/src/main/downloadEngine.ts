@@ -7,6 +7,7 @@ import type {
   CampusDownloadTask,
   CampusSourceId
 } from "@campusos/shared";
+import { JobRegistry, type JobStatus } from "./jobRegistry";
 
 export interface DownloadQueueItem {
   id: string;
@@ -52,11 +53,6 @@ export type DownloadResponseResolver = (
   request: DownloadResponseRequest
 ) => Promise<Response>;
 
-interface ActiveDownload {
-  item: DownloadQueueItem;
-  controller: AbortController;
-}
-
 const DEFAULT_MAX_CONCURRENT = 3;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -84,24 +80,40 @@ const getHttpUrl = (value: string): URL => {
   return url;
 };
 
+const mapJobStatus = (status: JobStatus): CampusDownloadStatus => {
+  switch (status) {
+    case "queued":
+      return "queued";
+    case "running":
+      return "syncing";
+    case "paused":
+      return "paused";
+    case "completed":
+      return "ready";
+    case "failed":
+      return "failed";
+    case "canceled":
+      return "failed";
+  }
+};
+
 export class DownloadEngine {
-  private queue: DownloadQueueItem[] = [];
-  private active = new Map<string, ActiveDownload>();
-  private runningOperations = 0;
-  private maxConcurrent: number;
+  private registry: JobRegistry;
+  private items = new Map<string, DownloadQueueItem>();
   private downloadRoot: string;
   private requestTimeoutMs: number;
   private persistencePath: string;
   private onChanged: (() => void) | null;
   private queuePersistence: DownloadQueuePersistence | null;
   private resolveResponse: DownloadResponseResolver;
+  private persistChain: Promise<void> = Promise.resolve();
 
   constructor(options: DownloadEngineOptions = {}) {
     if (!Number.isInteger(options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT) ||
       (options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT) < 1) {
       throw new Error("下载并发数必须是正整数。");
     }
-    this.maxConcurrent = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
+    const maxConcurrent = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
     const userDataPath =
       options.downloadRoot && options.persistencePath
         ? null
@@ -120,18 +132,29 @@ export class DownloadEngine {
         signal: request.signal,
         headers: request.headers
       }));
+    this.registry = new JobRegistry({
+      maxConcurrent,
+      onChanged: () => {
+        this.syncFromRegistry();
+        this.onChanged?.();
+      },
+      onFinalize: (job) => {
+        void this.persist().catch(() => undefined);
+        void job;
+      }
+    });
   }
 
   get pendingCount(): number {
-    return this.queue.filter((item) => item.status === "queued").length;
+    return this.registry.pendingCount;
   }
 
   get activeCount(): number {
-    return this.active.size;
+    return this.registry.activeCount;
   }
 
   get allTasks(): readonly DownloadQueueItem[] {
-    return [...this.queue];
+    return [...this.items.values()];
   }
 
   async enqueue(task: {
@@ -149,7 +172,7 @@ export class DownloadEngine {
     const courseName = safePathSegment(task.courseName, "课程名");
     const targetPath = join(this.downloadRoot, semester, courseName, fileName);
 
-    const existing = this.queue.find(
+    const existing = [...this.items.values()].find(
       (item) => item.url === task.url && item.targetPath === targetPath
     );
     if (existing) {
@@ -182,7 +205,7 @@ export class DownloadEngine {
       await rm(existing.temporaryPath, { force: true });
       await this.persist();
       this.onChanged?.();
-      this.drain();
+      this.schedule(existing);
       return existing;
     }
 
@@ -205,41 +228,61 @@ export class DownloadEngine {
       updatedAt: now
     };
 
-    this.queue.push(item);
+    this.items.set(item.id, item);
     await this.persist();
     this.onChanged?.();
-    this.drain();
+    this.schedule(item);
     return item;
   }
 
+  private jobIdFor(itemId: string): string | null {
+    return (
+      this.registry
+        .allJobs()
+        .find((job) => job.metadata === itemId)?.id ?? null
+    );
+  }
+
   async pause(id: string): Promise<boolean> {
-    const item = this.queue.find((candidate) => candidate.id === id);
+    const item = this.items.get(id);
     if (!item || item.status === "ready" || item.status === "paused") return false;
+    const jobId = this.jobIdFor(id);
+    if (jobId === null || !this.registry.pause(jobId)) return false;
     item.status = "paused";
     item.updatedAt = new Date().toISOString();
-    this.active.get(id)?.controller.abort();
     await this.persist();
     this.onChanged?.();
     return true;
   }
 
   async resume(id: string): Promise<boolean> {
-    const item = this.queue.find((candidate) => candidate.id === id);
+    const item = this.items.get(id);
     if (!item || (item.status !== "paused" && item.status !== "failed")) return false;
+    const jobId = this.jobIdFor(id);
+    if (jobId === null || !this.registry.resume(jobId)) {
+      // 终态（无对应 job 或 job 已结束）→ 重新排队
+      item.status = "queued";
+      item.failureMessage = undefined;
+      item.updatedAt = new Date().toISOString();
+      this.schedule(item);
+      await this.persist();
+      this.onChanged?.();
+      return true;
+    }
     item.status = "queued";
     item.failureMessage = undefined;
     item.updatedAt = new Date().toISOString();
     await this.persist();
     this.onChanged?.();
-    this.drain();
     return true;
   }
 
   async cancel(id: string): Promise<boolean> {
-    const itemIndex = this.queue.findIndex((item) => item.id === id);
-    if (itemIndex < 0) return false;
-    const [item] = this.queue.splice(itemIndex, 1);
-    this.active.get(id)?.controller.abort();
+    const item = this.items.get(id);
+    if (!item) return false;
+    const jobId = this.jobIdFor(id);
+    if (jobId !== null) this.registry.cancel(jobId);
+    this.items.delete(id);
     await rm(item.temporaryPath, { force: true });
     await this.persist();
     this.onChanged?.();
@@ -247,7 +290,7 @@ export class DownloadEngine {
   }
 
   getSummary(): CampusDownloadTask[] {
-    return this.queue.map((item) => ({
+    return [...this.items.values()].map((item) => ({
       id: item.id,
       title: item.title,
       courseName: item.courseName,
@@ -263,102 +306,120 @@ export class DownloadEngine {
 
   async loadPersisted(): Promise<void> {
     if (this.queuePersistence) {
-      this.queue = (await this.queuePersistence.load()).map((item) => ({
-        ...item,
-        temporaryPath: item.temporaryPath ?? `${item.targetPath}.part`,
-        status: item.status === "syncing" ? "queued" : item.status
-      }));
-      this.drain();
-      return;
-    }
-    try {
-      const parsed = JSON.parse(
-        await readFile(this.persistencePath, "utf8")
-      ) as { queue?: DownloadQueueItem[] };
-      if (Array.isArray(parsed.queue)) {
-        this.queue = parsed.queue.map((item) => ({
-          ...item,
-          temporaryPath: item.temporaryPath ?? `${item.targetPath}.part`,
-          status: item.status === "syncing" ? "queued" : item.status
-        }));
+      this.items = new Map(
+        (await this.queuePersistence.load()).map((item) => [
+          item.id,
+          {
+            ...item,
+            temporaryPath: item.temporaryPath ?? `${item.targetPath}.part`,
+            status: item.status === "syncing" ? "queued" : item.status
+          }
+        ])
+      );
+    } else {
+      try {
+        const parsed = JSON.parse(
+          await readFile(this.persistencePath, "utf8")
+        ) as { queue?: DownloadQueueItem[] };
+        if (Array.isArray(parsed.queue)) {
+          this.items = new Map(
+            parsed.queue.map((item) => [
+              item.id,
+              {
+                ...item,
+                temporaryPath: item.temporaryPath ?? `${item.targetPath}.part`,
+                status: item.status === "syncing" ? "queued" : item.status
+              }
+            ])
+          );
+        }
+      } catch (error) {
+        if (
+          typeof error !== "object" ||
+          error === null ||
+          !("code" in error) ||
+          error.code !== "ENOENT"
+        ) {
+          throw error;
+        }
       }
-    } catch (error) {
-      if (
-        typeof error !== "object" ||
-        error === null ||
-        !("code" in error) ||
-        error.code !== "ENOENT"
-      ) {
-        throw error;
-      }
     }
-    this.drain();
+    for (const item of this.items.values()) {
+      if (item.status === "queued") this.schedule(item);
+    }
   }
 
   async waitForIdle(): Promise<void> {
-    while (
-      this.runningOperations > 0 ||
-      this.queue.some((item) => item.status === "queued" || item.status === "syncing")
-    ) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
-    }
+    await this.registry.waitForIdle();
   }
 
   async persist(): Promise<void> {
-    if (this.queuePersistence) {
-      await this.queuePersistence.save(this.queue);
-      return;
-    }
-    await mkdir(dirname(this.persistencePath), { recursive: true });
-    const temporaryPath = `${this.persistencePath}.${randomUUID()}.tmp`;
-    await writeFile(
-      temporaryPath,
-      JSON.stringify({ queue: this.queue }),
-      "utf8"
-    );
-    await rename(temporaryPath, this.persistencePath);
-  }
-
-  private drain(): void {
-    while (
-      this.active.size < this.maxConcurrent &&
-      this.queue.some((item) => item.status === "queued")
-    ) {
-      const item = this.queue.find((candidate) => candidate.status === "queued");
-      if (!item) return;
-      item.status = "syncing";
-      item.updatedAt = new Date().toISOString();
-      this.runningOperations += 1;
-      void this.downloadOne(item)
-        .catch(() => undefined)
-        .finally(() => {
-          this.runningOperations -= 1;
-        });
-    }
-  }
-
-  private async downloadOne(item: DownloadQueueItem): Promise<void> {
-    const controller = new AbortController();
-    this.active.set(item.id, { item, controller });
-    try {
-      await this.doDownload(item, controller);
-    } catch (error) {
-      const queuedForRestart =
-        controller.signal.aborted && item.status === "queued";
-      if (item.status !== "paused" && !queuedForRestart) {
-        item.status = "failed";
-        item.failureMessage = error instanceof Error ? error.message : "下载失败。";
-        item.updatedAt = new Date().toISOString();
+    // 串行化持久化：onFinalize 的异步 persist 与主动调用可能并发，
+    // 并发写临时文件后 rename 会相互覆盖（EPERM）。
+    const operation = this.persistChain.then(async () => {
+      if (this.queuePersistence) {
+        await this.queuePersistence.save([...this.items.values()]);
+        return;
       }
-    } finally {
-      this.active.delete(item.id);
-      await this.persist();
-      this.onChanged?.();
-      this.drain();
+      await mkdir(dirname(this.persistencePath), { recursive: true });
+      const temporaryPath = `${this.persistencePath}.${randomUUID()}.tmp`;
+      await writeFile(
+        temporaryPath,
+        JSON.stringify({ queue: [...this.items.values()] }),
+        "utf8"
+      );
+      await rename(temporaryPath, this.persistencePath);
+    });
+    this.persistChain = operation.then(
+      () => undefined,
+      () => undefined
+    );
+    await operation;
+  }
+
+  private schedule(item: DownloadQueueItem): void {
+    if (item.status === "ready" || item.status === "paused") return;
+    this.registry.enqueue("download", {
+      metadata: item.id,
+      run: async (record, signal) => {
+        const current = this.items.get(record.metadata as string);
+        if (!current) return;
+        current.status = "syncing";
+        try {
+          await this.doDownload(current, signal);
+        } finally {
+          // 确保 waitForIdle 返回前最终状态已持久化（避免与清理竞态）。
+          await this.persist().catch(() => undefined);
+        }
+      }
+    });
+  }
+
+  private syncFromRegistry(): void {
+    for (const job of this.registry.allJobs()) {
+      const item = this.items.get(job.metadata as string);
+      if (!item) continue;
+      item.status = mapJobStatus(job.status);
+      item.updatedAt = job.updatedAt;
+      item.failureMessage = job.failureMessage;
     }
   }
 
   private async doDownload(
+    item: DownloadQueueItem,
+    jobSignal: AbortSignal
+  ): Promise<void> {
+    const controller = new AbortController();
+    const onAbort = (): void => controller.abort();
+    jobSignal.addEventListener("abort", onAbort, { once: true });
+    try {
+      await this.downloadStream(item, controller);
+    } finally {
+      jobSignal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  private async downloadStream(
     item: DownloadQueueItem,
     controller: AbortController
   ): Promise<void> {
