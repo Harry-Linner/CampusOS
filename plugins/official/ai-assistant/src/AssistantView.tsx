@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
+  AiAssistantAcademicQueryResult,
   AiAssistantExtractionIntent,
   AiAssistantExtractionResult,
   AiAssistantProvider,
@@ -131,6 +132,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
   const [message, setMessage] = useState("");
   const [sourceSentAt, setSourceSentAt] = useState("");
   const [extraction, setExtraction] = useState<AiAssistantExtractionResult | null>(null);
+  const [academicResult, setAcademicResult] = useState<AiAssistantAcademicQueryResult | null>(null);
   const [editable, setEditable] = useState<EditableIntent[]>([]);
   const [settings, setSettings] = useState<AiAssistantSettingsRecord | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -160,8 +162,13 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
     setBusy("parse"); setError(null); setNotice(null);
     try {
       const next = await assistant.parseMessage({ text: message, courseNames, now: new Date().toISOString(), source: { app: "manual", sentAt: sourceSentAt ? new Date(`${sourceSentAt}:00+08:00`).toISOString() : null } });
-      setExtraction(next); setEditable(next.intents.map(toEditable));
-      if (next.intents.length === 0) setNotice("没有识别出可确认的日程事项。");
+      if (next.intent === "academic-query") {
+        setAcademicResult(next); setExtraction(null); setEditable([]);
+        if (next.degraded) setNotice("数据问答模式：没有可查询的本地学业数据。");
+      } else {
+        setExtraction(next); setEditable(next.intents.map(toEditable)); setAcademicResult(null);
+        if (next.intents.length === 0) setNotice("没有识别出可确认的日程事项。");
+      }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "AI 解析失败。"); } finally { setBusy(null); }
   };
 
@@ -192,7 +199,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
   const clearSettings = async (): Promise<void> => {
     if (!assistant) return;
     setBusy("clear-settings"); setError(null); setNotice(null);
-    try { const record = await assistant.clearSettings(); setSettings(record); setProvider(record.provider); setProtocol(record.protocol); setBaseUrl(record.baseUrl); setModel(record.model); setApiKey(""); setExtraction(null); setEditable([]); setNotice("已清除 AI 连接密钥。"); }
+    try { const record = await assistant.clearSettings(); setSettings(record); setProvider(record.provider); setProtocol(record.protocol); setBaseUrl(record.baseUrl); setModel(record.model); setApiKey(""); setExtraction(null); setEditable([]); setAcademicResult(null); setNotice("已清除 AI 连接密钥。"); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "连接清除失败。"); }
     finally { setBusy(null); }
   };
@@ -267,9 +274,17 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
             <div className="assistant-actions"><Button type="button" disabled={!assistant || !settings?.configured || !message.trim() || busy !== null} onClick={() => void parse()}>{busy === "parse" ? "AI 正在解析" : "交给 AI 解析"}</Button>{!settings?.configured ? <Button variant="ghost" type="button" onClick={() => setSection("settings")}>先配置 AI 连接</Button> : null}</div>
           </section>
           <section className="assistant-draft-panel" aria-label="提取结果">
-            <header className="section-heading"><div><h2>待确认事项</h2></div>{extraction ? <span className="assistant-confidence">{extraction.intents.length} 个候选 · Schema {extraction.schemaVersion}</span> : null}</header>
-            {extraction?.unresolvedQuestions.length ? <div className="assistant-warning-block"><strong>需要补充</strong>{extraction.unresolvedQuestions.map((question) => <p key={question}>{question}</p>)}</div> : null}
-            {!extraction ? <div className="quiet-empty-state">AI 返回的多个候选事项会显示在这里，确认后才会写入日程。</div> : editable.length === 0 ? <div className="quiet-empty-state">没有识别出可确认的日程事项。</div> : <div className="assistant-candidate-list">{editable.map((item) => {
+            <header className="section-heading"><div><h2>{academicResult ? "数据问答" : "待确认事项"}</h2></div>{academicResult ? <span className="assistant-mode-badge">数据问答 · 只读本地数据</span> : extraction ? <span className="assistant-confidence">{extraction.intents.length} 个候选 · Schema {extraction.schemaVersion}</span> : null}</header>
+            {academicResult ? (
+              <div className="assistant-academic-result">
+                {academicResult.degraded ? <p className="assistant-academic-degraded" role="status">{academicResult.answer}</p> : <>
+                  <p className="assistant-academic-answer">{academicResult.answer}</p>
+                  {academicResult.evidence.length ? <div className="assistant-evidence-block"><strong className="assistant-evidence-title">证据引用</strong><ul className="assistant-evidence-sources">{academicResult.evidence.map((item) => <li key={item.capability}><span className="assistant-evidence-source">{item.label}<time dateTime={item.capturedAt}> · {new Date(item.capturedAt).toLocaleString("zh-CN", { hour12: false })}</time></span>{item.values?.length ? <span className="assistant-evidence-list">{item.values.map((value) => <mark key={value}>{value}</mark>)}</span> : null}</li>)}</ul></div> : null}
+                </>}
+                <p className="assistant-quiet-copy">数据问答只读取本地课表、成绩、考试与日程；可以继续追问，也可以问普通日程问题切回通用模式。</p>
+              </div>
+            ) : extraction?.unresolvedQuestions.length ? <div className="assistant-warning-block"><strong>需要补充</strong>{extraction.unresolvedQuestions.map((question) => <p key={question}>{question}</p>)}</div> : null}
+            {!extraction && !academicResult ? <div className="quiet-empty-state">AI 返回的多个候选事项会显示在这里，确认后才会写入日程。</div> : extraction && editable.length === 0 ? <div className="quiet-empty-state">没有识别出可确认的日程事项。</div> : extraction ? <div className="assistant-candidate-list">{editable.map((item) => {
               const original = extraction.intents.find((candidate) => candidate.id === item.id);
               const evidence = original ? [original.title, original.description, original.deadlineAt, original.startAt, original.endAt, original.durationMinutes, original.location, original.courseName].flatMap((field) => field.evidence ? [field.evidence.text] : []) : [];
               return <article className="assistant-candidate" key={item.id}>
@@ -285,7 +300,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
                   <div className="assistant-actions assistant-save-actions"><Button type="submit" disabled={!schedule || busy !== null}>{busy === "save-task" ? "正在写入" : item.intent === "create" ? "确认并写入" : item.intent === "update" ? "确认更新" : "确认取消"}</Button></div>
                 </form>
               </article>;
-            })}</div>}
+            })}</div> : null}
             <datalist id="assistant-course-candidates">{courseNames.map((courseName) => <option value={courseName} key={courseName} />)}</datalist>
           </section>
         </div>

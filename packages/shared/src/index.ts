@@ -9,6 +9,7 @@ import type {
   AiAssistantModelDiscoveryInput,
   AiAssistantModelDiscoveryResult,
   AiAssistantParseInput,
+  AiAssistantParseResult,
   AiAssistantSettingsInput,
   AiAssistantSettingsRecord,
   CalendarExportInput,
@@ -182,7 +183,7 @@ export interface PluginComponentProps {
     saveSettings: (input: AiAssistantSettingsInput) => Promise<AiAssistantSettingsRecord>;
     clearSettings: () => Promise<AiAssistantSettingsRecord>;
     testConnection: (input: AiAssistantConnectionTestInput) => Promise<AiAssistantConnectionTestResult>;
-    parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantExtractionResult>;
+    parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantParseResult>;
     discoverModels: (input: AiAssistantModelDiscoveryInput) => Promise<AiAssistantModelDiscoveryResult>;
   };
   brief?: BriefBridge;

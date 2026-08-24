@@ -1,10 +1,10 @@
 import type {
-  AiAssistantExtractionResult,
   AiAssistantConnectionTestInput,
   AiAssistantConnectionTestResult,
   AiAssistantModelDiscoveryInput,
   AiAssistantModelDiscoveryResult,
   AiAssistantParseInput,
+  AiAssistantParseResult,
   AiAssistantSettingsInput,
   AiAssistantSettingsRecord
 } from "@campusos/shared";
@@ -14,6 +14,6 @@ export interface AiAssistantBridge {
   saveSettings: (input: AiAssistantSettingsInput) => Promise<AiAssistantSettingsRecord>;
   clearSettings: () => Promise<AiAssistantSettingsRecord>;
   testConnection: (input: AiAssistantConnectionTestInput) => Promise<AiAssistantConnectionTestResult>;
-  parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantExtractionResult>;
+  parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantParseResult>;
   discoverModels: (input: AiAssistantModelDiscoveryInput) => Promise<AiAssistantModelDiscoveryResult>;
 }

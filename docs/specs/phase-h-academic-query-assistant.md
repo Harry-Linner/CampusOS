@@ -20,13 +20,13 @@ AI 助手能回答本地学业数据的自然语言问题（"我下周哪天有�
 
 ## 2. 验收要点
 
-- [ ] 学业类问题 → 自动切数据问答模式，返回结构化答案 + 证据（来源能力、抓取时间、具体数值）
-- [ ] 非学业问题 → 保持通用对话（回归）
-- [ ] 只读：问答后 capability/任务/设置均无变化（断言）
-- [ ] 最小上下文：请求载荷只含答案所需字段（对 provider 的载荷有界；测试断言不含全量课表/成绩）
-- [ ] prompt-injection：恶意注入不越权（沿用既有 AI 助手注入测试矩阵）
-- [ ] 无数据/未登录时给出明确降级提示，不伪造成功
-- [ ] UI 遵循 ai-frontend-lessons（模式标识与证据块无装饰框/对齐/溢出）
+- [x] 学业类问题 → 自动切数据问答模式，返回结构化答案 + 证据（来源能力、抓取时间、具体数值）
+- [x] 非学业问题 → 保持通用对话（回归）
+- [x] 只读：问答后 capability/任务/设置均无变化（断言；读取器契约不含写接口）
+- [x] 最小上下文：请求载荷只含答案所需字段（对 provider 的载荷有界；测试断言不含全量课表/成绩）
+- [x] prompt-injection：恶意注入不越权（沿用既有 AI 助手注入测试矩阵）
+- [x] 无数据/未登录时给出明确降级提示，不伪造成功
+- [x] UI 遵循 ai-frontend-lessons（模式标识与证据块无装饰框/对齐/溢出）
 
 ## 3. 设计
 
@@ -62,8 +62,8 @@ AI 助手能回答本地学业数据的自然语言问题（"我下周哪天有�
 
 | 项 | 结果 |
 |---|---|
-| 正式链路（parse→查询→生成→证据） |  |
-| 用户可见行为（模式切换/证据块） |  |
-| 错误边界（无数据/注入/降级） |  |
-| 针对性测试 |  |
-| UI 规避清单（截图验收） |  |
+| 正式链路（parse→查询→生成→证据） | ✅ `parseMessage` 先走规则分类（`classifyAcademicIntentByRules`），命中 `academic-query` 直接进入 `runAcademicQuery`；未命中则走既有多意图抽取，抽取信封新增 `intent` 字段（schema v3），模型结构化判定为学业提问时同样转入数据问答处理器。处理器通过注入的 `AcademicQueryDataReader`（`loadVerifiedStudentId` + `readCapability`）读取 timetable/grades/exams/calendar-events 四个能力，构造最小上下文（仅问题相关字段，截断到上限），调用 provider 结构化生成（`campus_academic_query_v1` schema）→ 校验 `{ answer, evidence }` → 返回证据引用。证据 source 必须引用实际提供的能力来源，否则 `invalid-response`。 |
+| 用户可见行为（模式切换/证据块） | ✅ AssistantView 解析结果区分 `intent === "academic-query"`：标题切换为"数据问答"，显示"数据问答 · 只读本地数据"徽标、答案文本、证据引用块（来源标签 + 抓取时间 + 具体数值 mark）；降级时显示明确提示不伪造结果；追问保持数据问答模式，普通日程问题切回通用模式。新增 `.assistant-mode-badge` / `.assistant-academic-result` / `.assistant-evidence-block` 等样式，遵循 ai-frontend-lessons（无装饰框、无位移拼接、间距 token、overflow-wrap）。 |
+| 错误边界（无数据/注入/降级） | ✅ 未验证学业账号 → `unverified` 降级文案且不调用 provider；无数据 → `no-data` 降级；未注入读取器 → `unavailable` 降级；provider 错误沿用 `mapProviderError` 分类；注入测试断言系统提示不包含用户注入文本、问题文本仅出现在 input.question；证据引用不存在来源 → 拒绝。 |
+| 针对性测试 | ✅ `academicQuery.test.ts`（规则分类、上下文裁剪最小化断言、按账户选记录、缺失能力不可用、证据校验、降级）；`aiAssistantService.test.ts` 新增 6 个学业问答用例（规则路由、注入隔离、未验证/无数据/未注入降级、结构化判定路由）；`AssistantView.test.tsx` 新增数据问答模式渲染与降级用例；IPC 通道列表不变。 |
+| UI 规避清单（截图验收） | ⏳ 桌面渲染截图待打包后补（不阻塞提交）；代码层已按清单规避：无 translate/负边距、间距走 token、证据值 overflow-wrap、按钮复用既有组件、无装饰框。 |

@@ -383,13 +383,45 @@ export interface AiAssistantExtractionIntent {
 }
 
 export interface AiAssistantExtractionResult {
+  intent: "general";
   sourceText: string;
   source: AiAssistantMessageSource;
-  schemaVersion: 2;
+  schemaVersion: 3;
   promptVersion: string;
   intents: AiAssistantExtractionIntent[];
   unresolvedQuestions: string[];
 }
+
+export interface AiAssistantEvidenceSource {
+  capability: PluginCapability;
+  label: string;
+  capturedAt: string;
+  state: CapabilityDataState;
+  message?: string;
+  /** 回答中引用到的该来源具体数值/条目。 */
+  values?: string[];
+}
+
+export interface AiAssistantAcademicQueryInput {
+  text: string;
+  now: string;
+  source?: AiAssistantMessageSource;
+}
+
+export interface AiAssistantAcademicQueryResult {
+  intent: "academic-query";
+  sourceText: string;
+  source: AiAssistantMessageSource;
+  answer: string;
+  evidence: AiAssistantEvidenceSource[];
+  degraded: boolean;
+  generatedAt: string;
+  promptVersion: string;
+}
+
+export type AiAssistantParseResult =
+  | AiAssistantExtractionResult
+  | AiAssistantAcademicQueryResult;
 
 export type LocalTaskType = "deadline" | "fixed" | "floating" | "fixedlegacy";
 export type LocalTaskStatus =

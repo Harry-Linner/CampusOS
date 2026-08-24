@@ -34,6 +34,9 @@ import { registerDownloadHandlers } from "./downloadIpc";
 import { createWorkspaceRefreshScheduler } from "./workspaceRefreshScheduler";
 import { registerScheduleHandlers } from "./scheduleIpc";
 import { registerAiAssistantHandlers, createAiAssistantVault } from "./aiAssistantIpc";
+import type { AcademicQueryDataReader } from "./academicQuery";
+import { readAcademicCredentialRecord } from "./academicCredentialStore";
+import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import { registerBriefHandlers } from "./briefIpc";
 import { createBriefService } from "./briefService";
 import { createBriefStore } from "./briefStore";
@@ -160,7 +163,17 @@ const startCampusApp = (): void => {
     registerDownloadHandlers();
     registerScheduleHandlers();
     registerExportHandlers();
-    registerAiAssistantHandlers();
+    const academicQueryData: AcademicQueryDataReader = {
+      loadVerifiedStudentId: async () => {
+        const record = await readAcademicCredentialRecord();
+        return record.verificationState === "verified" && record.authenticatedProfile
+          ? record.authenticatedProfile.studentId
+          : null;
+      },
+      readCapability: <T,>(capability: import("@campusos/shared").PluginCapability) =>
+        getOfficialCapabilityRepository().read<T>(capability)
+    };
+    registerAiAssistantHandlers({ academicData: academicQueryData });
     const briefVault = createAiAssistantVault();
     registerBriefHandlers(createBriefService({
       store: createBriefStore({ database: getOfficialDatabaseService() }),

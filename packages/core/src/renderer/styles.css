@@ -4129,6 +4129,69 @@ input:focus-visible {
   padding: 1px 4px;
 }
 
+.assistant-mode-badge {
+  color: var(--success);
+  font-size: 0.72rem;
+}
+
+.assistant-academic-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.assistant-academic-answer {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.assistant-academic-degraded {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.assistant-evidence-block {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.assistant-evidence-title {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.assistant-evidence-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-evidence-source {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.assistant-evidence-source time {
+  color: var(--ink-faint);
+}
+
+.assistant-quiet-copy {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .assistant-layout {
     grid-template-columns: 1fr;

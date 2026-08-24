@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type {
+  AiAssistantAcademicQueryResult,
   AiAssistantConnectionTestInput,
   AiAssistantConnectionTestResult,
   AiAssistantExtractionIntent,
@@ -16,6 +17,9 @@ import type {
   AiAssistantSettingsRecord
 } from "@campusos/shared";
 import {
+  AI_ASSISTANT_ACADEMIC_PROMPT_VERSION,
+  AI_ASSISTANT_ACADEMIC_SCHEMA,
+  AI_ASSISTANT_ACADEMIC_SYSTEM_PROMPT,
   AI_ASSISTANT_DEFAULT_BASE_URL,
   AI_ASSISTANT_DEFAULT_MODEL,
   AI_ASSISTANT_DEFAULT_PROVIDER,
@@ -29,6 +33,13 @@ import {
   createAiProviderAdapter,
   type AiProviderProfile
 } from "./aiProviderAdapters";
+import {
+  buildAcademicQueryContext,
+  classifyAcademicIntentByRules,
+  createDegradedAcademicQuery,
+  validateAcademicQuery,
+  type AcademicQueryDataReader
+} from "./academicQuery";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_MESSAGE_BYTES = 50_000;
@@ -57,6 +68,8 @@ interface AiAssistantServiceDependencies {
   vault: AiAssistantVault;
   fetchFn?: typeof fetch;
   now?: () => Date;
+  /** Phase H：学业数据问答的只读数据读取器（缺省时学业问答降级为"暂不可用"）。 */
+  academicData?: AcademicQueryDataReader;
 }
 
 export class AiAssistantServiceError extends Error {
@@ -207,10 +220,14 @@ const validateDateField = (field: AiAssistantExtractedField<string | null>, labe
   if (field.value !== null && (typeof field.value !== "string" || !Number.isFinite(Date.parse(field.value)))) throw new AiAssistantServiceError("invalid-response", `${label} 不是有效时间。`);
 };
 
-const validateExtraction = (value: unknown, sourceText: string, source: AiAssistantMessageSource, courseNames: readonly string[]): AiAssistantExtractionResult => {
+/** 结构化抽取结果（路由前）：intent 由模型返回，主进程据此决定是否转入学业问答。 */
+type RoutedExtraction = Omit<AiAssistantExtractionResult, "intent"> & { intent: "general" | "academic-query" };
+
+const validateExtraction = (value: unknown, sourceText: string, source: AiAssistantMessageSource, courseNames: readonly string[]): RoutedExtraction => {
   if (typeof value !== "object" || value === null) throw new AiAssistantServiceError("invalid-response", "AI 返回的抽取结果不是对象。");
   const candidate = value as Record<string, unknown>;
   if (!Array.isArray(candidate.intents) || !isStringArray(candidate.unresolvedQuestions) || candidate.intents.length > 20) throw new AiAssistantServiceError("invalid-response", "AI 返回的抽取信封结构无效。");
+  const intent = candidate.intent === "academic-query" ? "academic-query" as const : "general" as const;
   const intents: AiAssistantExtractionIntent[] = candidate.intents.map((raw, index) => {
     if (typeof raw !== "object" || raw === null) throw new AiAssistantServiceError("invalid-response", "AI 返回了无效事项。");
     const item = raw as Record<string, unknown>;
@@ -254,7 +271,7 @@ const validateExtraction = (value: unknown, sourceText: string, source: AiAssist
       fingerprint
     };
   });
-  return { sourceText, source, schemaVersion: 2, promptVersion: AI_ASSISTANT_PROMPT_VERSION, intents, unresolvedQuestions: candidate.unresolvedQuestions };
+  return { intent, sourceText, source, schemaVersion: 3, promptVersion: AI_ASSISTANT_PROMPT_VERSION, intents, unresolvedQuestions: candidate.unresolvedQuestions };
 };
 
 const mapProviderError = (cause: unknown): AiAssistantServiceError => {
@@ -263,7 +280,7 @@ const mapProviderError = (cause: unknown): AiAssistantServiceError => {
   return new AiAssistantServiceError("upstream-error", "AI 服务返回了无法识别的结果。", { cause });
 };
 
-export const createAiAssistantService = ({ vault, fetchFn = fetch, now = () => new Date() }: AiAssistantServiceDependencies) => {
+export const createAiAssistantService = ({ vault, fetchFn = fetch, now = () => new Date(), academicData }: AiAssistantServiceDependencies) => {
   const loadStored = async (): Promise<StoredAiAssistantSettings | null> => {
     const value = await vault.read();
     if (value === null) return null;
@@ -298,18 +315,30 @@ export const createAiAssistantService = ({ vault, fetchFn = fetch, now = () => n
 
   const createAdapter = (profile: AiProviderProfile, apiKey: string) => createAiProviderAdapter({ profile, apiKey, fetchFn, timeoutMs: REQUEST_TIMEOUT_MS });
 
-  const runStructured = async (profile: AiProviderProfile, apiKey: string, input: unknown): Promise<unknown> => {
+  const runStructuredWith = async (
+    profile: AiProviderProfile,
+    apiKey: string,
+    options: { systemPrompt: string; schemaName: string; schema: Record<string, unknown>; input: unknown }
+  ): Promise<unknown> => {
     try {
       return await createAdapter(profile, apiKey).generateStructured({
-        systemPrompt: AI_ASSISTANT_SYSTEM_PROMPT,
-        input,
-        schemaName: "campus_extraction_v2",
-        schema: AI_ASSISTANT_EXTRACTION_SCHEMA as unknown as Record<string, unknown>
+        systemPrompt: options.systemPrompt,
+        input: options.input,
+        schemaName: options.schemaName,
+        schema: options.schema
       });
     } catch (cause) {
       throw mapProviderError(cause);
     }
   };
+
+  const runStructured = (profile: AiProviderProfile, apiKey: string, input: unknown): Promise<unknown> =>
+    runStructuredWith(profile, apiKey, {
+      systemPrompt: AI_ASSISTANT_SYSTEM_PROMPT,
+      schemaName: "campus_extraction_v2",
+      schema: AI_ASSISTANT_EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
+      input
+    });
 
   return {
     loadSettings: async (): Promise<AiAssistantSettingsRecord> => toSettingsRecord(await loadStored(), vault.encrypted),
@@ -376,7 +405,7 @@ export const createAiAssistantService = ({ vault, fetchFn = fetch, now = () => n
       }
     },
 
-    parseMessage: async (input: AiAssistantParseInput): Promise<AiAssistantExtractionResult> => {
+    parseMessage: async (input: AiAssistantParseInput): Promise<AiAssistantExtractionResult | AiAssistantAcademicQueryResult> => {
       const text = typeof input?.text === "string" ? input.text.trim() : "";
       if (!text || Buffer.byteLength(text, "utf8") > MAX_MESSAGE_BYTES) throw new AiAssistantServiceError("invalid-input", "消息内容无效或超过 50 KB 限制。");
       const nowValue = typeof input?.now === "string" ? input.now : "";
@@ -384,14 +413,63 @@ export const createAiAssistantService = ({ vault, fetchFn = fetch, now = () => n
       const courseNames = Array.isArray(input?.courseNames)
         ? [...new Set(input.courseNames.filter((name): name is string => typeof name === "string" && name.trim().length > 0).map((name) => name.trim()))].slice(0, 300)
         : [];
+
+      const runAcademicQuery = async (profile: AiProviderProfile, apiKey: string): Promise<AiAssistantAcademicQueryResult> => {
+        if (!academicData) return createDegradedAcademicQuery(text, source, "unavailable", now);
+        const studentId = await academicData.loadVerifiedStudentId();
+        if (studentId === null) return createDegradedAcademicQuery(text, source, "unverified", now);
+        const { evidenceSources, payload } = await buildAcademicQueryContext(academicData, now);
+        const hasData = evidenceSources.some((candidate) => candidate.state !== "unavailable");
+        if (!hasData) return createDegradedAcademicQuery(text, source, "no-data", now);
+        const raw = await runStructuredWith(profile, apiKey, {
+          systemPrompt: AI_ASSISTANT_ACADEMIC_SYSTEM_PROMPT,
+          schemaName: "campus_academic_query_v1",
+          schema: AI_ASSISTANT_ACADEMIC_SCHEMA as unknown as Record<string, unknown>,
+          input: {
+            question: text,
+            now: nowValue,
+            timezone: "Asia/Shanghai",
+            context: payload,
+            evidenceSources: evidenceSources.map((candidate) => ({ capability: candidate.capability, label: candidate.label, capturedAt: candidate.capturedAt }))
+          }
+        });
+        try {
+          const { answer, evidence } = validateAcademicQuery(raw, evidenceSources);
+          return {
+            intent: "academic-query",
+            sourceText: text,
+            source,
+            answer,
+            evidence,
+            degraded: false,
+            generatedAt: now().toISOString(),
+            promptVersion: AI_ASSISTANT_ACADEMIC_PROMPT_VERSION
+          };
+        } catch (cause) {
+          throw mapProviderError(cause);
+        }
+      };
+
       const stored = await loadStored();
       if (!stored) throw new AiAssistantServiceError("not-configured", "请先在 AI 助手配置中保存 API Key。");
       const profile = profileFromStored(stored);
       const apiKey = await readApiKey("", profile);
+
+      // 规则快速路径：强学业信号直接走数据问答处理器。
+      const ruleIntent = classifyAcademicIntentByRules(text);
+      if (ruleIntent === "academic-query") {
+        return runAcademicQuery(profile, apiKey);
+      }
+
       const referenceTime = source.sentAt ?? nowValue;
       const raw = await runStructured(profile, apiKey, { message: text, now: nowValue, referenceTime, referenceTimeSource: source.sentAt ? "source-message" : "parse-time", timezone: "Asia/Shanghai", courseNames });
       try {
-        return validateExtraction(raw, text, source, courseNames);
+        const extraction = validateExtraction(raw, text, source, courseNames);
+        // 结构化判定命中学业提问 → 走数据问答处理器。
+        if (extraction.intent === "academic-query") {
+          return runAcademicQuery(profile, apiKey);
+        }
+        return { ...extraction, intent: "general" as const };
       } catch (cause) {
         throw mapProviderError(cause);
       }

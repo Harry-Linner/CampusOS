@@ -13,6 +13,7 @@ import {
   type AiAssistantVault,
   type StoredAiAssistantSettings
 } from "./aiAssistantService";
+import type { AcademicQueryDataReader } from "./academicQuery";
 import { assertTrustedRenderer } from "./ipcSecurity";
 
 const SETTINGS_FILE = "ai-assistant.json";
@@ -66,31 +67,33 @@ export const createAiAssistantVault = (): AiAssistantVault => {
   };
 };
 
-const createService = () => createAiAssistantService({ vault: createAiAssistantVault() });
+const createService = (academicData?: AcademicQueryDataReader) =>
+  createAiAssistantService({ vault: createAiAssistantVault(), academicData });
 
-export const registerAiAssistantHandlers = (): void => {
+export const registerAiAssistantHandlers = (options?: { academicData?: AcademicQueryDataReader }): void => {
+  const { academicData } = options ?? {};
   ipcMain.handle("campusos:assistant:settings:load", async (event) => {
     assertTrustedRenderer(event);
-    return createService().loadSettings();
+    return createService(academicData).loadSettings();
   });
   ipcMain.handle("campusos:assistant:settings:save", async (event, input: AiAssistantSettingsInput) => {
     assertTrustedRenderer(event);
-    return createService().saveSettings(input);
+    return createService(academicData).saveSettings(input);
   });
   ipcMain.handle("campusos:assistant:settings:clear", async (event) => {
     assertTrustedRenderer(event);
-    return createService().clearSettings();
+    return createService(academicData).clearSettings();
   });
   ipcMain.handle("campusos:assistant:test-connection", async (event, input: AiAssistantConnectionTestInput) => {
     assertTrustedRenderer(event);
-    return createService().testConnection(input);
+    return createService(academicData).testConnection(input);
   });
   ipcMain.handle("campusos:assistant:parse", async (event, input: AiAssistantParseInput) => {
     assertTrustedRenderer(event);
-    return createService().parseMessage(input);
+    return createService(academicData).parseMessage(input);
   });
   ipcMain.handle("campusos:assistant:models:discover", async (event, input: AiAssistantModelDiscoveryInput) => {
     assertTrustedRenderer(event);
-    return createService().discoverModels(input);
+    return createService(academicData).discoverModels(input);
   });
 };

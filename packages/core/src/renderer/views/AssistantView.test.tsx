@@ -3,7 +3,7 @@
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AiAssistantExtractionResult, LocalTaskRecord, PluginCapabilityClient, PluginComponentProps } from "@campusos/shared";
+import type { AiAssistantAcademicQueryResult, AiAssistantExtractionResult, LocalTaskRecord, PluginCapabilityClient, PluginComponentProps } from "@campusos/shared";
 import { AssistantView } from "../../../../../plugins/official/ai-assistant/src/AssistantView";
 
 afterEach(cleanup);
@@ -12,10 +12,11 @@ const baseProps: PluginComponentProps = { capabilities: { read: vi.fn(async () =
 const extractedField = <T,>(value: T, text: string | null = null) => ({ value, confidence: "high" as const, source: "explicit" as const, evidence: text ? { start: 0, end: text.length, text } : null, needsConfirmation: false });
 
 const extraction: AiAssistantExtractionResult = {
+  intent: "general",
   sourceText: "Submit report tomorrow at 8 PM",
   source: { app: "manual", sentAt: null },
-  schemaVersion: 2,
-  promptVersion: "test-v2",
+  schemaVersion: 3,
+  promptVersion: "test-v3",
   intents: [{
     id: "intent-1",
     intent: "create",
@@ -112,7 +113,7 @@ describe("AssistantView", () => {
     await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
     fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: "two actions" } });
     fireEvent.click(screen.getByRole("button", { name: "交给 AI 解析" }));
-    await waitFor(() => expect(screen.getByText("2 个候选 · Schema 2")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("2 个候选 · Schema 3")).toBeTruthy());
     expect(screen.getByText("Which room is the meeting in?")).toBeTruthy();
   });
 
@@ -140,5 +141,56 @@ describe("AssistantView", () => {
       expect(mutateTask).toHaveBeenCalledWith({ id: existingTask.id, status: "deleted" });
       expect(saveTask).not.toHaveBeenCalled();
     }
+  });
+
+  it("switches to the read-only data-query mode and renders the answer with evidence sources", async () => {
+    const academic: AiAssistantAcademicQueryResult = {
+      intent: "academic-query",
+      sourceText: "我下周哪天有早八？",
+      source: { app: "manual", sentAt: null },
+      answer: "周一第 1、2 节有高等数学。",
+      evidence: [{ capability: "academic.timetable@1", label: "课表", capturedAt: "2026-08-05T00:00:00.000Z", state: "live", values: ["高等数学", "第1节"] }],
+      degraded: false,
+      generatedAt: "2026-08-05T00:00:00.000Z",
+      promptVersion: "test-academic-v1"
+    };
+    const assistant = createAssistantBridge({ parseMessage: vi.fn(async () => academic) });
+    render(createElement(AssistantView, { ...baseProps, assistant }));
+    await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: academic.sourceText } });
+    fireEvent.click(screen.getByRole("button", { name: "交给 AI 解析" }));
+
+    await waitFor(() => expect(screen.getByText("数据问答 · 只读本地数据")).toBeTruthy());
+    expect(screen.getByText("数据问答", { selector: "h2" })).toBeTruthy();
+    expect(screen.getByText(academic.answer)).toBeTruthy();
+    expect(screen.getByText("证据引用")).toBeTruthy();
+    expect(screen.getByText("课表")).toBeTruthy();
+    expect(screen.getByText("高等数学")).toBeTruthy();
+    // 通用模式不残留
+    expect(screen.queryByText("待确认事项")).toBeNull();
+  });
+
+  it("keeps follow-up questions in data-query mode and shows degraded answers without a fake result", async () => {
+    const degraded: AiAssistantAcademicQueryResult = {
+      intent: "academic-query",
+      sourceText: "我成绩多少？",
+      source: { app: "manual", sentAt: null },
+      answer: "尚未验证学业账号，暂时无法查询本地学业数据。",
+      evidence: [],
+      degraded: true,
+      generatedAt: "2026-08-05T00:00:00.000Z",
+      promptVersion: "test-academic-v1"
+    };
+    const assistant = createAssistantBridge({ parseMessage: vi.fn(async () => degraded) });
+    render(createElement(AssistantView, { ...baseProps, assistant }));
+    await waitFor(() => expect(assistant.loadSettings).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText("粘贴消息"), { target: { value: degraded.sourceText } });
+    fireEvent.click(screen.getByRole("button", { name: "交给 AI 解析" }));
+
+    await waitFor(() => expect(screen.getByText(degraded.answer)).toBeTruthy());
+    expect(document.querySelector(".assistant-academic-degraded")).toBeTruthy();
+    expect(screen.queryByText("证据引用")).toBeNull();
   });
 });
