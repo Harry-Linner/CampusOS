@@ -18,3 +18,7 @@ live-auth.env
 # CC98 handoff (user-provided scripts + raw scrape data, not committed)
 cc98-handoff/
 cc98-handoff.zip
+
+# 本地诊断与 .dsh 备份（可能含会话/路径等隐私信息，禁止入库）
+/diagnostics-*.zip
+/.dsh.before.zip
