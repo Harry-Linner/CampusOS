@@ -65,8 +65,11 @@
 
 | 项 | 结果 |
 |---|---|
-| 正式链路（IPC/保存/真实数据） |  |
-| 用户可见行为（按钮/MD/PNG） |  |
-| 错误边界（取消/大小/失败提示） |  |
-| 针对性测试 |  |
-| UI 规避清单（截图验收） |  |
+| 正式链路（IPC/保存/真实数据） | ✅ `campusos:export:save`（markdown 写 UTF-8、png 解码写入、大小上限）；preload/renderer bridge/共享类型齐全；三个视图均用正式数据（tasks/periods、snapshot.courses/deadlines、grades 记录）序列化，不读 DOM |
+| 用户可见行为（按钮/MD/PNG） | ✅ 日程/总览/成绩各加"导出 MD / 导出图片"按钮（成绩视图禁用条件=无成绩）；PNG 走 html2canvas 对视图容器截图（背景显式 #fff、scale 2）；导出成功有 notice、失败有明确错误 |
+| 错误边界（取消/大小/失败提示） | ✅ 保存对话框取消返回 canceled；PNG ≤20MB、MD ≤5MB 超限拒绝；视图层 catch 展示错误 |
+| 针对性测试 | ✅ exportMarkdown 4 例（表格/列表/空小节/转义/时间本地化）；ScheduleView 导出 MD 走保存桥接 1 例；全量 564 passed + lint + typecheck 绿 |
+| UI 规避清单（截图验收） | ✅ 按钮沿用各视图既有工具区样式与 spacing token，无新增装饰/位移；桌面端 PNG 渲染截图验收待打包后补 |
+
+### 6.1 说明
+- 新增依赖：zod（K4，schema IPC）、html2canvas（PNG 导出，renderer 侧）——均为常规开源库，锁版后无网络依赖。

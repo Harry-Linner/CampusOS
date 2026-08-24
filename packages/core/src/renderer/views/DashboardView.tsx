@@ -4,12 +4,18 @@ import type {
   CampusPriority,
   CampusWorkspaceSnapshot
 } from "@campusos/shared";
+import { useRef, useState } from "react";
 import {
   formatDateTime,
   formatRelativeToNow,
   formatTimeRange
 } from "../lib/formatters";
 import { Skeleton } from "../components/ui/skeleton";
+import { Button } from "../components/ui/button";
+import {
+  exportElementAsPng,
+  exportViewAsMarkdown
+} from "../lib/exportView";
 
 interface DashboardViewProps {
   loading: boolean;
@@ -116,9 +122,75 @@ export const DashboardView = ({
   const courses = sortCourses(snapshot.todayCourses);
   const courseStates = getCourseStates(courses, now);
   const deadlines = sortDeadlines(snapshot.deadlines);
+  const pageRef = useRef<HTMLElement | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const exportMarkdown = async (): Promise<void> => {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      const courseRows = courses.map((course) => [
+        formatTimeRange(course.startAt, course.endAt),
+        course.title,
+        course.location ?? "-",
+        [course.instructor, course.courseCode].filter(Boolean).join(" · ") || "-"
+      ]);
+      const deadlineRows = deadlines.map((deadline) => [
+        formatDateTime(deadline.dueAt),
+        deadline.title,
+        deadline.courseName ?? deadlineKindLabelMap[deadline.kind],
+        priorityLabelMap[deadline.priority]
+      ]);
+      await exportViewAsMarkdown(
+        {
+          title: "总览导出",
+          generatedAt: snapshot.generatedAt,
+          sections: [
+            {
+              heading: "今日课程",
+              rows: [
+                ["时间", "课程", "地点", "教师 / 课号"],
+                ...courseRows
+              ]
+            },
+            {
+              heading: "待办",
+              rows: [
+                ["截止", "事项", "课程", "优先级"],
+                ...deadlineRows
+              ]
+            }
+          ]
+        },
+        `总览导出-${new Date().toISOString().slice(0, 10)}`
+      );
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : "Markdown 导出失败。");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const exportPng = async (): Promise<void> => {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      const element = pageRef.current;
+      if (!element) throw new Error("总览视图暂不可导出。");
+      await exportElementAsPng(
+        element,
+        `总览导出-${new Date().toISOString().slice(0, 10)}`
+      );
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : "图片导出失败。");
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   return (
-    <section className="page-shell">
+    <section className="page-shell" ref={pageRef}>
       <header className="page-heading">
         <div>
           <h1>总览</h1>
@@ -140,7 +212,28 @@ export const DashboardView = ({
                     : "开发数据"}
           </span>
         </div>
+        <div className="schedule-actions">
+          <Button
+            variant="ghost"
+            type="button"
+            disabled={exportBusy}
+            onClick={() => void exportMarkdown()}
+          >
+            导出 MD
+          </Button>
+          <Button
+            variant="ghost"
+            type="button"
+            disabled={exportBusy}
+            onClick={() => void exportPng()}
+          >
+            导出图片
+          </Button>
+        </div>
       </header>
+      {exportError ? (
+        <p className="error-copy" role="alert">{exportError}</p>
+      ) : null}
 
       <div className="dashboard-layout">
         <section className="content-section schedule-section" aria-labelledby="today-heading">

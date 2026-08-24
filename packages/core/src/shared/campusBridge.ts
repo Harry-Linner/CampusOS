@@ -4,6 +4,7 @@ import type { AcademicCredentialBridge } from "./credentialBridge";
 import type { ReminderBridge } from "./reminderBridge";
 import type { PluginRuntimeBridge } from "./pluginBridge";
 import type { DiagnosticBridge } from "./diagnosticBridge";
+import type { ExportBridge } from "./exportBridge";
 import type { DownloadBridge } from "./downloadBridge";
 import type { ScheduleBridge } from "./scheduleBridge";
 import type { AcademicBridge } from "./academicBridge";
@@ -55,6 +56,7 @@ export interface CampusosBridge {
   deskCalendar?: DeskCalendarControlBridge;
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;
+  exports: ExportBridge;
   updates: UpdateBridge;
   lifecycle?: AppLifecycleBridge;
   notifications?: NotificationCenterBridge;

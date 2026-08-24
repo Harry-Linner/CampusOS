@@ -12,6 +12,7 @@ import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
 import { pluginRefreshCoordinator } from "./refreshCoordinator";
+import { registerExportHandlers } from "./exportIpc";
 import {
   invariantFailures,
   registerCoreInvariants,
@@ -158,6 +159,7 @@ const startCampusApp = (): void => {
     });
     registerDownloadHandlers();
     registerScheduleHandlers();
+    registerExportHandlers();
     registerAiAssistantHandlers();
     const briefVault = createAiAssistantVault();
     registerBriefHandlers(createBriefService({

@@ -227,6 +227,13 @@ contextBridge.exposeInMainWorld("campusos", {
     probe: (sourceId: string) =>
       ipcRenderer.invoke("campusos:diagnostics:probe", sourceId)
   },
+  exports: {
+    save: (input: {
+      suggestedName: string;
+      content: string;
+      kind: "markdown" | "png";
+    }) => ipcRenderer.invoke("campusos:export:save", input)
+  },
   backup: {
     export: () => ipcRenderer.invoke("campusos:backup:export"),
     preview: () => ipcRenderer.invoke("campusos:backup:preview"),

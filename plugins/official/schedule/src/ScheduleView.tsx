@@ -10,6 +10,10 @@ import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  exportElementAsPng,
+  exportViewAsMarkdown
+} from "@/lib/exportView";
 
 type ScheduleViewMode = "month" | "week" | "agenda" | "day";
 
@@ -358,6 +362,7 @@ export const ScheduleView = ({
 }: ScheduleViewProps): JSX.Element => {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const schedulePageRef = useRef<HTMLElement | null>(null);
   const [tasks, setTasks] = useState<LocalTaskRecord[]>([]);
   const [taskUpdatedAt, setTaskUpdatedAt] = useState<string | null>(null);
   const [periods, setPeriods] = useState<LocalTaskPeriod[]>([]);
@@ -616,6 +621,76 @@ export const ScheduleView = ({
     }
   };
 
+  const exportMarkdown = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const sortedTasks = [...tasks]
+        .filter((task) => task.deletedAt === undefined || task.deletedAt === null)
+        .sort((left, right) => left.startAt.localeCompare(right.startAt));
+      const taskRows = sortedTasks.map((task) => [
+        formatTimeRange(task.startAt, task.endAt),
+        task.title,
+        task.courseName ?? "-",
+        task.location || "-",
+        task.status
+      ]);
+      const periodRows = periods.map((period) => [
+        formatTimeRange(period.startAt, period.endAt),
+        period.title,
+        period.location || "-"
+      ]);
+      await exportViewAsMarkdown(
+        {
+          title: "日程导出",
+          generatedAt: new Date().toISOString(),
+          sections: [
+            {
+              heading: "待办与课程安排",
+              rows: [
+                ["时间", "事项", "课程", "地点", "状态"],
+                ...taskRows
+              ]
+            },
+            periodRows.length > 0
+              ? {
+                  heading: "时段",
+                  rows: [
+                    ["时间", "名称", "地点"],
+                    ...periodRows
+                  ]
+                }
+              : { heading: "时段", rows: [] }
+          ]
+        },
+        `日程导出-${new Date().toISOString().slice(0, 10)}`
+      );
+      setNotice("Markdown 已导出");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Markdown 导出失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportPng = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const element = schedulePageRef.current;
+      if (!element) throw new Error("日程视图暂不可导出。");
+      await exportElementAsPng(
+        element,
+        `日程导出-${new Date().toISOString().slice(0, 10)}`
+      );
+      setNotice("图片已导出");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "图片导出失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const periodLabel = viewMode === "day"
     ? formatDay(selectedDate)
     : viewMode === "week"
@@ -623,7 +698,7 @@ export const ScheduleView = ({
       : formatMonth(selectedDate);
 
   return (
-    <section className="page-shell schedule-page">
+    <section className="page-shell schedule-page" ref={schedulePageRef}>
       <header className="page-heading schedule-heading">
         <div>
           <h1>日程</h1>
@@ -634,6 +709,12 @@ export const ScheduleView = ({
           </Button>
           <Button variant="ghost" type="button" disabled={busy || !schedule} onClick={() => void exportIcal()}>
             导出 iCal
+          </Button>
+          <Button variant="ghost" type="button" disabled={busy} onClick={() => void exportMarkdown()}>
+            导出 MD
+          </Button>
+          <Button variant="ghost" type="button" disabled={busy} onClick={() => void exportPng()}>
+            导出图片
           </Button>
           {deskCalendar ? (
             <div className="desk-calendar-control">

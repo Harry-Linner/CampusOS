@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   AcademicGradesData,
   CapabilityRecord,
@@ -8,6 +8,10 @@ import { inferGpaScale, summarizeAcademicGrades } from "./gradesModel";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  exportElementAsPng,
+  exportViewAsMarkdown
+} from "@/lib/exportView";
 
 const numberFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2
@@ -86,9 +90,64 @@ export const Component = ({
   const gpaScale = inferGpaScale(grades);
   const busy = !loaded || workspaceLoading || refreshing;
   const availableRecords = records.filter((record) => record.data !== null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const exportMarkdown = async (): Promise<void> => {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      const rows = grades.map((grade) => [
+        grade.courseName,
+        grade.courseCode ?? "-",
+        grade.credit.toString(),
+        grade.originalScore,
+        grade.gradePoint === null ? "-" : numberFormatter.format(grade.gradePoint),
+        grade.isMajorCourse ? "是" : "否"
+      ]);
+      await exportViewAsMarkdown(
+        {
+          title: "成绩导出",
+          generatedAt: new Date().toISOString(),
+          sections: [
+            {
+              heading: "课程成绩",
+              rows: [
+                ["课程", "课号", "学分", "成绩", "绩点", "专业课程"],
+                ...rows
+              ]
+            }
+          ]
+        },
+        `成绩导出-${new Date().toISOString().slice(0, 10)}`
+      );
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : "Markdown 导出失败。");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
+  const exportPng = async (): Promise<void> => {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      const element = panelRef.current;
+      if (!element) throw new Error("成绩视图暂不可导出。");
+      await exportElementAsPng(
+        element,
+        `成绩导出-${new Date().toISOString().slice(0, 10)}`
+      );
+    } catch (cause) {
+      setExportError(cause instanceof Error ? cause.message : "图片导出失败。");
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   return (
-    <section className="academic-panel" aria-label="成绩">
+    <section className="academic-panel" aria-label="成绩" ref={panelRef}>
       <div className="academic-panel-heading">
         <div>
           <h2>学业成绩</h2>
@@ -101,6 +160,22 @@ export const Component = ({
             onCheckedChange={setPrivacyMask}
           />
           <Button
+            variant="ghost"
+            type="button"
+            disabled={exportBusy || grades.length === 0}
+            onClick={() => void exportMarkdown()}
+          >
+            导出 MD
+          </Button>
+          <Button
+            variant="ghost"
+            type="button"
+            disabled={exportBusy || grades.length === 0}
+            onClick={() => void exportPng()}
+          >
+            导出图片
+          </Button>
+          <Button
             disabled={busy}
             type="button"
             onClick={() => void handleRefresh()}
@@ -109,6 +184,10 @@ export const Component = ({
           </Button>
         </div>
       </div>
+
+      {exportError ? (
+        <p className="error-copy" role="alert">{exportError}</p>
+      ) : null}
 
       {error ? (
         <article className="panel-card" role="alert">

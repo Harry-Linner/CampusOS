@@ -1,4 +1,4 @@
-/* @vitest-environment jsdom */
+﻿/* @vitest-environment jsdom */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusosBridge } from "../../shared/campusBridge";
@@ -28,6 +28,7 @@ const installBridge = (bridge: DeskCalendarControlBridge): void => {
     reminders: {} as CampusosBridge["reminders"],
     downloads: {} as CampusosBridge["downloads"],
     plugins: {} as CampusosBridge["plugins"],
+    exports: { save: vi.fn(async () => ({ canceled: true, path: null })) },
     diagnostics: {} as CampusosBridge["diagnostics"],
     updates: {} as CampusosBridge["updates"],
     deskCalendar: bridge

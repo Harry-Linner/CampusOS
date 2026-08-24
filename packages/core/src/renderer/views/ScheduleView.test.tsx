@@ -407,4 +407,31 @@ describe("schedule event ranges", () => {
     expect(grouped.get("2026-08-04")?.[0]?.title).toBe("Spanning");
     expect(grouped.get("2026-08-05")?.[0]?.title).toBe("Spanning");
   });
+
+  it("导出 Markdown 走正式保存桥接", async () => {
+    const save = vi.fn(async () => ({ canceled: false, path: "C:/export.md" }));
+    (window as unknown as { campusos?: unknown }).campusos = {
+      exports: { save }
+    };
+    try {
+      render(createElement(ScheduleView, {
+        loading: false,
+        snapshot,
+        capabilities: { read: vi.fn(async () => []) },
+        onRefresh: vi.fn(async () => undefined),
+        schedule: createSchedule()
+      }));
+      await screen.findAllByText("Read notes");
+      fireEvent.click(screen.getByRole("button", { name: "导出 MD" }));
+
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+      const input = save.mock.calls[0]?.[0] as { content?: string };
+      expect(input.content).toContain("# 日程导出");
+      expect(input.content).toContain("Read notes");
+    } finally {
+      delete (window as unknown as { campusos?: unknown }).campusos;
+    }
+  });
 });

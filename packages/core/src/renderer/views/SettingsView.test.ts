@@ -1,4 +1,4 @@
-/* @vitest-environment jsdom */
+﻿/* @vitest-environment jsdom */
 
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -140,6 +140,7 @@ const installBridge = (
         throw new Error("not used");
       })
     },
+    exports: { save: vi.fn(async () => ({ canceled: true, path: null })) },
     diagnostics: {
       load: vi.fn(async () => ({
         entries: [

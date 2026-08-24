@@ -234,6 +234,7 @@ const installBridge = (
         throw new Error("not used");
       })
     },
+    exports: { save: vi.fn(async () => ({ canceled: true, path: null })) },
     diagnostics: {
       load: vi.fn(async () => ({
         entries: [],
