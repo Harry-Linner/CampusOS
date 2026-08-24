@@ -324,20 +324,58 @@ export const ExtensionsView = ({
               <span>不申请权限</span>
             )}
           </div>
+          <div className="package-audit">
+            <span
+              className={`package-audit-badge is-${packageInspection.capabilityAudit.status}`}
+            >
+              {packageInspection.capabilityAudit.status === "suspicious"
+                ? "能力声明存疑"
+                : "能力声明已核验"}
+            </span>
+            {packageInspection.capabilityAudit.findings.length > 0 ? (
+              <ul className="package-audit-findings">
+                {packageInspection.capabilityAudit.findings.map((finding, index) => (
+                  <li key={`${finding.category}-${index}`}>
+                    {finding.detail}
+                    {finding.line ? `（第 ${finding.line} 行）` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <span className="package-audit-clean">
+                入口代码未发现超出声明权限的敏感用法。
+              </span>
+            )}
+          </div>
           <p className="package-sandbox-note">
             {inspectionSandboxIssue
               ? `${signatureNotice[packageInspection.signatureStatus]} 确认只会安装并保持停用；当前不能执行：${inspectionSandboxIssue}`
-              : `${signatureNotice[packageInspection.signatureStatus]} 安装后仍保持停用；只有逐项授权后，视图才会在无 Node、无网络、拒绝系统权限的独立 origin 沙箱中运行。`}
+              : packageInspection.capabilityAudit.status === "suspicious"
+                ? `${signatureNotice[packageInspection.signatureStatus]} 检测到未声明的敏感用法，只能安装并保持停用；授权执行前请先核对上述发现。`
+                : `${signatureNotice[packageInspection.signatureStatus]} 安装后仍保持停用；只有逐项授权后，视图才会在无 Node、无网络、拒绝系统权限的独立 origin 沙箱中运行。`}
           </p>
           <div className="package-review-actions">
             <button
               className="primary-button"
               type="button"
-              disabled={loading}
+              disabled={
+                loading ||
+                packageInspection.capabilityAudit.status === "suspicious"
+              }
               onClick={() => void installPackage()}
             >
               {loading ? "正在安装" : "确认安装"}
             </button>
+            {packageInspection.capabilityAudit.status === "suspicious" ? (
+              <button
+                className="ghost-button"
+                type="button"
+                disabled={loading}
+                onClick={() => void installPackage()}
+              >
+                {loading ? "正在安装" : "仅安装并保持停用"}
+              </button>
+            ) : null}
             <button
               className="text-button"
               type="button"

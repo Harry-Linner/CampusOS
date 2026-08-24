@@ -20,6 +20,8 @@ import {
   validateUserPluginManifestV2,
   type PluginManifestV2
 } from "@campusos/shared";
+import type { CapabilityAudit } from "../shared/pluginBridge";
+import { buildCapabilityAudit } from "./capabilityAudit";
 import {
   createCampusmodSigningPayload,
   verifyPackageContent
@@ -42,6 +44,7 @@ export interface CampusmodPackageInspection {
   fileCount: number;
   sha256: string;
   signatureStatus: "unsigned" | "verified" | "invalid";
+  capabilityAudit: CapabilityAudit;
 }
 
 export interface InstalledCampusmodPackage {
@@ -52,6 +55,7 @@ export interface InstalledCampusmodPackage {
   fileCount: number;
   sha256: string;
   signatureStatus: "unsigned" | "verified" | "invalid";
+  capabilityAudit: CapabilityAudit;
   installedAt: string;
   sourceFilename: string;
 }
@@ -123,6 +127,36 @@ const determineSignatureStatus = (
   }).valid
     ? "verified"
     : "invalid";
+};
+
+const decodeEntrySource = (bytes: Uint8Array | undefined): string | undefined => {
+  if (!bytes) return undefined;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+};
+
+const determineCapabilityAudit = (
+  parsed: Pick<ParsedCampusmodPackage, "manifest" | "entrypoints" | "entries">
+): CapabilityAudit =>
+  buildCapabilityAudit(
+    {
+      main: parsed.entrypoints.main
+        ? decodeEntrySource(parsed.entries.get(parsed.entrypoints.main))
+        : undefined,
+      renderer: parsed.entrypoints.renderer
+        ? decodeEntrySource(parsed.entries.get(parsed.entrypoints.renderer))
+        : undefined
+    },
+    parsed.manifest.permissions
+  );
+
+/** 旧版本安装元数据缺审计字段时的默认值（仅用于已安装列表展示）。 */
+const legacyCapabilityAudit: CapabilityAudit = {
+  status: "verified",
+  findings: []
 };
 
 export interface CampusmodPackageRegistry {
@@ -598,6 +632,7 @@ const parseInstalledMetadata = (value: unknown): StoredInstallMetadata => {
     fileCount: candidate.fileCount as number,
     sha256: candidate.sha256,
     signatureStatus: candidate.signatureStatus,
+    capabilityAudit: candidate.capabilityAudit ?? legacyCapabilityAudit,
     installedAt: candidate.installedAt,
     sourceFilename: candidate.sourceFilename,
     files
@@ -746,6 +781,7 @@ export const createCampusmodPackageRegistry = ({
         fileCount: metadata.fileCount,
         sha256: metadata.sha256,
         signatureStatus: metadata.signatureStatus,
+        capabilityAudit: metadata.capabilityAudit,
         installedAt: metadata.installedAt,
         sourceFilename: metadata.sourceFilename
       },
@@ -805,6 +841,7 @@ export const createCampusmodPackageRegistry = ({
       const token = randomUUID();
 
       const signatureStatus = determineSignatureStatus(parsed);
+      const capabilityAudit = determineCapabilityAudit(parsed);
 
       const inspection: CampusmodPackageInspection = {
         token,
@@ -814,7 +851,8 @@ export const createCampusmodPackageRegistry = ({
         unpackedSize: parsed.unpackedSize,
         fileCount: parsed.fileCount,
         sha256: parsed.sha256,
-        signatureStatus
+        signatureStatus,
+        capabilityAudit
       };
       pendingPackages.set(token, {
         sourcePath,
@@ -858,6 +896,7 @@ export const createCampusmodPackageRegistry = ({
           fileCount: parsed.fileCount,
           sha256: parsed.sha256,
           signatureStatus: pending.inspection.signatureStatus,
+          capabilityAudit: determineCapabilityAudit(parsed),
           installedAt,
           sourceFilename: pending.sourceFilename
         };

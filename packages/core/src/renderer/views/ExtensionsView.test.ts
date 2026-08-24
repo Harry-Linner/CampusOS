@@ -90,7 +90,8 @@ describe("ExtensionsView", () => {
       unpackedSize: 4096,
       fileCount: 3,
       sha256: "a".repeat(64),
-      signatureStatus: "unsigned"
+      signatureStatus: "unsigned",
+      capabilityAudit: { status: "verified", findings: [] }
     };
     const installPackage = vi.fn(async () => undefined);
     render(
@@ -131,7 +132,8 @@ describe("ExtensionsView", () => {
       unpackedSize: 4096,
       fileCount: 3,
       sha256: "a".repeat(64),
-      signatureStatus: "verified"
+      signatureStatus: "verified",
+      capabilityAudit: { status: "verified", findings: [] }
     };
     render(createElement(ExtensionsView, {
       ...createProps(),
@@ -141,6 +143,57 @@ describe("ExtensionsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
 
     expect(await screen.findByText("签名已验证")).toBeTruthy();
+  });
+
+  it("能力声明存疑时禁用确认安装，仅提供降级安装", async () => {
+    const inspection: PluginPackageInspection = {
+      token: "58ac2bea-45ab-497e-85e5-1856063b674d",
+      manifest: {
+        ...scheduleManifest,
+        id: "dev.example.suspicious-countdown",
+        name: "suspicious-countdown",
+        displayName: "可疑倒计时",
+        permissions: ["storage:local"],
+        requires: [],
+        optionalRequires: []
+      },
+      entrypoints: { renderer: "dist/renderer.js" },
+      archiveSize: 2048,
+      unpackedSize: 4096,
+      fileCount: 3,
+      sha256: "a".repeat(64),
+      signatureStatus: "unsigned",
+      capabilityAudit: {
+        status: "suspicious",
+        findings: [
+          {
+            category: "network",
+            detail: "[renderer] 检测到 fetch 调用",
+            line: 3
+          }
+        ]
+      }
+    };
+    const installPackage = vi.fn(async () => undefined);
+    render(createElement(ExtensionsView, {
+      ...createProps(),
+      onSelectPackage: vi.fn(async () => inspection),
+      onInstallPackage: installPackage
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
+
+    expect(await screen.findByText("能力声明存疑")).toBeTruthy();
+    expect(screen.getByText(/检测到 fetch 调用/)).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "确认安装" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "仅安装并保持停用" }));
+    await waitFor(() => {
+      expect(installPackage).toHaveBeenCalledWith(inspection.token);
+    });
   });
 
   it("grants and enables only an eligible installed sandbox view", async () => {
@@ -189,6 +242,7 @@ describe("ExtensionsView", () => {
           fileCount: 2,
           sha256: "a".repeat(64),
           signatureStatus: "unsigned",
+          capabilityAudit: { status: "verified", findings: [] },
           installedAt: "2026-07-19T00:00:00.000Z",
           sourceFilename: "countdown.campusmod"
         }],

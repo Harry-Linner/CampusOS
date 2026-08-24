@@ -73,8 +73,11 @@ buildCapabilityAudit(entries: { main?: string; renderer?: string }, permissions:
 
 | 项 | 结果 |
 |---|---|
-| 正式链路（IPC/持久化/真实数据） |  |
-| 用户可见行为（徽章/禁用/降级） |  |
-| 错误边界（误报控制/官方模块不误伤） |  |
-| 针对性测试 |  |
-| UI 规避清单（截图验收） |  |
+| 正式链路（IPC/持久化/真实数据） | ✅ 静态扫描器 capabilityAudit.ts（纯函数，无依赖）；inspect() 对 main/renderer 入口 JS 跑审计，结果并入 CampusmodPackageInspection；安装时重算并持久化到 .campusmod-install.json；旧安装元数据缺失字段时补默认值（v1 兼容）；pluginBridge 共享类型同步 |
+| 用户可见行为（徽章/禁用/降级） | ✅ 扩展页 package-review 区：能力声明已核验/存疑徽章 + 逐条发现清单；存疑时"确认安装"禁用并出现"仅安装并保持停用"降级按钮；提示文案区分三种情形 |
+| 错误边界（误报控制/官方模块不误伤） | ✅ 调用检测剥字符串与注释防误报；URL 字面量用注释区间排除（正确处理 https:// 内 // 与字符串内 // 的边界）；官方模块不走 user 包 inspect 路径；未知/非 UTF-8 入口按无发现处理 |
+| 针对性测试 | ✅ capabilityAudit 12 例（正/反样例、字符串注释误报、URL 提取与权限匹配、行号、main/renderer 标注）；注册表 16 例（干净包 verified / 恶意包 suspicious 且安装记录持久化）；ExtensionsView 存疑 UI（徽章/禁用/降级安装）；协议策略测试适配；全量 541 passed + lint + typecheck 绿 |
+| UI 规避清单（截图验收） | ✅ 徽章/发现清单用既有 design token 与正常流布局（无装饰框、无位移拼缝、窄屏可换行）；桌面端渲染截图验收待打包后补 |
+
+### 7.1 说明
+- 审计结论是**安装确认信号**，不替代沙箱执行边界；user 插件本就"安装后保持停用 + 逐项授权"才会在沙箱中运行，存疑包在此基础上强制只能降级安装。

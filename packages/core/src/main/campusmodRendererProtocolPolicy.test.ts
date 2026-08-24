@@ -55,6 +55,7 @@ const registry: CampusmodRegistrySnapshot = {
     fileCount: 2,
     sha256: "a".repeat(64),
     signatureStatus: "unsigned",
+    capabilityAudit: { status: "verified", findings: [] },
     installedAt: "2026-07-19T00:00:00.000Z",
     sourceFilename: "countdown.campusmod"
   }],

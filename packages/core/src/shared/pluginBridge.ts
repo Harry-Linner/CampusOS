@@ -11,6 +11,24 @@ export interface PluginCapabilityReadInput {
   capability: PluginCapability;
 }
 
+export type CapabilityFindingCategory =
+  | "network"
+  | "storage"
+  | "privileged"
+  | "eval";
+
+export interface CapabilityFinding {
+  category: CapabilityFindingCategory;
+  detail: string;
+  line?: number;
+}
+
+/** 能力声明审计：入口代码实际敏感用法 vs manifest 声明权限。 */
+export interface CapabilityAudit {
+  status: "verified" | "suspicious";
+  findings: CapabilityFinding[];
+}
+
 export interface PluginPackageInspection {
   token: string;
   manifest: PluginManifestV2;
@@ -23,6 +41,7 @@ export interface PluginPackageInspection {
   fileCount: number;
   sha256: string;
   signatureStatus: "unsigned" | "verified" | "invalid";
+  capabilityAudit: CapabilityAudit;
 }
 
 export type PluginPackageSelection =
@@ -37,6 +56,7 @@ export interface InstalledPluginPackage {
   fileCount: number;
   sha256: string;
   signatureStatus: "unsigned" | "verified" | "invalid";
+  capabilityAudit: CapabilityAudit;
   installedAt: string;
   sourceFilename: string;
 }

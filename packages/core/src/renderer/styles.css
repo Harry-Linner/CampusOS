@@ -713,6 +713,30 @@ input:focus-visible {
   font-weight: 600;
 }
 
+.ghost-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.ghost-button:hover {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+.ghost-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .icon-button:hover,
 .text-button:hover {
   border-color: var(--line);
@@ -879,6 +903,53 @@ input:focus-visible {
   color: var(--ink-soft);
   font-size: 0.76rem;
   line-height: 1.55;
+}
+
+.package-audit {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.package-audit-badge {
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+}
+
+.package-audit-badge.is-verified {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--line));
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 7%, var(--paper));
+}
+
+.package-audit-badge.is-suspicious {
+  border-color: color-mix(in srgb, var(--warning) 50%, var(--line));
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, var(--paper));
+}
+
+.package-audit-findings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.package-audit-findings li {
+  border-left: 2px solid var(--warning);
+  padding-left: 10px;
+  overflow-wrap: anywhere;
+}
+
+.package-audit-clean {
+  color: var(--ink-muted);
+  font-size: 0.76rem;
 }
 
 .package-review-actions {
