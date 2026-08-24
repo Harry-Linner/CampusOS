@@ -6,7 +6,6 @@ import type {
   DiagnosticDataState,
   DiagnosticEntry,
   DiagnosticErrorCategory,
-  DiagnosticProbeResult,
   DiagnosticSnapshot,
   HealthViewSnapshot,
   SourceHealthSummary
