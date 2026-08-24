@@ -189,7 +189,7 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     const assistantMessage = "Submit report by Aug 20 at 20:00. Review meeting Aug 21 from 10:00 to 11:00 in Room 101.";
     await page.getByLabel("粘贴消息").fill(assistantMessage);
     await page.getByRole("button", { name: "交给 AI 解析" }).click();
-    await expect(page.getByText("2 个候选 · Schema 2")).toBeVisible();
+    await expect(page.getByText("2 个候选 · Schema 3")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Submit report" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Review meeting" })).toBeVisible();
     await expect(page.getByText(/原文证据/).first()).toBeVisible();
