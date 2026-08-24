@@ -26,6 +26,7 @@ export * from "./academicSemester";
 export * from "./brief";
 export * from "./campusFeed";
 export * from "./pluginCapabilities";
+export * from "./assistantDraft";
 export * from "./deskCalendarBridge";
 export * from "./appNavigationBridge";
 export * from "./feedbackBridge";
