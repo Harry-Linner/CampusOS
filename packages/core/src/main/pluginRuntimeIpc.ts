@@ -1,10 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import type {
   PluginCapability,
-  PluginRuntimeConfigurationInput,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
-import type { PluginCapabilityReadInput } from "../shared/pluginBridge";
 import { readAcademicCredentialRecord } from "./academicCredentialStore";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
@@ -12,32 +10,12 @@ import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService"
 import { createPluginCapabilityAccess } from "./pluginCapabilityAccess";
 import { setSchedulePluginEnabled } from "./appLifecycle";
 import type { PluginUpdateCandidate } from "./pluginUpdateService";
+import {
+  parseCapabilityReadInput,
+  parsePluginConfigurationInput
+} from "./ipcSchemas";
 
 const SCHEDULE_PLUGIN_ID = "org.campusos.schedule";
-
-const isConfigurationInput = (
-  input: unknown
-): input is PluginRuntimeConfigurationInput =>
-  typeof input === "object" &&
-  input !== null &&
-  "pluginId" in input &&
-  typeof input.pluginId === "string" &&
-  "enabled" in input &&
-  typeof input.enabled === "boolean" &&
-  "grantedPermissions" in input &&
-  Array.isArray(input.grantedPermissions) &&
-  input.grantedPermissions.every((permission) => typeof permission === "string");
-
-const isCapabilityReadInput = (
-  input: unknown
-): input is PluginCapabilityReadInput =>
-  typeof input === "object" &&
-  input !== null &&
-  "pluginId" in input &&
-  typeof input.pluginId === "string" &&
-  "capability" in input &&
-  typeof input.capability === "string" &&
-    /^[a-z][a-z0-9.-]*@[1-9][0-9]*$/.test(input.capability);
 
 const isInspectionToken = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -111,11 +89,12 @@ export const registerPluginRuntimeHandlers = (): void => {
     "campusos:plugins:configure",
     async (event, input: unknown) => {
       assertTrustedRenderer(event);
-      if (!isConfigurationInput(input)) {
+      const parsed = parsePluginConfigurationInput(input);
+      if (!parsed) {
         throw new Error("Invalid plugin runtime configuration request.");
       }
 
-      const snapshot = await runtime.configure(input);
+      const snapshot = await runtime.configure(parsed);
       await applyDesktopCapabilityState(snapshot);
       return snapshot;
     }
@@ -188,11 +167,12 @@ export const registerPluginRuntimeHandlers = (): void => {
     "campusos:plugins:capability:read",
     async (event, input: unknown) => {
       assertTrustedRenderer(event);
-      if (!isCapabilityReadInput(input)) {
+      const parsed = parseCapabilityReadInput(input);
+      if (!parsed) {
         throw new Error("Invalid plugin capability read request.");
       }
 
-      return capabilityAccess.read(input);
+      return capabilityAccess.read(parsed);
     }
   );
 
