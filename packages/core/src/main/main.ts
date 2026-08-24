@@ -12,6 +12,12 @@ import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
 import { pluginRefreshCoordinator } from "./refreshCoordinator";
+import {
+  invariantFailures,
+  registerCoreInvariants,
+  registerInvariantHandlers,
+  runInvariants
+} from "./invariants";
 import { addNotification, registerNotificationHandlers } from "./notificationCenter";
 import { registerBackupHandlers } from "./backupStore";
 import {
@@ -177,6 +183,15 @@ const startCampusApp = (): void => {
     registerPluginRuntimeHandlers();
     registerDiagnosticHandlers({
       probeSource: async (sourceId) => pluginRefreshCoordinator.runOne(sourceId)
+    });
+    registerCoreInvariants();
+    registerInvariantHandlers();
+    void runInvariants().then((results) => {
+      for (const failure of invariantFailures(results)) {
+        process.stderr.write(
+          `[CampusOS] invariant failed (${failure.severity}): ${failure.name} — ${failure.message}\n`
+        );
+      }
     });
     registerDeskCalendarHandlers();
     registerUpdateHandlers();
