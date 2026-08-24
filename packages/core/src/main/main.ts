@@ -11,6 +11,7 @@ import {
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
 import { registerDiagnosticHandlers } from "./diagnosticLogStore";
+import { pluginRefreshCoordinator } from "./refreshCoordinator";
 import { addNotification, registerNotificationHandlers } from "./notificationCenter";
 import { registerBackupHandlers } from "./backupStore";
 import {
@@ -174,7 +175,9 @@ const startCampusApp = (): void => {
     }));
     registerCampusWorkspaceHandlers();
     registerPluginRuntimeHandlers();
-    registerDiagnosticHandlers();
+    registerDiagnosticHandlers({
+      probeSource: async (sourceId) => pluginRefreshCoordinator.runOne(sourceId)
+    });
     registerDeskCalendarHandlers();
     registerUpdateHandlers();
     registerAppLifecycleHandlers();

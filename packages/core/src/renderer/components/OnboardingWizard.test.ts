@@ -1,4 +1,4 @@
-/* @vitest-environment jsdom */
+﻿/* @vitest-environment jsdom */
 
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -245,7 +245,25 @@ const installBridge = (
         totalCount: 0,
         storagePath: "C:/diagnostics/refresh-log.json"
       })),
-      exportTxt: vi.fn(async () => ({ canceled: true, path: null }))
+      exportTxt: vi.fn(async () => ({ canceled: true, path: null })),
+      health: vi.fn(async () => ({ sources: [], totalRuns: 0 })),
+      probe: vi.fn(async () => ({
+        ok: true,
+        summary: {
+          module: "source",
+          currentState: "live" as const,
+          lastRunAt: null,
+          recentEntries: [],
+          liveRuns: 0,
+          cachedRuns: 0,
+          unavailableRuns: 0,
+          retryableFailures: 0,
+          fatalFailures: 0,
+          upstreamChangeCount: 0,
+          lastFingerprint: null,
+          lastMessage: null
+        }
+      }))
     },
     updates: {
       getAppInfo: vi.fn(async () => ({

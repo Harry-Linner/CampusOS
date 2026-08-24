@@ -6,14 +6,19 @@ import type {
   DiagnosticDataState,
   DiagnosticEntry,
   DiagnosticErrorCategory,
-  DiagnosticSnapshot
+  DiagnosticProbeResult,
+  DiagnosticSnapshot,
+  HealthViewSnapshot,
+  SourceHealthSummary
 } from "../shared/diagnosticBridge";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { sanitizeDiagnosticText } from "./diagnosticSanitizer";
+import type { RefreshSourceResult } from "./refreshCoordinator";
 
-const DATA_VERSION = 1;
+const DATA_VERSION = 2;
 const MAX_ENTRIES = 2_000;
 const UI_ENTRY_LIMIT = 200;
+const HEALTH_TREND_LIMIT = 20;
 
 interface StoredDiagnosticPayload {
   dataVersion: number;
@@ -26,6 +31,8 @@ export interface DiagnosticAppendInput {
   state: DiagnosticDataState;
   durationMs: number;
   message?: string;
+  requestFingerprint?: string | null;
+  retryClassification?: "retryable" | "fatal" | null;
 }
 
 const getStoragePath = (): string =>
@@ -52,15 +59,40 @@ const isMissingFileError = (error: unknown): boolean =>
   "code" in error &&
   error.code === "ENOENT";
 
+const normalizeEntry = (entry: DiagnosticEntry): DiagnosticEntry => ({
+  id: entry.id,
+  timestamp: entry.timestamp,
+  module: entry.module,
+  operation: entry.operation,
+  state: entry.state,
+  durationMs: entry.durationMs,
+  errorCategory: entry.errorCategory ?? null,
+  message: entry.message ?? null,
+  requestFingerprint: entry.requestFingerprint ?? null,
+  retryClassification: entry.retryClassification ?? null,
+  upstreamChange: entry.upstreamChange === true
+});
+
 const readPayload = async (): Promise<StoredDiagnosticPayload> => {
   try {
     const payload = JSON.parse(
       await readFile(getStoragePath(), "utf8")
-    ) as Partial<StoredDiagnosticPayload>;
-    if (payload.dataVersion !== DATA_VERSION || !Array.isArray(payload.entries)) {
-      throw new Error("Diagnostic log schema is invalid.");
+    ) as Partial<StoredDiagnosticPayload> & {
+      dataVersion?: number;
+      entries?: DiagnosticEntry[];
+    };
+    const rawEntries = Array.isArray(payload.entries) ? payload.entries : [];
+    const entries = rawEntries.map(normalizeEntry);
+    // 兼容 v1：新字段缺失时补默认值并升级为 v2。
+    if (payload.dataVersion !== DATA_VERSION) {
+      const upgraded: StoredDiagnosticPayload = {
+        dataVersion: DATA_VERSION,
+        entries
+      };
+      await writePayload(upgraded);
+      return upgraded;
     }
-    return payload as StoredDiagnosticPayload;
+    return { dataVersion: DATA_VERSION, entries };
   } catch (error) {
     if (!isMissingFileError(error)) throw error;
     return { dataVersion: DATA_VERSION, entries: [] };
@@ -99,18 +131,36 @@ export const appendDiagnosticEntry = async (
   const message = input.message
     ? sanitizeDiagnosticText(input.message)
     : null;
-  const entry: DiagnosticEntry = {
-    id: randomUUID(),
-    timestamp: new Date().toISOString(),
-    module: sanitizeDiagnosticText(input.module),
-    operation: sanitizeDiagnosticText(input.operation),
-    state: input.state,
-    durationMs: Math.max(0, Math.round(input.durationMs)),
-    errorCategory: classifyError(input.state, message),
-    message
-  };
+  const fingerprint = input.requestFingerprint
+    ? sanitizeDiagnosticText(input.requestFingerprint)
+    : null;
   const operation = updateQueue.then(async () => {
     const payload = await readPayload();
+    const previous = [...payload.entries]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.module === sanitizeDiagnosticText(input.module) &&
+          entry.operation === sanitizeDiagnosticText(input.operation)
+      );
+    const upstreamChange =
+      previous !== undefined &&
+      previous.requestFingerprint !== null &&
+      fingerprint !== null &&
+      previous.requestFingerprint !== fingerprint;
+    const entry: DiagnosticEntry = {
+      id: randomUUID(),
+      timestamp: new Date().toISOString(),
+      module: sanitizeDiagnosticText(input.module),
+      operation: sanitizeDiagnosticText(input.operation),
+      state: input.state,
+      durationMs: Math.max(0, Math.round(input.durationMs)),
+      errorCategory: classifyError(input.state, message),
+      message,
+      requestFingerprint: fingerprint,
+      retryClassification: input.retryClassification ?? null,
+      upstreamChange
+    };
     payload.entries = [...payload.entries, entry].slice(-MAX_ENTRIES);
     await writePayload(payload);
   });
@@ -148,6 +198,11 @@ const formatExport = (entries: DiagnosticEntry[]): string =>
         entry.state,
         `${entry.durationMs}ms`,
         entry.errorCategory ?? "-",
+        entry.retryClassification ?? "-",
+        entry.upstreamChange ? "changed" : "-",
+        entry.requestFingerprint
+          ? sanitizeDiagnosticText(entry.requestFingerprint)
+          : "-",
         entry.message ? sanitizeDiagnosticText(entry.message) : "-"
       ].join("\t")
     )
@@ -174,9 +229,13 @@ export type SourceFailureSummary = Record<string, {
   liveRuns: number;
   cacheRuns: number;
   unavailableRuns: number;
+  retryableFailures: number;
+  fatalFailures: number;
+  upstreamChangeCount: number;
   lastStatus: DiagnosticDataState;
   lastRunAt: string | null;
   lastMessage: string | null;
+  lastFingerprint: string | null;
 }>;
 
 export const buildSourceFailureSummary = (
@@ -190,23 +249,72 @@ export const buildSourceFailureSummary = (
       liveRuns: 0,
       cacheRuns: 0,
       unavailableRuns: 0,
+      retryableFailures: 0,
+      fatalFailures: 0,
+      upstreamChangeCount: 0,
       lastStatus: "live" as DiagnosticDataState,
       lastRunAt: null,
-      lastMessage: null
+      lastMessage: null,
+      lastFingerprint: null
     };
     existing.totalRuns += 1;
     if (entry.state === "live") existing.liveRuns += 1;
     else if (entry.state === "cache" || entry.state === "fallback") existing.cacheRuns += 1;
     else existing.unavailableRuns += 1;
+    if (entry.retryClassification === "retryable") existing.retryableFailures += 1;
+    else if (entry.retryClassification === "fatal") existing.fatalFailures += 1;
+    if (entry.upstreamChange) existing.upstreamChangeCount += 1;
     existing.lastStatus = entry.state;
     existing.lastRunAt = entry.timestamp;
     existing.lastMessage = entry.message;
+    if (entry.requestFingerprint) existing.lastFingerprint = entry.requestFingerprint;
     summary[entry.module] = existing;
   }
   return summary;
 };
 
-export const registerDiagnosticHandlers = (): void => {
+const buildSourceHealth = (
+  module: string,
+  entries: readonly DiagnosticEntry[]
+): SourceHealthSummary => {
+  const recentEntries = entries
+    .filter((entry) => entry.module === module)
+    .slice(-HEALTH_TREND_LIMIT);
+  const summary = buildSourceFailureSummary(recentEntries)[module];
+  const latest = recentEntries[recentEntries.length - 1];
+  return {
+    module,
+    currentState: summary?.lastStatus ?? "unavailable",
+    lastRunAt: summary?.lastRunAt ?? null,
+    recentEntries,
+    liveRuns: summary?.liveRuns ?? 0,
+    cachedRuns: summary?.cacheRuns ?? 0,
+    unavailableRuns: summary?.unavailableRuns ?? 0,
+    retryableFailures: summary?.retryableFailures ?? 0,
+    fatalFailures: summary?.fatalFailures ?? 0,
+    upstreamChangeCount: summary?.upstreamChangeCount ?? 0,
+    lastFingerprint: summary?.lastFingerprint ?? null,
+    lastMessage: latest?.message ?? summary?.lastMessage ?? null
+  };
+};
+
+export const buildHealthViewSnapshot = async (): Promise<HealthViewSnapshot> => {
+  await updateQueue;
+  const payload = await readPayload();
+  const modules = [...new Set(payload.entries.map((entry) => entry.module))];
+  return {
+    sources: modules
+      .map((module) => buildSourceHealth(module, payload.entries))
+      .sort((left, right) => left.module.localeCompare(right.module)),
+    totalRuns: payload.entries.length
+  };
+};
+
+export type ProbeSource = (sourceId: string) => Promise<RefreshSourceResult | null>;
+
+export const registerDiagnosticHandlers = (
+  options: { probeSource?: ProbeSource } = {}
+): void => {
   ipcMain.handle("campusos:diagnostics:load", async (event) => {
     assertTrustedRenderer(event);
     return loadDiagnosticSnapshot();
@@ -218,5 +326,29 @@ export const registerDiagnosticHandlers = (): void => {
   ipcMain.handle("campusos:diagnostics:export", async (event) => {
     assertTrustedRenderer(event);
     return exportDiagnostics();
+  });
+  ipcMain.handle("campusos:diagnostics:health", async (event) => {
+    assertTrustedRenderer(event);
+    return buildHealthViewSnapshot();
+  });
+  ipcMain.handle("campusos:diagnostics:probe", async (event, sourceId: string) => {
+    assertTrustedRenderer(event);
+    if (typeof sourceId !== "string" || sourceId.length === 0) {
+      throw new Error("连接器验证需要有效的来源标识。");
+    }
+    if (!options.probeSource) {
+      throw new Error("连接器验证探针暂不可用。");
+    }
+    const result = await options.probeSource(sourceId);
+    const snapshot = await buildHealthViewSnapshot();
+    const summary = snapshot.sources.find((source) => source.module === sourceId);
+    if (!summary) {
+      throw new Error(`连接器 ${sourceId} 尚未产生任何刷新记录。`);
+    }
+    return {
+      ok: result !== null && result.status !== "unavailable",
+      summary,
+      message: result?.message
+    };
   });
 };

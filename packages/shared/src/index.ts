@@ -28,6 +28,7 @@ export * from "./pluginCapabilities";
 export * from "./deskCalendarBridge";
 export * from "./appNavigationBridge";
 export * from "./feedbackBridge";
+export * from "./retryClassification";
 
 export type CampusPermission =
   | `network:${string}`

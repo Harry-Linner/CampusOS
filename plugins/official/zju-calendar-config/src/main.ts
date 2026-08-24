@@ -8,6 +8,7 @@ import type {
   PluginCapability,
   PluginCapabilityBinding
 } from "@campusos/shared";
+import { classifyRetryError } from "@campusos/shared";
 import { manifest } from "./manifest";
 
 /**
@@ -39,11 +40,16 @@ interface ConnectorRefreshResult {
   status: "live" | "cache" | "unavailable";
   updatedAt: string;
   message?: string;
+  /** 请求版本指纹（URL/方法/表单结构摘要，脱敏），供连接器健康台账与上游变化检测。 */
+  requestFingerprint?: string | null;
+  /** 失败分类（retryable/fatal），与主进程 retryPolicy 语义一致。 */
+  retryClassification?: "retryable" | "fatal" | null;
 }
 
 export interface CalendarPageFetchResult {
   body: string;
   sourceUrl: string;
+  requestFingerprint?: string;
 }
 
 export interface ZjuCalendarConfigConnectorDependencies {
@@ -244,8 +250,14 @@ export const createZjuCalendarConfigConnector = ({
         updatedAt,
         data
       });
-      return { sourceId: manifest.id, status: "live", updatedAt };
+      return {
+        sourceId: manifest.id,
+        status: "live",
+        updatedAt,
+        requestFingerprint: response.requestFingerprint ?? null
+      };
     } catch (error) {
+      const retryClassification = classifyRetryError(error);
       const cached = await loadCachedCalendar();
       if (cached) {
         await publish({
@@ -260,7 +272,8 @@ export const createZjuCalendarConfigConnector = ({
           sourceId: manifest.id,
           status: "cache",
           updatedAt,
-          message: "官网校历暂时不可用，已使用缓存。"
+          message: "官网校历暂时不可用，已使用缓存。",
+          retryClassification
         };
       }
 
@@ -289,7 +302,8 @@ export const createZjuCalendarConfigConnector = ({
         sourceId: manifest.id,
         status: "unavailable",
         updatedAt,
-        message
+        message,
+        retryClassification
       };
     }
   };

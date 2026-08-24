@@ -9,6 +9,10 @@ export interface RefreshSourceResult {
   status: RefreshSourceStatus;
   updatedAt: string;
   message?: string;
+  /** 请求版本指纹（URL/方法/表单结构的归一化摘要，脱敏），用于上游变化检测。 */
+  requestFingerprint?: string | null;
+  /** 失败分类：与 retryPolicy.classifyError 语义一致；成功可省略。 */
+  retryClassification?: "retryable" | "fatal" | null;
 }
 
 export type RefreshJob = () => Promise<RefreshSourceResult>;
@@ -24,6 +28,8 @@ export interface RefreshCoordinator {
     options?: RefreshJobOptions
   ) => () => void;
   runAll: () => Promise<RefreshSourceResult[]>;
+  /** 单独运行一个已注册的刷新源（连接器健康"手动验证探针"用）。 */
+  runOne: (sourceId: string) => Promise<RefreshSourceResult | null>;
 }
 
 export const createRefreshCoordinator = ({
@@ -96,6 +102,11 @@ export const createRefreshCoordinator = ({
           jobs.delete(sourceId);
         }
       };
+    },
+    runOne: async (sourceId) => {
+      const registration = jobs.get(sourceId);
+      if (!registration) return null;
+      return runJob(sourceId, registration.job);
     },
     runAll: async () => {
       const snapshot = new Map(jobs);
@@ -173,7 +184,9 @@ export const pluginRefreshCoordinator = createRefreshCoordinator({
       operation: "refresh",
       state: result.status,
       durationMs,
-      message: result.message
+      message: result.message,
+      requestFingerprint: result.requestFingerprint ?? null,
+      retryClassification: result.retryClassification ?? null
     });
   }
 });

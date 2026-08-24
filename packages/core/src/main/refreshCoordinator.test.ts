@@ -72,4 +72,44 @@ describe("refresh coordinator", () => {
     ]);
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it("runOne 运行单个已注册来源并返回结果", async () => {
+    const coordinator = createRefreshCoordinator();
+    coordinator.register("zju-undergraduate", async () => ({
+      sourceId: "zju-undergraduate",
+      status: "live",
+      updatedAt: "2026-07-19T04:00:00.000Z"
+    }));
+
+    await expect(coordinator.runOne("zju-undergraduate")).resolves.toEqual({
+      sourceId: "zju-undergraduate",
+      status: "live",
+      updatedAt: "2026-07-19T04:00:00.000Z"
+    });
+    await expect(coordinator.runOne("missing-source")).resolves.toBeNull();
+  });
+
+  it("recordResult 收到请求指纹与失败分类（供健康台账）", async () => {
+    const recordResult = vi.fn();
+    const coordinator = createRefreshCoordinator({ recordResult });
+    coordinator.register("zju-calendar-config", async () => ({
+      sourceId: "zju-calendar-config",
+      status: "unavailable",
+      updatedAt: "2026-07-19T04:00:00.000Z",
+      message: "浙江大学官网校历请求超时。",
+      requestFingerprint: "abc123",
+      retryClassification: "retryable" as const
+    }));
+
+    await coordinator.runAll();
+
+    expect(recordResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceId: "zju-calendar-config",
+        requestFingerprint: "abc123",
+        retryClassification: "retryable"
+      }),
+      expect.any(Number)
+    );
+  });
 });

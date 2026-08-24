@@ -8,7 +8,10 @@
  * - Consecutive failure tracking for diagnostic purposes
  */
 
-export type RetryClassification = "retryable" | "fatal";
+import { classifyRetryError } from "@campusos/shared";
+import type { RetryClassification } from "@campusos/shared";
+
+export type { RetryClassification } from "@campusos/shared";
 
 export interface RetryState {
   consecutiveFailures: number;
@@ -28,25 +31,12 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY_MS = 1000;
 const DEFAULT_MAX_DELAY_MS = 30_000;
 
-export const classifyError = (error: unknown): RetryClassification => {
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    if (message.includes("timeout") || message.includes("abort")) return "retryable";
-    if (message.includes("econnrefused") || message.includes("enotfound")) return "retryable";
-    if (message.includes("econnreset") || message.includes("socket hang")) return "retryable";
-    if (error.name === "AbortError") return "retryable";
-  }
-
-  if (isRetryableHttpStatus(error)) return "retryable";
-  return "fatal";
-};
-
-const isRetryableHttpStatus = (error: unknown): boolean => {
-  if (typeof error !== "object" || error === null) return false;
-  const status = (error as { status?: number }).status;
-  if (typeof status !== "number") return false;
-  return status === 408 || status === 429 || status >= 500;
-};
+/**
+ * 分类逻辑与 @campusos/shared 的 classifyRetryError 完全一致，
+ * 保证连接器健康台账（retryable/fatal）与重试策略语义统一。
+ */
+export const classifyError = (error: unknown): RetryClassification =>
+  classifyRetryError(error);
 
 export const computeBackoffMs = (
   attempt: number,

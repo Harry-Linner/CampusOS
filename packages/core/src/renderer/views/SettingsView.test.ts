@@ -151,7 +151,10 @@ const installBridge = (
             state: "live" as const,
             durationMs: 320,
             errorCategory: null,
-            message: null
+            message: null,
+            requestFingerprint: null,
+            retryClassification: null,
+            upstreamChange: false
           }
         ],
         totalCount: 1,
@@ -162,7 +165,57 @@ const installBridge = (
         totalCount: 0,
         storagePath: "C:/diagnostics/refresh-log.json"
       })),
-      exportTxt: vi.fn(async () => ({ canceled: true, path: null }))
+      exportTxt: vi.fn(async () => ({ canceled: true, path: null })),
+      health: vi.fn(async () => ({
+        sources: [
+          {
+            module: "zju-undergraduate",
+            currentState: "live" as const,
+            lastRunAt: "2026-07-19T04:00:00.000Z",
+            recentEntries: [
+              {
+                id: "diagnostic-1",
+                timestamp: "2026-07-19T04:00:00.000Z",
+                module: "zju-undergraduate",
+                operation: "refresh",
+                state: "live" as const,
+                durationMs: 320,
+                errorCategory: null,
+                message: null,
+                requestFingerprint: null,
+                retryClassification: null,
+                upstreamChange: false
+              }
+            ],
+            liveRuns: 1,
+            cachedRuns: 0,
+            unavailableRuns: 0,
+            retryableFailures: 0,
+            fatalFailures: 0,
+            upstreamChangeCount: 0,
+            lastFingerprint: null,
+            lastMessage: null
+          }
+        ],
+        totalRuns: 1
+      })),
+      probe: vi.fn(async () => ({
+        ok: true,
+        summary: {
+          module: "zju-undergraduate",
+          currentState: "live" as const,
+          lastRunAt: "2026-07-19T04:00:00.000Z",
+          recentEntries: [],
+          liveRuns: 1,
+          cachedRuns: 0,
+          unavailableRuns: 0,
+          retryableFailures: 0,
+          fatalFailures: 0,
+          upstreamChangeCount: 0,
+          lastFingerprint: null,
+          lastMessage: null
+        }
+      }))
     },
     updates: {
       getAppInfo: vi.fn(async () => ({
@@ -220,7 +273,10 @@ describe("SettingsView", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(await screen.findByText("刷新完成")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "高级" }));
-    expect(await screen.findByText("zju-undergraduate")).toBeDefined();
+    // 连接器健康与诊断日志都会出现来源名，使用多匹配断言两者之一存在。
+    expect(
+      (await screen.findAllByText("zju-undergraduate")).length
+    ).toBeGreaterThan(0);
     expect(screen.getByText("live · 320ms")).toBeDefined();
   });
 

@@ -1417,6 +1417,109 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.health-source-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.health-source-list li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.health-source-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.health-source-heading strong {
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.health-source-heading span {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.health-source-heading span[data-state="live"] {
+  color: var(--success);
+}
+
+.health-source-heading span[data-state="cache"],
+.health-source-heading span[data-state="fallback"] {
+  color: var(--warning);
+}
+
+.health-source-heading span[data-state="unavailable"] {
+  color: var(--danger);
+}
+
+.health-dot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+
+.health-dot[data-state="live"] {
+  background: var(--success);
+}
+
+.health-dot[data-state="cache"],
+.health-dot[data-state="fallback"] {
+  background: var(--warning);
+}
+
+.health-dot[data-state="unavailable"] {
+  background: var(--danger);
+}
+
+.health-dot-empty {
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+}
+
+.health-source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+}
+
+.health-upstream {
+  color: var(--warning);
+}
+
+.health-last-message {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.health-source-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .credential-proof {
   display: flex;
   flex-direction: column;

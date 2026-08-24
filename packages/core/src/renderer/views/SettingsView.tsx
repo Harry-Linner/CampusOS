@@ -3,7 +3,7 @@ import type { AcademicProgram } from "../../shared/credentialBridge";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useReminderSettings } from "../hooks/useReminderSettings";
 import { useTheme, type ThemeMode } from "../hooks/useTheme";
-import type { DiagnosticSnapshot } from "../../shared/diagnosticBridge";
+import type { DiagnosticSnapshot, HealthViewSnapshot } from "../../shared/diagnosticBridge";
 import type {
   CampusAppInfo,
   UpdateStatus
@@ -11,7 +11,9 @@ import type {
 import {
   clearDiagnostics,
   exportDiagnostics,
-  loadDiagnostics
+  loadDiagnostics,
+  loadHealthView,
+  probeSource
 } from "../lib/diagnosticBridge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -86,6 +88,10 @@ export const SettingsView = ({
     "idle" | "loading" | "exported" | "error"
   >("idle");
   const [diagnosticMessage, setDiagnosticMessage] = useState("");
+  const [healthView, setHealthView] = useState<HealthViewSnapshot | null>(null);
+  const [healthState, setHealthState] = useState<"idle" | "loading" | "error">("idle");
+  const [healthMessage, setHealthMessage] = useState("");
+  const [probingSource, setProbingSource] = useState<string | null>(null);
   const [appInfo, setAppInfo] = useState<CampusAppInfo | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: "idle" });
   const [launchAtLogin, setLaunchAtLogin] = useState(false);
@@ -175,8 +181,50 @@ export const SettingsView = ({
     }
   };
 
+  const reloadHealth = async (): Promise<void> => {
+    setHealthState("loading");
+    setHealthMessage("");
+    try {
+      setHealthView(await loadHealthView());
+      setHealthState("idle");
+    } catch (error) {
+      setHealthState("error");
+      setHealthMessage(
+        error instanceof Error ? error.message : "连接器健康信息读取失败。"
+      );
+    }
+  };
+
+  const runProbe = async (sourceId: string): Promise<void> => {
+    setProbingSource(sourceId);
+    setHealthMessage("");
+    try {
+      const result = await probeSource(sourceId);
+      setHealthView((current) =>
+        current
+          ? {
+              ...current,
+              sources: current.sources.map((source) =>
+                source.module === sourceId ? result.summary : source
+              )
+            }
+          : current
+      );
+      setHealthMessage(
+        result.ok ? `「${sourceId}」验证完成，状态正常。` : `「${sourceId}」验证完成，状态：${result.summary.currentState}。`
+      );
+    } catch (error) {
+      setHealthMessage(
+        error instanceof Error ? error.message : "连接器验证失败。"
+      );
+    } finally {
+      setProbingSource(null);
+    }
+  };
+
   useEffect(() => {
     void reloadDiagnostics();
+    void reloadHealth();
   }, []);
 
   useEffect(() => {
@@ -777,6 +825,85 @@ export const SettingsView = ({
 
           {category === "advanced" ? (
             <>
+              <section className="settings-section" aria-labelledby="health-heading">
+                <header className="settings-section-heading">
+                  <h2 id="health-heading">连接器健康</h2>
+                  <span className="diagnostic-count">
+                    {healthView ? `${healthView.sources.length} 个来源` : "未读取"}
+                  </span>
+                </header>
+
+                <p className="page-copy">
+                  记录每个连接器最近刷新趋势、失败分类与请求指纹变化；指纹变化提示"上游可能已改版"。不记录响应正文与凭证。
+                </p>
+                <div className="settings-actions">
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    disabled={healthState === "loading"}
+                    onClick={() => void reloadHealth()}
+                  >
+                    刷新健康
+                  </Button>
+                </div>
+
+                {healthMessage ? (
+                  <p className="save-note" role="status">{healthMessage}</p>
+                ) : null}
+
+                {healthView?.sources.length ? (
+                  <ul className="health-source-list">
+                    {healthView.sources.map((source) => (
+                      <li key={source.module}>
+                        <div className="health-source-heading">
+                          <strong>{source.module}</strong>
+                          <span data-state={source.currentState}>
+                            {source.currentState}
+                          </span>
+                        </div>
+                        <div className="health-dot-row" aria-label={`最近 ${source.recentEntries.length} 次刷新`}>
+                          {source.recentEntries.map((entry) => (
+                            <span
+                              key={entry.id}
+                              className="health-dot"
+                              data-state={entry.state}
+                              title={`${entry.state} · ${entry.durationMs}ms`}
+                            />
+                          ))}
+                          {source.recentEntries.length === 0 ? (
+                            <span className="health-dot-empty">暂无记录</span>
+                          ) : null}
+                        </div>
+                        <div className="health-source-meta">
+                          <span>live {source.liveRuns} · 缓存 {source.cachedRuns} · 失败 {source.unavailableRuns}</span>
+                          <span>可重试 {source.retryableFailures} · 致命 {source.fatalFailures}</span>
+                          {source.upstreamChangeCount > 0 ? (
+                            <span className="health-upstream" role="status">
+                              上游可能已变化
+                            </span>
+                          ) : null}
+                        </div>
+                        {source.lastMessage ? (
+                          <p className="health-last-message">{source.lastMessage}</p>
+                        ) : null}
+                        <div className="health-source-actions">
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            disabled={probingSource === source.module}
+                            onClick={() => void runProbe(source.module)}
+                          >
+                            {probingSource === source.module ? "验证中…" : "验证"}
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : healthState !== "loading" ? (
+                  <div className="quiet-empty-state quiet-empty-compact">暂无刷新记录</div>
+                ) : null}
+              </section>
+
               <section className="settings-section" aria-labelledby="diagnostic-heading">
                 <header className="settings-section-heading">
                   <h2 id="diagnostic-heading">诊断与测试</h2>

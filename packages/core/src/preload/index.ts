@@ -222,7 +222,10 @@ contextBridge.exposeInMainWorld("campusos", {
   diagnostics: {
     load: () => ipcRenderer.invoke("campusos:diagnostics:load"),
     clear: () => ipcRenderer.invoke("campusos:diagnostics:clear"),
-    exportTxt: () => ipcRenderer.invoke("campusos:diagnostics:export")
+    exportTxt: () => ipcRenderer.invoke("campusos:diagnostics:export"),
+    health: () => ipcRenderer.invoke("campusos:diagnostics:health"),
+    probe: (sourceId: string) =>
+      ipcRenderer.invoke("campusos:diagnostics:probe", sourceId)
   },
   backup: {
     export: () => ipcRenderer.invoke("campusos:backup:export"),

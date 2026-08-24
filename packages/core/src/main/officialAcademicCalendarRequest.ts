@@ -1,8 +1,17 @@
+import { computeRequestFingerprint } from "./requestFingerprint";
+
 const OFFICIAL_CALENDAR_URL =
   "https://www.zju.edu.cn/english/19600/list.htm";
 const REQUEST_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_ATTEMPTS = 2;
+
+export interface OfficialCalendarPage {
+  body: string;
+  sourceUrl: string;
+  /** 请求版本指纹：结构变化（URL 改版）时随之变化，用于上游兼容雷达。 */
+  requestFingerprint: string;
+}
 
 const E2E_OFFICIAL_CALENDAR_PAGE = `
   <div class="title">Autumn Quarter 2026</div>
@@ -15,21 +24,19 @@ const E2E_OFFICIAL_CALENDAR_PAGE = `
 export const useE2eFixtureSources = (): boolean =>
   process.env.CAMPUSOS_E2E_FIXTURE === "1";
 
-export const requestE2eOfficialCalendar = async (): Promise<{
-  body: string;
-  sourceUrl: string;
-}> => ({
+export const requestE2eOfficialCalendar = async (): Promise<OfficialCalendarPage> => ({
   body: E2E_OFFICIAL_CALENDAR_PAGE,
-  sourceUrl: "https://www.zju.edu.cn/english/19600/list.htm"
+  sourceUrl: "https://www.zju.edu.cn/english/19600/list.htm",
+  requestFingerprint: computeRequestFingerprint(
+    "GET",
+    "https://www.zju.edu.cn/english/19600/list.htm"
+  )
 });
 
 const isRetryableStatus = (status: number): boolean =>
   status === 408 || status === 429 || status >= 500;
 
-export const requestOfficialAcademicCalendar = async (): Promise<{
-  body: string;
-  sourceUrl: string;
-}> => {
+export const requestOfficialAcademicCalendar = async (): Promise<OfficialCalendarPage> => {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -76,7 +83,11 @@ export const requestOfficialAcademicCalendar = async (): Promise<{
         throw new Error("浙江大学官网校历响应超过安全大小限制。");
       }
 
-      return { body, sourceUrl: response.url };
+      return {
+        body,
+        sourceUrl: response.url,
+        requestFingerprint: computeRequestFingerprint("GET", response.url)
+      };
     } catch (error) {
       lastError = error;
       if (attempt >= MAX_ATTEMPTS) break;
