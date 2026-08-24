@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import type {
   PluginManifestV2,
@@ -10,7 +11,7 @@ import {
   toUserPluginSnapshot
 } from "../../main/officialPluginCatalog";
 import { resolvePluginRuntime } from "../../main/pluginRuntime";
-import { isPluginModuleUpdate, loadPlugins } from "./pluginHost";
+import { isPluginModuleUpdate, loadPlugins, type LoadedPlugin } from "./pluginHost";
 import { buildActivityItems } from "./pluginNavigation";
 
 const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
@@ -190,5 +191,118 @@ describe("isPluginModuleUpdate（开发期插件 HMR 判定）", () => {
 
   it("空更新列表不命中", () => {
     expect(isPluginModuleUpdate([])).toBe(false);
+  });
+});
+
+describe("buildActivityItems（侧栏子 Tab 分组）", () => {
+  const makePlugin = (
+    id: string,
+    views: Array<{
+      id: string;
+      title: string;
+      activityTarget: string;
+      parentActivityTarget?: string;
+      order?: number;
+    }>
+  ): LoadedPlugin => ({
+    manifest: {
+      id,
+      name: id.replace(/\./g, "-"),
+      displayName: id,
+      version: "1.0.0",
+      apiVersion: 2,
+      kind: "feature",
+      description: "test",
+      icon: "计",
+      permissions: ["storage:local"],
+      sourceScope: ["local"],
+      releaseStage: "ready",
+      provides: [],
+      requires: [],
+      optionalRequires: [],
+      contributes: {
+        views: views.map((view) => ({
+          id: view.id,
+          title: view.title,
+          icon: "Clock",
+          location: "activity" as const,
+          activityTarget: view.activityTarget,
+          ...(view.parentActivityTarget
+            ? { parentActivityTarget: view.parentActivityTarget }
+            : {}),
+          ...(view.order !== undefined ? { order: view.order } : {})
+        }))
+      }
+    },
+    runtime: {
+      id,
+      manifest: {} as LoadedPlugin["manifest"],
+      enabled: true,
+      grantedPermissions: ["storage:local"],
+      status: "active",
+      bindings: {},
+      issues: []
+    },
+    capabilities: { read: async () => [] }
+  });
+
+  it("子 Tab 视图归入父入口且不产生独立导航项", () => {
+    const plugin = makePlugin("dev.example.suite", [
+      { id: "main", title: "套件主页", activityTarget: "suite" },
+      { id: "stats", title: "统计", activityTarget: "suite-stats", parentActivityTarget: "suite" }
+    ]);
+    const items = buildActivityItems([
+      {
+        ...plugin,
+        manifest: { ...plugin.manifest },
+        runtime: { ...plugin.runtime, manifest: plugin.manifest },
+        Component: () => createElement("div")
+      }
+    ]);
+
+    const suite = items.find((item) => item.id === "suite");
+    expect(suite).toBeDefined();
+    expect(suite?.subTabs?.map((tab) => tab.label)).toEqual([
+      "套件主页",
+      "统计"
+    ]);
+    // 子视图不产生独立导航项
+    expect(items.some((item) => item.id === "suite-stats")).toBe(false);
+  });
+
+  it("父项无独立视图时由子 Tab 承担入口", () => {
+    const plugin = makePlugin("dev.example.grouped", [
+      { id: "only-child", title: "唯一子视图", activityTarget: "grouped-child", parentActivityTarget: "grouped" }
+    ]);
+    const items = buildActivityItems([
+      {
+        ...plugin,
+        manifest: { ...plugin.manifest },
+        runtime: { ...plugin.runtime, manifest: plugin.manifest },
+        Component: () => createElement("div")
+      }
+    ]);
+
+    const grouped = items.find((item) => item.id === "grouped");
+    expect(grouped?.label).toBe("唯一子视图");
+    expect(grouped?.subTabs).toEqual([
+      { id: "dev.example.grouped:only-child", label: "唯一子视图", viewId: "dev.example.grouped:only-child" }
+    ]);
+  });
+
+  it("无 parent 的既有行为不变", () => {
+    const plugin = makePlugin("dev.example.single", [
+      { id: "main", title: "单一视图", activityTarget: "single" }
+    ]);
+    const items = buildActivityItems([
+      {
+        ...plugin,
+        manifest: { ...plugin.manifest },
+        runtime: { ...plugin.runtime, manifest: plugin.manifest },
+        Component: () => createElement("div")
+      }
+    ]);
+    const single = items.find((item) => item.id === "single");
+    expect(single?.subTabs).toBeUndefined();
   });
 });

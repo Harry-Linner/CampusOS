@@ -1591,6 +1591,37 @@ input:focus-visible {
   gap: 8px;
 }
 
+.view-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.view-subtab {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 6px 12px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.view-subtab:hover {
+  border-color: var(--line);
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.view-subtab.is-active {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+
 .credential-proof {
   display: flex;
   flex-direction: column;

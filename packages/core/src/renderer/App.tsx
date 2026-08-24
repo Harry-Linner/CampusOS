@@ -105,7 +105,9 @@ export const App = (): JSX.Element => {
         return (plugin.manifest.contributes.views ?? [])
           .filter(
             (view) =>
-              view.location === "activity" && view.activityTarget === activeView
+              view.location === "activity" &&
+              (view.activityTarget === activeView ||
+                view.parentActivityTarget === activeView)
           )
           .map((view) => ({
             key: `${plugin.manifest.id}:${view.id}`,
@@ -123,6 +125,21 @@ export const App = (): JSX.Element => {
       }),
     [activeView, pluginHost.plugins]
   );
+
+  const activeItem = activityItems.find((item) => item.id === activeView);
+  const hasSubTabs = (activeItem?.subTabs?.length ?? 0) > 0;
+  const [activeSubTab, setActiveSubTab] = useState<string | null>(null);
+
+  // 切换一级视图时重置子 Tab 选择。
+  useEffect(() => {
+    setActiveSubTab(null);
+  }, [activeView]);
+
+  const selectedSubTab =
+    activeSubTab !== null &&
+    activityPlugins.some((plugin) => plugin.key === activeSubTab)
+      ? activeSubTab
+      : (activityPlugins[0]?.key ?? null);
 
   if (!onboardingComplete) {
     return <OnboardingWizard onComplete={handleOnboardingComplete} />;
@@ -162,7 +179,9 @@ export const App = (): JSX.Element => {
       />
     );
   } else if (activityPlugins.length > 0) {
-    const selected = activityPlugins[0];
+    const selected =
+      activityPlugins.find((plugin) => plugin.key === selectedSubTab) ??
+      activityPlugins[0];
     content = (
       <selected.Component
         capabilities={selected.capabilities}
@@ -214,6 +233,27 @@ export const App = (): JSX.Element => {
           </div>
         ) : null}
         <div key={activeView} className="view-stage">
+          {hasSubTabs && activityPlugins.length > 1 ? (
+            <nav className="view-subtabs" aria-label="视图子标签">
+              {activityPlugins.map((plugin) => (
+                <button
+                  key={plugin.key}
+                  type="button"
+                  className={
+                    plugin.key === selectedSubTab
+                      ? "view-subtab is-active"
+                      : "view-subtab"
+                  }
+                  aria-current={
+                    plugin.key === selectedSubTab ? "page" : undefined
+                  }
+                  onClick={() => setActiveSubTab(plugin.key)}
+                >
+                  {plugin.title}
+                </button>
+              ))}
+            </nav>
+          ) : null}
           {content}
         </div>
       </main>

@@ -137,6 +137,8 @@ export interface PluginActivityView {
   icon: string;
   location: "activity" | "extensions";
   activityTarget?: ActivityItemId;
+  /** 侧栏子 Tab：把本视图归入某个一级 activityTarget 之下（需指向已有 activity view 的 activityTarget）。 */
+  parentActivityTarget?: string;
   order?: number;
 }
 
@@ -412,6 +414,13 @@ export const validateManifestV2 = (
           issues.push("Manifest v2 activity view 缺少有效 activityTarget");
         }
         if (
+          candidateView.parentActivityTarget !== undefined &&
+          (typeof candidateView.parentActivityTarget !== "string" ||
+            !/^[a-z][a-z0-9-]*$/.test(candidateView.parentActivityTarget))
+        ) {
+          issues.push("Manifest v2 parentActivityTarget 无效");
+        }
+        if (
           candidateView.order !== undefined &&
           (typeof candidateView.order !== "number" ||
             !Number.isFinite(candidateView.order))
@@ -433,6 +442,28 @@ export const validateManifestV2 = (
       ) {
         issues.push(`Manifest v2 contributes.${field} 必须是非空字符串数组`);
       }
+    }
+  }
+
+  // parentActivityTarget 必须指向本 manifest 内某个 activity view 的 activityTarget。
+  const candidateWithViews = manifest as {
+    contributes?: {
+      views?: Array<{ activityTarget?: string; parentActivityTarget?: string }>;
+    };
+  };
+  const declaredTargets = new Set(
+    (candidateWithViews.contributes?.views ?? [])
+      .map((view) => view.activityTarget)
+      .filter((target): target is string => typeof target === "string")
+  );
+  for (const view of candidateWithViews.contributes?.views ?? []) {
+    if (
+      typeof view.parentActivityTarget === "string" &&
+      !declaredTargets.has(view.parentActivityTarget)
+    ) {
+      issues.push(
+        `Manifest v2 parentActivityTarget ${view.parentActivityTarget} 未指向任何 activityTarget`
+      );
     }
   }
 

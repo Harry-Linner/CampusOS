@@ -60,8 +60,11 @@
 
 | 项 | 结果 |
 |---|---|
-| 正式链路（manifest/导航/shell/懒加载） |  |
-| 用户可见行为（子 Tab/懒加载体感） |  |
-| 错误边界（parent 失效/懒加载失败） |  |
-| 针对性测试 |  |
-| UI 规避清单（截图验收） |  |
+| 正式链路（manifest/导航/shell/懒加载） | ✅ PluginActivityView 增加 parentActivityTarget（validateManifestV2 校验须指向本 manifest 内 activityTarget）；pluginNavigation 分组（子 Tab 并入父入口、父无独立视图时由子承担入口、reservedTargets 防劫持）；App 渲染子 Tab 条（切换只换视图不换导航、重置逻辑） |
+| 用户可见行为（子 Tab/懒加载体感） | ✅ 一级入口含多视图时显示子 Tab 条（正常流布局、aria-current、激活态）；未选中视图不挂载（懒边界）；官方插件未声明 parent 时行为不变（回归） |
+| 错误边界（parent 失效/懒加载失败） | ✅ parent 指向不存在 → manifest 校验拒绝；子 Tab 键缺失回退到首个视图 |
+| 针对性测试 | ✅ buildActivityItems 3 例（子 Tab 归组/父无独立视图/无 parent 回归）；validateManifestV2 parent 正反校验；全量 567 passed + lint + typecheck 绿 |
+| UI 规避清单（截图验收） | ✅ 子 Tab 条用 flex + gap + token（无装饰框/无位移拼缝/窄屏可换行）；桌面端截图验收待打包后补 |
+
+### 5.1 说明
+- 懒加载分两块：① 视图级按需挂载（本阶段完成：未选中的视图/子 Tab 不渲染）；② 重依赖动态 import 分块——官方插件现有动态 import（如 materials 经 pluginHost 按需加载）已覆盖一部分；进一步的按 bundle 分析拆分需在构建产物验证阶段进行，作为后续小项。
