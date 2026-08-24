@@ -1,4 +1,4 @@
-import { startTransition, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import type {
   PluginManifestV2,
   PluginRuntimeConfigurationInput,
@@ -9,7 +9,11 @@ import type {
   PluginPackageRegistrySnapshot,
   PluginUpdateCandidate
 } from "../../shared/pluginBridge";
-import { loadPlugins, type LoadedPlugin } from "../lib/pluginHost";
+import {
+  loadPlugins,
+  setupPluginDevHmr,
+  type LoadedPlugin
+} from "../lib/pluginHost";
 import {
   configurePluginRuntime,
   discardPluginPackage,
@@ -58,6 +62,19 @@ export const usePluginHost = (): PluginHostState => {
       setError(null);
     });
   };
+  const applySnapshotRef = useRef(applySnapshot);
+  applySnapshotRef.current = applySnapshot;
+
+  // 开发期插件源码热重载：官方插件包变更时按最新运行时快照重载插件视图。
+  useEffect(() => {
+    const meta = import.meta as ImportMeta & { env?: { DEV?: boolean } };
+    if (!meta.env?.DEV) return undefined;
+    return setupPluginDevHmr(() => {
+      void loadPluginRuntimeSnapshot()
+        .then((snapshot) => applySnapshotRef.current(snapshot))
+        .catch(() => undefined);
+    });
+  }, []);
 
   return useMemo(
     () => ({

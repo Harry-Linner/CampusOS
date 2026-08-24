@@ -10,7 +10,7 @@ import {
   toUserPluginSnapshot
 } from "../../main/officialPluginCatalog";
 import { resolvePluginRuntime } from "../../main/pluginRuntime";
-import { loadPlugins } from "./pluginHost";
+import { isPluginModuleUpdate, loadPlugins } from "./pluginHost";
 import { buildActivityItems } from "./pluginNavigation";
 
 const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
@@ -158,5 +158,37 @@ describe("loadPlugins", () => {
       sandbox: "allow-scripts allow-same-origin",
       referrerPolicy: "no-referrer"
     });
+  });
+});
+
+describe("isPluginModuleUpdate（开发期插件 HMR 判定）", () => {
+  it("命中官方插件包路径", () => {
+    expect(
+      isPluginModuleUpdate([
+        { type: "js-update", path: "/@fs/.../plugins/official/plugin-academic/src/index.tsx" }
+      ])
+    ).toBe(true);
+    expect(
+      isPluginModuleUpdate([
+        { type: "js-update", path: "/@fs/.../node_modules/@campusos/plugin-schedule/src/ScheduleView.tsx" }
+      ])
+    ).toBe(true);
+  });
+
+  it("非插件模块更新不命中", () => {
+    expect(
+      isPluginModuleUpdate([
+        { type: "js-update", path: "/src/renderer/views/DashboardView.tsx" }
+      ])
+    ).toBe(false);
+    expect(
+      isPluginModuleUpdate([
+        { type: "css-update", path: "/src/renderer/styles.css" }
+      ])
+    ).toBe(false);
+  });
+
+  it("空更新列表不命中", () => {
+    expect(isPluginModuleUpdate([])).toBe(false);
   });
 });

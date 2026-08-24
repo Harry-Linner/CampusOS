@@ -40,7 +40,8 @@ vi.mock("../lib/pluginHost", () => ({
           read: async () => []
         }
       })
-    )
+    ),
+  setupPluginDevHmr: () => () => undefined
 }));
 
 import type { PluginRuntimeRecord } from "@campusos/shared";

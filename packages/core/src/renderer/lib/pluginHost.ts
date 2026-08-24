@@ -87,6 +87,46 @@ const loadPluginDefinition = (definition: PluginDefinition): Promise<PluginModul
   return loading;
 };
 
+/** 判断一次 vite 热更新是否触及官方插件包源码（开发期插件 HMR 用）。 */
+export const isPluginModuleUpdate = (
+  updates: ReadonlyArray<{ type?: string; path?: string }>
+): boolean =>
+  updates.some((update) =>
+    (update.path ?? "").includes("plugin-")
+  );
+
+interface PluginHotApi {
+  on: (event: string, listener: (payload: unknown) => void) => void;
+  off: (event: string, listener: (payload: unknown) => void) => void;
+}
+
+/**
+ * 开发期插件源码热重载：官方插件包（@campusos/plugin-*）源码变更时，
+ * 清空插件模块缓存并通知宿主重新加载；生产构建下为 no-op。
+ */
+export const setupPluginDevHmr = (onUpdate: () => void): (() => void) => {
+  const meta = import.meta as ImportMeta & {
+    env?: { DEV?: boolean };
+    hot?: PluginHotApi;
+  };
+  const hot = meta.hot;
+  if (!meta.env?.DEV || !hot) return () => undefined;
+  const afterUpdate = (payload: unknown): void => {
+    const updates = Array.isArray(
+      (payload as { updates?: unknown })?.updates
+    )
+      ? (payload as { updates: Array<{ type?: string; path?: string }> }).updates
+      : [];
+    if (!isPluginModuleUpdate(updates)) return;
+    pluginModuleCache.clear();
+    onUpdate();
+  };
+  hot.on("vite:afterUpdate", afterUpdate);
+  return () => {
+    hot.off("vite:afterUpdate", afterUpdate);
+  };
+};
+
 export const loadPlugins = async (
   runtimeSnapshot: PluginRuntimeSnapshot
 ): Promise<LoadedPlugin[]> => {
