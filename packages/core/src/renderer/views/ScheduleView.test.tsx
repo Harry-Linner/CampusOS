@@ -409,7 +409,10 @@ describe("schedule event ranges", () => {
   });
 
   it("导出 Markdown 走正式保存桥接", async () => {
-    const save = vi.fn(async () => ({ canceled: false, path: "C:/export.md" }));
+    const save = vi.fn(
+      async (input: { content?: string; suggestedName?: string; kind?: string }) =>
+        ({ canceled: false, path: "C:/export.md" })
+    );
     (window as unknown as { campusos?: unknown }).campusos = {
       exports: { save }
     };
