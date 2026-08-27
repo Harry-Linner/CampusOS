@@ -31,6 +31,13 @@ export interface DeskCalendarProgress {
   endAt: string;
 }
 
+export interface DeskCalendarWeatherDay {
+  date: string;
+  weatherCode: number;
+  tempMax: number;
+  tempMin: number;
+}
+
 export interface DeskCalendarWeather {
   location: string;
   temperatureC: number;
@@ -38,6 +45,8 @@ export interface DeskCalendarWeather {
   observedAt: string;
   cachedAt: string;
   error: string | null;
+  /** 今日 + 未来 3 天预报（DeskToDo 式展示）。 */
+  forecast?: DeskCalendarWeatherDay[];
 }
 
 /** 桌面日历独立配色主题（与主应用主题无关）。 */

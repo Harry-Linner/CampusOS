@@ -61,6 +61,19 @@ export const App = (): JSX.Element => {
     setNavigationTarget(request);
   }), []);
 
+  // 导航目标是一次性消费：离开目标视图或短暂延迟后清除，避免同一目标在插件
+  // 重新挂载时再次触发（桌面日历点击课程跳转 → 切走 → 切回，详情不应重开）。
+  useEffect(() => {
+    if (!navigationTarget) return;
+    const target = navigationTarget.viewId;
+    if (activeView !== target) {
+      setNavigationTarget(null);
+      return;
+    }
+    const timer = window.setTimeout(() => setNavigationTarget(null), 800);
+    return () => window.clearTimeout(timer);
+  }, [navigationTarget, activeView]);
+
   // 渲染进程内部导航（如通知中心点击跳转）：自定义事件携带目标视图 id。
   useEffect(() => {
     const handleInternalNavigate = (event: Event): void => {

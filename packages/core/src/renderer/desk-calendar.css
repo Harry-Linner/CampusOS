@@ -217,8 +217,94 @@ body {
   color: var(--desk-cal-text);
 }
 
-.desk-cal-clock {
-  display: none;
+.desk-cal-widget-clock .desk-cal-clock-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.desk-cal-widget-empty {
+  opacity: 0.75;
+}
+
+.desk-cal-widget-empty span {
+  font-style: italic;
+}
+
+/* DeskToDo 式天气卡片：今日 + 3 天预报 + 折线图 */
+.desk-cal-widget.desk-cal-weather {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.desk-cal-weather-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.desk-cal-weather-head strong {
+  font-size: 13px;
+}
+
+.desk-cal-weather-head span {
+  grid-column: auto;
+  color: var(--desk-cal-text);
+  font-size: 12px;
+}
+
+.desk-cal-weather-head small {
+  color: var(--desk-cal-muted);
+  font-size: 9px;
+}
+
+.desk-cal-weather-head button {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 5px;
+  background: var(--desk-cal-soft);
+  color: var(--desk-cal-text);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 7px;
+}
+
+.desk-cal-weather-days {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.desk-cal-weather-day {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.desk-cal-weather-day span {
+  color: var(--desk-cal-muted);
+  font-size: 9px;
+}
+
+.desk-cal-weather-day i {
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.desk-cal-weather-day strong {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.desk-cal-weather-chart {
+  display: block;
+  min-height: 40px;
 }
 
 .desk-cal-close {
@@ -355,14 +441,28 @@ body {
 
 .desk-cal-task-tabs {
   display: flex;
-  gap: 13px;
+  gap: 4px;
   border-bottom: 1px solid var(--desk-cal-border);
-  color: var(--desk-cal-muted);
-  font-size: 10px;
   padding: 0 2px 7px;
 }
 
-.desk-cal-task-tabs .is-active {
+.desk-cal-task-tabs button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+.desk-cal-task-tabs button:hover {
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-task-tabs button.is-active {
+  background: var(--desk-cal-soft-strong);
   color: var(--desk-cal-accent);
 }
 
@@ -378,9 +478,47 @@ body {
 
 .desk-cal-sidebar-task {
   display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-sidebar-task:hover {
+  background: var(--desk-cal-soft);
+}
+
+.desk-cal-sidebar-complete {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.desk-cal-sidebar-complete:hover {
+  border-color: var(--desk-cal-accent);
+  color: var(--desk-cal-accent);
+}
+
+.desk-cal-sidebar-complete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.desk-cal-sidebar-task-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
   align-items: flex-start;
   gap: 8px;
-  width: 100%;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -390,11 +528,7 @@ body {
   cursor: pointer;
 }
 
-.desk-cal-sidebar-task:hover {
-  background: var(--desk-cal-soft);
-}
-
-.desk-cal-sidebar-task > span:last-child {
+.desk-cal-sidebar-task-body > span:last-child {
   display: grid;
   min-width: 0;
   gap: 3px;
@@ -1040,6 +1174,58 @@ body {
   color: var(--desk-cal-accent);
 }
 
+.desk-cal-widget-add-form {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--desk-cal-border);
+  border-radius: 8px;
+}
+
+.desk-cal-widget-add-form label {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+}
+
+.desk-cal-widget-add-form input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 5px;
+  background: var(--desk-cal-soft);
+  color: var(--desk-cal-text);
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 6px;
+}
+
+.desk-cal-widget-add-form button {
+  justify-self: end;
+  border: 1px solid color-mix(in srgb, var(--desk-cal-accent) 70%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--desk-cal-accent) 18%, transparent);
+  color: var(--desk-cal-accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 4px 12px;
+}
+
+.desk-cal-widget-add-form button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.desk-cal-widget-feedback {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--desk-cal-success, #3da06b) 16%, transparent);
+  color: var(--desk-cal-success, #3da06b);
+  font-size: 11px;
+  padding: 5px 9px;
+  text-align: center;
+}
+
 .desk-cal-view-switcher button:focus-visible,
 .desk-cal-icon:focus-visible,
 .desk-cal-today:focus-visible,
@@ -1050,9 +1236,96 @@ body {
   outline-offset: 2px;
 }
 
+/* DeskToDo 式新建待办弹窗：modal 覆盖层 + 居中对话框 */
+.desk-cal-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.desk-cal-quick-task {
+  display: grid;
+  gap: 12px;
+  width: min(300px, calc(100% - 40px));
+  padding: 16px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 12px;
+  background: var(--desk-cal-panel-solid);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+  color: var(--desk-cal-text);
+}
+
+.desk-cal-quick-task header {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.desk-cal-quick-task label {
+  display: grid;
+  gap: 5px;
+}
+
+.desk-cal-quick-task-label {
+  color: var(--desk-cal-muted);
+  font-size: 10px;
+}
+
+.desk-cal-quick-task input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 6px;
+  background: var(--desk-cal-soft);
+  color: var(--desk-cal-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.desk-cal-quick-task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.desk-cal-quick-task-actions button {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 6px;
+  background: var(--desk-cal-soft);
+  color: var(--desk-cal-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 5px 14px;
+}
+
+.desk-cal-quick-task-actions button:last-child {
+  border-color: color-mix(in srgb, var(--desk-cal-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--desk-cal-accent) 18%, transparent);
+  color: var(--desk-cal-accent);
+}
+
+.desk-cal-quick-task-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* 900–640px 仍有空间容纳组件列，压缩列宽而不是整体隐藏；
+   组件开关在更宽窗口下必须始终生效（此前 ≤900px 直接 display:none，
+   导致默认尺寸的桌面日历启用了组件却看不到）。 */
 @media (max-width: 900px) {
   .desk-cal-shell {
-    grid-template-columns: 180px minmax(0, 1fr);
+    grid-template-columns: 148px 168px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .desk-cal-shell {
+    grid-template-columns: 148px minmax(0, 1fr);
   }
 
   .desk-cal-widgets {

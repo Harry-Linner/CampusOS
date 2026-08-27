@@ -9,6 +9,13 @@
 - 产品范围、路线、架构或文档状态判断使用适用的产品、架构或全局视角 skill，并以仓库文档和代码证据说明结论。
 - 若没有合适的 skill，明确采用的替代方法及原因；不得为调用 skill 而扩大任务范围。
 
+### 视觉验收与操作链路自测（多窗口）
+
+CampusOS 是主窗口 + 桌面日历 overlay 的分体式应用，OS 级截图/无障碍树对副窗口不可靠。
+
+- 涉及 UI 的改动，实现后必须按 `docs/agents/visual-verification.md` 的 CDP 方案亲自操作并截图查看受影响链路；不得以脚本断言、单测或前任的视觉结论代替亲眼验收。
+- 每轮 UI 改动的固定流程：`pnpm typecheck` + `pnpm lint` + 根目录 `pnpm test` → 带 `CAMPUSOS_DEV_CDP_PORT=9223 pnpm dev` 走操作链路截图 → e2e → commit/push → CI 绿。
+
 ### Celechron 1.3.0 对照实现
 
 仓库内 `.tmp/celechron-1.3.0` 是 Celechron 1.3.0 社区维护版的本地对照实现。

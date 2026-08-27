@@ -1053,32 +1053,40 @@ export const ScheduleView = ({
                 />
               </label>
             </div>
-            <div className="schedule-kind-filters" role="group" aria-label="按类型筛选">
-              {([
-                ["course", "课程"],
-                ["exam", "考试"],
-                ["deadline", "截止"],
-                ["task", "任务"],
-                ["assignment", "作业"]
-              ] as const).map(([kind, label]) => {
-                const hidden = hiddenKinds.has(kind);
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    className={`schedule-kind-filter schedule-kind-${kind}${hidden ? " is-hidden" : ""}`}
-                    aria-pressed={!hidden}
-                    onClick={() => setHiddenKinds((current) => {
-                      const next = new Set(current);
-                      if (next.has(kind)) next.delete(kind);
-                      else next.add(kind);
-                      return next;
-                    })}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+          </header>
+          <div className="schedule-display-row" aria-label="日历显示选项">
+            <div className="schedule-display-group">
+              <span className="schedule-group-label">按类型显示</span>
+              <div className="schedule-kind-filters" role="group" aria-label="按类型筛选">
+                {([
+                  ["course", "课程"],
+                  ["exam", "考试"],
+                  ["deadline", "截止"],
+                  ["task", "任务"],
+                  ["assignment", "作业"]
+                ] as const).map(([kind, label]) => {
+                  const hidden = hiddenKinds.has(kind);
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      className={`schedule-kind-filter schedule-kind-${kind}${hidden ? " is-hidden" : ""}`}
+                      aria-pressed={!hidden}
+                      onClick={() => setHiddenKinds((current) => {
+                        const next = new Set(current);
+                        if (next.has(kind)) next.delete(kind);
+                        else next.add(kind);
+                        return next;
+                      })}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="schedule-display-group">
+              <span className="schedule-group-label">时间粒度</span>
               <label className="schedule-step-control">
                 <span className="sr-only">时间粒度</span>
                 <select value={timeStepMinutes} onChange={(event) => setTimeStepMinutes(Number(event.target.value) as 15 | 30 | 60)}>
@@ -1087,7 +1095,10 @@ export const ScheduleView = ({
                   <option value={60}>60 分</option>
                 </select>
               </label>
-              <div className="schedule-display-controls" role="group" aria-label="显示选项">
+            </div>
+            <div className="schedule-display-group">
+              <span className="schedule-group-label">呈现方式</span>
+              <div className="schedule-display-controls" role="group" aria-label="呈现方式">
                 <button
                   className={eventStyle === "bar" ? "is-active" : undefined}
                   type="button"
@@ -1100,6 +1111,11 @@ export const ScheduleView = ({
                   aria-pressed={eventStyle === "dot"}
                   onClick={() => setEventStyle("dot")}
                 >圆点</button>
+              </div>
+            </div>
+            <div className="schedule-display-group">
+              <span className="schedule-group-label">密度</span>
+              <div className="schedule-display-controls" role="group" aria-label="密度">
                 <button
                   className={density === "comfortable" ? "is-active" : undefined}
                   type="button"
@@ -1114,7 +1130,7 @@ export const ScheduleView = ({
                 >紧凑</button>
               </div>
             </div>
-          </header>
+          </div>
 
           {contextDay ? (
             <div className="schedule-context-menu" role="menu" aria-label="调休设置">
@@ -1216,10 +1232,29 @@ export const ScheduleView = ({
                 return slotMinutes.map((minutesIntoDay) => {
                   const hour = Math.floor(minutesIntoDay / 60);
                   const minute = minutesIntoDay % 60;
-                  const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => {
-                    const eventStart = getShanghaiDateParts(new Date(event.startAt));
-                    return Number(eventStart.hour) * 60 + Number(eventStart.minute) === minutesIntoDay;
+                  const slotStart = fromShanghaiParts(
+                    Number(getShanghaiDateParts(selectedDate).year),
+                    Number(getShanghaiDateParts(selectedDate).month),
+                    Number(getShanghaiDateParts(selectedDate).day),
+                    hour,
+                    minute
+                  );
+                  const slotEnd = new Date(slotStart.getTime() + timeStepMinutes * 60 * 1000);
+                  // 事件显示在「与其时间范围重叠」的每个槽位上：开始时间不必是
+                  // 粒度的倍数（真实教务时间如 8:55/13:25 也能显示），跨多节的课
+                  // 在后续槽位继续可见，避免「有课却看不到」。
+                  const dayItems = eventsByDay.get(dayKey(selectedDate)) ?? [];
+                  const items = dayItems.filter((event) => {
+                    const eventStart = Date.parse(event.startAt);
+                    const eventEnd = Date.parse(event.endAt);
+                    if (!Number.isFinite(eventStart) || !Number.isFinite(eventEnd) || eventEnd <= eventStart) return false;
+                    return slotStart.getTime() < eventEnd && slotEnd.getTime() > eventStart;
                   });
+                  // 同一事件在「非开始槽」只渲染紧凑延续条，避免完整卡片重复堆叠。
+                  const isSlotWithinEvent = (event: ScheduleEvent): boolean => {
+                    const eventStart = Date.parse(event.startAt);
+                    return slotStart.getTime() > eventStart;
+                  };
                   const formForSlot = (): TaskFormState => {
                     const parts = getShanghaiDateParts(selectedDate);
                     const start = fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour, minute);
@@ -1230,16 +1265,18 @@ export const ScheduleView = ({
                     const isDragging = dragEvent?.id === event.id;
                     const isConflict = conflictEvents.has(event.id);
                     const editable = isTaskEditable(event);
+                    const isContinuation = isSlotWithinEvent(event);
                     return <button
-                      className={`${eventClassName(event)}${isDragging ? " is-dragging" : ""}${isConflict ? " is-conflict" : ""}`}
+                      className={`${eventClassName(event)}${isDragging ? " is-dragging" : ""}${isConflict ? " is-conflict" : ""}${isContinuation ? " is-continuation" : ""}`}
                       type="button"
                       key={event.id}
+                      aria-label={isContinuation ? `${event.title}（延续）` : event.title}
                       onClick={(click) => { click.stopPropagation(); selectEvent(event); }}
                       onPointerDown={editable ? beginDayDrag(event, "move") : undefined}
                       onPointerMove={editable ? moveDayDrag : undefined}
                       onPointerUp={editable ? () => void endDayDrag() : undefined}
                       onPointerCancel={editable ? () => void endDayDrag() : undefined}
-                    ><strong>{event.title}</strong><small>{formatEventMeta(event)}</small>{editable ? <span className="schedule-resize-handle" onPointerDown={beginDayDrag(event, "resize-end")} aria-hidden="true" /> : null}</button>;
+                    >{isContinuation ? null : <strong>{event.title}</strong>}<small>{isContinuation ? "" : formatEventMeta(event)}</small>{editable ? <span className="schedule-resize-handle" onPointerDown={beginDayDrag(event, "resize-end")} aria-hidden="true" /> : null}</button>;
                   })}</div></section>;
                 });
               })()}

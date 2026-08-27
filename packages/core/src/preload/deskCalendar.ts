@@ -13,8 +13,8 @@ contextBridge.exposeInMainWorld("deskCalendar", {
   close: () => ipcRenderer.invoke("campusos:desk-calendar:window:close"),
   openMain: (entityId: string) =>
     ipcRenderer.invoke("campusos:desk-calendar:window:open-main", { entityId }),
-  completeTask: (taskId: string) =>
-    ipcRenderer.invoke("campusos:desk-calendar:task:complete", { taskId }),
+  completeTask: (taskId: string, options?: { status?: "running" | "completed" }) =>
+    ipcRenderer.invoke("campusos:desk-calendar:task:complete", { taskId, ...(options?.status ? { status: options.status } : {}) }),
   saveTask: (input: LocalTaskInput) =>
     ipcRenderer.invoke("campusos:desk-calendar:task:save", input),
   loadSnapshot: () => ipcRenderer.invoke("campusos:desk-calendar:window:snapshot"),

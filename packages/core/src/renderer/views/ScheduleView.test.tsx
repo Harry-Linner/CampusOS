@@ -109,6 +109,39 @@ describe("ScheduleView", () => {
     expect(screen.getByRole("button", { name: "日视图" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("lists a course in the day view even when its start time is not a multiple of the step", async () => {
+    // 回归：日视图时间槽曾要求事件开始分钟与槽位完全相等，真实教务时间
+    // （如 09:05 开始、跨多节）会整段消失。事件应显示在与其时间范围重叠的槽位。
+    // 用与组件相同的上海时区工具构造时间，避免测试机时区干扰。
+    const shanghaiDate = (offsetMinutes: number): string => {
+      const nowShanghai = new Date().getTime() + 8 * 60 * 60 * 1000;
+      const today = new Date(nowShanghai);
+      today.setUTCHours(0, 0, 0, 0);
+      return new Date(today.getTime() - 8 * 60 * 60 * 1000 + offsetMinutes * 60 * 1000).toISOString();
+    };
+    const courseSnapshot: CampusWorkspaceSnapshot = {
+      ...snapshot,
+      courses: [{
+        id: "course-905",
+        title: "非整点课程",
+        startAt: shanghaiDate(9 * 60 + 5),
+        endAt: shanghaiDate(9 * 60 + 5 + 90),
+        location: "教室 201",
+        sourceId: "academic-affairs"
+      }]
+    };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot: courseSnapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule([])
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "日视图" }));
+    expect((await screen.findAllByText("非整点课程")).length).toBeGreaterThan(0);
+  });
+
   it("loads formal task data, shows four views, and saves a new task through the bridge", async () => {
     const schedule = createSchedule();
     render(createElement(ScheduleView, {

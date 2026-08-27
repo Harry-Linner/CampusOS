@@ -230,17 +230,32 @@ const refreshWeather = async (): Promise<DeskCalendarWeather> => {
     if (!geocoding.ok) throw new Error(`定位服务返回 ${geocoding.status}`);
     const place = (await geocoding.json() as { results?: Array<{ latitude: number; longitude: number; name: string }> }).results?.[0];
     if (!place) throw new Error("未找到该地点。");
-    const forecast = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&timezone=Asia%2FShanghai`);
+    const forecast = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=4&timezone=Asia%2FShanghai`);
     if (!forecast.ok) throw new Error(`天气服务返回 ${forecast.status}`);
-    const data = await forecast.json() as { current?: { temperature_2m?: number; weather_code?: number; time?: string } };
+    const data = await forecast.json() as {
+      current?: { temperature_2m?: number; weather_code?: number; time?: string };
+      daily?: { time?: string[]; weather_code?: number[]; temperature_2m_max?: number[]; temperature_2m_min?: number[] };
+    };
     if (!data.current || !Number.isFinite(data.current.temperature_2m) || !Number.isFinite(data.current.weather_code)) throw new Error("天气服务返回无效数据。");
+    const currentTemperature = data.current.temperature_2m as number;
+    const currentWeatherCode = data.current.weather_code as number;
+    const daily = data.daily;
+    const days = daily && Array.isArray(daily.time) && Array.isArray(daily.temperature_2m_max) && Array.isArray(daily.temperature_2m_min)
+      ? daily.time.slice(0, 4).map((date, index) => ({
+          date,
+          weatherCode: daily.weather_code?.[index] ?? currentWeatherCode,
+          tempMax: daily.temperature_2m_max![index] ?? currentTemperature,
+          tempMin: daily.temperature_2m_min![index] ?? currentTemperature
+        }))
+      : undefined;
     const weather: DeskCalendarWeather = {
       location: place.name,
-      temperatureC: data.current.temperature_2m!,
-      weatherCode: data.current.weather_code!,
+      temperatureC: currentTemperature,
+      weatherCode: currentWeatherCode,
       observedAt: data.current.time ?? new Date().toISOString(),
       cachedAt: new Date().toISOString(),
-      error: null
+      error: null,
+      forecast: days
     };
     await saveSettings({ weather });
     return weather;
@@ -377,11 +392,11 @@ export const registerDeskCalendarHandlers = (): void => {
 
   ipcMain.handle("campusos:desk-calendar:task:complete", async (event, input: unknown) => {
     assertTrustedDeskCalendarCaller(event);
-    const taskId = typeof input === "object" && input !== null && "taskId" in input && typeof input.taskId === "string"
-      ? input.taskId.trim()
-      : "";
+    const candidate = typeof input === "object" && input !== null ? input as Record<string, unknown> : {};
+    const taskId = typeof candidate.taskId === "string" ? candidate.taskId.trim() : "";
     if (!taskId || taskId.length > 512) throw new Error("Invalid desktop calendar task.");
-    await mutateScheduleTask({ id: taskId, status: "completed", scope: "single" });
+    const status = candidate.status === "running" || candidate.status === "completed" ? candidate.status : "completed";
+    await mutateScheduleTask({ id: taskId, status, scope: "single" });
     broadcastSnapshotSafely();
   });
 

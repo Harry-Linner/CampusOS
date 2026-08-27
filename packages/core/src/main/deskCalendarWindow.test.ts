@@ -303,15 +303,27 @@ describe("desk calendar window IPC", () => {
     electronState.userDataPath = storageRoot;
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ results: [{ latitude: 30.27, longitude: 120.15, name: "杭州" }] }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ current: { temperature_2m: 27.5, weather_code: 1, time: "2026-08-16T12:00" } }) });
+      .mockResolvedValueOnce({ ok: true, json: async () => ({
+        current: { temperature_2m: 27.5, weather_code: 1, time: "2026-08-16T12:00" },
+        daily: {
+          time: ["2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19"],
+          weather_code: [1, 2, 3, 61],
+          temperature_2m_max: [30, 31, 29, 28],
+          temperature_2m_min: [24, 25, 23, 22]
+        }
+      }) });
     vi.stubGlobal("fetch", fetchMock);
     await registerFresh();
     const save = handlerFor("campusos:desk-calendar:settings:save");
     await save({}, { weather: { location: "杭州" } });
-    const weather = await handlerFor("campusos:desk-calendar:weather:refresh")({});
+    const weather = await handlerFor("campusos:desk-calendar:weather:refresh")({}) as { location: string; temperatureC: number; weatherCode: number; error: string | null; forecast?: Array<{ date: string; weatherCode: number; tempMax: number; tempMin: number }> };
     expect(weather).toMatchObject({ location: "杭州", temperatureC: 27.5, weatherCode: 1, error: null });
-    const stored = JSON.parse(await readFile(join(storageRoot, "settings", "desk-calendar.json"), "utf8")) as { weather: { temperatureC: number } };
+    expect(weather.forecast).toHaveLength(4);
+    expect(weather.forecast?.[0]).toEqual({ date: "2026-08-16", weatherCode: 1, tempMax: 30, tempMin: 24 });
+    expect(weather.forecast?.[3]).toEqual({ date: "2026-08-19", weatherCode: 61, tempMax: 28, tempMin: 22 });
+    const stored = JSON.parse(await readFile(join(storageRoot, "settings", "desk-calendar.json"), "utf8")) as { weather: { temperatureC: number; forecast: unknown[] } };
     expect(stored.weather.temperatureC).toBe(27.5);
+    expect(stored.weather.forecast).toHaveLength(4);
   });
 
   it("persists normalized widget, countdown, progress, appearance, holiday, and display settings", async () => {

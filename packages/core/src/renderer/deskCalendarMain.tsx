@@ -13,7 +13,7 @@ declare global {
       refreshWeather: () => Promise<DeskCalendarWeather>;
       close: () => Promise<unknown>;
       openMain: (entityId: string) => Promise<unknown>;
-      completeTask: (taskId: string) => Promise<unknown>;
+      completeTask: (taskId: string, options?: { status?: "running" | "completed" }) => Promise<unknown>;
       saveTask: (input: LocalTaskInput) => Promise<unknown>;
       loadSnapshot: () => Promise<DeskCalendarSnapshotMessage>;
       subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;

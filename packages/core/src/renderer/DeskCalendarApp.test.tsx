@@ -234,23 +234,23 @@ describe("DeskCalendarApp", () => {
     expect(screen.getByRole("button", { name: "月" }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("shows the runtime clock and persists its visibility toggle", async () => {
+  it("shows the runtime clock widget and persists its visibility toggle", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
 
-    expect(document.querySelector(".desk-cal-clock")).toBeTruthy();
+    expect(document.querySelector(".desk-cal-widget-clock")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "时钟" }));
 
     expect(api.setShowClock).toHaveBeenCalledWith(false);
-    await vi.waitFor(() => expect(document.querySelector(".desk-cal-clock")).toBeNull());
+    await vi.waitFor(() => expect(document.querySelector(".desk-cal-widget-clock")).toBeNull());
   });
 
   it("refreshes weather through the renderer bridge", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
-    fireEvent.click(screen.getByRole("button", { name: "刷新" }));
+    fireEvent.click(screen.getByRole("button", { name: "刷新天气" }));
     await vi.waitFor(() => expect(api.refreshWeather).toHaveBeenCalledOnce());
   });
   it("projects local tasks and completes them through the desktop IPC", async () => {
@@ -334,40 +334,121 @@ describe("DeskCalendarApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.contextMenu(document.querySelector(".desk-cal-cell.is-today") as HTMLElement);
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    fireEvent.click(screen.getByRole("button", { name: "新建待办" }));
-    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
     fireEvent.doubleClick(inboxTask);
     expect((await screen.findByLabelText("标题") as HTMLInputElement).value).toBe("Inbox task");
   });
 
+  it("creates a floating todo through the DeskToDo-style quick dialog and toggles completion tabs", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findAllByText("小学期课程");
+
+    // 新建待办：打开简化弹窗，输入名称并保存为 floating 任务。
+    fireEvent.click(screen.getByRole("button", { name: "新建待办" }));
+    expect(screen.getByRole("dialog", { name: "新建待办" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("任务名称"), { target: { value: "Quick todo" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await vi.waitFor(() => expect(api.saveTask).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Quick todo",
+      type: "floating"
+    })));
+  });
+
+  it("switches the todo rail between in-progress and completed tabs", async () => {
+    const runningTask = {
+      id: "t-running", status: "running" as const, description: "", timeSpentMinutes: 0,
+      timeNeededMinutes: 30, startAt: "2026-08-15T03:00:00.000Z", endAt: "2026-08-15T03:30:00.000Z",
+      location: "", title: "Running todo", breakable: true, type: "fixed" as const,
+      repeatType: "norepeat" as const, repeatPeriod: 1, repeatEndsOn: "2026-08-15", blocksPlanning: false,
+      fromId: null
+    };
+    const completedTask = {
+      ...runningTask,
+      id: "t-done",
+      title: "Done todo",
+      status: "completed" as const
+    };
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({ ...message, localTasks: [runningTask, completedTask] }))
+    });
+    render(createElement(DeskCalendarApp, { api }));
+
+    // 默认显示进行中；切到「已完成」后只显示已完成项。
+    expect(await screen.findByText("Running todo")).toBeTruthy();
+    expect(screen.queryByText("Done todo")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "已完成" }));
+    expect(screen.queryByText("Running todo")).toBeNull();
+    expect(await screen.findByText("Done todo")).toBeTruthy();
+  });
+
+  it("completes and restores a sidebar todo through the status toggle", async () => {
+    const runningTask = {
+      id: "t-toggle", status: "running" as const, description: "", timeSpentMinutes: 0,
+      timeNeededMinutes: 30, startAt: "2026-08-15T03:00:00.000Z", endAt: "2026-08-15T03:30:00.000Z",
+      location: "", title: "Toggle todo", breakable: true, type: "fixed" as const,
+      repeatType: "norepeat" as const, repeatPeriod: 1, repeatEndsOn: "2026-08-15", blocksPlanning: false,
+      fromId: null
+    };
+    let tasks: import("@campusos/shared").LocalTaskRecord[] = [runningTask];
+    const listeners: Array<(value: DeskCalendarSnapshotMessage) => void> = [];
+    const pushSnapshot = (): void => {
+      listeners.forEach((listener) => listener({ ...message, localTasks: tasks }));
+    };
+    const api = createApi({
+      loadSnapshot: vi.fn(async () => ({ ...message, localTasks: tasks })),
+      subscribe: vi.fn((listener) => {
+        listeners.push(listener);
+        return () => undefined;
+      }),
+      completeTask: vi.fn(async (taskId: string, options?: { status?: "running" | "completed" }) => {
+        tasks = tasks.map((task) => task.id === taskId
+          ? { ...task, status: options?.status ?? "completed" }
+          : task);
+        pushSnapshot();
+      })
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findByText("Toggle todo");
+
+    fireEvent.click(screen.getByRole("button", { name: "标记完成" }));
+    await vi.waitFor(() => expect(api.completeTask).toHaveBeenCalledWith("t-toggle", { status: "completed" }));
+
+    fireEvent.click(screen.getByRole("tab", { name: "已完成" }));
+    expect(await screen.findByText("Toggle todo")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "恢复为进行中" }));
+    await vi.waitFor(() => expect(api.completeTask).toHaveBeenCalledWith("t-toggle", { status: "running" }));
+  });
+
   it("persists widget ordering, countdown, progress, and appearance changes", async () => {
     const api = createApi();
-    const prompt = vi.spyOn(window, "prompt");
-    prompt.mockReturnValueOnce("Exam").mockReturnValueOnce("2026-08-20T09:00");
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "组件" }));
     fireEvent.click(screen.getByRole("button", { name: "添加倒计时" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Exam" } });
+    fireEvent.change(screen.getByLabelText("目标时间"), { target: { value: "2026-08-20T09:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存倒计时" }));
     await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ countdowns: [expect.objectContaining({ title: "Exam" })] })));
+    expect(screen.getByRole("status")).toBeTruthy();
     const opacity = screen.getByLabelText("透明度");
     fireEvent.change(opacity, { target: { value: "0.6" } });
     expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ appearance: expect.objectContaining({ opacity: 0.6 }) }));
-    prompt.mockRestore();
   });
 
   it("adds a bounded progress widget and toggles its registry state", async () => {
     const api = createApi();
-    const prompt = vi.spyOn(window, "prompt");
-    prompt.mockReturnValueOnce("Semester").mockReturnValueOnce("2026-08-01T00:00").mockReturnValueOnce("2026-09-01T00:00");
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "组件" }));
     fireEvent.click(screen.getByRole("button", { name: "添加进度条" }));
+    fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Semester" } });
+    fireEvent.change(screen.getByLabelText("开始时间"), { target: { value: "2026-08-01T00:00" } });
+    fireEvent.change(screen.getByLabelText("结束时间"), { target: { value: "2026-09-01T00:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存进度条" }));
     await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ progress: [expect.objectContaining({ title: "Semester" })] })));
     const weatherToggle = screen.getByRole("checkbox", { name: "天气" });
     fireEvent.click(weatherToggle);
     expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ widgets: expect.arrayContaining([expect.objectContaining({ id: "weather", enabled: false })]) }));
-    prompt.mockRestore();
   });
 
   it("persists a theme choice through the appearance settings", async () => {

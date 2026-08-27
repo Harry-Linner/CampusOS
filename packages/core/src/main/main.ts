@@ -152,6 +152,13 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   return window;
 };
 
+// Dev-only CDP endpoint so external visual tooling can enumerate and capture
+// every WebContents (main window + desk calendar overlay) independently.
+// Opt-in via env var; never active in packaged builds or normal dev runs.
+if (!app.isPackaged && process.env.CAMPUSOS_DEV_CDP_PORT) {
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.CAMPUSOS_DEV_CDP_PORT);
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
 const startCampusApp = (): void => {
