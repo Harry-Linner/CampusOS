@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -146,6 +147,7 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
 
   try {
     const page = await app.firstWindow({ timeout: 10_000 });
+    attachRendererGuard(page);
     await page.setViewportSize({ width: 1440, height: 960 });
     await completeOnboarding(page);
     await expect.poll(async () => {

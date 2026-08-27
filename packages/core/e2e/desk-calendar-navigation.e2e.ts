@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -26,6 +27,7 @@ test("jumps to the exact event from the desk calendar and keeps in-place detail 
   try {
     const mainPage = await app.firstWindow({ timeout: 10_000 });
     mainPage.setDefaultTimeout(15_000);
+    attachRendererGuard(mainPage);
     await mainPage.waitForLoadState("domcontentloaded");
     await completeOnboarding(mainPage);
     await mainPage.getByLabel("主导航").getByRole("button", { name: "日程" }).click();
@@ -35,6 +37,7 @@ test("jumps to the exact event from the desk calendar and keeps in-place detail 
     await mainPage.getByRole("menu", { name: "桌面日历设置" }).getByRole("button", { name: "开启桌面日历" }).click();
     const floatingPage = await floatingWindowPromise;
     floatingPage.setDefaultTimeout(15_000);
+    attachRendererGuard(floatingPage);
     await floatingPage.waitForLoadState("domcontentloaded");
 
     // Decision 二.2: clicking an event in the floating window jumps to the main

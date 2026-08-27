@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, _electron as electron } from "@playwright/test";
+import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -106,6 +107,7 @@ test("renders an installed campusmod through the real Electron sandbox origin", 
   try {
     const page = await app.firstWindow({ timeout: 10_000 });
     page.setDefaultTimeout(15_000);
+    attachRendererGuard(page);
     await page.waitForLoadState("domcontentloaded");
     await page.getByRole("button", { name: "开始配置" }).click();
     await page.locator(".onboarding-development-skip").click();

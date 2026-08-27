@@ -11,6 +11,7 @@ import {
   generateEd25519KeyPair,
   signPackageContent
 } from "../src/main/packageSignature";
+import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginId = "dev.example.update-fixture";
@@ -159,6 +160,7 @@ test("updates a signed campusmod through a real local feed and preserves it on d
   try {
     const page = await app.firstWindow({ timeout: 10_000 });
     page.setDefaultTimeout(15_000);
+    attachRendererGuard(page);
     await page.waitForLoadState("domcontentloaded");
     await completeOnboarding(page);
     await page.locator('[data-activity-id="extensions"]').click();

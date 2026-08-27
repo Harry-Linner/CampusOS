@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,6 +31,7 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
   try {
     let page = await app.firstWindow({ timeout: 10_000 });
     page.setDefaultTimeout(15_000);
+    attachRendererGuard(page);
     await page.waitForLoadState("domcontentloaded");
     await completeOnboarding(page);
 
@@ -59,6 +61,7 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
 
     app = await launch(userDataPath);
     page = await app.firstWindow({ timeout: 10_000 });
+    attachRendererGuard(page);
     const restored = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
     expect(restored?.x).toBe(storedWindowState.bounds.x);
     expect(restored?.y).toBe(storedWindowState.bounds.y);
@@ -67,7 +70,8 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     await app.close();
 
     app = await launch(userDataPath, ["--hidden"]);
-    await app.firstWindow({ timeout: 10_000 });
+    const hiddenPage = await app.firstWindow({ timeout: 10_000 });
+    attachRendererGuard(hiddenPage);
     await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible())).toBe(false);
     await app.close();
 
@@ -77,7 +81,8 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
       maximized: false
     }), "utf8");
     app = await launch(userDataPath);
-    await app.firstWindow({ timeout: 10_000 });
+    const recoveredPage = await app.firstWindow({ timeout: 10_000 });
+    attachRendererGuard(recoveredPage);
     const recovered = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
     expect(recovered?.x).toBeLessThan(5000);
     expect(recovered?.y).toBeLessThan(5000);
