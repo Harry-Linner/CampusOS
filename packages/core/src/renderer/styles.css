@@ -3343,6 +3343,14 @@ input:focus-visible {
   border-left-color: var(--success);
 }
 
+.schedule-event-exam {
+  border-left-color: #8e4a9e;
+}
+
+.schedule-event-assignment {
+  border-left-color: #b5802a;
+}
+
 .schedule-event.is-complete {
   opacity: 0.58;
 }
@@ -3488,6 +3496,118 @@ input:focus-visible {
   color: var(--accent-deep);
   text-decoration-color: var(--accent-deep);
 }
+
+.schedule-mini-wrap {
+  position: relative;
+}
+
+.schedule-mini-calendar {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: min(252px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-elevated);
+}
+
+.schedule-mini-calendar > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.schedule-mini-calendar > header strong {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.schedule-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.schedule-mini-weekday {
+  color: var(--ink-faint);
+  font-size: 0.66rem;
+  text-align: center;
+  padding: 3px 0;
+}
+
+.schedule-mini-day {
+  min-width: 0;
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-mini-day:hover {
+  background: var(--paper-muted);
+}
+
+.schedule-mini-day.is-outside {
+  color: var(--ink-faint);
+}
+
+.schedule-mini-day.is-today {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
+.schedule-mini-day.is-active {
+  background: var(--accent);
+  color: white;
+}
+
+.schedule-mini-day.is-active.is-today {
+  color: white;
+}
+
+.schedule-kind-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.schedule-kind-filter {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0 9px;
+  font-size: 0.72rem;
+  transition: background-color 160ms ease, color 160ms ease, opacity 160ms ease;
+}
+
+.schedule-kind-filter:hover {
+  background: var(--paper-muted);
+}
+
+.schedule-kind-filter.is-hidden {
+  opacity: 0.4;
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-faint);
+}
+
+.schedule-kind-filter.schedule-kind-course { border-left: 3px solid var(--accent); }
+.schedule-kind-filter.schedule-kind-exam { border-left: 3px solid #8e4a9e; }
+.schedule-kind-filter.schedule-kind-deadline { border-left: 3px solid var(--warning); }
+.schedule-kind-filter.schedule-kind-task { border-left: 3px solid var(--success); }
+.schedule-kind-filter.schedule-kind-assignment { border-left: 3px solid #b5802a; }
 
 .schedule-date-jump {
   display: inline-flex;

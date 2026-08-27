@@ -378,6 +378,9 @@ export const ScheduleView = ({
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
   const [moreDay, setMoreDay] = useState<string | null>(null);
+  const [miniOpen, setMiniOpen] = useState(false);
+  const [miniMonth, setMiniMonth] = useState(() => new Date());
+  const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<ScheduleEvent["kind"]>>(new Set());
   const selectedTask = useMemo(
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
@@ -478,7 +481,10 @@ export const ScheduleView = ({
     };
   }, [periodsRange.end, periodsRange.start, schedule, taskUpdatedAt]);
 
-  const events = useMemo(() => buildEvents(snapshot, periods), [periods, snapshot]);
+  const events = useMemo(
+    () => buildEvents(snapshot, periods).filter((event) => !hiddenKinds.has(event.kind)),
+    [hiddenKinds, periods, snapshot]
+  );
   const eventsByDay = useMemo(() => groupEventsByDay(events, range), [events, range]);
   const monthDays = useMemo(() => buildMonthDays(selectedDate), [selectedDate]);
   const weekDays = useMemo(() => {
@@ -815,6 +821,45 @@ export const ScheduleView = ({
               <strong>{periodLabel}</strong>
               <button className="icon-button" type="button" aria-label="下一个周期" onClick={() => movePeriod(1)}><AppIcon name="chevron-right" size={18} /></button>
               <Button variant="ghost" type="button" onClick={() => setSelectedDate(new Date())}>今天</Button>
+              <div className="schedule-mini-wrap">
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="迷你月历"
+                  aria-expanded={miniOpen}
+                  onClick={() => { setMiniOpen((value) => !value); setMiniMonth(selectedDate); }}
+                >
+                  <AppIcon name="calendar" size={18} />
+                </button>
+                {miniOpen ? (
+                  <div className="schedule-mini-calendar" role="dialog" aria-label="迷你月历">
+                    <header>
+                      <button className="icon-button" type="button" aria-label="上个月" onClick={() => setMiniMonth((value) => addMonths(value, -1))}><AppIcon name="chevron-left" size={16} /></button>
+                      <strong>{formatMonth(miniMonth)}</strong>
+                      <button className="icon-button" type="button" aria-label="下个月" onClick={() => setMiniMonth((value) => addMonths(value, 1))}><AppIcon name="chevron-right" size={16} /></button>
+                    </header>
+                    <div className="schedule-mini-grid">
+                      {weekdayLabels.map((label) => <span className="schedule-mini-weekday" key={label}>{label.slice(0, 1)}</span>)}
+                      {buildMonthDays(miniMonth).map((day) => {
+                        const key = dayKey(day);
+                        const outside = monthKey(day) !== monthKey(miniMonth);
+                        const today = key === dayKey(new Date());
+                        const active = key === dayKey(selectedDate);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            className={`schedule-mini-day${outside ? " is-outside" : ""}${today ? " is-today" : ""}${active ? " is-active" : ""}`}
+                            onClick={() => { setSelectedDate(day); setSelectedEvent(null); setMiniOpen(false); }}
+                          >
+                            {getShanghaiDayNumber(day)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               <label className="schedule-date-jump">
                 <span className="sr-only">跳转到日期</span>
                 <input
@@ -830,6 +875,33 @@ export const ScheduleView = ({
                   }}
                 />
               </label>
+            </div>
+            <div className="schedule-kind-filters" role="group" aria-label="按类型筛选">
+              {([
+                ["course", "课程"],
+                ["exam", "考试"],
+                ["deadline", "截止"],
+                ["task", "任务"],
+                ["assignment", "作业"]
+              ] as const).map(([kind, label]) => {
+                const hidden = hiddenKinds.has(kind);
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    className={`schedule-kind-filter schedule-kind-${kind}${hidden ? " is-hidden" : ""}`}
+                    aria-pressed={!hidden}
+                    onClick={() => setHiddenKinds((current) => {
+                      const next = new Set(current);
+                      if (next.has(kind)) next.delete(kind);
+                      else next.add(kind);
+                      return next;
+                    })}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </header>
 
