@@ -42,7 +42,7 @@
 ## 5. 待办
 
 - [x] 对照 `.tmp/celechron-1.3.0` 的课表解析与课程合并逻辑（2026-08-28）
-- [ ] 真实基线验证重复课程出现条件（待真实账号基线核对）
+- [x] 真实基线验证重复课程出现条件（2026-08-28 完成，见 §6）
 - [x] 与用户确认修复方向后实施（2026-08-28 完成）
 
 ## 6. 实施记录（2026-08-28）
@@ -60,4 +60,6 @@
 3. `AcademicCourseRecord` 新增 `derivedOnly?: boolean`：仅由课表/考试派生、无成绩关联的课程标记为 true；前端 AcademicView 对 derivedOnly 课程显示「学分待出」而非误导性的「0 学分」。
 4. 有 xkkh 的重复课程（不同选课课号）仍保持分离（grade.dart/semester.dart 对照中成绩列表独立保留），同名同学期仅一个成绩支撑时合并。
 
-**验证：** typecheck/lint/全量 vitest 通过；新增 3 条单测覆盖：无 xkkh 排课并入成绩课程、秋冬季节折叠、derivedOnly 标记。真实基线验收待补。
+**验证：** typecheck/lint/全量 vitest 通过；新增 3 条单测覆盖：无 xkkh 排课并入成绩课程、秋冬季节折叠、derivedOnly 标记。
+
+**真实基线验收（`timetable-2026-2027-autumn-winter.json`）：** 基线 35 条课表排课全部无 xkkh（与 Celechron「ZDBK 不给课号」注释一致），横跨 1|秋(19)+1|冬(16)；`buildCourseCatalog` 合并结果为恰好 10 门课程（每课程名一条），「计算机网络」秋/冬排课合并为单课程、排课去重合并，全部标记 `derivedOnly`（该基线无成绩数据）。重复/0 学分派生条目消除。
