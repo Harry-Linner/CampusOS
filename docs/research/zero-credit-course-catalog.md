@@ -41,6 +41,23 @@
 
 ## 5. 待办
 
-- [ ] 对照 `.tmp/celechron-1.3.0` 的课表解析与课程合并逻辑
-- [ ] 真实基线验证重复课程出现条件
-- [ ] 与用户确认修复方向后实施
+- [x] 对照 `.tmp/celechron-1.3.0` 的课表解析与课程合并逻辑（2026-08-28）
+- [ ] 真实基线验证重复课程出现条件（待真实账号基线核对）
+- [x] 与用户确认修复方向后实施（2026-08-28 完成）
+
+## 6. 实施记录（2026-08-28）
+
+**Celechron 对照结论（`.tmp/celechron-1.3.0`）：**
+
+- `Semester.addSession/addExamWithSemester/addGradeWithSemester`（semester.dart:384-441）均以 **「学期号 + 课程名」** 为 Course 键（`'$semesterId${name}'`），不以 xkkh 为键；课表接口（ZDBK）不返回 xkkh。
+- 学期号只有 1|2 两档（ugrs_spider.dart:493 `semKey = season.startsWith('1') ? '-1' : '-2'`），秋/冬合并为 1、春/夏合并为 2。
+- `Course.completeGrade` 用成绩覆盖 credit 与 grade；`completeSession` 仅当 credit 仍为 0 时用排课学分填充。
+
+**CampusOS 修复（plugins/official/zju-undergraduate/src/main.ts buildCourseCatalog）：**
+
+1. `termNameKey` 改为按「学期号 + 课程名」归组（秋/冬→1、春/夏→2），与 Celechron 对齐。
+2. session/exam 无 xkkh（或 xkkh 与成绩不一致）时，回退到「学期号+课程名」匹配成绩课程（`gradeBackedKeyByName`），消除 0 学分派生重复条目。
+3. `AcademicCourseRecord` 新增 `derivedOnly?: boolean`：仅由课表/考试派生、无成绩关联的课程标记为 true；前端 AcademicView 对 derivedOnly 课程显示「学分待出」而非误导性的「0 学分」。
+4. 有 xkkh 的重复课程（不同选课课号）仍保持分离（grade.dart/semester.dart 对照中成绩列表独立保留），同名同学期仅一个成绩支撑时合并。
+
+**验证：** typecheck/lint/全量 vitest 通过；新增 3 条单测覆盖：无 xkkh 排课并入成绩课程、秋冬季节折叠、derivedOnly 标记。真实基线验收待补。

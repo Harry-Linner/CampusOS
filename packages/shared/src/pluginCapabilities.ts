@@ -82,6 +82,11 @@ export interface AcademicCourseRecord {
   gradeSourceId: string | null;
   examSourceIds: string[];
   sessions: AcademicTimetableSession[];
+  /**
+   * 仅由课表/考试派生、尚无成绩关联的课程标记（学分尚未出）。
+   * 与 Celechron 的“未出成绩课程 credit 恒为 0”行为对齐，供前端区分展示。
+   */
+  derivedOnly?: boolean;
 }
 
 export interface AcademicCourseCatalogData {

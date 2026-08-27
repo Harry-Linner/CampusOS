@@ -755,6 +755,126 @@ describe("undergraduate practice and course catalog projections", () => {
     expect(catalog.courses[0]?.examSourceIds).toEqual(["exam-a"]);
     expect(catalog.courses[1]?.examSourceIds).toEqual(["exam-b"]);
   });
+
+  it("merges a no-xkkh timetable session into the graded course by term+name (Celechron)", () => {
+    // 用户场景：课表排课没有 xkkh（ZDBK 不给课号），成绩有 xkkh + 学分。
+    // Celechron 以「学期号 + 课程名」归组，课表排课必须并入成绩课程，而不是
+    // 生成 0 学分派生重复条目（semester.dart:384-441）。
+    const catalog = buildCourseCatalog({
+      terms: [{
+        academicYearStart: 2025,
+        season: "1|秋" as const,
+        state: "live" as const,
+        sessions: [{
+          sourceId: "session-noxkkh",
+          courseName: "数据库系统",
+          teacher: "陈老师",
+          location: "紫金港东1A-301",
+          dayOfWeek: 2,
+          periods: [1, 2],
+          firstHalf: true,
+          secondHalf: true,
+          weekPattern: "all" as const,
+          confirmed: true
+        }]
+      }],
+      exams: [],
+      grades: [{
+        sourceId: "(2025-2026-1)-DB-001-1",
+        realId: "(2025-2026-1)-DB-001",
+        courseCode: "DB001",
+        courseName: "数据库系统",
+        credit: 4,
+        originalScore: "88",
+        gradePoint: 3.8,
+        academicYearStart: 2025,
+        termNumber: 1,
+        isMajorCourse: true,
+        courseCategory: null
+      }]
+    });
+
+    expect(catalog.courses).toHaveLength(1);
+    expect(catalog.courses[0]).toMatchObject({
+      courseName: "数据库系统",
+      credit: 4,
+      gradeSourceId: "(2025-2026-1)-DB-001-1",
+      derivedOnly: false
+    });
+    expect(catalog.courses[0]?.sessions).toHaveLength(1);
+    expect(catalog.courses[0]?.sessions[0]?.sourceId).toBe("session-noxkkh");
+  });
+
+  it("collapses 秋/冬 and 春/夏 into the same term course identity (Celechron semKey)", () => {
+    const catalog = buildCourseCatalog({
+      terms: [{
+        academicYearStart: 2025,
+        season: "1|冬" as const,
+        state: "live" as const,
+        sessions: [{
+          sourceId: "winter-session",
+          courseName: "大学英语Ⅲ",
+          teacher: "李老师",
+          location: "紫金港东6-223",
+          dayOfWeek: 3,
+          periods: [3],
+          firstHalf: false,
+          secondHalf: true,
+          weekPattern: "all" as const,
+          confirmed: true
+        }]
+      }],
+      exams: [],
+      grades: [{
+        sourceId: "(2025-2026-1)-ENG-003-1",
+        realId: "(2025-2026-1)-ENG-003",
+        courseCode: "ENG003",
+        courseName: "大学英语Ⅲ",
+        credit: 3,
+        originalScore: "90",
+        gradePoint: 4.5,
+        academicYearStart: 2025,
+        termNumber: 1,
+        isMajorCourse: false,
+        courseCategory: null
+      }]
+    });
+
+    expect(catalog.courses).toHaveLength(1);
+    expect(catalog.courses[0]).toMatchObject({ courseName: "大学英语Ⅲ", credit: 3, derivedOnly: false });
+  });
+
+  it("marks sessions with no grade backing as derivedOnly instead of fake zero credit", () => {
+    const catalog = buildCourseCatalog({
+      terms: [{
+        academicYearStart: 2026,
+        season: "1|秋" as const,
+        state: "live" as const,
+        sessions: [{
+          sourceId: "future-session",
+          courseName: "操作系统",
+          teacher: "王老师",
+          location: "玉泉教7-211",
+          dayOfWeek: 4,
+          periods: [5],
+          firstHalf: true,
+          secondHalf: false,
+          weekPattern: "all" as const,
+          confirmed: true
+        }]
+      }],
+      exams: [],
+      grades: []
+    });
+
+    expect(catalog.courses).toHaveLength(1);
+    expect(catalog.courses[0]).toMatchObject({
+      courseName: "操作系统",
+      credit: 0,
+      gradeSourceId: null,
+      derivedOnly: true
+    });
+  });
 });
 describe("undergraduate cached timetable projection", () => {
   it("merges cached timetable terms into the course catalog when only some terms fail", async () => {

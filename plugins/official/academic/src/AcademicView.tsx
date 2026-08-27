@@ -394,7 +394,7 @@ const CourseCatalogPanel = ({
                 <span className="meta-line">
                   {course.realId ?? course.courseCode ?? "课程代码未返回"} · {" "}
                   {course.semesterLabel ?? "学期待确认"} · {" "}
-                  {numberFormatter.format(course.credit)} 学分
+                  {course.derivedOnly ? "学分待出" : `${numberFormatter.format(course.credit)} 学分`}
                 </span>
               </button>
             </li>
@@ -418,7 +418,7 @@ const CourseCatalogPanel = ({
               </div>
               <div>
                 <dt>学分</dt>
-                <dd>{numberFormatter.format(selected.credit)}</dd>
+                <dd>{selected.derivedOnly ? "待出（暂无成绩记录）" : numberFormatter.format(selected.credit)}</dd>
               </div>
               <div>
                 <dt>学期</dt>

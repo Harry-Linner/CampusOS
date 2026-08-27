@@ -574,14 +574,28 @@ export const buildCourseCatalog = ({
   const identityKeysByName = new Map<string, Set<string>>();
   const gradeKeysById = new Map<string, string>();
   const sessionBucketsByName = new Map<string, string>();
+
+  // Celechron Semester merge key: "$semesterId$name"（semester.dart:384-441）。
+  // semesterId 只有 1|2 两档（ugrs_spider.dart:493 按 season.startsWith('1') 折叠），
+  // 秋/冬合并到 1、春/夏合并到 2；课表接口（ZDBK）不返回 xkkh，因此本科课程必须
+  // 以「学期号 + 课程名」归组，再在同一 Course 内合并成绩/考试/排课。
+  const termNumberForSeason = (season: AcademicTimetableSeason | null): number | null =>
+    season?.startsWith("1|") ? 1 : season?.startsWith("2|") ? 2 : null;
   const termNameKey = (academicYearStart: number | null, season: AcademicTimetableSeason | null, courseName: string): string =>
-    `${academicYearStart ?? "unknown"}:${season ?? "unknown"}:${courseName}`;
+    `${academicYearStart ?? "unknown"}:${termNumberForSeason(season) ?? "unknown"}:${courseName}`;
 
   const registerIdentity = (key: string, courseName: string, academicYearStart: number | null, season: AcademicTimetableSeason | null): void => {
     const nameKey = termNameKey(academicYearStart, season, courseName);
     const keys = identityKeysByName.get(nameKey) ?? new Set<string>();
     keys.add(key);
     identityKeysByName.set(nameKey, keys);
+  };
+
+  /** 名字兜底：同名同学期恰好只有一个「成绩支撑」的课程时，返回其键（Celechron 归组规则）。 */
+  const gradeBackedKeyByName = (nameKey: string): string | null => {
+    const candidates = [...(identityKeysByName.get(nameKey) ?? [])]
+      .filter((key) => byKey.get(key)?.gradeSourceId !== null && byKey.get(key)?.gradeSourceId !== undefined);
+    return candidates.length === 1 ? candidates[0] ?? null : null;
   };
 
   const addSession = (course: AcademicCourseRecord, session: AcademicTimetableSession): void => {
@@ -637,7 +651,8 @@ export const buildCourseCatalog = ({
       courseCategory: grade.courseCategory,
       gradeSourceId: grade.sourceId,
       examSourceIds: [],
-      sessions: []
+      sessions: [],
+      derivedOnly: false
     };
     byKey.set(key, course);
     gradeKeysById.set(grade.sourceId, key);
@@ -648,7 +663,13 @@ export const buildCourseCatalog = ({
     const term = academicTermFromSourceId(exam.courseId);
     const academicYearStart = term?.academicYearStart ?? null;
     const season = seasonForTerm(term?.termNumber ?? null);
-    const key = gradeKeysById.get(exam.courseId) ?? `id:${exam.courseId}`;
+    const nameKey = termNameKey(academicYearStart, season, exam.courseName);
+    // 优先按 xkkh 挂到成绩记录；xkkh 缺失/不一致时按 Celechron 的「学期号+课程名」归组，
+    // 避免生成 0 学分重复条目（grade.dart/semester.dart 对照）。
+    const key = gradeKeysById.get(exam.courseId)
+      ?? gradeBackedKeyByName(nameKey)
+      ?? (identityKeysByName.get(nameKey)?.size === 1 ? [...identityKeysByName.get(nameKey)!][0] : null)
+      ?? `id:${exam.courseId}`;
     const existing = byKey.get(key) ?? {
       sourceId: exam.courseId,
       realId: deriveCelechronRealId(exam.courseId),
@@ -664,9 +685,11 @@ export const buildCourseCatalog = ({
       courseCategory: null,
       gradeSourceId: null,
       examSourceIds: [],
-      sessions: []
+      sessions: [],
+      derivedOnly: true
     } satisfies AcademicCourseRecord;
     if (!existing.examSourceIds.includes(exam.sourceId)) existing.examSourceIds.push(exam.sourceId);
+    if (existing.gradeSourceId !== null) existing.derivedOnly = false;
     byKey.set(key, existing);
     registerIdentity(key, existing.courseName, existing.academicYearStart, existing.season);
   }
@@ -674,11 +697,14 @@ export const buildCourseCatalog = ({
   for (const term of terms) {
     for (const session of term.sessions) {
       const nameKey = termNameKey(term.academicYearStart, term.season, session.courseName);
-      const key = session.courseId
-        ? gradeKeysById.get(session.courseId) ?? `id:${session.courseId}`
-        : (identityKeysByName.get(nameKey)?.size === 1
-          ? [...identityKeysByName.get(nameKey)!][0]
-          : sessionBucketsByName.get(nameKey) ?? `session:${nameKey}`);
+      // xkkh 优先（成绩/考试已有精确键）；否则回退 Celechron 的「学期号+课程名」归组，
+      // 使无 xkkh 的课表排课并入成绩课程，消除 0 学分派生重复。
+      const key = session.courseId && gradeKeysById.has(session.courseId)
+        ? gradeKeysById.get(session.courseId)!
+        : gradeBackedKeyByName(nameKey)
+          ?? (identityKeysByName.get(nameKey)?.size === 1 ? [...identityKeysByName.get(nameKey)!][0] : null)
+          ?? sessionBucketsByName.get(nameKey)
+          ?? `session:${nameKey}`;
       const existing = byKey.get(key) ?? {
         sourceId: session.courseId ?? session.sourceId,
         realId: session.courseId ? deriveCelechronRealId(session.courseId) : null,
@@ -692,11 +718,13 @@ export const buildCourseCatalog = ({
         courseCategory: null,
         gradeSourceId: null,
         examSourceIds: [],
-        sessions: []
+        sessions: [],
+        derivedOnly: true
       } satisfies AcademicCourseRecord;
       addSession(existing, session);
+      if (existing.gradeSourceId !== null) existing.derivedOnly = false;
       byKey.set(key, existing);
-      if (!session.courseId && !identityKeysByName.get(nameKey)?.size) {
+      if (!session.courseId && gradeBackedKeyByName(nameKey) === null && !(identityKeysByName.get(nameKey)?.size ?? 0)) {
         sessionBucketsByName.set(nameKey, key);
       }
     }
