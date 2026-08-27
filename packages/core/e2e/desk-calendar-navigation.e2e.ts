@@ -16,7 +16,7 @@ const completeOnboarding = async (page: Awaited<ReturnType<Awaited<ReturnType<ty
   await page.getByRole("button", { name: "进入 CampusOS" }).click();
 };
 
-test("opens the exact desktop-calendar event in the main schedule view", async () => {
+test("jumps to the exact event from the desk calendar and keeps in-place detail on right-click", async () => {
   const userDataPath = await mkdtemp(join(tmpdir(), "campusos-desk-navigation-"));
   const app = await electron.launch({
     args: [join(packageRoot, "out/main/main.js"), `--user-data-dir=${userDataPath}`],
@@ -37,9 +37,9 @@ test("opens the exact desktop-calendar event in the main schedule view", async (
     floatingPage.setDefaultTimeout(15_000);
     await floatingPage.waitForLoadState("domcontentloaded");
 
+    // Decision 二.2: clicking an event in the floating window jumps to the main
+    // window and locates that event (reusing the navigation chain).
     await floatingPage.getByRole("button", { name: "软件工程课程设计", exact: true }).first().click();
-    await expect(floatingPage.getByLabel("安排详情")).toBeVisible();
-    await floatingPage.getByRole("button", { name: "打开 CampusOS 日程" }).click();
 
     const detailDialog = mainPage.getByRole("dialog");
     await expect(detailDialog).toBeVisible();
@@ -50,6 +50,11 @@ test("opens the exact desktop-calendar event in the main schedule view", async (
     await expect(
       mainPage.getByLabel("日历视图", { exact: true }).getByRole("button", { name: "日视图" })
     ).toHaveAttribute("aria-pressed", "true");
+
+    // Decision 二.1/二.2: right-click keeps the in-place detail panel for tasks.
+    await floatingPage.getByRole("button", { name: "软件工程课程设计", exact: true }).first().click({ button: "right" });
+    await expect(floatingPage.getByLabel("安排详情")).toBeVisible();
+    await floatingPage.getByRole("button", { name: "关闭详情" }).click();
 
     await floatingPage.getByRole("button", { name: "关闭桌面日历" }).click();
     await expect.poll(() => app.windows().length).toBe(1);

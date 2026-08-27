@@ -481,6 +481,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       className={`desk-cal-event desk-cal-event-${event.kind}`}
       key={event.id}
       type="button"
+      aria-label={event.title}
       data-detail={`${formatEventTime(event)}${event.location ? ` · ${event.location}` : ""}`}
       onClick={() => openEventInMain(event)}
       onContextMenu={(contextEvent) => {
