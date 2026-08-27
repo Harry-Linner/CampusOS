@@ -3827,6 +3827,82 @@ input:focus-visible {
   font-size: 0.72rem;
 }
 
+.schedule-display-controls {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.schedule-display-controls button {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0 9px;
+  font-size: 0.72rem;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.schedule-display-controls button:hover {
+  background: var(--paper-muted);
+}
+
+.schedule-display-controls button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+
+/* 月视图圆点模式：事件只显示语义色圆点 */
+.schedule-month-grid.is-dot .schedule-event-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 5px;
+}
+
+.schedule-month-grid.is-dot .schedule-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--paper) 80%, transparent);
+  transition: transform 120ms ease;
+}
+
+.schedule-month-grid.is-dot .schedule-dot:hover {
+  transform: scale(1.35);
+}
+
+.schedule-dot-course { background: var(--accent); }
+.schedule-dot-deadline { background: var(--warning); }
+.schedule-dot-task { background: var(--success); }
+.schedule-dot-exam { background: #8e4a9e; }
+.schedule-dot-assignment { background: #b5802a; }
+
+/* 紧凑密度：压缩格子高度与内边距 */
+.schedule-month-grid.is-compact .schedule-month-cell {
+  min-height: 72px;
+  padding: 5px;
+}
+
+.schedule-month-grid.is-compact .schedule-month-cell > time {
+  font-size: 0.66rem;
+}
+
+.schedule-month-grid.is-compact .schedule-event-list {
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.schedule-month-grid.is-compact .schedule-month-cell .schedule-event {
+  padding: 1px 4px;
+  font-size: 0.66rem;
+}
+
 .schedule-date-jump {
   display: inline-flex;
 }

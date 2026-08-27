@@ -130,6 +130,27 @@ describe("ScheduleView", () => {
     await waitFor(() => expect(schedule.saveTask).toHaveBeenCalledWith(expect.objectContaining({ title: "New task" })));
   });
 
+  it("switches month display between bars and dots and between density tiers", async () => {
+    const schedule = createSchedule();
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule
+    }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "月历" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "圆点" }));
+    expect(document.querySelector(".schedule-month-grid.is-dot")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "圆点" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "紧凑" }));
+    expect(document.querySelector(".schedule-month-grid.is-compact")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "色条" }));
+    expect(document.querySelector(".schedule-month-grid.is-dot")).toBeNull();
+    expect(globalThis.localStorage?.getItem("campusos.schedule.event-style")).toBe("bar");
+  });
+
   it("opens the desk calendar from the schedule actions and persists the view choice", async () => {
     const schedule = createSchedule();
     const deskCalendar = {

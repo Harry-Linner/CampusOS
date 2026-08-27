@@ -81,6 +81,14 @@
 - **验证**：`pnpm typecheck`、`pnpm lint`、core 全量 vitest（601 passed）通过；视觉验收用 HTML 快照 + vision glance/ground/dominant-colors 迭代（深色/浅色两主题、边界对齐、无溢出、文字对比度）。
 - **未完成项**：d4 视觉风格细节（色条/圆点切换、密度档位、深色跟随系统）仍按 §七 待截图对照后迭代；桌面日历与 DeskToDo 实际截图对照仍待视觉模型恢复后补。
 
+### 自查记录 — 视觉打磨批次（2026-08-28 完成）
+
+- **深色跟随系统（§一.11/§五.1）**：`useTheme` 新增 `system` 模式，`resolveThemeMode` 按 `prefers-color-scheme` 解析浅/深；系统深色变化时监听 `change` 事件实时切换；`main.tsx` 首绘前解析；设置页新增「跟随系统」选项（默认值改为 system，保留 light/dark/high-contrast）。
+- **密度档位（§一.11/§五.2）**：日程月视图新增「舒适/紧凑」两档密度（`campusos.schedule.density`，localStorage 持久化）：紧凑档压缩格子高度（112→72px）、内边距、事件条字号与间距。
+- **色条/圆点切换（§一.11/§五.2）**：日程月视图新增「色条/圆点」双呈现（`campusos.schedule.event-style` 持久化）：色条=语义色左竖条+短标题（默认），圆点=语义色小圆点（course/deadline/task/exam/assignment 五色），悬停放大；圆点模式 +N 溢出上限 8。
+- **验证**：`pnpm typecheck`、`pnpm lint`、core 全量 vitest（608 passed）、e2e 7 passed 全绿；视觉验收用 HTML 快照 + 本地像素分析（圆点五色渲染确认、紧凑格无溢出）。
+- **未完成项**：圆点模式点击行为（现为 span 悬停缩放，后续可改 button+title 增强可访问性）；深色模式下载/导出页等残余硬编码色仍待全量 token 审计。
+
 ## 七、待办/风险
 
 - [ ] 桌面日历与 DeskToDo/主流日历的实际截图对照（视觉模型恢复后补；当前以文字调研+迭代验收代替）

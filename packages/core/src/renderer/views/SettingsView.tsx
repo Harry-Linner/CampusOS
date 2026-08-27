@@ -563,7 +563,7 @@ export const SettingsView = ({
               <fieldset className="academic-program-fieldset">
                 <legend>主题</legend>
                 <div className="academic-program-options">
-                  {(["light", "dark", "high-contrast"] as ThemeMode[]).map((mode) => (
+                  {(["system", "light", "dark", "high-contrast"] as ThemeMode[]).map((mode) => (
                     <label key={mode} className={theme === mode ? "selected" : undefined}>
                       <input
                         type="radio"
@@ -574,14 +574,16 @@ export const SettingsView = ({
                       />
                       <span>
                         <strong>
-                          {mode === "light" ? "亮色" : mode === "dark" ? "暗色" : "高对比度"}
+                          {mode === "system" ? "跟随系统" : mode === "light" ? "亮色" : mode === "dark" ? "暗色" : "高对比度"}
                         </strong>
                         <small>
-                          {mode === "light"
-                            ? "默认浅色主题"
-                            : mode === "dark"
-                              ? "深色背景，护眼"
-                              : "最大对比度，无障碍"}
+                          {mode === "system"
+                            ? "随操作系统切换浅色/深色"
+                            : mode === "light"
+                              ? "默认浅色主题"
+                              : mode === "dark"
+                                ? "深色背景，护眼"
+                                : "最大对比度，无障碍"}
                         </small>
                       </span>
                     </label>

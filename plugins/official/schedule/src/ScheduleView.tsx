@@ -380,6 +380,20 @@ export const ScheduleView = ({
   const [miniMonth, setMiniMonth] = useState(() => new Date());
   const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<ScheduleEvent["kind"]>>(new Set());
   const [timeStepMinutes, setTimeStepMinutes] = useState<15 | 30 | 60>(30);
+  const [eventStyle, setEventStyleState] = useState<"bar" | "dot">(() => {
+    try {
+      return globalThis.localStorage?.getItem("campusos.schedule.event-style") === "dot" ? "dot" : "bar";
+    } catch {
+      return "bar";
+    }
+  });
+  const [density, setDensityState] = useState<"comfortable" | "compact">(() => {
+    try {
+      return globalThis.localStorage?.getItem("campusos.schedule.density") === "compact" ? "compact" : "comfortable";
+    } catch {
+      return "comfortable";
+    }
+  });
   const [dragEvent, setDragEvent] = useState<ScheduleEvent | null>(null);
   const [dragPreview, setDragPreview] = useState<{ startAt: string; endAt: string } | null>(null);
   const [conflictEvents, setConflictEvents] = useState<Set<string>>(new Set());
@@ -464,6 +478,25 @@ export const ScheduleView = ({
       void loadMakeupCalendar();
     });
   }, [deskCalendar, loadDeskCalendarState, loadMakeupCalendar]);
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("campusos.schedule.event-style", eventStyle);
+    } catch {
+      // Ignore
+    }
+  }, [eventStyle]);
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("campusos.schedule.density", density);
+    } catch {
+      // Ignore
+    }
+  }, [density]);
+
+  const setEventStyle = (next: "bar" | "dot"): void => setEventStyleState(next);
+  const setDensity = (next: "comfortable" | "compact"): void => setDensityState(next);
 
   const toggleDeskCalendar = async (enabled: boolean): Promise<void> => {
     if (!deskCalendar) return;
@@ -1054,6 +1087,32 @@ export const ScheduleView = ({
                   <option value={60}>60 分</option>
                 </select>
               </label>
+              <div className="schedule-display-controls" role="group" aria-label="显示选项">
+                <button
+                  className={eventStyle === "bar" ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={eventStyle === "bar"}
+                  onClick={() => setEventStyle("bar")}
+                >色条</button>
+                <button
+                  className={eventStyle === "dot" ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={eventStyle === "dot"}
+                  onClick={() => setEventStyle("dot")}
+                >圆点</button>
+                <button
+                  className={density === "comfortable" ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={density === "comfortable"}
+                  onClick={() => setDensity("comfortable")}
+                >舒适</button>
+                <button
+                  className={density === "compact" ? "is-active" : undefined}
+                  type="button"
+                  aria-pressed={density === "compact"}
+                  onClick={() => setDensity("compact")}
+                >紧凑</button>
+              </div>
             </div>
           </header>
 
@@ -1088,7 +1147,7 @@ export const ScheduleView = ({
           ) : null}
 
           {viewMode === "month" ? (
-            <div className="schedule-month-grid">
+            <div className={`schedule-month-grid${eventStyle === "dot" ? " is-dot" : ""}${density === "compact" ? " is-compact" : ""}`}>
               {weekdayLabels.map((label) => <span className="schedule-weekday" key={label}>{label}</span>)}
               {monthDays.map((day) => {
                 const dayKeyValue = dayKey(day);
@@ -1100,8 +1159,10 @@ export const ScheduleView = ({
                     {statutoryHolidays.find((holiday) => holiday.date === dayKeyValue) ? <span className="schedule-holiday-label">{statutoryHolidays.find((holiday) => holiday.date === dayKeyValue)!.label}</span> : null}
                     {makeupDays.find((makeup) => makeup.date === dayKeyValue) ? <span className="schedule-makeup-label">补{weekdayLabels[(makeupDays.find((makeup) => makeup.date === dayKeyValue)!.weekday + 6) % 7]}</span> : null}
                     <div className="schedule-event-list">
-                      {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)}
-                      {items.length > 5 ? <button className="schedule-more-button" type="button" onClick={(click) => { click.stopPropagation(); setMoreDay(dayKeyValue); }}>+{items.length - 5} 项</button> : null}
+                      {eventStyle === "bar"
+                        ? items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)
+                        : items.slice(0, 8).map((event) => <span className={`schedule-dot schedule-dot-${event.kind}`} key={event.id} role="img" aria-label={event.title} title={event.title} onClick={(click) => { click.stopPropagation(); selectEvent(event); }} />)}
+                      {items.length > (eventStyle === "bar" ? 5 : 8) ? <button className="schedule-more-button" type="button" onClick={(click) => { click.stopPropagation(); setMoreDay(dayKeyValue); }}>+{items.length - (eventStyle === "bar" ? 5 : 8)} 项</button> : null}
                     </div>
                   </section>
                 );
