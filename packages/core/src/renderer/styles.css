@@ -4285,7 +4285,8 @@ input:focus-visible {
   background: var(--paper-deep);
 }
 .notification-trigger:focus-visible,
-.notification-item > button:first-child:focus-visible,
+.notification-item > button:focus-visible,
+.notification-filters button:focus-visible,
 .desk-calendar-menu-item:focus-visible,
 .desk-calendar-view-options button:focus-visible {
   outline: 2px solid var(--accent);
@@ -4293,11 +4294,27 @@ input:focus-visible {
 }
 .notification-badge { display: inline-flex; min-width: 18px; justify-content: center; margin-left: 6px; border-radius: 999px; background: var(--accent); color: white; font-size: 11px; }
 .notification-popover { width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-gutter: stable; margin-top: 8px; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
-.notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.notification-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
-.notification-item > button:first-child { flex: 1; display: grid; gap: 3px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: 8px; padding: 4px 6px; transition: background-color 160ms ease; }
-.notification-item > button:first-child:hover { background: var(--paper-muted); }
-.notification-item span, .notification-item time { color: var(--ink-muted); font-size: 12px; }
+.notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 10px; }
+.notification-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.notification-filters { display: flex; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.notification-filters button { min-height: 28px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; padding: 0 10px; font-size: 0.76rem; }
+.notification-filters button:hover,
+.notification-filters button.is-active { border-color: var(--line); background: var(--paper-deep); color: var(--ink); }
+.notification-list { margin: 0; padding: 0; list-style: none; }
+.notification-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px 10px 16px; position: relative; border-radius: var(--radius-md); }
+.notification-item + .notification-item { margin-top: 2px; }
+.notification-item.is-unread { background: color-mix(in srgb, var(--accent) 6%, var(--paper)); }
+.notification-item.is-unread::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--accent); }
+.notification-item.is-selected { background: var(--paper-deep); }
+.notification-check { flex-shrink: 0; padding-top: 4px; }
+.notification-check input { margin: 0; }
+.notification-item > button { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 3px; min-width: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-sm); padding: 2px 4px; transition: background-color 160ms ease; }
+.notification-item > button:hover { background: var(--paper-muted); }
+.notification-item > button:active { background: var(--paper-deep); }
+.notification-item > button strong { grid-column: 1; min-width: 0; overflow-wrap: anywhere; }
+.notification-item > button time { grid-column: 2; grid-row: 1; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.notification-item > button span { grid-column: 1 / -1; min-width: 0; color: var(--ink-muted); font-size: 12px; overflow-wrap: anywhere; }
+.notification-jump { flex-shrink: 0; align-self: center; color: var(--ink-faint); font-size: 13px; }
 .schedule-deleted-group { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
 .schedule-deleted-group-heading { display: flex; justify-content: space-between; color: var(--ink-muted); font-size: 12px; }.schedule-delete-decision { position: fixed; inset: auto 24px 24px auto; z-index: 35; width: min(460px, calc(100vw - 48px)); padding: 18px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
 .schedule-delete-decision p { margin: 6px 0 14px; color: var(--ink-muted); }

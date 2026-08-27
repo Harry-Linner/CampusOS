@@ -242,8 +242,13 @@ contextBridge.exposeInMainWorld("campusos", {
   notifications: {
     load: () => ipcRenderer.invoke("campusos:notifications:load"),
     markRead: (id: string) => ipcRenderer.invoke("campusos:notifications:read", id),
+    markUnread: (id: string) => ipcRenderer.invoke("campusos:notifications:unread", id),
     markHandled: (id: string) => ipcRenderer.invoke("campusos:notifications:handled", id),
+    markAllRead: () => ipcRenderer.invoke("campusos:notifications:read-all"),
+    batchMark: (ids: string[], state: "read" | "unread" | "handled") =>
+      ipcRenderer.invoke("campusos:notifications:batch", { ids, state }),
     clearExpired: () => ipcRenderer.invoke("campusos:notifications:clear-expired"),
+    clearAll: () => ipcRenderer.invoke("campusos:notifications:clear-all"),
     subscribe: (listener: () => void) => {
       const channel = "campusos:notifications:changed";
       const handler = () => listener();

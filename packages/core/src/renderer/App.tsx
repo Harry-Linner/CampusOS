@@ -61,6 +61,16 @@ export const App = (): JSX.Element => {
     setNavigationTarget(request);
   }), []);
 
+  // 渲染进程内部导航（如通知中心点击跳转）：自定义事件携带目标视图 id。
+  useEffect(() => {
+    const handleInternalNavigate = (event: Event): void => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (typeof detail === "string" && detail) setActiveView(detail);
+    };
+    window.addEventListener("campusos:navigate", handleInternalNavigate);
+    return () => window.removeEventListener("campusos:navigate", handleInternalNavigate);
+  }, []);
+
   useEffect(() => subscribeToDownloadChanges(() => {
     void workspace.refreshDownloads();
   }), []);

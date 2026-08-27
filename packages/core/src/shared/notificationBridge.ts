@@ -16,6 +16,10 @@ export interface NotificationCenterBridge {
   load: () => Promise<NotificationRecord[]>;
   markRead: (id: string) => Promise<NotificationRecord[]>;
   markHandled: (id: string) => Promise<NotificationRecord[]>;
+  markUnread: (id: string) => Promise<NotificationRecord[]>;
+  markAllRead: () => Promise<NotificationRecord[]>;
+  batchMark: (ids: string[], state: "read" | "unread" | "handled") => Promise<NotificationRecord[]>;
   clearExpired: () => Promise<NotificationRecord[]>;
+  clearAll: () => Promise<NotificationRecord[]>;
   subscribe: (listener: () => void) => () => void;
 }

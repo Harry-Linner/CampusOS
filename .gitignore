@@ -22,3 +22,6 @@ cc98-handoff.zip
 # 本地诊断与 .dsh 备份（可能含会话/路径等隐私信息，禁止入库）
 /diagnostics-*.zip
 /.dsh.before.zip
+
+# dsh-vision-toolkit 的临时截图 Artifact（视觉验收产物，不入库）
+/.dsh-vision-toolkit/

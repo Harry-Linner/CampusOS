@@ -64,15 +64,42 @@ export const addNotification = async (input: { kind: NotificationKind; title: st
   return record;
 };
 
-const mutate = async (id: string, state: "read" | "handled"): Promise<NotificationRecord[]> => {
+const mutate = async (id: string, state: "read" | "unread" | "handled"): Promise<NotificationRecord[]> => {
   await load();
   records = (records ?? []).map((entry) => entry.id === id ? { ...entry, state } : entry);
+  return persist();
+};
+
+const mutateMany = async (ids: readonly string[], state: "read" | "unread" | "handled"): Promise<NotificationRecord[]> => {
+  await load();
+  const idSet = new Set(ids);
+  records = (records ?? []).map((entry) => idSet.has(entry.id) ? { ...entry, state } : entry);
   return persist();
 };
 
 export const registerNotificationHandlers = (): void => {
   ipcMain.handle("campusos:notifications:load", async (event) => { assertTrustedRenderer(event); return load(); });
   ipcMain.handle("campusos:notifications:read", async (event, id: string) => { assertTrustedRenderer(event); return mutate(id, "read"); });
+  ipcMain.handle("campusos:notifications:unread", async (event, id: string) => { assertTrustedRenderer(event); return mutate(id, "unread"); });
   ipcMain.handle("campusos:notifications:handled", async (event, id: string) => { assertTrustedRenderer(event); return mutate(id, "handled"); });
+  ipcMain.handle("campusos:notifications:read-all", async (event) => {
+    assertTrustedRenderer(event);
+    await load();
+    records = (records ?? []).map((entry) => entry.state === "unread" ? { ...entry, state: "read" } : entry);
+    return persist();
+  });
+  ipcMain.handle("campusos:notifications:batch", async (event, input: { ids: string[]; state: "read" | "unread" | "handled" }) => {
+    assertTrustedRenderer(event);
+    if (!Array.isArray(input?.ids) || !["read", "unread", "handled"].includes(input?.state)) {
+      throw new Error("通知批量操作参数无效。");
+    }
+    return mutateMany(input.ids.slice(0, 500), input.state);
+  });
   ipcMain.handle("campusos:notifications:clear-expired", async (event) => { assertTrustedRenderer(event); await load(); return persist(); });
+  ipcMain.handle("campusos:notifications:clear-all", async (event) => {
+    assertTrustedRenderer(event);
+    await load();
+    records = [];
+    return persist();
+  });
 };
