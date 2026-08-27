@@ -3655,6 +3655,96 @@ input:focus-visible {
   font-weight: 600;
 }
 
+.schedule-floating-strip {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  padding: 10px 14px;
+}
+
+.schedule-floating-strip > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+
+.schedule-floating-strip > header strong {
+  font-size: 0.82rem;
+}
+
+.schedule-floating-strip > header span {
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+}
+
+.schedule-floating-strip ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-floating-strip li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.floating-task-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--ink-faint);
+}
+
+.floating-task-dot.is-running {
+  background: var(--success);
+}
+
+.floating-task-dot.is-overdue {
+  background: var(--danger);
+}
+
+.schedule-floating-strip li > button:first-of-type {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.schedule-floating-strip li > button:first-of-type:hover {
+  color: var(--accent-deep);
+}
+
+.floating-task-complete {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--success);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  padding: 2px 7px;
+}
+
+.floating-task-complete:hover,
+.floating-task-complete:focus-visible {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, var(--paper));
+}
+
 .schedule-context-menu {
   display: flex;
   flex-direction: column;

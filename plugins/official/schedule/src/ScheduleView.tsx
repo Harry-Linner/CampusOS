@@ -390,6 +390,12 @@ export const ScheduleView = ({
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
   );
+  const floatingTasks = useMemo(
+    () => tasks
+      .filter((task) => task.type === "floating" && task.status !== "deleted" && task.status !== "completed")
+      .sort((left, right) => left.title.localeCompare(right.title, "zh-CN")),
+    [tasks]
+  );
 
   const loadMakeupCalendar = useCallback(async (): Promise<void> => {
     if (!deskCalendar) return;
@@ -1061,6 +1067,24 @@ export const ScheduleView = ({
               <button type="button" role="menuitem" onClick={() => void clearDay(contextDay)}>清除标记</button>
               <button type="button" role="menuitem" onClick={() => setContextDay(null)}>取消</button>
             </div>
+          ) : null}
+
+          {floatingTasks.length > 0 ? (
+            <section className="schedule-floating-strip" aria-label="无日期待办">
+              <header>
+                <strong>无日期待办</strong>
+                <span>{floatingTasks.length} 项</span>
+              </header>
+              <ul>
+                {floatingTasks.map((task) => (
+                  <li key={task.id}>
+                    <span className={`floating-task-dot is-${task.status}`} aria-hidden="true" />
+                    <button type="button" onClick={() => setForm(taskToForm(task))}>{task.title}</button>
+                    {task.status !== "completed" ? <button type="button" className="floating-task-complete" onClick={() => void mutate(task, "completed")}>完成</button> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
 
           {viewMode === "month" ? (
