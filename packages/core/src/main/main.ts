@@ -80,12 +80,24 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   const defaultHeight = 900;
   // Without a saved position, prefer a secondary display so the primary
   // screen stays free for the user; fall back to the primary display.
+  // E2E fixture runs use a fresh user-data dir (no saved state) and must not
+  // pop up on the user's working screen, so they always center on the
+  // primary display (the user's designated screen 1).
+  const isE2eFixture = process.env.CAMPOS_E2E_FIXTURE === "1";
   let position: { x?: number; y?: number } = {};
   if (!savedState) {
     const primary = screen.getPrimaryDisplay();
-    const secondary = screen.getAllDisplays().find((display) => display.id !== primary.id);
+    const secondary = isE2eFixture
+      ? undefined
+      : screen.getAllDisplays().find((display) => display.id !== primary.id);
     if (secondary) {
       const { x, y, width, height } = secondary.workArea;
+      position = {
+        x: x + Math.max(0, Math.round((width - defaultWidth) / 2)),
+        y: y + Math.max(0, Math.round((height - defaultHeight) / 2))
+      };
+    } else {
+      const { x, y, width, height } = primary.workArea;
       position = {
         x: x + Math.max(0, Math.round((width - defaultWidth) / 2)),
         y: y + Math.max(0, Math.round((height - defaultHeight) / 2))

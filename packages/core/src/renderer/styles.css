@@ -2160,6 +2160,21 @@ input:focus-visible {
   text-align: right;
 }
 
+/* GPA 口径矩阵：百分制是最后一行，删除其下的浅色分隔线（软编码，按结构定位）。 */
+.grade-gpa-matrix-row:last-child {
+  border-bottom: 0;
+}
+
+/* 每个学期的最后一门课不重复画浅色分隔线（软编码，按列表末项定位）。 */
+.grade-terms .data-row:last-child {
+  border-bottom: 0;
+}
+
+/* 最末学期的最后一门课下方补上深色分隔线（与每个学期开始前的线一致，保留原间距）。 */
+.grade-terms .panel-card:last-child .data-row:last-child {
+  border-bottom: 1px solid var(--line-strong);
+}
+
 .workspace-error-banner {
   margin-bottom: 18px;
   border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
@@ -3350,7 +3365,7 @@ input:focus-visible {
 .schedule-layout {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr);
   border-top: 1px solid var(--line-strong);
 }
 
@@ -3560,203 +3575,6 @@ input:focus-visible {
   gap: 22px;
   border-left: 1px solid var(--line);
   padding: 18px 0 0 clamp(18px, 3vw, 34px);
-}
-
-.schedule-notice-panel {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.schedule-notice-heading {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.schedule-notice-heading h2 {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.schedule-notice-heading p {
-  margin: 4px 0 0;
-  color: var(--ink-faint);
-  font-size: 0.74rem;
-}
-
-.schedule-notice-error {
-  margin: 0;
-  color: var(--danger);
-  font-size: 0.76rem;
-  line-height: 1.5;
-}
-
-.schedule-notice-empty {
-  margin: 0;
-  color: var(--ink-faint);
-  font-size: 0.76rem;
-  line-height: 1.6;
-}
-
-.schedule-notice-list {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--line);
-}
-
-.schedule-notice-item {
-  min-width: 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.schedule-notice-item.is-new {
-  background: color-mix(in srgb, var(--accent) 5%, var(--paper));
-}
-
-.schedule-notice-check {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 4px;
-  cursor: pointer;
-}
-
-.schedule-notice-check input {
-  flex-shrink: 0;
-  margin-top: 3px;
-}
-
-.schedule-notice-item-main {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.schedule-notice-title {
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-.schedule-notice-title:hover,
-.schedule-notice-title:focus-visible {
-  color: var(--accent-deep);
-}
-
-.schedule-notice-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-faint);
-  font-size: 0.7rem;
-}
-
-.schedule-notice-meta em {
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent) 16%, var(--paper));
-  color: var(--accent-deep);
-  font-style: normal;
-  padding: 1px 5px;
-}
-
-.schedule-notice-drafts {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-top: 1px solid var(--line-strong);
-  padding-top: 14px;
-}
-
-.schedule-notice-drafts header p {
-  margin: 4px 0 0;
-  color: var(--ink-faint);
-  font-size: 0.72rem;
-  line-height: 1.5;
-}
-
-.schedule-notice-draft {
-  min-width: 0;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-
-.schedule-notice-draft-head {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.schedule-notice-draft-head strong {
-  overflow-wrap: anywhere;
-  font-size: 0.84rem;
-}
-
-.schedule-notice-draft-head span {
-  flex-shrink: 0;
-  color: var(--success);
-  font-size: 0.7rem;
-}
-
-.schedule-notice-draft-head span.is-low {
-  color: var(--warning);
-}
-
-.schedule-notice-draft-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  padding-top: 10px;
-}
-
-.schedule-notice-draft-form label {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-  color: var(--ink-soft);
-  font-size: 0.7rem;
-}
-
-.schedule-notice-draft-form label:first-child {
-  grid-column: 1 / -1;
-}
-
-.schedule-notice-draft-form input {
-  min-width: 0;
-  min-height: 34px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-  color: var(--ink);
-  padding: 6px 8px;
-  font: inherit;
-}
-
-.schedule-notice-draft-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-top: 10px;
 }
 
 .schedule-task-list {

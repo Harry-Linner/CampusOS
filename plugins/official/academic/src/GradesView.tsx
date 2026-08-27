@@ -262,46 +262,48 @@ export const Component = ({
             </article>
           ) : null}
 
-          {summary.terms.map((term) => (
-            <article key={term.key} className="panel-card">
-              <div className="grade-term-heading">
-                <h2>{term.label}</h2>
-                <span>{numberFormatter.format(term.credits)} 学分</span>
-              </div>
-              <ul className="data-list">
-                {term.grades.map((grade) => (
-                  <li key={grade.sourceId} className="data-row">
-                    <div>
-                      <strong>
-                        {grade.courseName}
-                        {grade.isMajorCourse ? (
-                          <span className="grade-major-tag">主修</span>
-                        ) : null}
-                      </strong>
-                        <span className="meta-line">
-                        {grade.realId ?? grade.courseCode ?? "课程代码未返回"} / {numberFormatter.format(grade.credit)} 学分
-                        {grade.courseCategory ? ` · ${grade.courseCategory}` : ""}
-                      </span>
-                    </div>
-                      <div className="row-side">
-                      <strong>
-                        {privacyMask
-                          ? "***"
-                          : (grade.originalScore || "未返回成绩")}
-                      </strong>
-                      <span className="meta-line">
-                        {privacyMask
-                          ? "***"
-                          : grade.gradePoint === null
-                          ? "绩点未返回"
-                          : `绩点 ${numberFormatter.format(grade.gradePoint)}`}
+          <div className="grade-terms">
+            {summary.terms.map((term) => (
+              <article key={term.key} className="panel-card">
+                <div className="grade-term-heading">
+                  <h2>{term.label}</h2>
+                  <span>{numberFormatter.format(term.credits)} 学分</span>
+                </div>
+                <ul className="data-list">
+                  {term.grades.map((grade) => (
+                    <li key={grade.sourceId} className="data-row">
+                      <div>
+                        <strong>
+                          {grade.courseName}
+                          {grade.isMajorCourse ? (
+                            <span className="grade-major-tag">主修</span>
+                          ) : null}
+                        </strong>
+                          <span className="meta-line">
+                          {grade.realId ?? grade.courseCode ?? "课程代码未返回"} / {numberFormatter.format(grade.credit)} 学分
+                          {grade.courseCategory ? ` · ${grade.courseCategory}` : ""}
                         </span>
                       </div>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
+                        <div className="row-side">
+                        <strong>
+                          {privacyMask
+                            ? "***"
+                            : (grade.originalScore || "未返回成绩")}
+                        </strong>
+                        <span className="meta-line">
+                          {privacyMask
+                            ? "***"
+                            : grade.gradePoint === null
+                            ? "绩点未返回"
+                            : `绩点 ${numberFormatter.format(grade.gradePoint)}`}
+                          </span>
+                        </div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
         </>
       ) : null}
     </section>

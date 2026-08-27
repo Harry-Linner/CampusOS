@@ -8,7 +8,6 @@ import type {
 import type { DeskCalendarView } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
-import { ScheduleNoticeBoard } from "./ScheduleNoticeBoard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -358,8 +357,6 @@ const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Dat
 export const ScheduleView = ({
   snapshot,
   schedule,
-  assistant,
-  campusFeed,
   deskCalendar,
   navigationTarget
 }: ScheduleViewProps): JSX.Element => {
@@ -861,13 +858,6 @@ export const ScheduleView = ({
             </div>
           ) : null}
         </section>
-        <aside className="schedule-sidebar">
-          <ScheduleNoticeBoard
-            campusFeed={campusFeed}
-            assistant={assistant}
-            schedule={schedule}
-          />
-        </aside>
       </div>
 
       {selectedEvent ? (
