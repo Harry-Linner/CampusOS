@@ -3466,6 +3466,76 @@ input:focus-visible {
   font-size: 0.72rem;
 }
 
+.schedule-more-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--accent-deep);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  text-align: left;
+  padding: 2px 5px 2px 7px;
+  border-radius: var(--radius-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.schedule-more-button:hover,
+.schedule-more-button:focus-visible {
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+  text-decoration-color: var(--accent-deep);
+}
+
+.schedule-date-jump {
+  display: inline-flex;
+}
+
+.schedule-date-jump input {
+  min-height: 30px;
+  max-width: 150px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-more-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedule-more-day-list .schedule-event {
+  width: 100%;
+  border-width: 0 0 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 8px 10px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.schedule-more-day-list .schedule-event strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+}
+
+.schedule-more-day-list .schedule-event small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
 .schedule-month-cell .schedule-event:hover,
 .schedule-month-cell .schedule-event:focus-visible {
   background: var(--accent-wash);
@@ -3544,7 +3614,29 @@ input:focus-visible {
 
 .schedule-day-timeline {
   min-width: 560px;
+  position: relative;
   border-top: 1px solid var(--line);
+}
+
+.schedule-now-line {
+  position: absolute;
+  left: 58px;
+  right: 0;
+  height: 2px;
+  background: var(--danger);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.schedule-now-line::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--danger);
 }
 
 .schedule-hour {

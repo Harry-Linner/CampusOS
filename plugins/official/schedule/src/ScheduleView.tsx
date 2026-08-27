@@ -377,6 +377,7 @@ export const ScheduleView = ({
   const [deskCalendarBusy, setDeskCalendarBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
+  const [moreDay, setMoreDay] = useState<string | null>(null);
   const selectedTask = useMemo(
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
@@ -493,6 +494,22 @@ export const ScheduleView = ({
     });
     setSelectedEvent(null);
   };
+
+  // 键盘方向键翻页（焦点不在输入控件时）。
+  useEffect(() => {
+    const isTyping = (target: EventTarget | null): boolean => {
+      const element = target as HTMLElement | null;
+      return element !== null && (element.tagName === "INPUT" || element.tagName === "TEXTAREA" || element.tagName === "SELECT" || element.isContentEditable);
+    };
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isTyping(event.target)) return;
+      if (event.key === "ArrowLeft") { event.preventDefault(); movePeriod(-1); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); movePeriod(1); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); setSelectedDate(new Date()); }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
 
   const selectEvent = (event: ScheduleEvent): void => {
     setSelectedEvent(event);
@@ -798,6 +815,21 @@ export const ScheduleView = ({
               <strong>{periodLabel}</strong>
               <button className="icon-button" type="button" aria-label="下一个周期" onClick={() => movePeriod(1)}><AppIcon name="chevron-right" size={18} /></button>
               <Button variant="ghost" type="button" onClick={() => setSelectedDate(new Date())}>今天</Button>
+              <label className="schedule-date-jump">
+                <span className="sr-only">跳转到日期</span>
+                <input
+                  type="date"
+                  value={toDateInput(selectedDate)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (!value) return;
+                    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+                    if (!match) return;
+                    setSelectedDate(fromShanghaiParts(Number(match[1]), Number(match[2]), Number(match[3])));
+                    setSelectedEvent(null);
+                  }}
+                />
+              </label>
             </div>
           </header>
 
@@ -805,14 +837,15 @@ export const ScheduleView = ({
             <div className="schedule-month-grid">
               {weekdayLabels.map((label) => <span className="schedule-weekday" key={label}>{label}</span>)}
               {monthDays.map((day) => {
-                const items = eventsByDay.get(dayKey(day)) ?? [];
+                const dayKeyValue = dayKey(day);
+                const items = eventsByDay.get(dayKeyValue) ?? [];
                 const outside = monthKey(day) !== monthKey(selectedDate);
                 return (
-                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)} onClick={() => setForm(defaultTaskForm(day))}>
+                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKeyValue === dayKey(new Date()) ? " is-today" : ""}`} key={dayKeyValue} onDoubleClick={() => setForm(defaultTaskForm(day))}>
                     <time dateTime={day.toISOString()}>{getShanghaiDayNumber(day)}</time>
                     <div className="schedule-event-list">
                       {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)}
-                      {items.length > 5 ? <small>+{items.length - 5} 项</small> : null}
+                      {items.length > 5 ? <button className="schedule-more-button" type="button" onClick={(click) => { click.stopPropagation(); setMoreDay(dayKeyValue); }}>+{items.length - 5} 项</button> : null}
                     </div>
                   </section>
                 );
@@ -823,7 +856,15 @@ export const ScheduleView = ({
           {viewMode === "week" ? (
             <div className="schedule-week-grid">
               {weekDays.map((day) => (
-                <section className={`schedule-week-column${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)} onClick={() => setForm(defaultTaskForm(day))}>
+                <section className={`schedule-week-column${dayKey(day) === dayKey(new Date()) ? " is-today" : ""}`} key={dayKey(day)} onClick={(click) => {
+                  const rect = (click.currentTarget as HTMLElement).getBoundingClientRect();
+                  const hourRatio = (click.clientY - rect.top) / Math.max(1, rect.height);
+                  const hour = Math.max(0, Math.min(23, Math.floor(hourRatio * 24)));
+                  const parts = getShanghaiDateParts(day);
+                  const start = fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour, 0);
+                  const end = new Date(start.getTime() + 60 * 60 * 1000);
+                  setForm({ ...defaultTaskForm(day), startAt: toDateTimeInput(start), endAt: toDateTimeInput(end) });
+                }}>
                   <header><span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span><strong>{getShanghaiDayNumber(day)}</strong></header>
                   <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
                 </section>
@@ -845,6 +886,13 @@ export const ScheduleView = ({
 
           {viewMode === "day" ? (
             <div className="schedule-day-timeline">
+              {(() => {
+                const now = new Date();
+                const nowParts = getShanghaiDateParts(now);
+                const isToday = dayKey(now) === dayKey(selectedDate);
+                const minutesIntoDay = Number(nowParts.hour) * 60 + Number(nowParts.minute);
+                return isToday ? <div className="schedule-now-line" style={{ top: `${(minutesIntoDay / 24 / 60) * 100}%` }} aria-hidden="true" /> : null;
+              })()}
               {Array.from({ length: 24 }, (_, hour) => {
                 const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => getShanghaiHour(event.startAt) === hour);
                 const formForHour = (): TaskFormState => {
@@ -876,6 +924,24 @@ export const ScheduleView = ({
                   <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask)}>删除</Button>
                 </div>
               ) : <p className="text-xs leading-5 text-muted-foreground">课程、考试和上游作业为只读；需要修改自建任务时请在 CampusOS 主窗口操作。</p>}
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {moreDay ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setMoreDay(null); }}>
+          <DialogContent aria-describedby={undefined}>
+            <DialogHeader>
+              <DialogTitle>{moreDay ? `${Number(moreDay.slice(5, 7))}月${Number(moreDay.slice(8, 10))}日 ${weekdayLabels[(getShanghaiWeekday(dateFromDayKey(moreDay)) + 6) % 7]} · 全部安排` : "当天安排"}</DialogTitle>
+            </DialogHeader>
+            <div className="schedule-more-day-list">
+              {(eventsByDay.get(moreDay) ?? []).map((event) => (
+                <button className={eventClassName(event)} type="button" key={event.id} onClick={() => { setMoreDay(null); selectEvent(event); }}>
+                  <strong>{event.title}</strong>
+                  <small>{formatEventMeta(event)}{event.location ? ` · ${event.location}` : ""}</small>
+                </button>
+              ))}
             </div>
           </DialogContent>
         </Dialog>
