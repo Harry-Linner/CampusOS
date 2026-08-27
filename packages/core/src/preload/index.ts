@@ -131,6 +131,8 @@ contextBridge.exposeInMainWorld("campusos", {
       ipcRenderer.invoke("campusos:desk-calendar:settings:save", { enabled }),
     setView: (view: "month" | "week" | "day") =>
       ipcRenderer.invoke("campusos:desk-calendar:settings:save", { view }),
+    updateSettings: (patch: Record<string, unknown>) =>
+      ipcRenderer.invoke("campusos:desk-calendar:settings:save", patch),
     subscribe: (listener: () => void) => {
       const channel = "campusos:desk-calendar:changed";
       const handler = () => listener();

@@ -50,6 +50,16 @@ export interface DeskCalendarHoliday {
   label: string;
 }
 
+/** 调休补课：某天被设为补课日时，补的是星期几的课（1=周一 … 7=周日）。 */
+export interface DeskCalendarMakeupDay {
+  /** 补课日期（YYYY-MM-DD）。 */
+  date: string;
+  /** 补的是星期几的课，1-7。 */
+  weekday: number;
+  /** 来源：内置校历或用户手动录入。 */
+  source: "builtin" | "manual";
+}
+
 export interface DeskCalendarDisplayProfile {
   displayKey: string;
   bounds: { x: number; y: number; width: number; height: number };
@@ -65,6 +75,7 @@ export interface DeskCalendarSettings {
   weather: DeskCalendarWeather | null;
   appearance: DeskCalendarAppearance;
   statutoryHolidays: DeskCalendarHoliday[];
+  makeupDays: DeskCalendarMakeupDay[];
   displayProfiles: DeskCalendarDisplayProfile[];
   savedAt: string;
   storagePath: string;
@@ -85,6 +96,7 @@ export interface DeskCalendarControlBridge {
   loadSettings: () => Promise<DeskCalendarSettings>;
   setEnabled: (enabled: boolean) => Promise<DeskCalendarSettings>;
   setView: (view: DeskCalendarView) => Promise<DeskCalendarSettings>;
+  updateSettings: (patch: Partial<Omit<DeskCalendarSettings, "savedAt" | "storagePath">>) => Promise<DeskCalendarSettings>;
   subscribe: (listener: () => void) => () => void;
 }
 
@@ -117,6 +129,7 @@ export const createDefaultDeskCalendarSettings = (
   weather: null,
   appearance: { opacity: 0.88, background: "#111722" },
   statutoryHolidays: [],
+  makeupDays: [],
   displayProfiles: [],
   savedAt: new Date(0).toISOString(),
   storagePath

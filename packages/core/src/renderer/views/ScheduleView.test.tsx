@@ -143,6 +143,7 @@ describe("ScheduleView", () => {
         weather: null,
         appearance: { opacity: 0.88, background: "#111722" },
         statutoryHolidays: [],
+        makeupDays: [],
         displayProfiles: [],
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
@@ -157,6 +158,7 @@ describe("ScheduleView", () => {
         weather: null,
         appearance: { opacity: 0.88, background: "#111722" },
         statutoryHolidays: [],
+        makeupDays: [],
         displayProfiles: [],
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
@@ -171,6 +173,22 @@ describe("ScheduleView", () => {
         weather: null,
         appearance: { opacity: 0.88, background: "#111722" },
         statutoryHolidays: [],
+        makeupDays: [],
+        displayProfiles: [],
+        savedAt: "2026-08-15T00:00:00.000Z",
+        storagePath: "C:/settings/desk-calendar.json"
+      })),
+      updateSettings: vi.fn(async (patch: Record<string, unknown>) => ({
+        enabled: true,
+        view: "month" as const,
+        showClock: true,
+        widgets: [],
+        countdowns: [],
+        progress: [],
+        weather: null,
+        appearance: { opacity: 0.88, background: "#111722" },
+        statutoryHolidays: (patch.statutoryHolidays ?? []) as { date: string; label: string }[],
+        makeupDays: (patch.makeupDays ?? []) as { date: string; weekday: number; source: "builtin" | "manual" }[],
         displayProfiles: [],
         savedAt: "2026-08-15T00:00:00.000Z",
         storagePath: "C:/settings/desk-calendar.json"
@@ -475,6 +493,45 @@ describe("schedule event ranges", () => {
     await waitFor(() => {
       expect(screen.queryByText("Read notes")).toBeNull();
     });
+  });
+
+  it("renders holiday and makeup marks from the desk calendar settings", async () => {
+    const deskCalendar = {
+      loadSettings: vi.fn(async () => ({
+        enabled: true,
+        view: "month" as const,
+        showClock: true,
+        widgets: [],
+        countdowns: [],
+        progress: [],
+        weather: null,
+        appearance: { opacity: 0.88, background: "#111722" },
+        statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
+        makeupDays: [{ date: "2026-10-04", weekday: 1, source: "manual" as const }],
+        displayProfiles: [],
+        savedAt: "2026-08-15T00:00:00.000Z",
+        storagePath: "C:/settings/desk-calendar.json"
+      })),
+      setEnabled: vi.fn(),
+      setView: vi.fn(),
+      updateSettings: vi.fn(),
+      subscribe: vi.fn(() => () => undefined)
+    };
+    const snapshotWithOctober: CampusWorkspaceSnapshot = { ...snapshot, generatedAt: "2026-10-01T00:00:00.000Z" };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot: snapshotWithOctober,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule(),
+      deskCalendar
+    }));
+
+    await waitFor(() => expect(deskCalendar.loadSettings).toHaveBeenCalled());
+    // 跳转到 2026-10 月视图。
+    fireEvent.change(screen.getByLabelText("跳转到日期"), { target: { value: "2026-10-01" } });
+    await waitFor(() => expect(screen.getByText("国庆节")).toBeTruthy());
+    expect(screen.getByText("补周一")).toBeTruthy();
   });
 
 });

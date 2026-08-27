@@ -193,6 +193,7 @@ export interface PluginComponentProps {
     loadSettings: () => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
     setEnabled: (enabled: boolean) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
     setView: (view: import("./deskCalendarBridge").DeskCalendarView) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
+    updateSettings: (patch: Partial<Omit<import("./deskCalendarBridge").DeskCalendarSettings, "savedAt" | "storagePath">>) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
     subscribe: (listener: () => void) => () => void;
   };
 }

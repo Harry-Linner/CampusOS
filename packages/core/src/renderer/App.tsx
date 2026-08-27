@@ -162,6 +162,7 @@ export const App = (): JSX.Element => {
       <DashboardView
         loading={workspace.loading}
         snapshot={workspace.snapshot}
+        deskCalendar={window.campusos?.deskCalendar}
       />
     );
   } else if (activeView === "extensions") {

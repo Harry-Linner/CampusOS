@@ -326,6 +326,7 @@ describe("desk calendar window IPC", () => {
       progress: [{ id: "progress-1", title: "Term", startAt: "2026-08-01T00:00:00.000Z", endAt: "2026-09-01T00:00:00.000Z" }],
       appearance: { opacity: 0.55, background: "#223344" },
       statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
+      makeupDays: [{ date: "2026-10-09", weekday: 5, source: "manual" as const }],
       displayProfiles: [{ displayKey: "primary", bounds: { x: 0, y: 0, width: 720, height: 560 } }]
     });
     await expect(handlerFor("campusos:desk-calendar:settings:load")({})).resolves.toMatchObject({
@@ -333,6 +334,7 @@ describe("desk calendar window IPC", () => {
       progress: [{ id: "progress-1" }],
       appearance: { opacity: 0.55, background: "#223344" },
       statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
+      makeupDays: [{ date: "2026-10-09", weekday: 5, source: "manual" }],
       displayProfiles: [{ displayKey: "primary" }]
     });
   });

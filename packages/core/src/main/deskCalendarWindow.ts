@@ -78,6 +78,17 @@ const normalizeStatutoryHolidays = (value: unknown): DeskCalendarSettings["statu
     : [])
   : [];
 
+const normalizeMakeupDays = (value: unknown): DeskCalendarSettings["makeupDays"] => Array.isArray(value)
+  ? value.flatMap((item) => {
+    if (typeof item !== "object" || item === null) return [];
+    const candidate = item as { date?: unknown; weekday?: unknown; source?: unknown };
+    if (typeof candidate.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(candidate.date)) return [];
+    if (typeof candidate.weekday !== "number" || !Number.isInteger(candidate.weekday) || candidate.weekday < 1 || candidate.weekday > 7) return [];
+    const source = candidate.source === "manual" ? "manual" : "builtin";
+    return [{ date: candidate.date, weekday: candidate.weekday, source }];
+  })
+  : [];
+
 const normalizeDisplayProfiles = (value: unknown): DeskCalendarSettings["displayProfiles"] => Array.isArray(value)
   ? value.flatMap((item) => {
     if (typeof item !== "object" || item === null) return [];
@@ -120,6 +131,7 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
       weather?: DeskCalendarWeather | null;
       appearance?: unknown;
       statutoryHolidays?: unknown;
+      makeupDays?: unknown;
       displayProfiles?: unknown;
       savedAt?: string;
     };
@@ -133,6 +145,7 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
       weather: payload.weather && typeof payload.weather === "object" ? payload.weather : null,
       appearance: normalizeAppearance(payload.appearance),
       statutoryHolidays: normalizeStatutoryHolidays(payload.statutoryHolidays),
+      makeupDays: normalizeMakeupDays(payload.makeupDays),
       displayProfiles: normalizeDisplayProfiles(payload.displayProfiles),
       savedAt: payload.savedAt ?? new Date(0).toISOString(),
       storagePath
@@ -338,6 +351,7 @@ export const registerDeskCalendarHandlers = (): void => {
     if (candidate.progress !== undefined) patch.progress = normalizeProgress(candidate.progress);
     if (candidate.appearance !== undefined) patch.appearance = normalizeAppearance(candidate.appearance);
     if (candidate.statutoryHolidays !== undefined) patch.statutoryHolidays = normalizeStatutoryHolidays(candidate.statutoryHolidays);
+    if (candidate.makeupDays !== undefined) patch.makeupDays = normalizeMakeupDays(candidate.makeupDays);
     if (candidate.displayProfiles !== undefined) patch.displayProfiles = normalizeDisplayProfiles(candidate.displayProfiles);
     if (candidate.weather !== undefined) patch.weather = candidate.weather;
     const next = await saveSettings(patch);

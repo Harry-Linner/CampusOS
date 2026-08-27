@@ -383,10 +383,60 @@ export const ScheduleView = ({
   const [dragEvent, setDragEvent] = useState<ScheduleEvent | null>(null);
   const [dragPreview, setDragPreview] = useState<{ startAt: string; endAt: string } | null>(null);
   const [conflictEvents, setConflictEvents] = useState<Set<string>>(new Set());
+  const [makeupDays, setMakeupDays] = useState<ReadonlyArray<{ date: string; weekday: number; source: "builtin" | "manual" }>>([]);
+  const [statutoryHolidays, setStatutoryHolidays] = useState<ReadonlyArray<{ date: string; label: string }>>([]);
+  const [contextDay, setContextDay] = useState<string | null>(null);
   const selectedTask = useMemo(
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
   );
+
+  const loadMakeupCalendar = useCallback(async (): Promise<void> => {
+    if (!deskCalendar) return;
+    try {
+      const record = await deskCalendar.loadSettings();
+      setMakeupDays(record.makeupDays ?? []);
+      setStatutoryHolidays(record.statutoryHolidays ?? []);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "无法读取调休校历。");
+    }
+  }, [deskCalendar]);
+
+  const persistMakeupCalendar = async (nextHolidays: ReadonlyArray<{ date: string; label: string }>, nextMakeup: ReadonlyArray<{ date: string; weekday: number; source: "builtin" | "manual" }>): Promise<void> => {
+    if (!deskCalendar) return;
+    try {
+      await deskCalendar.updateSettings({ statutoryHolidays: [...nextHolidays], makeupDays: [...nextMakeup] });
+      setStatutoryHolidays(nextHolidays);
+      setMakeupDays(nextMakeup);
+      setContextDay(null);
+      setNotice("调休校历已更新");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "调休校历保存失败。");
+    }
+  };
+
+  const setDayHoliday = async (date: string, label: string): Promise<void> => {
+    const existing = statutoryHolidays.find((holiday) => holiday.date === date);
+    const next = existing ? statutoryHolidays.map((holiday) => holiday.date === date ? { ...holiday, label } : holiday) : [...statutoryHolidays, { date, label }];
+    // 节假日与补课互斥：设节假日时移除该天的补课。
+    const nextMakeup = makeupDays.filter((makeup) => makeup.date !== date);
+    await persistMakeupCalendar(next, nextMakeup);
+  };
+
+  const clearDay = async (date: string): Promise<void> => {
+    await persistMakeupCalendar(
+      statutoryHolidays.filter((holiday) => holiday.date !== date),
+      makeupDays.filter((makeup) => makeup.date !== date)
+    );
+  };
+
+  const setDayMakeup = async (date: string, weekday: number): Promise<void> => {
+    const existing = makeupDays.find((makeup) => makeup.date === date);
+    const next = existing ? makeupDays.map((makeup) => makeup.date === date ? { ...makeup, weekday, source: "manual" as const } : makeup) : [...makeupDays, { date, weekday, source: "manual" as const }];
+    // 补课与节假日互斥：设补课时移除该天的节假日。
+    const nextHolidays = statutoryHolidays.filter((holiday) => holiday.date !== date);
+    await persistMakeupCalendar(nextHolidays, next);
+  };
 
   const loadDeskCalendarState = useCallback(async (): Promise<void> => {
     if (!deskCalendar) return;
@@ -401,11 +451,13 @@ export const ScheduleView = ({
 
   useEffect(() => {
     void loadDeskCalendarState();
+    void loadMakeupCalendar();
     if (!deskCalendar) return undefined;
     return deskCalendar.subscribe(() => {
       void loadDeskCalendarState();
+      void loadMakeupCalendar();
     });
-  }, [deskCalendar, loadDeskCalendarState]);
+  }, [deskCalendar, loadDeskCalendarState, loadMakeupCalendar]);
 
   const toggleDeskCalendar = async (enabled: boolean): Promise<void> => {
     if (!deskCalendar) return;
@@ -999,6 +1051,18 @@ export const ScheduleView = ({
             </div>
           </header>
 
+          {contextDay ? (
+            <div className="schedule-context-menu" role="menu" aria-label="调休设置">
+              <div className="schedule-context-title">{contextDay.slice(5, 7)}月{contextDay.slice(8, 10)}日 · 调休设置</div>
+              <button type="button" role="menuitem" onClick={() => void setDayHoliday(contextDay, "节假日")}>设为节假日</button>
+              {([1, 2, 3, 4, 5, 6, 7] as const).map((weekday) => (
+                <button key={weekday} type="button" role="menuitem" onClick={() => void setDayMakeup(contextDay, weekday)}>设为补课（补{weekdayLabels[(weekday + 6) % 7]}的课）</button>
+              ))}
+              <button type="button" role="menuitem" onClick={() => void clearDay(contextDay)}>清除标记</button>
+              <button type="button" role="menuitem" onClick={() => setContextDay(null)}>取消</button>
+            </div>
+          ) : null}
+
           {viewMode === "month" ? (
             <div className="schedule-month-grid">
               {weekdayLabels.map((label) => <span className="schedule-weekday" key={label}>{label}</span>)}
@@ -1007,8 +1071,10 @@ export const ScheduleView = ({
                 const items = eventsByDay.get(dayKeyValue) ?? [];
                 const outside = monthKey(day) !== monthKey(selectedDate);
                 return (
-                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKeyValue === dayKey(new Date()) ? " is-today" : ""}`} key={dayKeyValue} onDoubleClick={() => setForm(defaultTaskForm(day))}>
+                  <section className={`schedule-month-cell${outside ? " is-outside" : ""}${dayKeyValue === dayKey(new Date()) ? " is-today" : ""}${statutoryHolidays.some((holiday) => holiday.date === dayKeyValue) ? " is-holiday" : ""}`} key={dayKeyValue} onDoubleClick={() => setForm(defaultTaskForm(day))} onContextMenu={(event) => { event.preventDefault(); setContextDay(dayKeyValue); }}>
                     <time dateTime={day.toISOString()}>{getShanghaiDayNumber(day)}</time>
+                    {statutoryHolidays.find((holiday) => holiday.date === dayKeyValue) ? <span className="schedule-holiday-label">{statutoryHolidays.find((holiday) => holiday.date === dayKeyValue)!.label}</span> : null}
+                    {makeupDays.find((makeup) => makeup.date === dayKeyValue) ? <span className="schedule-makeup-label">补{weekdayLabels[(makeupDays.find((makeup) => makeup.date === dayKeyValue)!.weekday + 6) % 7]}</span> : null}
                     <div className="schedule-event-list">
                       {items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)}
                       {items.length > 5 ? <button className="schedule-more-button" type="button" onClick={(click) => { click.stopPropagation(); setMoreDay(dayKeyValue); }}>+{items.length - 5} 项</button> : null}

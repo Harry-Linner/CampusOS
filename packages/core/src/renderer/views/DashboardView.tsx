@@ -4,7 +4,7 @@ import type {
   CampusPriority,
   CampusWorkspaceSnapshot
 } from "@campusos/shared";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatDateTime,
   formatRelativeToNow,
@@ -20,6 +20,21 @@ import {
 interface DashboardViewProps {
   loading: boolean;
   snapshot: CampusWorkspaceSnapshot | null;
+  deskCalendar?: {
+    loadSettings: () => Promise<import("@campusos/shared").DeskCalendarSettings>;
+    subscribe: (listener: () => void) => () => void;
+  };
+}
+
+interface MakeupDayInfo {
+  date: string;
+  weekday: number;
+  source: "builtin" | "manual";
+}
+
+interface HolidayInfo {
+  date: string;
+  label: string;
 }
 
 type CourseState = "complete" | "current" | "next" | "later";
@@ -101,8 +116,24 @@ const DashboardSkeleton = (): JSX.Element => (
 
 export const DashboardView = ({
   loading,
-  snapshot
+  snapshot,
+  deskCalendar
 }: DashboardViewProps): JSX.Element => {
+  const [makeupDays, setMakeupDays] = useState<MakeupDayInfo[]>([]);
+  const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
+
+  useEffect(() => {
+    if (!deskCalendar) return undefined;
+    const load = (): void => {
+      void deskCalendar.loadSettings().then((record) => {
+        setMakeupDays(record.makeupDays ?? []);
+        setHolidays(record.statutoryHolidays ?? []);
+      }).catch(() => undefined);
+    };
+    load();
+    return deskCalendar.subscribe(load);
+  }, [deskCalendar]);
+
   if (!snapshot) {
     return loading ? (
       <DashboardSkeleton />
@@ -307,6 +338,23 @@ export const DashboardView = ({
             </ol>
           )}
         </section>
+
+        {makeupDays.length > 0 || holidays.length > 0 ? (
+          <section className="content-section makeup-card" aria-labelledby="makeup-heading">
+            <header className="section-heading">
+              <h2 id="makeup-heading">本周调休</h2>
+              <span>仅提醒 · 以校历为准</span>
+            </header>
+            <div className="makeup-card-body">
+              {holidays.map((holiday) => (
+                <p key={`h-${holiday.date}`}><strong>{holiday.date.slice(5, 7)}月{holiday.date.slice(8, 10)}日</strong> {holiday.label}</p>
+              ))}
+              {makeupDays.map((makeup) => (
+                <p key={`m-${makeup.date}`}><strong>{makeup.date.slice(5, 7)}月{makeup.date.slice(8, 10)}日</strong> 补{["周一", "周二", "周三", "周四", "周五", "周六", "周日"][makeup.weekday - 1]}的课</p>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </section>
   );

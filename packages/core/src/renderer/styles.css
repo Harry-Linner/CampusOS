@@ -3476,6 +3476,35 @@ input:focus-visible {
   color: var(--ink-faint);
 }
 
+.schedule-month-cell.is-holiday {
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--line) 30%, transparent),
+    color-mix(in srgb, var(--line) 30%, transparent) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.schedule-holiday-label {
+  display: block;
+  color: var(--ink-faint);
+  font-size: 0.66rem;
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.schedule-makeup-label {
+  display: inline-block;
+  margin-top: 3px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 16%, var(--paper));
+  color: var(--warning);
+  padding: 1px 5px;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
 .schedule-month-cell.is-today > time {
   color: var(--accent-deep);
   font-weight: 700;
@@ -3597,6 +3626,70 @@ input:focus-visible {
 
 .schedule-mini-day.is-active.is-today {
   color: white;
+}
+
+.makeup-card {
+  border-left: 3px solid var(--warning);
+}
+
+.makeup-card .section-heading span {
+  color: var(--ink-faint);
+}
+
+.makeup-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+}
+
+.makeup-card-body p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.makeup-card-body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.schedule-context-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(240px, calc(100vw - 32px));
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-elevated);
+}
+
+.schedule-context-title {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  padding: 4px 8px 8px;
+}
+
+.schedule-context-menu button {
+  min-height: 30px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  padding: 0 8px;
+}
+
+.schedule-context-menu button:hover,
+.schedule-context-menu button:focus-visible {
+  background: var(--paper-muted);
 }
 
 .schedule-kind-filters {
