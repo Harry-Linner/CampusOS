@@ -438,4 +438,43 @@ describe("schedule event ranges", () => {
     }
   });
 
+  it("shows the time granularity selector and mini calendar toggle", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule()
+    }));
+
+    const stepSelect = screen.getByLabelText("时间粒度") as HTMLSelectElement;
+    expect(stepSelect.value).toBe("30");
+    fireEvent.change(stepSelect, { target: { value: "15" } });
+    expect((screen.getByLabelText("时间粒度") as HTMLSelectElement).value).toBe("15");
+
+    fireEvent.click(screen.getByRole("button", { name: "迷你月历" }));
+    const miniDialog = screen.getByRole("dialog", { name: "迷你月历" });
+    fireEvent.click(within(miniDialog).getByRole("button", { name: "下个月" }));
+    expect(within(miniDialog).getByText(/2026年/)).toBeTruthy();
+  });
+
+  it("filters events by kind via the type toggles", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule()
+    }));
+    await screen.findAllByText("Read notes");
+
+    // 默认全部显示。
+    expect(screen.getAllByText("Read notes").length).toBeGreaterThan(0);
+    // 隐藏"任务"后，Read notes（task 事件）不再显示。
+    fireEvent.click(screen.getByRole("button", { name: "任务" }));
+    await waitFor(() => {
+      expect(screen.queryByText("Read notes")).toBeNull();
+    });
+  });
+
 });

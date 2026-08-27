@@ -147,8 +147,6 @@ const dateFromDayKey = (value: string): Date => {
   return fromShanghaiParts(Number(match[1]), Number(match[2]), Number(match[3]));
 };
 
-const getShanghaiHour = (value: string): number => Number(getShanghaiDateParts(new Date(value)).hour);
-
 export const getShanghaiDayNumber = (value: Date): number =>
   Number(getShanghaiDateParts(value).day);
 
@@ -381,6 +379,10 @@ export const ScheduleView = ({
   const [miniOpen, setMiniOpen] = useState(false);
   const [miniMonth, setMiniMonth] = useState(() => new Date());
   const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<ScheduleEvent["kind"]>>(new Set());
+  const [timeStepMinutes, setTimeStepMinutes] = useState<15 | 30 | 60>(30);
+  const [dragEvent, setDragEvent] = useState<ScheduleEvent | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ startAt: string; endAt: string } | null>(null);
+  const [conflictEvents, setConflictEvents] = useState<Set<string>>(new Set());
   const selectedTask = useMemo(
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
@@ -519,6 +521,90 @@ export const ScheduleView = ({
 
   const selectEvent = (event: ScheduleEvent): void => {
     setSelectedEvent(event);
+  };
+
+  const isTaskEditable = (event: ScheduleEvent): boolean =>
+    event.taskId !== undefined && event.kind === "task";
+
+  // 日视图拖拽：按像素偏移换算分钟（1 小时 = 52px 基准，实际按容器高度换算）。
+  const dayDragState = useRef<{ event: ScheduleEvent; originStart: number; originEnd: number; startY: number; startHeight: number; mode: "move" | "resize-end" } | null>(null);
+
+  const beginDayDrag = (event: ScheduleEvent, mode: "move" | "resize-end") => (pointer: React.PointerEvent<HTMLElement>): void => {
+    if (!isTaskEditable(event)) return;
+    pointer.preventDefault();
+    const originStart = Date.parse(event.startAt);
+    const originEnd = Date.parse(event.endAt);
+    dayDragState.current = { event, originStart, originEnd, startY: pointer.clientY, startHeight: originEnd - originStart, mode };
+    setDragEvent(event);
+    setDragPreview({ startAt: event.startAt, endAt: event.endAt });
+    (pointer.currentTarget as HTMLElement).setPointerCapture(pointer.pointerId);
+  };
+
+  const moveDayDrag = (pointer: React.PointerEvent<HTMLElement>): void => {
+    const state = dayDragState.current;
+    if (!state) return;
+    const container = pointer.currentTarget.closest(".schedule-day-timeline") as HTMLElement | null;
+    if (!container) return;
+    const hoursPerPx = 24 / Math.max(1, container.getBoundingClientRect().height);
+    const deltaMinutes = Math.round((pointer.clientY - state.startY) * hoursPerPx * 60 / timeStepMinutes) * timeStepMinutes;
+    const newStart = state.originStart + deltaMinutes * 60_000;
+    const newEnd = state.mode === "move" ? newStart + state.startHeight : newStart + (pointer.clientY - state.startY) * hoursPerPx * 60_000;
+    const snappedEnd = newEnd - ((newEnd - newStart) % (timeStepMinutes * 60_000));
+    const clampedEnd = Math.max(newStart + timeStepMinutes * 60_000, snappedEnd);
+    const preview = { startAt: new Date(newStart).toISOString(), endAt: new Date(clampedEnd).toISOString() };
+    setDragPreview(preview);
+    // 冲突检测：与其它自建任务重叠（排除自身）。
+    const conflicts = new Set<string>();
+    for (const candidate of events) {
+      if (candidate.id === state.event.id || candidate.taskId === undefined) continue;
+      const candidateStart = Date.parse(candidate.startAt);
+      const candidateEnd = Date.parse(candidate.endAt);
+      if (candidateStart < Date.parse(preview.endAt) && candidateEnd > Date.parse(preview.startAt)) conflicts.add(candidate.id);
+    }
+    setConflictEvents(conflicts);
+  };
+
+  const endDayDrag = async (): Promise<void> => {
+    const state = dayDragState.current;
+    if (!state || !dragPreview || !schedule || !state.event.taskId) {
+      dayDragState.current = null;
+      setDragEvent(null);
+      setDragPreview(null);
+      setConflictEvents(new Set());
+      return;
+    }
+    const original = tasks.find((task) => task.id === state.event.taskId);
+    const next = { ...dragPreview };
+    dayDragState.current = null;
+    setDragEvent(null);
+    setDragPreview(null);
+    setConflictEvents(new Set());
+    if (!original) return;
+    try {
+      await schedule.saveTask({
+        id: original.id,
+        title: original.title,
+        description: original.description,
+        timeSpentMinutes: original.timeSpentMinutes,
+        timeNeededMinutes: Math.max(timeStepMinutes, Math.round((Date.parse(next.endAt) - Date.parse(next.startAt)) / 60_000)),
+        startAt: next.startAt,
+        endAt: next.endAt,
+        location: original.location,
+        breakable: original.breakable,
+        type: original.type === "fixedlegacy" ? "fixed" : original.type,
+        repeatType: original.repeatType,
+        repeatPeriod: original.repeatPeriod,
+        repeatEndsOn: original.repeatEndsOn,
+        repeatWeekdays: original.repeatWeekdays ?? [],
+        blocksPlanning: original.blocksPlanning,
+        reminderMode: original.reminderMode,
+        reminderLeadMinutes: original.reminderLeadMinutes,
+        reminderAt: original.reminderAt
+      });
+      setNotice("任务时间已更新");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "任务时间更新失败。");
+    }
   };
 
   const eventsRef = useRef(events);
@@ -902,6 +988,14 @@ export const ScheduleView = ({
                   </button>
                 );
               })}
+              <label className="schedule-step-control">
+                <span className="sr-only">时间粒度</span>
+                <select value={timeStepMinutes} onChange={(event) => setTimeStepMinutes(Number(event.target.value) as 15 | 30 | 60)}>
+                  <option value={15}>15 分</option>
+                  <option value={30}>30 分</option>
+                  <option value={60}>60 分</option>
+                </select>
+              </label>
             </div>
           </header>
 
@@ -957,7 +1051,7 @@ export const ScheduleView = ({
           ) : null}
 
           {viewMode === "day" ? (
-            <div className="schedule-day-timeline">
+            <div className="schedule-day-timeline" style={{ "--schedule-step-min": String(timeStepMinutes) } as React.CSSProperties}>
               {(() => {
                 const now = new Date();
                 const nowParts = getShanghaiDateParts(now);
@@ -965,16 +1059,39 @@ export const ScheduleView = ({
                 const minutesIntoDay = Number(nowParts.hour) * 60 + Number(nowParts.minute);
                 return isToday ? <div className="schedule-now-line" style={{ top: `${(minutesIntoDay / 24 / 60) * 100}%` }} aria-hidden="true" /> : null;
               })()}
-              {Array.from({ length: 24 }, (_, hour) => {
-                const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => getShanghaiHour(event.startAt) === hour);
-                const formForHour = (): TaskFormState => {
-                  const parts = getShanghaiDateParts(selectedDate);
-                  const start = fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour, 0);
-                  const end = new Date(start.getTime() + 60 * 60 * 1000);
-                  return { ...defaultTaskForm(selectedDate), startAt: toDateTimeInput(start), endAt: toDateTimeInput(end) };
-                };
-                return <section className="schedule-hour" key={hour} onClick={() => setForm(formForHour())}><time>{pad(hour)}:00</time><div className="schedule-hour-events">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div></section>;
-              })}
+              {(() => {
+                const slotsPerHour = 60 / timeStepMinutes;
+                const slotMinutes = Array.from({ length: 24 * slotsPerHour }, (_, index) => Math.floor(index / slotsPerHour) * 60 + (index % slotsPerHour) * timeStepMinutes);
+                return slotMinutes.map((minutesIntoDay) => {
+                  const hour = Math.floor(minutesIntoDay / 60);
+                  const minute = minutesIntoDay % 60;
+                  const items = (eventsByDay.get(dayKey(selectedDate)) ?? []).filter((event) => {
+                    const eventStart = getShanghaiDateParts(new Date(event.startAt));
+                    return Number(eventStart.hour) * 60 + Number(eventStart.minute) === minutesIntoDay;
+                  });
+                  const formForSlot = (): TaskFormState => {
+                    const parts = getShanghaiDateParts(selectedDate);
+                    const start = fromShanghaiParts(Number(parts.year), Number(parts.month), Number(parts.day), hour, minute);
+                    const end = new Date(start.getTime() + timeStepMinutes * 60 * 1000);
+                    return { ...defaultTaskForm(selectedDate), startAt: toDateTimeInput(start), endAt: toDateTimeInput(end) };
+                  };
+                  return <section className="schedule-hour" key={minutesIntoDay} onClick={() => setForm(formForSlot())}><time>{pad(hour)}:{pad(minute)}</time><div className="schedule-hour-events">{items.map((event) => {
+                    const isDragging = dragEvent?.id === event.id;
+                    const isConflict = conflictEvents.has(event.id);
+                    const editable = isTaskEditable(event);
+                    return <button
+                      className={`${eventClassName(event)}${isDragging ? " is-dragging" : ""}${isConflict ? " is-conflict" : ""}`}
+                      type="button"
+                      key={event.id}
+                      onClick={(click) => { click.stopPropagation(); selectEvent(event); }}
+                      onPointerDown={editable ? beginDayDrag(event, "move") : undefined}
+                      onPointerMove={editable ? moveDayDrag : undefined}
+                      onPointerUp={editable ? () => void endDayDrag() : undefined}
+                      onPointerCancel={editable ? () => void endDayDrag() : undefined}
+                    ><strong>{event.title}</strong><small>{formatEventMeta(event)}</small>{editable ? <span className="schedule-resize-handle" onPointerDown={beginDayDrag(event, "resize-end")} aria-hidden="true" /> : null}</button>;
+                  })}</div></section>;
+                });
+              })()}
             </div>
           ) : null}
         </section>
