@@ -14,15 +14,19 @@ import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exa
 import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
 import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
-import { manifest as dailyBriefManifest } from "@campusos/plugin-daily-brief/manifest";
 import { manifest as campusFeedManifest } from "@campusos/plugin-campus-feed/manifest";
 
-/** User-selectable Modules. Each contributes exactly one activity entry. */
+/**
+ * User-selectable Modules. Each contributes exactly one activity entry.
+ *
+ * daily-brief（早报）已于 2026-08-25 用户决议移出官方名单并暂停开发
+ * （功能边界未厘清、设计过重），故不再出现在本列表；其代码与 IPC 保留，
+ * 未从仓库删除，后续如需恢复开发再重新接入。
+ */
 export const officialUserPluginManifests: PluginManifestV2[] = [
   academicManifest,
   scheduleManifest,
   assistantManifest,
-  dailyBriefManifest,
   campusFeedManifest,
   materialsManifest
 ];

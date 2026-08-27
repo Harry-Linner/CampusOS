@@ -25,12 +25,13 @@ const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
   }));
 
 describe("loadPlugins", () => {
-  it("loads exactly the five official user Modules", async () => {
+  it("loads exactly the official user Modules without the retired daily-brief", async () => {
     const plugins = await loadPlugins(createOfficialUserRuntime());
 
     expect(plugins.map((plugin) => plugin.manifest.id).sort()).toEqual(
       officialUserPluginManifests.map((manifest) => manifest.id).sort()
     );
+    expect(plugins.some((plugin) => plugin.manifest.id === "org.campusos.daily-brief")).toBe(false);
     expect(plugins.every((plugin) => plugin.Component !== undefined)).toBe(true);
     expect(plugins.every(
       (plugin) => (plugin.manifest.contributes.views?.length ?? 0) === 1
@@ -40,7 +41,6 @@ describe("loadPlugins", () => {
       "academic",
       "schedule",
       "ai-assistant",
-      "daily-brief",
       "materials",
       "campus-feed",
       "extensions",
@@ -63,7 +63,6 @@ describe("loadPlugins", () => {
       "dashboard",
       "academic",
       "ai-assistant",
-      "daily-brief",
       "materials",
       "campus-feed",
       "extensions",

@@ -189,6 +189,12 @@
 
 - **所有涉及 UI 的 Phase（含 D、E、H、F 及以后一切前端工作）开工前必读 `docs/research/ai-frontend-lessons.md`**，并按该清单逐条自查（无意义装饰框、字符重叠、生造位移/手动对齐、硬编码像素、横向溢出门禁、间距节奏、视觉平衡、效果滥用、模板感等）；验收时以渲染截图为准，不以代码"看起来对"为准。
 
+### 5.4 早报（daily-brief）移出官方名单（2026-08-25 用户决议）
+
+- [x] **早报组件移出官方组件名单，暂停后续开发** —— 决议理由：早报功能边界未思考清楚、设计过重，暂不维护。
+- 实施方式：从 `officialUserPluginManifests` / renderer `pluginDefinitions` 移除（侧栏不再出现）；代码、IPC（briefService/briefIpc）与测试**保留不删**，后续若重新厘清边界再恢复接入。
+- 关联：#4 日程页移除"校园通知"板块（2026-08-25）亦为本决议的后续收敛动作之一。
+
 ## 6. 来源
 
 - dshfind 插件超市：https://dshfind.com/zh/plugins
