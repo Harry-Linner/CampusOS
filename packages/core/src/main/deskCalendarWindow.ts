@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import {
   createDefaultDeskCalendarSettings,
+  isDeskCalendarTheme,
   normalizeDeskCalendarView,
   type DeskCalendarView,
   type DeskCalendarSettings,
@@ -49,14 +50,15 @@ const normalizeWidgets = (value: unknown): DeskCalendarSettings["widgets"] => {
 
 const normalizeAppearance = (value: unknown): DeskCalendarSettings["appearance"] => {
   if (typeof value !== "object" || value === null) return createDefaultDeskCalendarSettings("").appearance;
-  const candidate = value as { opacity?: unknown; background?: unknown };
+  const candidate = value as { opacity?: unknown; background?: unknown; theme?: unknown };
   return {
     opacity: typeof candidate.opacity === "number" && Number.isFinite(candidate.opacity)
       ? Math.max(0.2, Math.min(1, candidate.opacity))
       : 0.88,
     background: typeof candidate.background === "string" && /^#[0-9a-fA-F]{6}$/.test(candidate.background)
       ? candidate.background
-      : "#111722"
+      : "#111722",
+    theme: isDeskCalendarTheme(candidate.theme) ? candidate.theme : "midnight"
   };
 };
 

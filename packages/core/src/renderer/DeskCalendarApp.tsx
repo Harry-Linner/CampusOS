@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   CalendarEventRecord,
   CampusWorkspaceSnapshot,
@@ -8,6 +8,7 @@ import type {
   LocalTaskInput,
   LocalTaskRecord
 } from "@campusos/shared";
+import { DESK_CALENDAR_THEMES } from "@campusos/shared";
 import "./desk-calendar.css";
 
 const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
@@ -268,6 +269,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [taskForm, setTaskForm] = useState<DeskTaskForm | null>(null);
   const [savingTask, setSavingTask] = useState(false);
+  const wheelDeltaRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -405,9 +407,23 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     }
   };
 
-  const openDay = (day: Date): void => {
-    setSelectedDate(day);
-    void switchView("day");
+  const handleCalendarWheel = (event: React.WheelEvent<HTMLDivElement>): void => {
+    const target = event.target as HTMLElement;
+    const scrollable = target.closest(".desk-cal-day-list, .desk-cal-agenda-list") as HTMLElement | null;
+    if (scrollable) {
+      const canScrollDown = event.deltaY > 0 && scrollable.scrollTop < scrollable.scrollHeight - scrollable.clientHeight - 1;
+      const canScrollUp = event.deltaY < 0 && scrollable.scrollTop > 0;
+      if (canScrollDown || canScrollUp) return;
+    }
+    wheelDeltaRef.current += event.deltaY;
+    const threshold = 120;
+    if (Math.abs(wheelDeltaRef.current) < threshold) return;
+    const forward = wheelDeltaRef.current > 0;
+    wheelDeltaRef.current = 0;
+    const order: DeskCalendarView[] = ["month", "week", "day"];
+    const next = order[(order.indexOf(view) + (forward ? 1 : 2)) % 3];
+    event.preventDefault();
+    void switchView(next);
   };
 
   const saveTask = async (): Promise<void> => {
@@ -456,8 +472,23 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     });
   };
 
+  const openEventInMain = (event: DeskCalendarEvent): void => {
+    void api.openMain(event.id);
+  };
+
   const renderEventChip = (event: DeskCalendarEvent): JSX.Element => (
-    <button className={`desk-cal-event desk-cal-event-${event.kind}`} key={event.id} title={event.location ?? undefined} type="button" onClick={() => setSelectedEvent(event)}>
+    <button
+      className={`desk-cal-event desk-cal-event-${event.kind}`}
+      key={event.id}
+      type="button"
+      data-detail={`${formatEventTime(event)}${event.location ? ` · ${event.location}` : ""}`}
+      onClick={() => openEventInMain(event)}
+      onContextMenu={(contextEvent) => {
+        contextEvent.preventDefault();
+        contextEvent.stopPropagation();
+        setSelectedEvent(event);
+      }}
+    >
       {event.kind !== "course" && event.kind !== "task" ? (
         <em>{eventKindLabel[event.kind]}</em>
       ) : null}
@@ -470,19 +501,23 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     const dayEvents = eventsByDay.get(key) ?? [];
     const outside = view === "month" && !isSameDayKey(key.slice(0, 7), toDayKey(selectedDate).slice(0, 7));
     const isToday = isSameDayKey(key, todayKey);
+    const isSelected = isSameDayKey(key, toDayKey(selectedDate));
+    const holiday = deskSettings?.statutoryHolidays.find((item) => item.date === key);
+    const makeup = deskSettings?.makeupDays.find((item) => item.date === key);
     return (
       <section
-        className={`desk-cal-cell${outside ? " is-outside" : ""}${isToday ? " is-today" : ""}`}
+        className={`desk-cal-cell${outside ? " is-outside" : ""}${isToday ? " is-today" : ""}${isSelected ? " is-selected" : ""}${holiday ? " is-holiday" : ""}`}
         key={key}
         onContextMenu={(event) => {
           event.preventDefault();
           if (!outside) setTaskForm(createDeskTaskForm(day));
         }}
       >
-        <button className="desk-cal-day-button" type="button" aria-label={`查看 ${key}`} onClick={() => openDay(day)}>
+        <button className={`desk-cal-day-button${isSelected ? " is-selected" : ""}`} type="button" aria-pressed={isSelected} aria-label={`查看 ${key}`} onClick={() => setSelectedDate(day)}>
           <time dateTime={key}>{Number(key.slice(8, 10))}</time>
           <small className="desk-cal-lunar">{calendarAnnotation(day, deskSettings?.statutoryHolidays ?? [])}</small>
         </button>
+        {makeup ? <small className="desk-cal-makeup-label">补{weekdayLabels[(makeup.weekday + 6) % 7]}</small> : null}
         <div className="desk-cal-cell-events">
           {dayEvents.slice(0, 3).map(renderEventChip)}
           {dayEvents.length > 3 ? <small className="desk-cal-more">+{dayEvents.length - 3} 项</small> : null}
@@ -491,8 +526,18 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     );
   };
 
+  const selectedKey = toDayKey(selectedDate);
+  const selectedHoliday = deskSettings?.statutoryHolidays.find((item) => item.date === selectedKey);
+  const selectedMakeup = deskSettings?.makeupDays.find((item) => item.date === selectedKey);
+
   return (
-    <div className="desk-cal-shell" role="dialog" aria-label="桌面日历">
+    <div
+      className="desk-cal-shell"
+      role="dialog"
+      aria-label="桌面日历"
+      data-theme={deskSettings?.appearance.theme ?? "midnight"}
+      style={{ "--desk-cal-alpha": String(deskSettings?.appearance.opacity ?? 0.92) } as CSSProperties}
+    >
       <header className="desk-cal-toolbar">
         <div className="desk-cal-view-switcher" role="group" aria-label="日历视图">
           {(["month", "week", "day"] as const).map((mode) => (
@@ -522,7 +567,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       </header>
       {showClock && widgetEnabled("clock") ? <time className="desk-cal-clock" dateTime={now.toISOString()}>{new Intl.DateTimeFormat("zh-CN", { timeZone: SHANGHAI_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(now)}</time> : null}
 
-      {deskSettings ? <section className="desk-cal-widgets" style={{ backgroundColor: deskSettings.appearance.background, opacity: deskSettings.appearance.opacity }}>
+      {deskSettings ? <section className="desk-cal-widgets">
         {widgetEnabled("weather") ? <div className="desk-cal-widget"><strong>天气</strong><span>{deskSettings.weather?.error ? `天气暂不可用：${deskSettings.weather.error}` : deskSettings.weather ? `${deskSettings.weather.location} ${deskSettings.weather.temperatureC}°C` : "尚未刷新天气"}</span><button type="button" onClick={() => void api.refreshWeather().then((weather) => setDeskSettings((current) => current ? { ...current, weather: weather as DeskCalendarSettings["weather"] } : current)).catch((cause) => setError(cause instanceof Error ? cause.message : "天气刷新失败。"))}>刷新</button></div> : null}
         {widgetEnabled("countdown") ? deskSettings.countdowns.map((item) => <div className="desk-cal-widget" key={item.id}><strong>{item.title}</strong><span>{Math.max(0, Math.ceil((Date.parse(item.targetAt) - now.getTime()) / 86_400_000))} 天</span><button type="button" onClick={() => void saveWidgetSettings({ countdowns: deskSettings.countdowns.filter((candidate) => candidate.id !== item.id) })}>删除</button></div>) : null}
         {widgetEnabled("progress") ? deskSettings.progress.map((item) => { const percent = Math.max(0, Math.min(100, ((now.getTime() - Date.parse(item.startAt)) / (Date.parse(item.endAt) - Date.parse(item.startAt))) * 100)); return <div className="desk-cal-widget desk-cal-progress" key={item.id}><strong>{item.title}</strong><span>{percent.toFixed(0)}%</span><div role="progressbar" aria-label={item.title} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${percent}%` }} /></div><button type="button" onClick={() => void saveWidgetSettings({ progress: deskSettings.progress.filter((candidate) => candidate.id !== item.id) })}>删除</button></div>; }) : null}
@@ -533,7 +578,8 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
         {deskSettings.widgets.map((widget, index) => <div key={widget.id}><label><input type="checkbox" checked={widget.enabled} onChange={(event) => void saveWidgetSettings({ widgets: deskSettings.widgets.map((candidate) => candidate.id === widget.id ? { ...candidate, enabled: event.target.checked } : candidate) })} />{widget.id === "clock" ? "时钟" : widget.id === "weather" ? "天气" : widget.id === "countdown" ? "倒计时" : "进度条"}</label><button type="button" disabled={index === 0} onClick={() => { const widgets = [...deskSettings.widgets]; [widgets[index - 1], widgets[index]] = [widgets[index], widgets[index - 1]]; void saveWidgetSettings({ widgets }); }}>上移</button><button type="button" disabled={index === deskSettings.widgets.length - 1} onClick={() => { const widgets = [...deskSettings.widgets]; [widgets[index + 1], widgets[index]] = [widgets[index], widgets[index + 1]]; void saveWidgetSettings({ widgets }); }}>下移</button></div>)}
         <div><button type="button" onClick={addCountdown}>添加倒计时</button><button type="button" onClick={addProgress}>添加进度条</button><button type="button" onClick={() => { const location = window.prompt("天气地点", deskSettings.weather?.location ?? "Hangzhou"); if (!location?.trim()) return; void saveWidgetSettings({ weather: { location: location.trim(), temperatureC: 0, weatherCode: -1, observedAt: new Date(0).toISOString(), cachedAt: new Date(0).toISOString(), error: null } }).then(() => api.refreshWeather()).then((weather) => setDeskSettings((current) => current ? { ...current, weather: weather as DeskCalendarSettings["weather"] } : current)); }}>设置地点并刷新</button></div>
         <button type="button" onClick={() => { const raw = window.prompt("粘贴法定假期 JSON（[{date,label}]）"); if (!raw) return; try { const statutoryHolidays = JSON.parse(raw) as DeskCalendarSettings["statutoryHolidays"]; void saveWidgetSettings({ statutoryHolidays }); } catch { setError("法定假期 JSON 格式无效。"); } }}>导入法定假期 JSON</button>
-        <label>透明度<input type="range" min="0.2" max="1" step="0.05" value={deskSettings.appearance.opacity} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, opacity: Number(event.target.value) } })} /></label><label>背景<input type="color" value={deskSettings.appearance.background} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, background: event.target.value } })} /></label>
+        <label>透明度<input type="range" min="0.2" max="1" step="0.05" value={deskSettings.appearance.opacity} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, opacity: Number(event.target.value) } })} /></label>
+        <div className="desk-cal-theme-row" aria-label="配色主题">主题{DESK_CALENDAR_THEMES.map((theme) => <button key={theme.id} type="button" className={deskSettings.appearance.theme === theme.id ? "is-active" : undefined} aria-pressed={deskSettings.appearance.theme === theme.id} onClick={() => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, theme: theme.id } })}>{theme.label}</button>)}</div>
       </section> : null}
 
       <aside className="desk-cal-task-rail" aria-label="待办事项">
@@ -546,53 +592,86 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
         <button className="desk-cal-sidebar-new" type="button" onClick={() => setTaskForm(createDeskTaskForm(selectedDate))}>＋ 添加待办</button>
       </aside>
       {error ? <p className="desk-cal-error" role="alert">{error}</p> : null}
-      {!snapshot && !error ? <p className="desk-cal-empty">暂无日历数据，请先在工作台完成同步。</p> : null}
+      {!snapshot && !error ? <p className="desk-cal-nodata">暂无日历数据，请先在工作台完成同步。</p> : null}
 
-      {view === "month" ? (
-        <div className="desk-cal-month-grid">
-          {weekdayLabels.map((label) => <span className="desk-cal-weekday" key={label}>{label}</span>)}
-          {monthDays.map(renderDayCell)}
-        </div>
-      ) : null}
-
-      {view === "week" ? (
-        <div className="desk-cal-week-grid">
-          {weekDays.map((day) => {
-            const key = toDayKey(day);
-            const dayEvents = eventsByDay.get(key) ?? [];
-            const isToday = isSameDayKey(key, todayKey);
-            return (
-              <section className={`desk-cal-week-col${isToday ? " is-today" : ""}`} key={key}>
-                <header>
-                  <span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span>
-                  <strong>{Number(key.slice(8, 10))}</strong>
-                </header>
-                <div className="desk-cal-cell-events">
-                  {dayEvents.slice(0, 6).map(renderEventChip)}
-                  {dayEvents.length > 6 ? <small className="desk-cal-more">+{dayEvents.length - 6} 项</small> : null}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {view === "day" ? (
-        <div className="desk-cal-day-list">
-          {(eventsByDay.get(toDayKey(selectedDate)) ?? []).map((event) => (
-            <button className={`desk-cal-day-row desk-cal-event-${event.kind}`} key={event.id} type="button" onClick={() => setSelectedEvent(event)}>
-              <time>{formatEventTime(event)}</time>
-              <div>
-                <strong>{event.title}</strong>
-                {event.location ? <small>{event.location}</small> : null}
+      <div className="desk-cal-calendar" onWheel={handleCalendarWheel}>
+        {view === "month" ? (
+          <div className="desk-cal-month-area">
+            <div className="desk-cal-month-grid">
+              {weekdayLabels.map((label) => <span className="desk-cal-weekday" key={label}>{label}</span>)}
+              {monthDays.map(renderDayCell)}
+            </div>
+            <section className="desk-cal-agenda" aria-label="当日议程">
+              <header>
+                <strong>当日议程</strong>
+                <span>{dayLabel}{selectedHoliday ? ` · ${selectedHoliday.label}` : ""}{selectedMakeup ? ` · 补${weekdayLabels[(selectedMakeup.weekday + 6) % 7]}` : ""}</span>
+              </header>
+              <div className="desk-cal-agenda-list">
+                {(eventsByDay.get(selectedKey) ?? []).map((event) => (
+                  <button
+                    className={`desk-cal-agenda-row desk-cal-event-${event.kind}`}
+                    key={event.id}
+                    type="button"
+                    data-detail={`${formatEventTime(event)}${event.location ? ` · ${event.location}` : ""}`}
+                    onClick={() => openEventInMain(event)}
+                    onContextMenu={(contextEvent) => {
+                      contextEvent.preventDefault();
+                      contextEvent.stopPropagation();
+                      setSelectedEvent(event);
+                    }}
+                  >
+                    <time>{formatEventTime(event)}</time>
+                    <strong>{event.title}</strong>
+                    {event.location ? <small>{event.location}</small> : null}
+                  </button>
+                ))}
+                {(eventsByDay.get(selectedKey) ?? []).length === 0 ? (
+                  <p className="desk-cal-agenda-empty">这一天没有安排</p>
+                ) : null}
               </div>
-            </button>
-          ))}
-          {(eventsByDay.get(toDayKey(selectedDate)) ?? []).length === 0 ? (
-            <p className="desk-cal-empty">这一天没有安排</p>
-          ) : null}
-        </div>
-      ) : null}
+            </section>
+          </div>
+        ) : null}
+
+        {view === "week" ? (
+          <div className="desk-cal-week-grid">
+            {weekDays.map((day) => {
+              const key = toDayKey(day);
+              const dayEvents = eventsByDay.get(key) ?? [];
+              const isToday = isSameDayKey(key, todayKey);
+              return (
+                <section className={`desk-cal-week-col${isToday ? " is-today" : ""}`} key={key}>
+                  <header>
+                    <span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span>
+                    <strong>{Number(key.slice(8, 10))}</strong>
+                  </header>
+                  <div className="desk-cal-cell-events">
+                    {dayEvents.slice(0, 6).map(renderEventChip)}
+                    {dayEvents.length > 6 ? <small className="desk-cal-more">+{dayEvents.length - 6} 项</small> : null}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {view === "day" ? (
+          <div className="desk-cal-day-list">
+            {(eventsByDay.get(toDayKey(selectedDate)) ?? []).map((event) => (
+              <button className={`desk-cal-day-row desk-cal-event-${event.kind}`} key={event.id} type="button" onClick={() => openEventInMain(event)} onContextMenu={(contextEvent) => { contextEvent.preventDefault(); contextEvent.stopPropagation(); setSelectedEvent(event); }}>
+                <time>{formatEventTime(event)}</time>
+                <div>
+                  <strong>{event.title}</strong>
+                  {event.location ? <small>{event.location}</small> : null}
+                </div>
+              </button>
+            ))}
+            {(eventsByDay.get(toDayKey(selectedDate)) ?? []).length === 0 ? (
+              <p className="desk-cal-empty">这一天没有安排</p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {selectedEvent ? (
         <section className="desk-cal-detail" aria-label="安排详情">

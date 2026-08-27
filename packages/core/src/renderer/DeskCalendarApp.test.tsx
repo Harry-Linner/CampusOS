@@ -87,11 +87,11 @@ const message: DeskCalendarSnapshotMessage = {
 };
 
 const createApi = (overrides: Partial<DeskCalendarWindowApi> = {}): DeskCalendarWindowApi => ({
-  loadSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [{ id: "clock" as const, enabled: true }, { id: "weather" as const, enabled: true }, { id: "countdown" as const, enabled: true }, { id: "progress" as const, enabled: true }], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722" }, statutoryHolidays: [], makeupDays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
+  loadSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [{ id: "clock" as const, enabled: true }, { id: "weather" as const, enabled: true }, { id: "countdown" as const, enabled: true }, { id: "progress" as const, enabled: true }], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const }, statutoryHolidays: [], makeupDays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
   loadSnapshot: vi.fn(async () => message),
   completeTask: vi.fn(async () => undefined),
   saveTask: vi.fn(async () => undefined),
-  saveSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722" }, statutoryHolidays: [], makeupDays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
+  saveSettings: vi.fn(async () => ({ enabled: true, view: "month" as const, showClock: true, widgets: [], countdowns: [], progress: [], weather: null, appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const }, statutoryHolidays: [], makeupDays: [], displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json" })),
   refreshWeather: vi.fn(async () => ({ location: "Hangzhou", temperatureC: 20, weatherCode: 0, observedAt: now.toISOString(), cachedAt: now.toISOString(), error: null })),
   setView: vi.fn(async () => undefined),
   setShowClock: vi.fn(async () => undefined),
@@ -153,7 +153,7 @@ describe("buildDeskCalendarEvents", () => {
     });
 
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "查看 2026-08-16" }));
     expect(await screen.findByText("这一天没有安排")).toBeTruthy();
   });
@@ -163,7 +163,7 @@ describe("DeskCalendarApp", () => {
   it("loads the snapshot and renders the month grid with events", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    expect(await screen.findByText("小学期课程")).toBeTruthy();
+    expect((await screen.findAllByText("小学期课程")).length).toBeGreaterThan(0);
     expect(screen.getByRole("dialog", { name: "桌面日历" })).toBeTruthy();
     expect(api.loadSnapshot).toHaveBeenCalledTimes(1);
   });
@@ -171,17 +171,25 @@ describe("DeskCalendarApp", () => {
   it("switches to the week view and calls setView", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "周" }));
     expect(api.setView).toHaveBeenCalledWith("week");
     expect(screen.getByRole("button", { name: "周" }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("opens an event detail without enabling edits inside the desktop window", async () => {
+  it("jumps to the main window when an event chip is clicked", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
     const events = await screen.findAllByRole("button", { name: "小学期课程" });
     fireEvent.click(events[0]);
+    expect(api.openMain).toHaveBeenCalledWith("calendar:event-1");
+  });
+
+  it("opens an event detail on right-click without enabling edits inside the desktop window", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    const events = await screen.findAllByRole("button", { name: "小学期课程" });
+    fireEvent.contextMenu(events[0]);
     expect(screen.getByLabelText("安排详情")).toBeTruthy();
     expect(document.querySelector(".desk-cal-detail-complete")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "打开 CampusOS 日程" }));
@@ -191,24 +199,24 @@ describe("DeskCalendarApp", () => {
   it("switches to the day view and lists the day's events", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "日" }));
     expect(api.setView).toHaveBeenCalledWith("day");
     // Today (8/15) shows the course; navigate to 8/16 to see the exam.
-    expect(await screen.findByText("小学期课程")).toBeTruthy();
+    expect((await screen.findAllByText("小学期课程")).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "下一个周期" }));
     expect(await screen.findByText("期末考试")).toBeTruthy();
   });
 
-  it("opens a selected month cell in the day view", async () => {
+  it("selects a month cell and reflects it in the day agenda strip", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
 
     fireEvent.click(screen.getByRole("button", { name: "查看 2026-08-16" }));
 
-    expect(api.setView).toHaveBeenCalledWith("day");
-    expect(await screen.findByText("期末考试")).toBeTruthy();
+    expect(api.setView).not.toHaveBeenCalledWith("day");
+    expect(screen.getByLabelText("当日议程").textContent).toContain("期末考试");
   });
 
   it("reports a persisted view failure and restores the previous view", async () => {
@@ -218,7 +226,7 @@ describe("DeskCalendarApp", () => {
       })
     });
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
 
     fireEvent.click(screen.getByRole("button", { name: "周" }));
 
@@ -229,7 +237,7 @@ describe("DeskCalendarApp", () => {
   it("shows the runtime clock and persists its visibility toggle", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
 
     expect(document.querySelector(".desk-cal-clock")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "时钟" }));
@@ -241,7 +249,7 @@ describe("DeskCalendarApp", () => {
   it("refreshes weather through the renderer bridge", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "刷新" }));
     await vi.waitFor(() => expect(api.refreshWeather).toHaveBeenCalledOnce());
   });
@@ -257,8 +265,8 @@ describe("DeskCalendarApp", () => {
       }))
     });
     render(createElement(DeskCalendarApp, { api }));
-    const task = await screen.findByText("Local task");
-    fireEvent.click(task);
+    const task = (await screen.findAllByText("Local task"))[0];
+    fireEvent.contextMenu(task);
     const complete = document.querySelector(".desk-cal-detail-complete");
     expect(complete).toBeTruthy();
     fireEvent.click(complete as HTMLButtonElement);
@@ -268,7 +276,7 @@ describe("DeskCalendarApp", () => {
   it("creates a dated task from the current desktop calendar date", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
 
     fireEvent.click(screen.getByRole("button", { name: "新建任务" }));
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Desktop created" } });
@@ -301,7 +309,7 @@ describe("DeskCalendarApp", () => {
       }))
     });
     render(createElement(DeskCalendarApp, { api }));
-    fireEvent.click(await screen.findByText("Local task"));
+    fireEvent.contextMenu((await screen.findAllByText("Local task"))[0]);
     fireEvent.click(screen.getByRole("button", { name: "编辑任务" }));
     fireEvent.change(screen.getByLabelText("标题"), { target: { value: "Edited task" } });
     fireEvent.click(screen.getByRole("button", { name: "保存任务" }));
@@ -337,7 +345,7 @@ describe("DeskCalendarApp", () => {
     const prompt = vi.spyOn(window, "prompt");
     prompt.mockReturnValueOnce("Exam").mockReturnValueOnce("2026-08-20T09:00");
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "组件" }));
     fireEvent.click(screen.getByRole("button", { name: "添加倒计时" }));
     await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ countdowns: [expect.objectContaining({ title: "Exam" })] })));
@@ -352,7 +360,7 @@ describe("DeskCalendarApp", () => {
     const prompt = vi.spyOn(window, "prompt");
     prompt.mockReturnValueOnce("Semester").mockReturnValueOnce("2026-08-01T00:00").mockReturnValueOnce("2026-09-01T00:00");
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "组件" }));
     fireEvent.click(screen.getByRole("button", { name: "添加进度条" }));
     await vi.waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ progress: [expect.objectContaining({ title: "Semester" })] })));
@@ -362,10 +370,46 @@ describe("DeskCalendarApp", () => {
     prompt.mockRestore();
   });
 
+  it("persists a theme choice through the appearance settings", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findAllByText("小学期课程");
+    fireEvent.click(screen.getByRole("button", { name: "组件" }));
+    fireEvent.click(screen.getByRole("button", { name: "纸白" }));
+    expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({
+      appearance: expect.objectContaining({ theme: "paper" })
+    }));
+  });
+
+  it("switches the view with the wheel over the calendar area", async () => {
+    const api = createApi();
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findAllByText("小学期课程");
+    fireEvent.wheel(document.querySelector(".desk-cal-calendar") as HTMLElement, { deltaY: 150 });
+    expect(api.setView).toHaveBeenCalledWith("week");
+  });
+
+  it("marks makeup days with the 补周X badge and holidays with striping", async () => {
+    const api = createApi({
+      loadSettings: vi.fn(async () => ({
+        enabled: true, view: "month" as const, showClock: true,
+        widgets: [], countdowns: [], progress: [], weather: null,
+        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
+        statutoryHolidays: [{ date: "2026-08-15", label: "调休" }],
+        makeupDays: [{ date: "2026-08-15", weekday: 5, source: "manual" as const }],
+        displayProfiles: [], savedAt: now.toISOString(), storagePath: "C:/settings/desk-calendar.json"
+      }))
+    });
+    render(createElement(DeskCalendarApp, { api }));
+    await screen.findAllByText("小学期课程");
+    expect(screen.getByText("补周五")).toBeTruthy();
+    expect(document.querySelector(".desk-cal-cell.is-holiday")).toBeTruthy();
+  });
+
   it("closes through the api when the close button is pressed", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "关闭桌面日历" }));
     expect(api.close).toHaveBeenCalledTimes(1);
   });
@@ -379,7 +423,7 @@ describe("DeskCalendarApp", () => {
       })
     });
     render(createElement(DeskCalendarApp, { api }));
-    await screen.findByText("小学期课程");
+    await screen.findAllByText("小学期课程");
 
     const updated: DeskCalendarSnapshotMessage = {
       ...message,
@@ -394,7 +438,7 @@ describe("DeskCalendarApp", () => {
       }
     };
     listeners.forEach((listener) => listener(updated));
-    expect(await screen.findByText("更新后的课程")).toBeTruthy();
+    expect((await screen.findAllByText("更新后的课程")).length).toBeGreaterThan(0);
   });
 
   it("surfaces a load error instead of crashing", async () => {

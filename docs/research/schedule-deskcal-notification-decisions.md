@@ -70,6 +70,17 @@
 6. **视觉打磨**：深色模式 → 密度档位 → 色条/圆点切换 → 首页/桌面日历视觉迭代。
 7. **#7 零学分课程**：对照 Celechron → 修 xkkh 合并 → 0 学分标记 → 真实基线验收。
 
+### 自查记录 — 桌面日历批次（2026-08-25 完成）
+
+- **事件呈现（二.1）**：月/周/日格子事件条改为「语义色左竖条 + 短标题」，颜色与主日程一致（课程蓝/考试紫/作业金/任务绿）；悬停显示时间+地点 tooltip（`data-detail` + CSS `::after`）。入口：`renderEventChip`。
+- **联动（二.2）**：点击悬浮窗事件 → `api.openMain(entity.id)` 打开主窗口并定位（复用 `campusos:navigation:request` 链路）；右键事件条打开悬浮窗内「安排详情」（任务可完成/编辑）。
+- **布局（二.3）**：月视图下方新增「当日议程」条：选中日期的当日几件事一览（时间+标题+地点，点击同样跳主窗口）；日期点击改为「选日」联动议程，不再强切日视图。
+- **导航（二.4）**：翻月/选日/今日高亮保留；滚轮在月/周/日间循环切换（`onWheel` 累计 deltaY≥120 触发，日/议程列表可滚动时优先原生滚动）。
+- **外观（二.5）**：`.desk-cal-shell` 毛玻璃（`backdrop-filter: blur(22px)` + `rgba(var(--desk-cal-panel-rgb), var(--desk-cal-alpha))`）；透明度滑块作用于面板 alpha；新增 4 套独立配色主题（midnight/paper/aurora/forest），主题选择器在「组件」面板（`DESK_CALENDAR_THEMES`）。
+- **调休同步（三.8）**：桌面日历月格显示「补周X」徽标 + 节假日斜纹弱化背景（`is-holiday`/`desk-cal-makeup-label`），与主日程一致。
+- **验证**：`pnpm typecheck`、`pnpm lint`、core 全量 vitest（601 passed）通过；视觉验收用 HTML 快照 + vision glance/ground/dominant-colors 迭代（深色/浅色两主题、边界对齐、无溢出、文字对比度）。
+- **未完成项**：d4 视觉风格细节（色条/圆点切换、密度档位、深色跟随系统）仍按 §七 待截图对照后迭代；桌面日历与 DeskToDo 实际截图对照仍待视觉模型恢复后补。
+
 ## 七、待办/风险
 
 - [ ] 桌面日历与 DeskToDo/主流日历的实际截图对照（视觉模型恢复后补；当前以文字调研+迭代验收代替）
