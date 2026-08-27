@@ -121,6 +121,9 @@ export const DashboardView = ({
 }: DashboardViewProps): JSX.Element => {
   const [makeupDays, setMakeupDays] = useState<MakeupDayInfo[]>([]);
   const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
+  const pageRef = useRef<HTMLElement | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!deskCalendar) return undefined;
@@ -153,9 +156,6 @@ export const DashboardView = ({
   const courses = sortCourses(snapshot.todayCourses);
   const courseStates = getCourseStates(courses, now);
   const deadlines = sortDeadlines(snapshot.deadlines);
-  const pageRef = useRef<HTMLElement | null>(null);
-  const [exportBusy, setExportBusy] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
 
   const exportMarkdown = async (): Promise<void> => {
     setExportBusy(true);

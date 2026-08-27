@@ -5,7 +5,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CampusCourseSession, CampusWorkspaceSnapshot } from "@campusos/shared";
 import { DashboardView } from "./DashboardView";
-
 afterEach(cleanup);
 
 const course = (
@@ -112,5 +111,27 @@ describe("DashboardView", () => {
 
     expect(screen.getByText("学期进行中")).toBeDefined();
     expect(screen.queryByText("mock")).toBeNull();
+  });
+
+  it("keeps a stable hook order when the snapshot transitions from loading to ready", () => {
+    // 回归：调休卡片 hooks 曾在条件 return 之后声明，snapshot 从 null 变为有值时
+    // React 抛出 "Rendered more hooks than during the previous render" 导致纯色崩溃。
+    const snapshot = createUpcomingSnapshot();
+    const { rerender } = render(createElement(DashboardView, {
+      loading: true,
+      snapshot: null
+    }));
+    expect(screen.getByLabelText("正在加载总览")).toBeDefined();
+
+    expect(() => {
+      rerender(createElement(DashboardView, { loading: false, snapshot }));
+    }).not.toThrow();
+    expect(screen.getByRole("heading", { name: "今日事项预览" })).toBeDefined();
+
+    // 反过来（有值 → 空）也不得改变 hooks 顺序。
+    expect(() => {
+      rerender(createElement(DashboardView, { loading: true, snapshot: null }));
+    }).not.toThrow();
+    expect(screen.getByLabelText("正在加载总览")).toBeDefined();
   });
 });
