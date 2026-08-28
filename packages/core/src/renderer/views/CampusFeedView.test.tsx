@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import { createElement } from "react";
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusFeedBridge, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
 import { CampusFeedView } from "../../../../../plugins/official/campus-feed/src/CampusFeedView";
