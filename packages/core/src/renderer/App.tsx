@@ -90,7 +90,7 @@ export const App = (): JSX.Element => {
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
         setSearchOpen(true);
       }

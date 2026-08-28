@@ -48,7 +48,7 @@ export const ActivityBar = ({
       <button className="search-trigger" type="button" onClick={onSearch}>
         <AppIcon name="search" size={18} />
         <span>搜索</span>
-        <kbd>Ctrl K</kbd>
+        <kbd>Ctrl F</kbd>
       </button>
 
       <nav className="primary-navigation" aria-label="主导航">
