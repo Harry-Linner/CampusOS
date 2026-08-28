@@ -2593,6 +2593,12 @@ input:focus-visible {
   padding: 10px 4px;
 }
 
+.materials-file-row.is-search-highlight,
+.materials-file-row.is-search-highlight * {
+  background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 6px;
+}
+
 .materials-file-copy,
 .materials-download-copy {
   display: flex;

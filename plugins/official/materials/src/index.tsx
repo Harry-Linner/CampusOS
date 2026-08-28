@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   CampusDownloadRequest,
   CampusDownloadTask,
@@ -149,7 +149,8 @@ export const Component = ({
   downloads,
   loading,
   onRefresh,
-  snapshot
+  snapshot,
+  navigationTarget
 }: PluginComponentProps): JSX.Element => {
   const [section, setSection] = useState<MaterialsSection>("library");
   const [semesterKey, setSemesterKey] = useState("");
@@ -184,6 +185,37 @@ export const Component = ({
   const selectedMaterials = selectableMaterials.filter((material) =>
     selectedIds.has(material.id)
   );
+
+  // Jump-to-locate: when the global search navigates to a material, select the
+  // semester + course that contains it, then scroll to and flash-highlight it.
+  useEffect(() => {
+    if (!navigationTarget || navigationTarget.viewId !== "materials" || !navigationTarget.entityId) return;
+    const targetId = navigationTarget.entityId;
+    for (const semester of semesterGroups) {
+      const course = semester.courses.find((candidate) =>
+        candidate.materials.some((material) => material.id === targetId)
+      );
+      if (course) {
+        setSemesterKey(semester.key);
+        setCourseKey(course.key);
+        break;
+      }
+    }
+  }, [navigationTarget, semesterGroups]);
+
+  useEffect(() => {
+    if (!navigationTarget || navigationTarget.viewId !== "materials" || !navigationTarget.entityId) return;
+    const id = navigationTarget.entityId;
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-search-id="${id}"]`);
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("is-search-highlight");
+        window.setTimeout(() => el.classList.remove("is-search-highlight"), 1600);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [navigationTarget, selectedCourseKey, semesterKey]);
 
   const runAction = async (
     id: string,
@@ -415,7 +447,7 @@ export const Component = ({
                       snapshot.downloads
                     );
                     return (
-                      <li key={material.id} className="materials-file-row">
+                      <li key={material.id} data-search-id={material.id} className="materials-file-row">
                         <input
                           type="checkbox"
                           aria-label={`选择${material.title}`}
