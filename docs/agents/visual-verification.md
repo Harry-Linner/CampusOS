@@ -96,3 +96,14 @@ DeskToDo（PyQt6，`.tmp/DeskToDo`，`python -m venv .venv && .venv/Scripts/pip 
 - **桌历形态：直接做独立悬浮组件**（用户跳过原型阶段拍板，DeskToDo 式）。
 - 前任 agent 的视觉验收结论一律不采信（无自主多模态能力），涉及 UI 的判断以本方案重新实测为准。
 - 验证时反复开关桌历会打扰用户实际使用：验证应快速开合、验完即关，贴底实现前不让桌历常驻。
+
+## 6. 桌面日历贴底（Win32）的四个实测坑（2026-08-28，desktopPinning.ts）
+
+1. **锚点方向**：SetWindowPos 语义是"插到 hWndInsertAfter 之后（更靠底）"。要落在"桌面之上、其余窗口之下"，insertAfter 必须取 **Progman 的 GW_HWNDNEXT(=2)**（上方邻窗）。取 HWND_BOTTOM 会沉到桌面层之下被壁纸盖住；取 GW_HWNDPREV(=3，下方邻窗) 同样沉底。常量速记：HWNDFIRST=0、HWNDLAST=1、HWNDNEXT=2、HWNDPREV=3、OWNER=4（把 4 当 PREV 用会查成 owner，得到误导性的"下方无窗口"）。
+2. **不能从 GetDesktopWindow() 枚举**：对根桌面窗口取 GW_HWNDLAST 恒返回 0（实测）。锚点基准用 `FindWindowW("Progman")`。
+3. **不能用 WM_WINDOWPOSCHANGING 钩子**：钩子上下文里调 koffi（含字符串编组的 FindWindowW）会段错误（0xC0000005，实测把 electron-vite dev 整个打挂）；且 Electron hookWindowMessage 传入的 lParam Buffer 是指针值的拷贝，改写它无法影响真实 WINDOWPOS。压底时机只用"创建后 + focus"。
+4. **Win+D 自愈守护**：Explorer"显示桌面"直接 SW_HIDE，Electron 的 isVisible() 感知不到（仍返回 true），showInactive() 会因此空转——守护必须查 Win32 IsWindowVisible，并先 hide() 强制两侧状态对齐再 showInactive()。skipTaskbar+工具窗被隐藏后没有任何系统恢复入口，无守护=窗口永久消失。
+
+## 7. 桌面日历窗口状态与设置的文件名碰撞（已修复）
+
+`windowStateStore.ts` 按 `settings/{key}.json` 存窗口状态，而桌面日历设置文件也叫 `settings/desk-calendar.json`——窗口每次移动/缩放都会以 bounds-only JSON 覆盖 enabled/天气/组件配置（实测导致天气城市丢失、enabled 变 false、启动不恢复）。修复：窗口状态键改为 `desk-calendar-window`。同类碰撞排查方法：对照 `windowStateStore.ts` 的路径规则与各设置文件名。
