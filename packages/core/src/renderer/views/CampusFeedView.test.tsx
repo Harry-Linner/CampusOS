@@ -1,8 +1,8 @@
 /* @vitest-environment jsdom */
 import { createElement } from "react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CampusFeedBridge, PluginComponentProps } from "@campusos/shared";
+import type { CampusFeedBridge, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
 import { CampusFeedView } from "../../../../../plugins/official/campus-feed/src/CampusFeedView";
 
 afterEach(cleanup);
@@ -38,5 +38,55 @@ describe("campus-feed view", () => {
     expect(await findByText("AI 处理")).toBeTruthy();
     expect(getByRole("button", { name: "测试连接" })).toBeTruthy();
     expect(getByRole("button", { name: "保存设置" })).toBeTruthy();
+  });
+});
+
+describe("campus-feed view (source/tag/unread filters)", () => {
+  const sourceA: FeedSourceDescriptor = { id: "s-a", name: "学工门户", category: "general", tags: ["评奖评优"], baseUrl: "https://a", listUrl: "https://a/list", intervalMinutes: 60, enabled: true };
+  const sourceB: FeedSourceDescriptor = { id: "s-b", name: "校团委", category: "general", tags: ["活动"], baseUrl: "https://b", listUrl: "https://b/list", intervalMinutes: 60, enabled: true };
+  const item = (id: string, sourceId: string, state: "new" | "read", title: string): FeedItemRecord => ({
+    id, sourceId, title, url: `https://x/${id}`, publishedAt: "2026-08-28T00:00:00.000Z",
+    summary: null, contentHash: `h-${id}`, fetchedAt: "2026-08-28T00:00:00.000Z", state
+  });
+
+  const makeBridge = (sources: FeedSourceDescriptor[], items: FeedItemRecord[], overrides: { markRead?: ReturnType<typeof vi.fn> } = {}): NonNullable<PluginComponentProps["campusFeed"]> => ({
+    ...bridge(),
+    getSnapshot: vi.fn(async () => ({ sources, items, lastRefresh: {} })),
+    markRead: overrides.markRead ?? vi.fn(async () => undefined)
+  }) as CampusFeedBridge;
+
+  it("renders source chips with per-source unread badges and filters on click", async () => {
+    const feed = makeBridge([sourceA, sourceB], [
+      item("1", "s-a", "new", "A最新"), item("2", "s-a", "read", "A旧"), item("3", "s-b", "new", "B活动")
+    ]);
+    const { findByText, getByRole, queryByText, getByText } = render(createElement(CampusFeedView, { ...baseProps, campusFeed: feed }));
+    expect(await findByText("A最新")).toBeTruthy();
+    // "全部来源" chip + a chip per enabled source
+    expect(getByRole("button", { name: "全部来源" })).toBeTruthy();
+    fireEvent.click(getByRole("button", { name: /^学工门户/ }));
+    expect(queryByText("B活动")).toBeNull();
+    expect(getByText("A最新")).toBeTruthy();
+  });
+
+  it("filters to unread only when the switch is on", async () => {
+    const feed = makeBridge([sourceA], [item("1", "s-a", "new", "新条目"), item("2", "s-a", "read", "已读条目")]);
+    const { findByText, getByRole, queryByText, getByText } = render(createElement(CampusFeedView, { ...baseProps, campusFeed: feed }));
+    expect(await findByText("新条目")).toBeTruthy();
+    expect(getByText("已读条目")).toBeTruthy();
+    fireEvent.click(getByRole("switch", { name: "只看未读" }));
+    expect(queryByText("已读条目")).toBeNull();
+    expect(getByText("新条目")).toBeTruthy();
+  });
+
+  it("marks a single source read through its section button", async () => {
+    const markRead = vi.fn(async () => undefined);
+    const feed = makeBridge([sourceA, sourceB], [item("1", "s-a", "new", "A新"), item("4", "s-b", "read", "B旧")], { markRead });
+    const { findByText, getAllByRole } = render(createElement(CampusFeedView, { ...baseProps, campusFeed: feed }));
+    expect(await findByText("A新")).toBeTruthy();
+    // header 全部已读 + source A 全部已读 (source B has no unread)
+    const readButtons = getAllByRole("button", { name: "全部已读" });
+    expect(readButtons.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(readButtons[1]);
+    expect(markRead).toHaveBeenCalledWith(["1"]);
   });
 });

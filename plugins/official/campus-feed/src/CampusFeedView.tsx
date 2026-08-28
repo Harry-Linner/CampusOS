@@ -66,6 +66,10 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleCandidates, setScheduleCandidates] = useState<CampusFeedScheduleCandidate[]>([]);
   const [importing, setImporting] = useState(false);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<FeedSourceDescriptor["category"] | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [onlyUnread, setOnlyUnread] = useState(false);
   const busyRef = useRef(false);
 
   const refreshAll = useCallback(async (): Promise<void> => {
@@ -126,6 +130,17 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
     }
   };
 
+  const markSourceRead = async (source: FeedSourceDescriptor): Promise<void> => {
+    if (!feed || !snapshot) return;
+    const unread = snapshot.items
+      .filter((item) => item.sourceId === source.id && item.state === "new")
+      .map((item) => item.id);
+    if (unread.length === 0) return;
+    try { await feed.markRead(unread); } catch (cause) {
+      toast.error("操作失败", { description: cause instanceof Error ? cause.message : "无法更新已读状态。" });
+    }
+  };
+
   const toggleSource = async (source: FeedSourceDescriptor): Promise<void> => {
     if (!feed) return;
     try { await feed.updateSource(source.id, { enabled: !source.enabled }); } catch (cause) {
@@ -175,6 +190,24 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const items = snapshot?.items ?? [];
   const unreadCount = items.filter((item) => item.state === "new").length;
   const loading = refreshing.has("*");
+
+  const unreadOfSource = (sourceId: string): number =>
+    items.filter((item) => item.sourceId === sourceId && item.state === "new").length;
+  const unreadSources = enabledSources.filter((source) => unreadOfSource(source.id) > 0);
+  const orderedSources = unreadSources.concat(enabledSources.filter((source) => unreadOfSource(source.id) === 0));
+  const allTags = [...new Set(enabledSources.flatMap((source) => source.tags))];
+
+  const matchesSource = (source: FeedSourceDescriptor): boolean =>
+    (selectedSourceId === null || source.id === selectedSourceId) &&
+    (selectedCategory === null || source.category === selectedCategory) &&
+    (selectedTag === null || source.tags.includes(selectedTag));
+  const visibleSources = enabledSources.filter(matchesSource);
+  const visibleSourceIds = new Set(visibleSources.map((source) => source.id));
+  const visibleItems = onlyUnread
+    ? items.filter((item) => item.state === "new" && visibleSourceIds.has(item.sourceId))
+    : items.filter((item) => visibleSourceIds.has(item.sourceId));
+  const hasFilter = selectedSourceId !== null || selectedCategory !== null || selectedTag !== null || onlyUnread;
+  const hasChips = enabledSources.length > 1 || allTags.length > 0;
 
   return (
     <section className="mx-auto w-full max-w-5xl px-1 pb-10 sm:px-2">
@@ -284,11 +317,49 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                 {sources.length === 0 ? "尚未配置订阅源" : Object.keys(snapshot?.lastRefresh ?? {}).length > 0 ? `上次更新 ${formatLastRefresh(Object.values(snapshot!.lastRefresh).sort().at(-1)!)}` : "尚未抓取，点击刷新开始"}
               </p>
             </div>
-            <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Switch checked={onlyUnread} onCheckedChange={setOnlyUnread} aria-label="只看未读" />
+                只看未读
+              </label>
               {unreadCount > 0 ? <Button variant="outline" onClick={() => void markAllRead()} className="w-full sm:w-auto"><Check className="size-4" aria-hidden="true" />全部已读</Button> : null}
               <Button onClick={() => void refreshAll()} disabled={loading} className="w-full sm:w-auto"><RefreshCw className={loading ? "animate-spin" : undefined} aria-hidden="true" />{loading ? "刷新中" : "刷新全部"}</Button>
             </div>
           </div>
+
+          {hasChips ? (
+            <div className="space-y-2">
+              {enabledSources.length > 1 ? (
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label="按来源筛选">
+                  <Button size="sm" variant={selectedSourceId === null ? "default" : "outline"} onClick={() => setSelectedSourceId(null)}>全部来源</Button>
+                  {orderedSources.map((source) => {
+                    const unread = unreadOfSource(source.id);
+                    return (
+                      <Button
+                        key={source.id}
+                        size="sm"
+                        variant={selectedSourceId === source.id ? "default" : "outline"}
+                        onClick={() => setSelectedSourceId(selectedSourceId === source.id ? null : source.id)}
+                        className="gap-1.5"
+                      >
+                        {source.name}
+                        {unread > 0 ? <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">{unread > 99 ? "99+" : unread}</span> : null}
+                      </Button>
+                    );
+                  })}
+                </div>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label="按类目筛选">
+                <Button size="sm" variant={selectedCategory === null && selectedTag === null ? "default" : "outline"} onClick={() => { setSelectedCategory(null); setSelectedTag(null); }}>全部</Button>
+                <Button size="sm" variant={selectedCategory === "general" ? "default" : "outline"} onClick={() => { setSelectedCategory("general"); setSelectedTag(null); }}>全校</Button>
+                <Button size="sm" variant={selectedCategory === "college" ? "default" : "outline"} onClick={() => { setSelectedCategory("college"); setSelectedTag(null); }}>学院</Button>
+                {allTags.map((tag) => (
+                  <Button key={tag} size="sm" variant={selectedTag === tag ? "default" : "outline"} onClick={() => { setSelectedTag(selectedTag === tag ? null : tag); setSelectedCategory(null); }}>{tag}</Button>
+                ))}
+                {hasFilter ? <Button size="sm" variant="ghost" onClick={() => { setSelectedSourceId(null); setSelectedCategory(null); setSelectedTag(null); setOnlyUnread(false); }}>清除筛选</Button> : null}
+              </div>
+            </div>
+          ) : null}
 
           {error ? <Alert variant="destructive"><AlertCircle className="size-4" aria-hidden="true" /><AlertTitle>部分信息源没有更新</AlertTitle><AlertDescription className="flex flex-wrap items-center gap-3"><span>{error}</span><Button size="sm" variant="outline" onClick={() => { setError(null); void refreshAll(); }}>重试</Button></AlertDescription></Alert> : null}
 
@@ -301,25 +372,29 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
               </div>
               <Button onClick={() => void refreshAll()} disabled={loading}><RefreshCw aria-hidden="true" />抓取默认订阅</Button>
             </div>
-          ) : loading && items.length === 0 ? (
+          ) : loading && visibleItems.length === 0 ? (
             <div className="space-y-4" role="status" aria-live="polite">
               {[0, 1, 2].map((index) => <div key={index} className="space-y-2"><Skeleton className="h-5 w-2/3" /><Skeleton className="h-4 w-1/3" /></div>)}
             </div>
-          ) : items.length === 0 ? (
-            <p className="py-14 text-center text-sm text-muted-foreground">该订阅源暂无新内容。</p>
+          ) : visibleItems.length === 0 ? (
+            <p className="py-14 text-center text-sm text-muted-foreground">{hasFilter ? "没有符合当前筛选项的内容。" : "该订阅源暂无新内容。"}</p>
           ) : (
             <div>
-              {enabledSources.map((source) => {
-                const sourceItems = items.filter((item) => item.sourceId === source.id);
+              {visibleSources.map((source) => {
+                const sourceItems = visibleItems.filter((item) => item.sourceId === source.id);
                 if (sourceItems.length === 0) return null;
+                const sourceUnread = unreadOfSource(source.id);
                 return (
                   <section key={source.id} aria-labelledby={`feed-source-${source.id}-heading`} className="border-t border-border/60 pt-5 pb-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <h2 id={`feed-source-${source.id}-heading`} className="text-lg font-semibold leading-7">{source.name}</h2>
-                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{sourceItems.length} 条通知</p>
+                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{sourceItems.length} 条通知{sourceUnread > 0 ? ` · ${sourceUnread} 条未读` : ""}</p>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {sourceUnread > 0 ? <Button size="sm" variant="outline" onClick={() => void markSourceRead(source)}><Check className="size-3.5" aria-hidden="true" />全部已读</Button> : null}
+                        <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
+                      </div>
                     </div>
                     <div className="divide-y divide-border/60">
                       {sourceItems.map((item) => (
