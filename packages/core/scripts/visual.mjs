@@ -132,6 +132,50 @@ switch (command ?? "list") {
     });
     break;
   }
+  // Multi-step chains in ONE connection: popovers/menus die on disconnect, so
+  // sequences that navigate menus must run atomically. JSON steps:
+  //   {"click":["needle","role","name"]}          {"rightclick":["needle","role","name"]}
+  //   {"doubleclick":["needle","role","name"]}    {"fill":["needle","role","name","value"]}
+  //   {"keys":["needle","Escape"]}                {"eval":["needle","js"]}
+  //   {"shot":["needle","out.png"]}               {"wait":[ms]}
+  //   {"nth":n} applies to the preceding click/fill when present as a sibling key:
+  //   {"click":["needle","role","name"],"nth":1}
+  case "flow": {
+    const [file] = positional();
+    const steps = JSON.parse(await import("node:fs/promises").then((fs) => fs.readFile(file, "utf8")));
+    await withBrowser(async (pages) => {
+      const page = (needle) => pick(pages, needle);
+      for (const step of steps) {
+        const [kind, value] = Object.entries(step)[0];
+        const nth = typeof step.nth === "number" ? step.nth : 0;
+        if (kind === "wait") {
+          await new Promise((resolve) => setTimeout(resolve, value));
+          continue;
+        }
+        const [needle, a, b, c] = value;
+        const target = page(needle);
+        if (kind === "shot") {
+          await target.screenshot({ path: a, animations: "disabled" });
+          console.log(`saved ${a}`);
+        } else if (kind === "eval") {
+          console.log(String(await target.evaluate(a)));
+        } else if (kind === "keys") {
+          await target.keyboard.press(a);
+          console.log(`pressed ${a}`);
+        } else if (kind === "fill") {
+          await target.getByRole(a, { name: b }).nth(nth).fill(c);
+          console.log(`filled ${a} "${b}"`);
+        } else if (kind === "click" || kind === "rightclick" || kind === "doubleclick") {
+          const locator = target.getByRole(a, { name: b }).nth(nth);
+          if (kind === "rightclick") await locator.click({ button: "right" });
+          else if (kind === "doubleclick") await locator.dblclick();
+          else await locator.click();
+          console.log(`${kind} ${a} "${b}"`);
+        }
+      }
+    });
+    break;
+  }
   default:
     console.error(`unknown command "${command}"`);
     process.exitCode = 1;

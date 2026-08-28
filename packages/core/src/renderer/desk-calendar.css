@@ -275,8 +275,10 @@ body {
 
 .desk-cal-weather-days {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* minmax(0, 1fr)：轨道可收缩，防止 nowrap 内容把 4 列撑破组件列产生横向滚动 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
+  min-width: 0;
 }
 
 .desk-cal-weather-day {
@@ -297,9 +299,26 @@ body {
   line-height: 1.2;
 }
 
+/* 最高/最低温分两行、对齐折线图配色；拆行后单列内容宽度 ≤ 数字宽度，不再溢出 */
 .desk-cal-weather-day strong {
-  font-size: 10px;
-  white-space: nowrap;
+  display: grid;
+  justify-items: center;
+  font-weight: normal;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.desk-cal-weather-day strong em {
+  font-style: normal;
+  font-size: 9px;
+}
+
+.desk-cal-weather-day .desk-cal-temp-max {
+  color: #ff7043;
+}
+
+.desk-cal-weather-day .desk-cal-temp-min {
+  color: #42a5f5;
 }
 
 .desk-cal-weather-chart {

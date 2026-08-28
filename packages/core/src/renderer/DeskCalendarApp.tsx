@@ -725,7 +725,7 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
                     <div className="desk-cal-weather-day" key={day.date}>
                       <span>{index === 0 ? "今天" : day.weekday}</span>
                       <i aria-hidden="true">{weatherEmoji(day.weatherCode)}</i>
-                      <strong>{day.tempMax.toFixed(0)}°/{day.tempMin.toFixed(0)}°</strong>
+                      <strong><em className="desk-cal-temp-max">{day.tempMax.toFixed(0)}°</em><em className="desk-cal-temp-min">{day.tempMin.toFixed(0)}°</em></strong>
                     </div>
                   ))}
                 </div>
