@@ -19,7 +19,7 @@ import {
   registerInvariantHandlers,
   runInvariants
 } from "./invariants";
-import { addNotification, registerNotificationHandlers } from "./notificationCenter";
+import { addNotification, markNotificationsReadByTarget, registerNotificationHandlers } from "./notificationCenter";
 import { registerBackupHandlers } from "./backupStore";
 import {
   CAMPUSMOD_RENDERER_SCHEME
@@ -205,6 +205,7 @@ const startCampusApp = (): void => {
       notify: (input) => addNotification({ kind: "system", ...input, showDesktop: false }),
       encryptSecret: (value) => briefVault.encrypt(value),
       decryptSecret: (value) => briefVault.decrypt(value),
+      onItemsRead: () => markNotificationsReadByTarget("campus-feed"),
       saveTask: async (input) => {
         const result = await saveScheduleTask(input);
         return {

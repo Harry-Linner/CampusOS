@@ -45,6 +45,18 @@ const broadcast = (): void => {
 
 export const readNotificationRecords = (): Promise<NotificationRecord[]> => load();
 
+/** Marks every unread notification carrying the given actionTarget as read (used to keep
+ *  a source-of-truth module's unread state in sync with the notification bell). */
+export const markNotificationsReadByTarget = async (actionTarget: string): Promise<void> => {
+  await load();
+  records = (records ?? []).map((entry) =>
+    entry.actionTarget === actionTarget && entry.state === "unread"
+      ? { ...entry, state: "read" }
+      : entry
+  );
+  await persist();
+};
+
 export const restoreNotificationRecords = async (incoming: NotificationRecord[], mode: "merge" | "replace"): Promise<NotificationRecord[]> => {
   await load();
   records = mode === "replace" ? incoming.slice() : [...incoming, ...(records ?? []).filter((current) => !incoming.some((item) => item.id === current.id))];

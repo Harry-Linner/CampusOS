@@ -261,6 +261,16 @@ describe("campusFeedService", () => {
       expect(titles).not.toContain("超窗老通知");
       expect(titles).toHaveLength(200); // per-source cap applies within the window
     });
+
+    it("invokes onItemsRead when items are marked read (未读与通知中心打通)", async () => {
+      const fetchFn = createFetch({ "http://www.xgb.zju.edu.cn/53395/list.htm": XGB_HTML });
+      const onItemsRead = vi.fn(async () => undefined);
+      service = createCampusFeedService({ database, fetchFn, onItemsRead, startScheduler: false });
+      await service.refreshSource("xgb-pingjiang");
+      const ids = (await service.getSnapshot()).items.map((item) => item.id);
+      await service.markRead(ids);
+      expect(onItemsRead).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("AI schedule extraction", () => {

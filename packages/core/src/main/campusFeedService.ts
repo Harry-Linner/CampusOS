@@ -64,6 +64,8 @@ export interface CampusFeedServiceDependencies {
   decryptSecret?: (value: string) => string;
   /** Persists an extracted schedule entry; defaults to the schedule store. */
   saveTask?: (input: LocalTaskInput) => Promise<CampusFeedScheduleImportResult>;
+  /** Invoked after feed items are marked read, to sync the notification center (campus-feed target). */
+  onItemsRead?: () => Promise<unknown> | void;
 }
 
 export interface CampusFeedService {
@@ -231,7 +233,8 @@ export const createCampusFeedService = ({
     createAiProviderAdapter({ profile, apiKey }),
   encryptSecret,
   decryptSecret,
-  saveTask
+  saveTask,
+  onItemsRead
 }: CampusFeedServiceDependencies): CampusFeedService => {
   let sources: FeedSourceDescriptor[] = [];
   const listeners = new Set<(snapshot: CampusFeedSnapshot) => void>();
@@ -443,6 +446,7 @@ export const createCampusFeedService = ({
       const clean = ids.filter((id) => typeof id === "string" && id.length > 0);
       if (clean.length > 0) {
         database.markCampusFeedItemsRead(clean);
+        if (onItemsRead) void onItemsRead();
         broadcast();
       }
     },
