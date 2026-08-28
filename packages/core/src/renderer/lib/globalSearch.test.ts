@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CampusWorkspaceSnapshot } from "@campusos/shared";
+import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 import { buildGlobalSearchIndex, searchGlobalIndex } from "./globalSearch";
 
 const snapshot: CampusWorkspaceSnapshot = {
@@ -74,9 +74,37 @@ describe("global search", () => {
     const index = buildGlobalSearchIndex(snapshot);
     expect(searchGlobalIndex(index, "MGT3001")[0]).toMatchObject({
       title: "组织行为学",
-      target: "academic"
+      navigation: { viewId: "academic", entityId: "course-1-a" }
     });
-    expect(searchGlobalIndex(index, "案例分析")[0]?.target).toBe("schedule");
-    expect(searchGlobalIndex(index, "第一讲")[0]?.target).toBe("materials");
+    expect(searchGlobalIndex(index, "案例分析")[0]?.navigation.viewId).toBe("schedule");
+    expect(searchGlobalIndex(index, "第一讲")[0]?.navigation.viewId).toBe("materials");
+    expect(searchGlobalIndex(index, "第一讲")[0]?.navigation.semester).toBe("2026-2027 秋冬");
+  });
+
+  it("indexes self-created tasks from the local task store as items", () => {
+    const task: LocalTaskRecord = {
+      id: "task-1",
+      status: "running",
+      description: "小组讨论稿",
+      timeSpentMinutes: 0,
+      timeNeededMinutes: 60,
+      startAt: "2026-10-03T09:00:00.000Z",
+      endAt: "2026-10-03T10:00:00.000Z",
+      location: "图书馆研讨室",
+      title: "准备小组讨论",
+      breakable: false,
+      type: "deadline",
+      repeatType: "norepeat",
+      repeatPeriod: 0,
+      repeatEndsOn: "",
+      blocksPlanning: false,
+      fromId: null
+    };
+    const index = buildGlobalSearchIndex(snapshot, [task]);
+    expect(searchGlobalIndex(index, "小组讨论")[0]).toMatchObject({
+      kind: "item",
+      title: "准备小组讨论",
+      navigation: { viewId: "schedule", entityId: "task-1" }
+    });
   });
 });

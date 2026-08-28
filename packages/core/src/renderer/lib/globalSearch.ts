@@ -1,6 +1,13 @@
-import type { ActivityItemId, CampusWorkspaceSnapshot } from "@campusos/shared";
+import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 
 export type GlobalSearchKind = "course" | "item" | "material";
+
+/** Where to navigate when a result is clicked, and what to locate inside the target view. */
+export interface GlobalSearchNavigation {
+  viewId: string;
+  entityId?: string;
+  semester?: string;
+}
 
 export interface GlobalSearchResult {
   id: string;
@@ -8,7 +15,7 @@ export interface GlobalSearchResult {
   title: string;
   detail: string;
   searchableText: string;
-  target: ActivityItemId;
+  navigation: GlobalSearchNavigation;
 }
 
 const normalize = (value: string): string =>
@@ -18,7 +25,8 @@ const compact = (values: Array<string | null | undefined>): string =>
   values.filter((value): value is string => Boolean(value?.trim())).join(" · ");
 
 export const buildGlobalSearchIndex = (
-  snapshot: CampusWorkspaceSnapshot | null
+  snapshot: CampusWorkspaceSnapshot | null,
+  tasks: readonly LocalTaskRecord[] = []
 ): GlobalSearchResult[] => {
   if (!snapshot) return [];
 
@@ -43,7 +51,7 @@ export const buildGlobalSearchIndex = (
         course.location,
         course.note
       ]),
-      target: "academic"
+      navigation: { viewId: "academic", entityId: course.id }
     });
   }
 
@@ -57,10 +65,10 @@ export const buildGlobalSearchIndex = (
       deadline.courseName,
       deadline.note
     ]),
-    target: "schedule"
+    navigation: { viewId: "schedule", entityId: deadline.id }
   }));
 
-  const materials = snapshot.materials.map<GlobalSearchResult>((material) => ({
+  const materialIndex = snapshot.materials.map<GlobalSearchResult>((material) => ({
     id: `material:${material.id}`,
     kind: "material",
     title: material.title,
@@ -70,10 +78,27 @@ export const buildGlobalSearchIndex = (
       material.courseName,
       material.semester
     ]),
-    target: "materials"
+    navigation: {
+      viewId: "materials",
+      entityId: material.id,
+      semester: material.semester
+    }
   }));
 
-  return [...courses.values(), ...items, ...materials];
+  // Self-created tasks (local task store) — not part of the workspace snapshot, but
+  // searchable so the user can locate their own schedule entries.
+  const taskIndex = tasks
+    .filter((task) => !task.deletedAt && task.status !== "deleted")
+    .map<GlobalSearchResult>((task) => ({
+      id: `task:${task.id}`,
+      kind: "item",
+      title: task.title,
+      detail: compact([task.courseName, task.location, task.startAt]),
+      searchableText: compact([task.title, task.courseName, task.location, task.description]),
+      navigation: { viewId: "schedule", entityId: task.id }
+    }));
+
+  return [...courses.values(), ...items, ...materialIndex, ...taskIndex];
 };
 
 const scoreResult = (result: GlobalSearchResult, query: string): number => {

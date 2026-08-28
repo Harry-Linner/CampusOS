@@ -129,7 +129,7 @@ describe("GlobalSearch", () => {
     const input = getInput();
     fireEvent.change(input, { target: { value: "高等" } });
     fireEvent.click(screen.getByText("高等数学"));
-    expect(props.onNavigate).toHaveBeenCalledWith("academic");
+    expect(props.onNavigate).toHaveBeenCalledWith(expect.objectContaining({ viewId: "academic" }));
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 

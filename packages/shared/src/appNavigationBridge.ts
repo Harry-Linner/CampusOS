@@ -3,6 +3,8 @@ export interface AppNavigationRequest {
   requestId: string;
   viewId: string;
   entityId?: string;
+  /** Optional semester/term hint carried by the global-search jump-to-locate flow. */
+  semester?: string;
 }
 
 export interface AppNavigationBridge {

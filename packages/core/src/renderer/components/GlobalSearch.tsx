@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ActivityItemId, CampusWorkspaceSnapshot } from "@campusos/shared";
+import type { CampusWorkspaceSnapshot, LocalTaskRecord, PluginComponentProps } from "@campusos/shared";
 import {
   buildGlobalSearchIndex,
   searchGlobalIndex,
-  type GlobalSearchKind
+  type GlobalSearchKind,
+  type GlobalSearchNavigation
 } from "../lib/globalSearch";
 import { Input } from "../components/ui/input";
 
 interface GlobalSearchProps {
   open: boolean;
   snapshot: CampusWorkspaceSnapshot | null;
+  schedule?: PluginComponentProps["schedule"];
   onClose: () => void;
-  onNavigate: (target: ActivityItemId) => void;
+  onNavigate: (navigation: GlobalSearchNavigation) => void;
 }
 
 const kindLabels: Record<GlobalSearchKind, string> = {
@@ -23,13 +25,32 @@ const kindLabels: Record<GlobalSearchKind, string> = {
 export const GlobalSearch = ({
   open,
   snapshot,
+  schedule,
   onClose,
   onNavigate
 }: GlobalSearchProps): JSX.Element | null => {
   const [query, setQuery] = useState("");
+  const [tasks, setTasks] = useState<LocalTaskRecord[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const index = useMemo(() => buildGlobalSearchIndex(snapshot), [snapshot]);
+  const index = useMemo(
+    () => buildGlobalSearchIndex(snapshot, tasks),
+    [snapshot, tasks]
+  );
   const results = useMemo(() => searchGlobalIndex(index, query), [index, query]);
+
+  // Load the local task store when the modal opens so self-created items are searchable.
+  useEffect(() => {
+    if (!open) return;
+    if (!schedule?.loadTasks) return;
+    let active = true;
+    void schedule.loadTasks().then((data) => {
+      if (active) setTasks(data.tasks);
+    }).catch(() => undefined);
+    const unsubscribe = schedule.subscribe?.(() => {
+      void schedule.loadTasks().then((data) => setTasks(data.tasks)).catch(() => undefined);
+    });
+    return () => { active = false; unsubscribe?.(); };
+  }, [open, schedule]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,7 +107,7 @@ export const GlobalSearch = ({
                   <button
                     type="button"
                     onClick={() => {
-                      onNavigate(result.target);
+                      onNavigate(result.navigation);
                       onClose();
                     }}
                   >

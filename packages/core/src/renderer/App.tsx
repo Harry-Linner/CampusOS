@@ -284,8 +284,19 @@ export const App = (): JSX.Element => {
       <GlobalSearch
         open={searchOpen}
         snapshot={workspace.snapshot}
+        schedule={window.campusos?.schedule}
         onClose={() => setSearchOpen(false)}
-        onNavigate={setActiveView}
+        onNavigate={(navigation) => {
+          setActiveView(navigation.viewId as ActivityItemId);
+          if (navigation.entityId || navigation.semester) {
+            setNavigationTarget({
+              requestId: crypto.randomUUID(),
+              viewId: navigation.viewId,
+              entityId: navigation.entityId,
+              semester: navigation.semester
+            });
+          }
+        }}
       />
     </div>
   );
