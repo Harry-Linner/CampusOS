@@ -3,6 +3,7 @@ import type { AcademicProgram } from "../../shared/credentialBridge";
 import { useAcademicCredential } from "../hooks/useAcademicCredential";
 import { useReminderSettings } from "../hooks/useReminderSettings";
 import { useTheme, type ThemeMode } from "../hooks/useTheme";
+import { readSearchHotkey, saveSearchHotkey, type SearchHotkey } from "../lib/searchHotkey";
 import type { DiagnosticSnapshot, HealthViewSnapshot } from "../../shared/diagnosticBridge";
 import type {
   CampusAppInfo,
@@ -29,6 +30,7 @@ interface SettingsViewProps {
 type SettingsCategory =
   | "account"
   | "appearance"
+  | "shortcuts"
   | "notifications"
   | "data"
   | "update"
@@ -38,6 +40,7 @@ type SettingsCategory =
 const settingsCategories: ReadonlyArray<{ id: SettingsCategory; label: string }> = [
   { id: "account", label: "账号" },
   { id: "appearance", label: "外观" },
+  { id: "shortcuts", label: "快捷键" },
   { id: "notifications", label: "通知" },
   { id: "data", label: "数据与备份" },
   { id: "update", label: "更新" },
@@ -104,6 +107,13 @@ export const SettingsView = ({
   const [analyticsAvailable, setAnalyticsAvailable] = useState(false);
   const [analyticsMessage, setAnalyticsMessage] = useState("");
   const [category, setCategory] = useState<SettingsCategory>("account");
+  const [searchHotkey, setSearchHotkey] = useState<SearchHotkey>(() => readSearchHotkey());
+
+  useEffect(() => {
+    const handleHotkeyChange = (): void => setSearchHotkey(readSearchHotkey());
+    window.addEventListener("campusos:search-hotkey-changed", handleHotkeyChange);
+    return () => window.removeEventListener("campusos:search-hotkey-changed", handleHotkeyChange);
+  }, []);
   const authenticatedProfile =
     academicCredential.record?.verificationState === "verified" &&
     academicCredential.record.username === username.trim() &&
@@ -551,6 +561,29 @@ export const SettingsView = ({
                   {academicCredential.error}
                 </p>
               ) : null}
+            </section>
+          ) : null}
+
+          {category === "shortcuts" ? (
+            <section className="settings-section" aria-labelledby="shortcuts-heading">
+              <header className="settings-section-heading">
+                <h2 id="shortcuts-heading">快捷键</h2>
+              </header>
+              <div className="settings-row">
+                <div className="settings-row-copy">
+                  <strong>打开全局搜索</strong>
+                  <small>默认 Ctrl+F；习惯 Slack/Discord 的用户可切回 Ctrl+K。改动即时生效并持久保存。</small>
+                </div>
+                <select
+                  aria-label="打开全局搜索的快捷键"
+                  className="settings-select"
+                  value={searchHotkey}
+                  onChange={(event) => saveSearchHotkey(event.target.value as SearchHotkey)}
+                >
+                  <option value="ctrl+f">Ctrl+F</option>
+                  <option value="ctrl+k">Ctrl+K</option>
+                </select>
+              </div>
             </section>
           ) : null}
 

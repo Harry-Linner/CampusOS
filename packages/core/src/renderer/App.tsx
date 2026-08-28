@@ -24,6 +24,7 @@ import {
 } from "./lib/downloadBridge";
 import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 import { subscribeToPluginRuntimeChanges } from "./lib/pluginBridge";
+import { readSearchHotkey, searchHotkeyKey, type SearchHotkey } from "./lib/searchHotkey";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { UpdatePrompt } from "./components/UpdatePrompt";
 
@@ -37,6 +38,7 @@ export const App = (): JSX.Element => {
   const [activeView, setActiveView] = useState<ActivityItemId>("dashboard");
   const [navigationTarget, setNavigationTarget] = useState<AppNavigationRequest | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchHotkey, setSearchHotkey] = useState<SearchHotkey>(() => readSearchHotkey());
   const pluginHost = usePluginHost();
   const workspace = useCampusWorkspace();
 
@@ -89,15 +91,22 @@ export const App = (): JSX.Element => {
   }), []);
 
   useEffect(() => {
+    const handleHotkeyChange = (): void => setSearchHotkey(readSearchHotkey());
+    window.addEventListener("campusos:search-hotkey-changed", handleHotkeyChange);
+    return () => window.removeEventListener("campusos:search-hotkey-changed", handleHotkeyChange);
+  }, []);
+
+  useEffect(() => {
     const handleShortcut = (event: KeyboardEvent): void => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+      const key = searchHotkeyKey(searchHotkey);
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === key) {
         event.preventDefault();
         setSearchOpen(true);
       }
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, []);
+  }, [searchHotkey]);
 
   const handleOnboardingComplete = useCallback(() => {
     setOnboardingComplete(true);

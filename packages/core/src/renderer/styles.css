@@ -1252,6 +1252,35 @@ input:focus-visible {
   justify-content: space-between;
 }
 
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-row-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row-copy small {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.settings-select {
+  max-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+
 .academic-program-fieldset {
   min-width: 0;
   margin: 0;
