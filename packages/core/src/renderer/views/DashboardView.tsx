@@ -93,6 +93,26 @@ const sortDeadlines = (deadlines: CampusDeadline[]): CampusDeadline[] =>
     (left, right) => Date.parse(left.dueAt) - Date.parse(right.dueAt)
   );
 
+const DAY_MS = 86_400_000;
+
+interface DeadlineGroup {
+  key: "week" | "month" | "farther";
+  label: string;
+  items: CampusDeadline[];
+}
+
+// 待办按时间分段：本周（含已逾期）/ 本月 / 更远。更远默认折叠，避免远期
+// 考试倒计时把面板刷屏（用户决策 2026-08-28）。
+const groupDeadlines = (deadlines: CampusDeadline[], nowMs: number): DeadlineGroup[] => {
+  const weekLater = nowMs + 7 * DAY_MS;
+  const monthLater = nowMs + 31 * DAY_MS;
+  return [
+    { key: "week", label: "本周", items: deadlines.filter((deadline) => Date.parse(deadline.dueAt) <= weekLater) },
+    { key: "month", label: "本月", items: deadlines.filter((deadline) => { const due = Date.parse(deadline.dueAt); return due > weekLater && due <= monthLater; }) },
+    { key: "farther", label: "更远", items: deadlines.filter((deadline) => Date.parse(deadline.dueAt) > monthLater) }
+  ];
+};
+
 const DashboardSkeleton = (): JSX.Element => (
   <section className="page-shell" aria-busy="true" aria-label="正在加载总览">
     <header className="page-heading">
@@ -124,6 +144,7 @@ export const DashboardView = ({
   const pageRef = useRef<HTMLElement | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [showFartherDeadlines, setShowFartherDeadlines] = useState(false);
 
   useEffect(() => {
     if (!deskCalendar) return undefined;
@@ -316,26 +337,48 @@ export const DashboardView = ({
           {deadlines.length === 0 ? (
             <div className="quiet-empty-state quiet-empty-compact">暂无待办</div>
           ) : (
-            <ol className="todo-list">
-              {deadlines.map((deadline) => (
-                <li key={deadline.id} className="todo-item">
-                  <span
-                    className={`priority-mark priority-${deadline.priority}`}
-                    aria-label={priorityLabelMap[deadline.priority]}
-                  />
-                  <div className="todo-content">
-                    <strong>{deadline.title}</strong>
-                    <span>
-                      {deadline.courseName ?? deadlineKindLabelMap[deadline.kind]}
-                    </span>
-                  </div>
-                  <div className="todo-deadline">
-                    <strong>{formatRelativeToNow(deadline.dueAt)}</strong>
-                    <span>{formatDateTime(deadline.dueAt)}</span>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            groupDeadlines(deadlines, Date.parse(snapshot.generatedAt)).map((group) => {
+              if (group.items.length === 0) return null;
+              const collapsed = group.key === "farther" && !showFartherDeadlines;
+              return (
+                <div key={group.key} className="todo-group">
+                  {group.key === "farther" ? (
+                    <button
+                      type="button"
+                      className="todo-group-toggle"
+                      aria-expanded={showFartherDeadlines}
+                      onClick={() => setShowFartherDeadlines((current) => !current)}
+                    >
+                      {collapsed ? `展开更远（${group.items.length} 项）` : "收起更远"}
+                    </button>
+                  ) : (
+                    <p className="todo-group-label">{group.label}</p>
+                  )}
+                  {!collapsed ? (
+                    <ol className="todo-list">
+                      {group.items.map((deadline) => (
+                        <li key={deadline.id} className="todo-item">
+                          <span
+                            className={`priority-mark priority-${deadline.priority}`}
+                            aria-label={priorityLabelMap[deadline.priority]}
+                          />
+                          <div className="todo-content">
+                            <strong>{deadline.title}</strong>
+                            <span>
+                              {deadline.courseName ?? deadlineKindLabelMap[deadline.kind]}
+                            </span>
+                          </div>
+                          <div className="todo-deadline">
+                            <strong>{formatRelativeToNow(deadline.dueAt)}</strong>
+                            <span>{formatDateTime(deadline.dueAt)}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
+                </div>
+              );
+            })
           )}
         </section>
 
