@@ -12,6 +12,7 @@ import {
   type LocalTaskInput,
 } from "@campusos/shared";
 import { assertTrustedDeskCalendarCaller } from "./ipcSecurity";
+import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
 import {
@@ -282,7 +283,9 @@ const disableAfterUserClose = async (): Promise<void> => {
 };
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
-  const storedState = await loadWindowState("desk-calendar", { minimumWidth: 420, minimumHeight: 320 });
+  // 窗口状态键用 "desk-calendar-window"：此前与桌面日历设置共用 "desk-calendar.json"，
+  // 窗口移动/缩放会以 bounds-only JSON 覆盖 enabled/天气/displayProfiles 设置（实测踩坑）。
+  const storedState = await loadWindowState("desk-calendar-window", { minimumWidth: 420, minimumHeight: 320 });
   const currentSettings = await loadSettings();
   const profile = currentSettings.displayProfiles.find((candidate) => candidate.displayKey === getDisplayKey());
   const profileBounds = profile && isVisibleOnCurrentDisplays(profile.bounds) ? profile.bounds : undefined;
@@ -295,7 +298,11 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
-    alwaysOnTop: true,
+    // 对照 DeskToDo 的 Qt.Tool（overlay_window.py:267-271）：WS_EX_TOOLWINDOW
+    // 使窗口不进任务栏/Alt-Tab，且 Win+D"显示桌面"时不会被最小化（用户贴底需求的一部分）。
+    type: "toolbar",
+    // 用户决策（2026-08-28）：桌面日历必须常驻桌面底层（壁纸之上、普通窗口之下），
+    // 置顶会遮挡正常使用。贴底由 pinWindowToDesktopBottom 以 Win32 实现。
     skipTaskbar: true,
     resizable: true,
     show: false,
@@ -308,7 +315,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
     }
   });
 
-  const detachWindowStatePersistence = attachWindowStatePersistence(window, "desk-calendar");
+  const detachWindowStatePersistence = attachWindowStatePersistence(window, "desk-calendar-window");
   const persistDisplayProfile = (): void => {
     const nextProfile = { displayKey: getDisplayKey(), bounds: window.getNormalBounds() };
     void loadSettings().then((latest) => saveSettings({ displayProfiles: [...latest.displayProfiles.filter((candidate) => candidate.displayKey !== nextProfile.displayKey), nextProfile] })).catch(() => undefined);
@@ -316,8 +323,8 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   window.on("move", persistDisplayProfile);
   window.on("resize", persistDisplayProfile);
   if (storedState?.maximized) window.maximize();
-  window.setAlwaysOnTop(true, "floating");
   window.setMenu(null);
+  pinWindowToDesktopBottom(window);
   window.on("closed", () => {
     detachWindowStatePersistence();
     deskCalendarWindow = null;

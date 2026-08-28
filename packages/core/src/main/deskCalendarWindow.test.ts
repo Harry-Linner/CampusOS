@@ -17,10 +17,19 @@ const electronState = vi.hoisted(() => ({
     isDestroyed: () => boolean;
     loadURL: ReturnType<typeof vi.fn>;
     loadFile: ReturnType<typeof vi.fn>;
-    setAlwaysOnTop: ReturnType<typeof vi.fn>;
+    on: ReturnType<typeof vi.fn>;
+    getNativeWindowHandle: ReturnType<typeof vi.fn>;
     setMenu: ReturnType<typeof vi.fn>;
     listeners: Map<string, () => void>;
   }>
+}));
+
+vi.mock("koffi", () => ({
+  default: {
+    load: () => ({
+      func: () => vi.fn(() => true)
+    })
+  }
 }));
 
 vi.mock("electron", () => ({
@@ -48,7 +57,11 @@ vi.mock("electron", () => ({
         }),
         loadURL: vi.fn(async () => undefined),
         loadFile: vi.fn(async () => undefined),
-        setAlwaysOnTop: vi.fn(),
+        getNativeWindowHandle: vi.fn(() => {
+          const handle = Buffer.alloc(8);
+          handle.writeBigUInt64LE(0x1234n, 0);
+          return handle;
+        }),
         setMenu: vi.fn(),
         getNormalBounds: vi.fn(() => ({ x: 0, y: 0, width: 720, height: 560 })),
         isMaximized: vi.fn(() => false)
@@ -200,7 +213,8 @@ describe("desk calendar window IPC", () => {
     const save = handlerFor("campusos:desk-calendar:settings:save");
     await save({}, { enabled: true });
     expect(electronState.windows).toHaveLength(1);
-    expect(electronState.windows[0].setAlwaysOnTop).toHaveBeenCalled();
+    // 贴底（2026-08-28 用户决策）：不再置顶，而是注册 focus 压底并在创建时压底一次。
+    expect(electronState.windows[0].on).toHaveBeenCalledWith("focus", expect.any(Function));
     electronState.windows[0].listeners.get("move")?.();
 
     await save({}, { enabled: false });
