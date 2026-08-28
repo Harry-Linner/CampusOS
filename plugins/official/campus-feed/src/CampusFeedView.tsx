@@ -3,6 +3,7 @@ import {
   AlertCircle,
   CalendarClock,
   Check,
+  ChevronDown,
   ExternalLink,
   Plus,
   RefreshCw,
@@ -70,6 +71,9 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const [selectedCategory, setSelectedCategory] = useState<FeedSourceDescriptor["category"] | null>(null);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [viewMode, setViewMode] = useState<"grouped" | "all">("grouped");
+  const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
+  const focusedIndexRef = useRef(0);
   const busyRef = useRef(false);
 
   const refreshAll = useCallback(async (): Promise<void> => {
@@ -114,21 +118,21 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
     return () => { active = false; unsubscribe(); };
   }, [feed]);
 
-  const openOriginal = (item: FeedItemRecord): void => {
+  const openOriginal = useCallback((item: FeedItemRecord): void => {
     if (!feed) return;
     void feed.openExternal(item.url).catch((cause) =>
       toast.error("无法打开原文", { description: cause instanceof Error ? cause.message : "链接未通过本地安全检查。" })
     );
-  };
+  }, [feed]);
 
-  const markAllRead = async (): Promise<void> => {
+  const markAllRead = useCallback(async (): Promise<void> => {
     if (!feed || !snapshot) return;
     const unread = snapshot.items.filter((item) => item.state === "new").map((item) => item.id);
     if (unread.length === 0) return;
     try { await feed.markRead(unread); } catch (cause) {
       toast.error("操作失败", { description: cause instanceof Error ? cause.message : "无法更新已读状态。" });
     }
-  };
+  }, [feed, snapshot]);
 
   const markSourceRead = async (source: FeedSourceDescriptor): Promise<void> => {
     if (!feed || !snapshot) return;
@@ -140,6 +144,17 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
       toast.error("操作失败", { description: cause instanceof Error ? cause.message : "无法更新已读状态。" });
     }
   };
+
+  const toggleSourceCollapse = (sourceId: string): void => {
+    setCollapsedSources((current) => {
+      const next = new Set(current);
+      if (next.has(sourceId)) next.delete(sourceId); else next.add(sourceId);
+      return next;
+    });
+  };
+
+  const sourceNameOf = (sourceId: string): string =>
+    sources.find((source) => source.id === sourceId)?.name ?? sourceId;
 
   const toggleSource = async (source: FeedSourceDescriptor): Promise<void> => {
     if (!feed) return;
@@ -208,6 +223,47 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
     : items.filter((item) => visibleSourceIds.has(item.sourceId));
   const hasFilter = selectedSourceId !== null || selectedCategory !== null || selectedTag !== null || onlyUnread;
   const hasChips = enabledSources.length > 1 || allTags.length > 0;
+  // Display order (and keyboard navigation order): globally-sorted in "all" mode, source-by-source in "grouped".
+  const orderedItems = viewMode === "all"
+    ? visibleItems
+    : visibleSources.flatMap((source) => visibleItems.filter((item) => item.sourceId === source.id));
+  const resetFilters = (): void => {
+    setSelectedSourceId(null); setSelectedCategory(null); setSelectedTag(null); setOnlyUnread(false);
+  };
+
+  const scrollToFocused = (): void => {
+    const el = document.querySelector(`[data-feed-index="${focusedIndexRef.current}"]`);
+    el?.scrollIntoView({ block: "center" });
+  };
+
+  useEffect(() => {
+    if (tab !== "feed" || !feed) return;
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (orderedItems.length === 0) return;
+      if (event.key === "j") {
+        event.preventDefault();
+        focusedIndexRef.current = Math.min(focusedIndexRef.current + 1, orderedItems.length - 1);
+        scrollToFocused();
+      } else if (event.key === "k") {
+        event.preventDefault();
+        focusedIndexRef.current = Math.max(focusedIndexRef.current - 1, 0);
+        scrollToFocused();
+      } else if (event.key === "m") {
+        const item = orderedItems[focusedIndexRef.current];
+        if (item && item.state === "new") void feed.markRead([item.id]);
+      } else if (event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        void markAllRead();
+      } else if (event.key === "Enter") {
+        const item = orderedItems[focusedIndexRef.current];
+        if (item) openOriginal(item);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, feed, orderedItems, markAllRead, openOriginal]);
 
   return (
     <section className="mx-auto w-full max-w-5xl px-1 pb-10 sm:px-2">
@@ -318,6 +374,10 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
               </p>
             </div>
             <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+              <div className="flex gap-1 rounded-lg border border-border bg-muted/60 p-1" role="group" aria-label="视图方式">
+                <Button size="sm" variant={viewMode === "grouped" ? "default" : "ghost"} onClick={() => setViewMode("grouped")}>按源</Button>
+                <Button size="sm" variant={viewMode === "all" ? "default" : "ghost"} onClick={() => setViewMode("all")}>时间流</Button>
+              </div>
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Switch checked={onlyUnread} onCheckedChange={setOnlyUnread} aria-label="只看未读" />
                 只看未读
@@ -356,7 +416,7 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                 {allTags.map((tag) => (
                   <Button key={tag} size="sm" variant={selectedTag === tag ? "default" : "outline"} onClick={() => { setSelectedTag(selectedTag === tag ? null : tag); setSelectedCategory(null); }}>{tag}</Button>
                 ))}
-                {hasFilter ? <Button size="sm" variant="ghost" onClick={() => { setSelectedSourceId(null); setSelectedCategory(null); setSelectedTag(null); setOnlyUnread(false); }}>清除筛选</Button> : null}
+                {hasFilter ? <Button size="sm" variant="ghost" onClick={resetFilters}>清除筛选</Button> : null}
               </div>
             </div>
           ) : null}
@@ -380,45 +440,76 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
             <p className="py-14 text-center text-sm text-muted-foreground">{hasFilter ? "没有符合当前筛选项的内容。" : "该订阅源暂无新内容。"}</p>
           ) : (
             <div>
-              {visibleSources.map((source) => {
-                const sourceItems = visibleItems.filter((item) => item.sourceId === source.id);
-                if (sourceItems.length === 0) return null;
-                const sourceUnread = unreadOfSource(source.id);
-                return (
-                  <section key={source.id} aria-labelledby={`feed-source-${source.id}-heading`} className="border-t border-border/60 pt-5 pb-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h2 id={`feed-source-${source.id}-heading`} className="text-lg font-semibold leading-7">{source.name}</h2>
-                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{sourceItems.length} 条通知{sourceUnread > 0 ? ` · ${sourceUnread} 条未读` : ""}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {sourceUnread > 0 ? <Button size="sm" variant="outline" onClick={() => void markSourceRead(source)}><Check className="size-3.5" aria-hidden="true" />全部已读</Button> : null}
-                        <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
-                      </div>
-                    </div>
-                    <div className="divide-y divide-border/60">
-                      {sourceItems.map((item) => (
-                        <article key={item.id} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <h3 className="text-base font-semibold leading-7 text-foreground">{item.title}</h3>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
-                                <span>{formatTime(item.publishedAt)}</span>
-                                {item.state === "new" ? <Badge variant="default" className="px-1.5 py-0 text-[10px]">新</Badge> : null}
-                              </div>
-                              {item.summary ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{item.summary}</p> : null}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              <Button size="sm" variant="outline" onClick={() => void extractItem(item)} disabled={extractingId !== null} title="AI 提取时间信息后加入日程"><CalendarClock className={extractingId === item.id ? "animate-pulse" : undefined} aria-hidden="true" />转为日程</Button>
-                              <Button size="sm" variant="outline" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button>
-                            </div>
+              {viewMode === "all" ? (
+                <div className="divide-y divide-border/60">
+                  {orderedItems.map((item, index) => (
+                    <article key={item.id} data-feed-index={index} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
+                            <span className="font-medium text-foreground/70">{sourceNameOf(item.sourceId)}</span>
+                            <span aria-hidden="true">·</span>
+                            <span>{formatTime(item.publishedAt)}</span>
+                            {item.state === "new" ? <Badge variant="default" className="px-1.5 py-0 text-[10px]">新</Badge> : null}
                           </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
+                          <h3 className="mt-1 text-base font-semibold leading-7 text-foreground">{item.title}</h3>
+                          {item.summary ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{item.summary}</p> : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button size="sm" variant="outline" onClick={() => void extractItem(item)} disabled={extractingId !== null} title="AI 提取时间信息后加入日程"><CalendarClock className={extractingId === item.id ? "animate-pulse" : undefined} aria-hidden="true" />转为日程</Button>
+                          <Button size="sm" variant="outline" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                visibleSources.map((source) => {
+                  const sourceItems = orderedItems.filter((item) => item.sourceId === source.id);
+                  if (sourceItems.length === 0) return null;
+                  const sourceUnread = unreadOfSource(source.id);
+                  const collapsed = collapsedSources.has(source.id);
+                  return (
+                    <section key={source.id} aria-labelledby={`feed-source-${source.id}-heading`} className="border-t border-border/60 pt-5 pb-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <button type="button" onClick={() => toggleSourceCollapse(source.id)} className="flex min-w-0 items-center gap-2 text-left" aria-expanded={!collapsed}>
+                          <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${collapsed ? "-rotate-90" : ""}`} aria-hidden="true" />
+                          <span className="min-w-0">
+                            <span id={`feed-source-${source.id}-heading`} className="block text-lg font-semibold leading-7">{source.name}</span>
+                            <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{sourceItems.length} 条通知{sourceUnread > 0 ? ` · ${sourceUnread} 条未读` : ""}</span>
+                          </span>
+                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {sourceUnread > 0 ? <Button size="sm" variant="outline" onClick={() => void markSourceRead(source)}><Check className="size-3.5" aria-hidden="true" />全部已读</Button> : null}
+                          <Button size="sm" variant="ghost" onClick={() => void refreshSource(source.id)} disabled={refreshing.has(source.id)} aria-label={`刷新 ${source.name}`}><RefreshCw className={refreshing.has(source.id) ? "animate-spin" : undefined} aria-hidden="true" /></Button>
+                        </div>
+                      </div>
+                      {!collapsed ? (
+                        <div className="divide-y divide-border/60">
+                          {sourceItems.map((item) => (
+                            <article key={item.id} data-feed-index={orderedItems.indexOf(item)} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <h3 className="text-base font-semibold leading-7 text-foreground">{item.title}</h3>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
+                                    <span>{formatTime(item.publishedAt)}</span>
+                                    {item.state === "new" ? <Badge variant="default" className="px-1.5 py-0 text-[10px]">新</Badge> : null}
+                                  </div>
+                                  {item.summary ? <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{item.summary}</p> : null}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <Button size="sm" variant="outline" onClick={() => void extractItem(item)} disabled={extractingId !== null} title="AI 提取时间信息后加入日程"><CalendarClock className={extractingId === item.id ? "animate-pulse" : undefined} aria-hidden="true" />转为日程</Button>
+                                  <Button size="sm" variant="outline" onClick={() => openOriginal(item)}><ExternalLink className="size-3.5" aria-hidden="true" />阅读原文</Button>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
