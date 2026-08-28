@@ -91,9 +91,11 @@ export interface DatabaseService {
   listCampusFeedSources: () => { config: unknown; savedAt: string }[];
   saveCampusFeedSource: (id: string, config: unknown, savedAt: string) => void;
   deleteCampusFeedSource: (id: string) => void;
-  /** Returns true when the item was newly inserted (canonical-URL dedupe). */
+  /** Returns true when the item was newly inserted or its content changed (canonical-URL dedupe + edit detection). */
   upsertCampusFeedItem: (item: unknown) => boolean;
   listCampusFeedItems: (limit: number) => { item: unknown; savedAt: string }[];
+  /** Lists one source's items within a fetched-at time window, newest first, capped per source. */
+  listCampusFeedItemsBySource: (sourceId: string, sinceIso: string, limit: number) => { item: unknown; savedAt: string }[];
   markCampusFeedItemsRead: (ids: string[]) => void;
   findCampusFeedItem: (id: string) => unknown | null;
   saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
@@ -568,10 +570,24 @@ export const createDatabaseService = ({
       if (!Number.isFinite(Date.parse(candidate.fetchedAt))) {
         throw new Error("校园资讯条目抓取时间无效。");
       }
-      const result = database.prepare(`
-        INSERT OR IGNORE INTO campus_feed_items (
+      const existing = database.prepare(
+        "SELECT content_hash FROM campus_feed_items WHERE id = ?"
+      ).get(candidate.id) as { content_hash: string } | undefined;
+      // Truly new insert, or an upstream edit (contentHash changed) — both should be
+      // surfaced as "fresh" and reset the item to unread.
+      const isNewOrChanged = !existing || existing.content_hash !== candidate.contentHash;
+      database.prepare(`
+        INSERT INTO campus_feed_items (
           id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')
+        ON CONFLICT(id) DO UPDATE SET
+          url = excluded.url,
+          title = excluded.title,
+          summary = excluded.summary,
+          published_at = excluded.published_at,
+          content_hash = excluded.content_hash,
+          fetched_at = excluded.fetched_at,
+          state = CASE WHEN campus_feed_items.content_hash != excluded.content_hash THEN 'new' ELSE campus_feed_items.state END
       `).run(
         candidate.id,
         candidate.sourceId,
@@ -582,15 +598,48 @@ export const createDatabaseService = ({
         candidate.contentHash,
         candidate.fetchedAt
       );
-      return result.changes === 1;
+      return isNewOrChanged;
     },
     listCampusFeedItems: (limit) => {
       const rows = database.prepare(`
         SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
         FROM campus_feed_items
-        ORDER BY fetched_at DESC, id ASC
+        ORDER BY (published_at IS NULL), published_at DESC, fetched_at DESC, id ASC
         LIMIT ?
       `).all(limit) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      }[];
+      return rows.map((row) => ({
+        item: {
+          id: row.id,
+          sourceId: row.source_id,
+          url: row.url,
+          title: row.title,
+          summary: row.summary,
+          publishedAt: row.published_at,
+          contentHash: row.content_hash,
+          fetchedAt: row.fetched_at,
+          state: row.state
+        },
+        savedAt: row.fetched_at
+      }));
+    },
+    listCampusFeedItemsBySource: (sourceId, sinceIso, limit) => {
+      const rows = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        WHERE source_id = ? AND fetched_at >= ?
+        ORDER BY (published_at IS NULL), published_at DESC, fetched_at DESC, id ASC
+        LIMIT ?
+      `).all(sourceId, sinceIso, limit) as {
         id: string;
         source_id: string;
         url: string;

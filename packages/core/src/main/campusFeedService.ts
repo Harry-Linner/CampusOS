@@ -37,6 +37,8 @@ import {
 import type { DatabaseService } from "./databaseService";
 
 const DEFAULT_ITEM_LIMIT = 500;
+const ITEM_PER_SOURCE_LIMIT = 200;
+const ITEM_TIME_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 const MAX_INTERVAL_MINUTES = 1440;
 const MIN_INTERVAL_MINUTES = 1;
 const BACKOFF_BASE_MS = 5 * 60 * 1000;
@@ -101,6 +103,20 @@ const isDescriptor = (value: unknown): value is FeedSourceDescriptor => {
 const normalizeInterval = (value: number): number => {
   if (!Number.isFinite(value)) return 60;
   return Math.min(MAX_INTERVAL_MINUTES, Math.max(MIN_INTERVAL_MINUTES, Math.round(value)));
+};
+
+/** Global sort for the snapshot stream: newest published first, null published last, then by fetch time. */
+const compareFeedItems = (a: FeedItemRecord, b: FeedItemRecord): number => {
+  const aNull = a.publishedAt === null ? 1 : 0;
+  const bNull = b.publishedAt === null ? 1 : 0;
+  if (aNull !== bNull) return aNull - bNull;
+  if (a.publishedAt !== null && b.publishedAt !== null) {
+    const delta = Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
+    if (delta !== 0) return delta;
+  }
+  const fetchDelta = Date.parse(b.fetchedAt) - Date.parse(a.fetchedAt);
+  if (fetchDelta !== 0) return fetchDelta;
+  return a.id.localeCompare(b.id);
 };
 
 /** AI connection as persisted in the campus-feed settings (key never plaintext). */
@@ -249,12 +265,20 @@ export const createCampusFeedService = ({
     await hydration;
   };
 
+  const buildItems = (): FeedItemRecord[] => {
+    const cutoff = new Date(now().getTime() - ITEM_TIME_WINDOW_MS).toISOString();
+    const items: FeedItemRecord[] = [];
+    for (const source of sources) {
+      const rows = database.listCampusFeedItemsBySource(source.id, cutoff, ITEM_PER_SOURCE_LIMIT);
+      for (const row of rows) items.push(row.item as FeedItemRecord);
+    }
+    return items.sort(compareFeedItems);
+  };
+
   const broadcast = (): void => {
     const snapshot: CampusFeedSnapshot = {
       sources: sources.map((source) => ({ ...source })),
-      items: database
-        .listCampusFeedItems(DEFAULT_ITEM_LIMIT)
-        .map((entry) => entry.item as FeedItemRecord),
+      items: buildItems(),
       lastRefresh: { ...lastRefresh }
     };
     for (const listener of listeners) listener(snapshot);
@@ -357,9 +381,7 @@ export const createCampusFeedService = ({
       await hydrate();
       return {
         sources: sources.map((source) => ({ ...source })),
-        items: database
-          .listCampusFeedItems(DEFAULT_ITEM_LIMIT)
-          .map((entry) => entry.item as FeedItemRecord),
+        items: buildItems(),
         lastRefresh: { ...lastRefresh }
       };
     },
@@ -591,7 +613,7 @@ export const createCampusFeedService = ({
       if (!saveTask) throw new Error("日程存储不可用，请重启 CampusOS。");
       const allowed = new Set(
         database
-          .listCampusFeedItems(500)
+          .listCampusFeedItems(DEFAULT_ITEM_LIMIT)
           .map((entry) => (entry.item as FeedItemRecord).id)
       );
       const result: CampusFeedScheduleImportResult = { created: 0, deduplicated: 0 };

@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LocalTaskInput } from "@campusos/shared";
+import type { FeedItemRecord, LocalTaskInput } from "@campusos/shared";
 import { createCampusFeedService, type CampusFeedService } from "./campusFeedService";
 import type { AiProviderAdapter } from "./aiProviderAdapters";
 import { createDatabaseService } from "./databaseService";
@@ -177,6 +178,89 @@ describe("campusFeedService", () => {
     expect(listener).toHaveBeenCalledTimes(1);
     const snapshot = listener.mock.calls[0][0] as { items: unknown[] };
     expect(snapshot.items).toHaveLength(2);
+  });
+
+  describe("F0 data-layer fixes", () => {
+    const makeItem = (
+      seed: string,
+      sourceId: string,
+      title: string,
+      publishedAt: string | null,
+      fetchedAt: string
+    ): FeedItemRecord => {
+      const url = `https://test.local/${seed}/page.htm`;
+      return {
+        id: createHash("sha256").update(url).digest("hex"),
+        sourceId,
+        title,
+        url,
+        publishedAt,
+        summary: null,
+        contentHash: createHash("sha256").update(`${title}\n${url}`).digest("hex"),
+        fetchedAt,
+        state: "new" as const
+      };
+    };
+    const hydrate = async (): Promise<void> => {
+      await service.getSnapshot(); // seeds the four MVP sources
+    };
+
+    it("orders snapshot items by publishedAt desc with nulls last (F0-1)", async () => {
+      service = createCampusFeedService({ database, startScheduler: false });
+      await hydrate();
+      const nowIso = new Date().toISOString();
+      database.upsertCampusFeedItem(makeItem("a", "xgb-pingjiang", "旧通知", "2026-01-01T00:00:00.000Z", nowIso));
+      database.upsertCampusFeedItem(makeItem("b", "xgb-pingjiang", "新通知", "2026-08-01T00:00:00.000Z", nowIso));
+      database.upsertCampusFeedItem(makeItem("c", "xgb-pingjiang", "无日期", null, nowIso));
+      const snapshot = await service.getSnapshot();
+      expect(snapshot.items.map((item) => item.title)).toEqual(["新通知", "旧通知", "无日期"]);
+    });
+
+    it("resets an edited item to unread and notifies again (F0-3)", async () => {
+      const listUrl = "http://www.xgb.zju.edu.cn/53395/list.htm";
+      const edited = XGB_HTML.replace(
+        "关于评选2024-2025学年浙江大学校友爱心励志奖学金的通知",
+        "【已更新】关于评选2024-2025学年浙江大学校友爱心励志奖学金的通知"
+      );
+      let listCalls = 0;
+      const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === listUrl) {
+          listCalls += 1;
+          return new Response(listCalls === 1 ? XGB_HTML : edited, { status: 200 });
+        }
+        return new Response("not found", { status: 404 });
+      }) as unknown as typeof fetch;
+      const notify = vi.fn(async () => undefined);
+      service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
+      await service.refreshSource("xgb-pingjiang");
+      await service.markRead((await service.getSnapshot()).items.map((item) => item.id));
+      expect(notify).toHaveBeenCalledTimes(1);
+
+      const again = await service.refreshSource("xgb-pingjiang");
+      expect(again).toHaveLength(2);
+      const snapshot = await service.getSnapshot();
+      // The edited item is unread again; the unchanged one stays read.
+      expect(snapshot.items.filter((item) => item.state === "new")).toHaveLength(1);
+      expect(snapshot.items.filter((item) => item.title.includes("已更新"))[0].state).toBe("new");
+      expect(notify).toHaveBeenCalledTimes(2);
+    });
+
+    it("caps the snapshot per source and drops items outside the time window (F0-2)", async () => {
+      service = createCampusFeedService({ database, startScheduler: false });
+      await hydrate();
+      const recent = new Date().toISOString();
+      const stale = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString();
+      database.upsertCampusFeedItem(makeItem("stale", "xgb-pingjiang", "超窗老通知", "2026-01-01T00:00:00.000Z", stale));
+      // exceed the per-source cap this source would return alone
+      for (let i = 0; i < 205; i += 1) {
+        database.upsertCampusFeedItem(makeItem(`cap-${i}`, "xgb-pingjiang", `窗口内通知 ${i}`, "2026-08-28T00:00:00.000Z", recent));
+      }
+      const snapshot = await service.getSnapshot();
+      const titles = snapshot.items.map((item) => item.title);
+      expect(titles).not.toContain("超窗老通知");
+      expect(titles).toHaveLength(200); // per-source cap applies within the window
+    });
   });
 
   describe("AI schedule extraction", () => {
