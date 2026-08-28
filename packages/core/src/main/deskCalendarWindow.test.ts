@@ -358,7 +358,8 @@ describe("desk calendar window IPC", () => {
     await expect(handlerFor("campusos:desk-calendar:settings:load")({})).resolves.toMatchObject({
       countdowns: [{ id: "countdown-1" }],
       progress: [{ id: "progress-1" }],
-      appearance: { opacity: 0.55, background: "#223344", theme: "aurora" },
+      // 方案A：配色随主应用主题，仅独立透明度；background/theme 历史字段被忽略。
+      appearance: { opacity: 0.55 },
       statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
       makeupDays: [{ date: "2026-10-09", weekday: 5, source: "manual" }],
       displayProfiles: [{ displayKey: "primary" }]

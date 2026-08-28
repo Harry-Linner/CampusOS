@@ -451,14 +451,15 @@ describe("DeskCalendarApp", () => {
     expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ widgets: expect.arrayContaining([expect.objectContaining({ id: "weather", enabled: false })]) }));
   });
 
-  it("persists a theme choice through the appearance settings", async () => {
+  it("persists the appearance opacity through the settings panel", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
     fireEvent.click(screen.getByRole("button", { name: "组件" }));
-    fireEvent.click(screen.getByRole("button", { name: "纸白" }));
+    const opacity = screen.getByLabelText("透明度");
+    fireEvent.change(opacity, { target: { value: "0.6" } });
     expect(api.saveSettings).toHaveBeenCalledWith(expect.objectContaining({
-      appearance: expect.objectContaining({ theme: "paper" })
+      appearance: expect.objectContaining({ opacity: 0.6 })
     }));
   });
 

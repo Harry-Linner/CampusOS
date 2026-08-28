@@ -49,23 +49,9 @@ export interface DeskCalendarWeather {
   forecast?: DeskCalendarWeatherDay[];
 }
 
-/** 桌面日历独立配色主题（与主应用主题无关）。 */
-export type DeskCalendarTheme = "midnight" | "paper" | "aurora" | "forest";
-
-export const DESK_CALENDAR_THEMES: ReadonlyArray<{ id: DeskCalendarTheme; label: string }> = [
-  { id: "midnight", label: "深夜" },
-  { id: "paper", label: "纸白" },
-  { id: "aurora", label: "极光" },
-  { id: "forest", label: "森林" }
-];
-
-export const isDeskCalendarTheme = (value: unknown): value is DeskCalendarTheme =>
-  DESK_CALENDAR_THEMES.some((theme) => theme.id === value);
-
+/** 桌面日历外观：配色跟随主应用主题（theme.css），仅透明度独立可调。 */
 export interface DeskCalendarAppearance {
   opacity: number;
-  background: string;
-  theme: DeskCalendarTheme;
 }
 
 export interface DeskCalendarHoliday {
@@ -150,7 +136,7 @@ export const createDefaultDeskCalendarSettings = (
   countdowns: [],
   progress: [],
   weather: null,
-  appearance: { opacity: 0.88, background: "#111722", theme: "midnight" },
+  appearance: { opacity: 0.88 },
   statutoryHolidays: [],
   makeupDays: [],
   displayProfiles: [],

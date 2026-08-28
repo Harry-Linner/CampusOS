@@ -8,7 +8,6 @@ import type {
   LocalTaskInput,
   LocalTaskRecord
 } from "@campusos/shared";
-import { DESK_CALENDAR_THEMES } from "@campusos/shared";
 import "./desk-calendar.css";
 
 const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
@@ -663,7 +662,6 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
       className="desk-cal-shell"
       role="dialog"
       aria-label="桌面日历"
-      data-theme={deskSettings?.appearance.theme ?? "midnight"}
       style={{ "--desk-cal-alpha": String(deskSettings?.appearance.opacity ?? 0.92) } as CSSProperties}
     >
       <header className="desk-cal-toolbar">
@@ -766,7 +764,6 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
         {widgetFeedback ? <p className="desk-cal-widget-feedback" role="status">{widgetFeedback}</p> : null}
         <button type="button" onClick={() => { const raw = window.prompt("粘贴法定假期 JSON（[{date,label}]）"); if (!raw) return; try { const statutoryHolidays = JSON.parse(raw) as DeskCalendarSettings["statutoryHolidays"]; void saveWidgetSettings({ statutoryHolidays }); } catch { setError("法定假期 JSON 格式无效。"); } }}>导入法定假期 JSON</button>
         <label>透明度<input type="range" min="0.2" max="1" step="0.05" value={deskSettings.appearance.opacity} onChange={(event) => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, opacity: Number(event.target.value) } })} /></label>
-        <div className="desk-cal-theme-row" aria-label="配色主题">主题{DESK_CALENDAR_THEMES.map((theme) => <button key={theme.id} type="button" className={deskSettings.appearance.theme === theme.id ? "is-active" : undefined} aria-pressed={deskSettings.appearance.theme === theme.id} onClick={() => void saveWidgetSettings({ appearance: { ...deskSettings.appearance, theme: theme.id } })}>{theme.label}</button>)}</div>
       </section> : null}
 
       <aside className="desk-cal-task-rail" aria-label="待办事项">

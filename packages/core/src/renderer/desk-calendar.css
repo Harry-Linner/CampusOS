@@ -1,65 +1,37 @@
-/* 桌面悬浮日历 — 毛玻璃面板 + 独立配色主题（midnight/paper/aurora/forest）。
-   语义色与主日程一致：课程蓝 / 考试紫 / 作业金 / 任务绿。 */
+/* 桌面悬浮日历 — 视觉语言与主窗口【日程】一致（方案 A，2026-08-28）：
+   颜色全部跟随主应用主题 token（theme.css 的 :root[data-theme]，浅色/深色/高对比），
+   仅保留贴底所需的独立透明度（--desk-cal-alpha）。格子为共享边线硬边框网格，
+   今日高亮、事件语义色与主日程同语言。 */
 :root {
-  --desk-cal-panel-rgb: 20, 22, 28;
+  --desk-cal-panel-rgb: 248, 249, 247; /* --paper light */
   --desk-cal-alpha: 0.92;
-  --desk-cal-text: #f2f0ea;
-  --desk-cal-muted: rgba(242, 240, 234, 0.55);
-  --desk-cal-border: rgba(255, 255, 255, 0.12);
-  --desk-cal-accent: #d9a441;
-  --desk-cal-accent-text: #19150d;
-  --desk-cal-soft: rgba(255, 255, 255, 0.07);
-  --desk-cal-soft-strong: rgba(255, 255, 255, 0.14);
-  --desk-cal-panel-solid: rgba(14, 16, 21, 0.97);
-  --desk-cal-danger: #e08b8b;
-  --desk-cal-danger-soft: rgba(220, 80, 80, 0.15);
-  --desk-cal-kind-course: #4a7de0;
-  --desk-cal-kind-course-soft: rgba(74, 125, 224, 0.16);
-  --desk-cal-kind-exam: #8e4a9e;
-  --desk-cal-kind-exam-soft: rgba(142, 74, 158, 0.18);
-  --desk-cal-kind-assignment: #b5802a;
-  --desk-cal-kind-assignment-soft: rgba(181, 128, 42, 0.16);
-  --desk-cal-kind-task: #3da06b;
-  --desk-cal-kind-task-soft: rgba(61, 160, 107, 0.16);
-  --desk-cal-radius: 14px;
-}
-
-.desk-cal-shell[data-theme="paper"] {
-  --desk-cal-panel-rgb: 250, 247, 240;
-  --desk-cal-text: #2b2926;
-  --desk-cal-muted: rgba(43, 41, 38, 0.62);
-  --desk-cal-border: rgba(43, 41, 38, 0.16);
-  --desk-cal-accent: #8a5a13;
+  --desk-cal-text: var(--ink);
+  --desk-cal-muted: var(--ink-faint);
+  --desk-cal-border: var(--line);
+  --desk-cal-accent: var(--accent);
   --desk-cal-accent-text: #ffffff;
-  --desk-cal-soft: rgba(43, 41, 38, 0.06);
-  --desk-cal-soft-strong: rgba(43, 41, 38, 0.13);
-  --desk-cal-panel-solid: rgba(252, 250, 245, 0.98);
-  --desk-cal-danger: #a03d3d;
-  --desk-cal-danger-soft: rgba(160, 61, 61, 0.12);
+  --desk-cal-soft: color-mix(in srgb, var(--ink) 5%, transparent);
+  --desk-cal-soft-strong: color-mix(in srgb, var(--ink) 12%, transparent);
+  --desk-cal-panel-solid: var(--paper);
+  --desk-cal-danger: var(--danger);
+  --desk-cal-danger-soft: color-mix(in srgb, var(--danger) 15%, transparent);
+  --desk-cal-kind-course: var(--accent);
+  --desk-cal-kind-course-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --desk-cal-kind-exam: #8e4a9e; /* 与主日程考试紫同色 */
+  --desk-cal-kind-exam-soft: color-mix(in srgb, #8e4a9e 16%, transparent);
+  --desk-cal-kind-assignment: var(--warning);
+  --desk-cal-kind-assignment-soft: color-mix(in srgb, var(--warning) 16%, transparent);
+  --desk-cal-kind-task: var(--success);
+  --desk-cal-kind-task-soft: color-mix(in srgb, var(--success) 16%, transparent);
+  --desk-cal-radius: var(--radius-md);
 }
 
-.desk-cal-shell[data-theme="aurora"] {
-  --desk-cal-panel-rgb: 18, 22, 34;
-  --desk-cal-text: #eef1fb;
-  --desk-cal-muted: rgba(238, 241, 251, 0.55);
-  --desk-cal-border: rgba(255, 255, 255, 0.12);
-  --desk-cal-accent: #7fa7ff;
-  --desk-cal-accent-text: #10131c;
-  --desk-cal-soft: rgba(255, 255, 255, 0.07);
-  --desk-cal-soft-strong: rgba(255, 255, 255, 0.14);
-  --desk-cal-panel-solid: rgba(12, 15, 26, 0.97);
+:root[data-theme="dark"] {
+  --desk-cal-panel-rgb: 26, 31, 38; /* --paper dark */
 }
 
-.desk-cal-shell[data-theme="forest"] {
-  --desk-cal-panel-rgb: 17, 27, 23;
-  --desk-cal-text: #ecf3ee;
-  --desk-cal-muted: rgba(236, 243, 238, 0.55);
-  --desk-cal-border: rgba(255, 255, 255, 0.12);
-  --desk-cal-accent: #8fd3a5;
-  --desk-cal-accent-text: #0f1c15;
-  --desk-cal-soft: rgba(255, 255, 255, 0.07);
-  --desk-cal-soft-strong: rgba(255, 255, 255, 0.14);
-  --desk-cal-panel-solid: rgba(11, 20, 16, 0.97);
+:root[data-theme="high-contrast"] {
+  --desk-cal-panel-rgb: 10, 10, 10;
 }
 
 * {
@@ -94,8 +66,8 @@ body {
   border: 1px solid var(--desk-cal-border);
   border-radius: var(--desk-cal-radius);
   background: rgba(var(--desk-cal-panel-rgb), var(--desk-cal-alpha));
-  -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: var(--desk-cal-text);
   overflow: hidden;
@@ -608,49 +580,51 @@ body {
   gap: 8px;
 }
 
-/* 月视图 7x6 网格 */
+/* 月视图 7x6 网格 — 与主日程同语言：共享边线硬边框，无圆角 */
 .desk-cal-month-grid {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-template-rows: auto repeat(6, minmax(0, 1fr));
-  gap: 4px;
   min-height: 0;
+  border-top: 1px solid var(--desk-cal-border);
+  border-left: 1px solid var(--desk-cal-border);
 }
 
 .desk-cal-weekday {
   font-size: 11px;
   text-align: center;
   color: var(--desk-cal-muted);
-  padding: 2px 0;
+  padding: 4px 0;
+  border-right: 1px solid var(--desk-cal-border);
+  border-bottom: 1px solid var(--desk-cal-border);
 }
 
 .desk-cal-cell {
-  border: 1px solid var(--desk-cal-border);
-  border-radius: 7px;
-  padding: 5px;
+  border-right: 1px solid var(--desk-cal-border);
+  border-bottom: 1px solid var(--desk-cal-border);
+  padding: 5px 6px;
   display: flex;
   flex-direction: column;
   gap: 3px;
   min-height: 0;
   overflow: hidden;
-  background: var(--desk-cal-soft);
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition: background-color 140ms ease;
 }
 
 .desk-cal-cell:hover {
-  border-color: var(--desk-cal-accent);
-  background: color-mix(in srgb, var(--desk-cal-accent) 7%, transparent);
+  background: var(--desk-cal-soft);
 }
 
+/* 今日高亮与主日程同语言：accent 洗底 + 内描边 + 数字 accent 加粗 */
 .desk-cal-cell.is-today {
-  border-color: color-mix(in srgb, var(--desk-cal-accent) 70%, transparent);
-  box-shadow: inset 0 2px 0 var(--desk-cal-accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
 .desk-cal-cell.is-selected {
-  border-color: var(--desk-cal-accent);
-  background: color-mix(in srgb, var(--desk-cal-accent) 10%, var(--desk-cal-soft));
+  box-shadow: inset 0 0 0 1px var(--desk-cal-accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
 .desk-cal-cell.is-outside {
@@ -674,7 +648,8 @@ body {
 }
 
 .desk-cal-cell.is-today time {
-  color: var(--desk-cal-accent);
+  color: var(--accent-deep);
+  font-weight: 700;
 }
 
 .desk-cal-day-button {
@@ -1169,28 +1144,6 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.desk-cal-widget-settings .desk-cal-theme-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.desk-cal-widget-settings .desk-cal-theme-row button {
-  border: 1px solid var(--desk-cal-border);
-  border-radius: 6px;
-  background: var(--desk-cal-soft);
-  color: var(--desk-cal-text);
-  font: inherit;
-  cursor: pointer;
-  padding: 3px 10px;
-}
-
-.desk-cal-widget-settings .desk-cal-theme-row button.is-active {
-  border-color: var(--desk-cal-accent);
-  background: color-mix(in srgb, var(--desk-cal-accent) 18%, transparent);
-  color: var(--desk-cal-accent);
 }
 
 .desk-cal-widget-add-form {
