@@ -74,7 +74,7 @@ describe("global search", () => {
     const index = buildGlobalSearchIndex(snapshot);
     expect(searchGlobalIndex(index, "MGT3001")[0]).toMatchObject({
       title: "组织行为学",
-      navigation: { viewId: "academic", entityId: "course-1-a" }
+      navigation: { viewId: "academic", entityId: "组织行为学", semester: "2026:1" }
     });
     expect(searchGlobalIndex(index, "案例分析")[0]?.navigation.viewId).toBe("schedule");
     expect(searchGlobalIndex(index, "第一讲")[0]?.navigation.viewId).toBe("materials");

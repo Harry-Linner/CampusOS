@@ -24,6 +24,18 @@ const normalize = (value: string): string =>
 const compact = (values: Array<string | null | undefined>): string =>
   values.filter((value): value is string => Boolean(value?.trim())).join(" · ");
 
+/** Derive an academic semester key (`<academicYearStart>:<1|2>`) from a course's start
+ *  time (ISO string), so the timetable can select the right term when jumping to a course. */
+const semesterKeyFromStartAt = (startAt: string): string | undefined => {
+  const match = /^(\d{4})-(\d{2})/.exec(startAt);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month >= 9) return `${year}:1`;      // Sep-Dec -> autumn-winter of this academic year
+  if (month >= 2) return `${year - 1}:2`;  // Feb-Aug -> spring-summer of the previous academic year
+  return `${year - 1}:1`;                   // January -> autumn-winter continuation
+};
+
 export const buildGlobalSearchIndex = (
   snapshot: CampusWorkspaceSnapshot | null,
   tasks: readonly LocalTaskRecord[] = []
@@ -51,7 +63,11 @@ export const buildGlobalSearchIndex = (
         course.location,
         course.note
       ]),
-      navigation: { viewId: "academic", entityId: course.id }
+      navigation: {
+        viewId: "academic",
+        entityId: course.title,
+        semester: semesterKeyFromStartAt(course.startAt)
+      }
     });
   }
 

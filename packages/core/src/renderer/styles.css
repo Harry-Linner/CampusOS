@@ -1887,6 +1887,12 @@ input:focus-visible {
   padding: 13px 0;
 }
 
+.academic-record-row.is-search-highlight,
+.academic-record-row.is-search-highlight > div {
+  background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 6px;
+}
+
 .academic-record-row > div:first-child {
   display: flex;
   min-width: 0;

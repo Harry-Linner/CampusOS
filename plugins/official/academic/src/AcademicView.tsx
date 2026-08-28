@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AcademicCalendarConfigData,
   AcademicCourseCatalogData,
@@ -98,7 +98,8 @@ const buildTimetableSemesters = (
 
 const TimetablePanel = ({
   capabilities,
-  snapshot
+  snapshot,
+  navigationTarget
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<
     CapabilityRecord<AcademicTimetableData>[]
@@ -235,6 +236,35 @@ const TimetablePanel = ({
   const weekPatternLabel = (value: string): string =>
     value === "all" ? "全周" : value === "odd" ? "单周" : "双周";
 
+  // Jump-to-locate from the global search: select the course's semester, then
+  // scroll to + flash-highlight the merged row for that course.
+  const pendingCourseRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (navigationTarget?.viewId !== "academic" || !navigationTarget.entityId) return;
+    pendingCourseRef.current = navigationTarget.entityId;
+    const targetSemester = navigationTarget.semester;
+    if (targetSemester && semesters.some((semester) => semester.key === targetSemester)) {
+      setTermKey(targetSemester);
+    }
+  }, [navigationTarget, semesters]);
+
+  useEffect(() => {
+    const courseName = pendingCourseRef.current;
+    if (!courseName) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector(
+        `[data-course-name="${CSS.escape(courseName)}"]`
+      );
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("is-search-highlight");
+        window.setTimeout(() => el.classList.remove("is-search-highlight"), 1600);
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [selectedKey, semesters]);
+
   return (
     <section className="academic-panel" aria-label="课表">
       <div className="academic-panel-heading">
@@ -285,7 +315,7 @@ const TimetablePanel = ({
       ) : (
         <ul className="academic-record-list">
           {mergedRows.map((row) => (
-            <li key={row.key} className="academic-record-row">
+            <li key={row.key} data-course-name={row.courseName} className="academic-record-row">
               <div>
                 <strong>{row.courseName}</strong>
                 <span className="meta-line">
