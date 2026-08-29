@@ -36,6 +36,8 @@ describe("briefInfoSources", () => {
     expect(outcome.items[0].url).toBe("https://arxiv.org/post");
     expect(outcome.items[0].fingerprint).toMatch(/^[0-9a-f]{64}$/);
     expect(outcome.items[0].summary).toBe("hello");
+    // B4-1：抓取层返回请求版本指纹（脱敏 16 hex）。
+    expect(outcome.requestFingerprints["arxiv"]).toMatch(/^[a-f0-9]{16}$/);
   });
 
   it("truncates long summaries and drops non-https links", async () => {
@@ -81,6 +83,12 @@ describe("briefInfoSources", () => {
     expect(outcome.degraded).toEqual(["arxiv"]);
     expect(outcome.items).toHaveLength(1);
     expect(outcome.items[0].sourceId).toBe("hacker-news");
+    // B4-1：成功与失败的源都携带请求指纹。
+    expect(outcome.requestFingerprints["arxiv"]).toMatch(/^[a-f0-9]{16}$/);
+    expect(outcome.requestFingerprints["hacker-news"]).toMatch(/^[a-f0-9]{16}$/);
+    expect(outcome.requestFingerprints["arxiv"]).not.toBe(
+      outcome.requestFingerprints["hacker-news"]
+    );
   });
 
   it("skips disabled sources without fetching them", async () => {
@@ -92,6 +100,7 @@ describe("briefInfoSources", () => {
     expect(fetchFn).not.toHaveBeenCalled();
     expect(outcome.items).toEqual([]);
     expect(outcome.degraded).toEqual([]);
+    expect(outcome.requestFingerprints).toEqual({});
   });
 
   it("marks every enabled source degraded when all fetches fail", async () => {

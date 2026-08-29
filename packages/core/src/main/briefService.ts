@@ -46,6 +46,7 @@ import {
   type BriefFetcher
 } from "./briefInfoSources";
 import type { BriefStore } from "./briefStore";
+import type { DiagnosticAppendInput } from "./diagnosticLogStore";
 
 export class BriefServiceError extends Error {
   constructor(
@@ -80,6 +81,11 @@ export interface BriefServiceDependencies {
   decryptSecret?: (value: string) => string;
   now?: () => Date;
   timezone?: string;
+  /**
+   * B4-1：刷新台账写入钩子（module=feed 源 id，operation=refresh）。
+   * 生产环境由 main.ts 注入 appendDiagnosticEntry；测试可注入 mock。
+   */
+  recordDiagnostic?: (input: DiagnosticAppendInput) => Promise<void> | void;
 }
 
 export interface BriefService {
@@ -320,13 +326,20 @@ export const createBriefService = ({
   encryptSecret,
   decryptSecret,
   now = () => new Date(),
-  timezone = "Asia/Shanghai"
+  timezone = "Asia/Shanghai",
+  recordDiagnostic
 }: BriefServiceDependencies): BriefService => {
   let state: BriefState = { status: "idle", snapshot: null, error: null };
   const listeners = new Set<(state: BriefState) => void>();
   let hydrated = false;
   let hydration: Promise<void> | null = null;
   let refreshInFlight: Promise<BriefState> | null = null;
+
+  /** B4-1：刷新台账写入（best-effort，失败不打断刷新流程）。 */
+  const record = (input: DiagnosticAppendInput): void => {
+    const pending = recordDiagnostic?.(input);
+    if (pending) void pending.catch(() => undefined);
+  };
 
   const setState = (next: BriefState): void => {
     state = next;
@@ -361,6 +374,7 @@ export const createBriefService = ({
 
   const performRefresh = async (): Promise<BriefState> => {
     await hydrate();
+    const refreshStartedAt = performance.now();
     setState({ status: "fetching", snapshot: state.snapshot, error: null });
     try {
       const profile = (await store.loadProfile()) ?? defaultProfile();
@@ -376,6 +390,24 @@ export const createBriefService = ({
         return state;
       }
       const outcome = await fetchSources({ enabledSourceIds });
+      // B4-1：按 feed 源写刷新台账（module=源 id）；耗时取整次刷新耗时（抓取层不逐源计时）。
+      const refreshDurationMs = Math.max(
+        0,
+        Math.round(performance.now() - refreshStartedAt)
+      );
+      for (const [sourceId, fingerprint] of Object.entries(
+        outcome.requestFingerprints ?? {}
+      )) {
+        const degraded = outcome.degraded.includes(sourceId);
+        record({
+          module: sourceId,
+          operation: "refresh",
+          state: degraded ? "unavailable" : "live",
+          durationMs: refreshDurationMs,
+          requestFingerprint: fingerprint,
+          ...(degraded ? { message: "信息源抓取失败，本期间该源降级。" } : {})
+        });
+      }
       const freshItems: BriefCachedItem[] = [];
       for (const item of outcome.items) {
         if (await store.upsertItem(item)) freshItems.push(item);

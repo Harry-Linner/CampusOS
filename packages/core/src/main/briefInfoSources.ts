@@ -10,6 +10,7 @@ import Parser from "rss-parser";
 import type { BriefCachedItem } from "@campusos/shared";
 import { BRIEF_MAX_RAW_SUMMARY, BRIEF_MAX_RAW_TITLE } from "@campusos/shared";
 import { createRetryState, withRetry } from "./retryPolicy";
+import { computeRequestFingerprint } from "./requestFingerprint";
 
 export interface BriefSourceDefinition {
   id: string;
@@ -73,6 +74,11 @@ export const isBriefSourceUrl = (sourceId: string, value: string): boolean => {
 export interface BriefFetchOutcome {
   items: BriefCachedItem[];
   degraded: string[];
+  /**
+   * B4-1：请求版本指纹，sourceId → 该 feed 请求的指纹（脱敏，抓取前计算，
+   * 成功与失败的源都包含），供刷新台账与上游兼容雷达使用。
+   */
+  requestFingerprints: Record<string, string>;
 }
 
 export interface BriefFetcher {
@@ -195,14 +201,20 @@ export const createBriefFetcher = ({
     const enabled = new Set(enabledSourceIds.filter((id) => BRIEF_SOURCE_IDS.includes(id)));
     const degraded: string[] = [];
     const items: BriefCachedItem[] = [];
+    const requestFingerprints: Record<string, string> = {};
     for (const source of BRIEF_SOURCE_DEFINITIONS) {
       if (!enabled.has(source.id)) continue;
+      // B4-1：请求版本指纹在发起 HTTP 处构造（方法+主机+路径，不含任何值）。
+      requestFingerprints[source.id] = computeRequestFingerprint(
+        "GET",
+        source.feedUrl
+      );
       try {
         items.push(...await fetchSource(source));
       } catch {
         degraded.push(source.id);
       }
     }
-    return { items, degraded };
+    return { items, degraded, requestFingerprints };
   };
 };

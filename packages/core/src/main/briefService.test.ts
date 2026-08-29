@@ -70,13 +70,15 @@ const createHarness = ({
   configured = true,
   fetchItems = items,
   profileOverride = null,
-  degraded
+  degraded,
+  recordDiagnostic
 }: {
   raw?: unknown;
   configured?: boolean;
   fetchItems?: BriefCachedItem[];
   profileOverride?: BriefProfile | null;
   degraded?: string[];
+  recordDiagnostic?: (input: import("./diagnosticLogStore").DiagnosticAppendInput) => Promise<void> | void;
 } = {}): Harness => {
   const defaultProfile: BriefProfile = {
     interests: [{ name: "数学", weight: 5 }],
@@ -96,7 +98,14 @@ const createHarness = ({
   };
   const fetcher: BriefFetcher = vi.fn(async () => ({
     items: fetchItems,
-    degraded: degraded ?? (fetchItems.length === items.length ? [] : ["infoq"])
+    degraded: degraded ?? (fetchItems.length === items.length ? [] : ["infoq"]),
+    // B4-1：抓取层返回的请求指纹（测试用固定值，只验证服务透传）。
+    requestFingerprints: {
+      arxiv: "fp-arxiv",
+      "hacker-news": "fp-hacker-news",
+      infoq: "fp-infoq",
+      solidot: "fp-solidot"
+    }
   }));
   const adapter: AiProviderAdapter = {
     profile: {
@@ -115,7 +124,8 @@ const createHarness = ({
     createAdapter: () => adapter,
     encryptSecret: (value) => `enc:${value}`,
     decryptSecret: () => "mock-key",
-    now: () => new Date("2026-08-22T08:00:00+08:00")
+    now: () => new Date("2026-08-22T08:00:00+08:00"),
+    recordDiagnostic
   });
   return { store, fetcher, adapter, service };
 };
@@ -157,11 +167,42 @@ describe("briefService", () => {
     const harness = createHarness();
     (harness.fetcher as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       items: [],
-      degraded: ["arxiv", "hacker-news", "infoq", "solidot"]
+      degraded: ["arxiv", "hacker-news", "infoq", "solidot"],
+      requestFingerprints: {
+        arxiv: "fp-arxiv",
+        "hacker-news": "fp-hacker-news",
+        infoq: "fp-infoq",
+        solidot: "fp-solidot"
+      }
     });
     const state = await harness.service.refresh();
     expect(state.status).toBe("error");
     expect(state.error).toContain("所有信息源抓取失败");
+  });
+
+  it("B4-1: writes a fingerprint ledger entry per feed source on refresh", async () => {
+    const recordDiagnostic = vi.fn(async () => undefined);
+    const harness = createHarness({ degraded: ["infoq"], recordDiagnostic });
+    const state = await harness.service.refresh();
+    expect(state.status).toBe("ready");
+    expect(recordDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: "arxiv",
+        operation: "refresh",
+        state: "live",
+        requestFingerprint: "fp-arxiv"
+      })
+    );
+    expect(recordDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: "infoq",
+        operation: "refresh",
+        state: "unavailable",
+        requestFingerprint: "fp-infoq",
+        message: expect.stringContaining("降级")
+      })
+    );
+    expect(recordDiagnostic).toHaveBeenCalledTimes(4);
   });
 
   it("fails with a settings hint when no source is enabled", async () => {

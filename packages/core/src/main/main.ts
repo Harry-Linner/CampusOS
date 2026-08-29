@@ -201,7 +201,8 @@ const startCampusApp = (): void => {
       store: createBriefStore({ database: getOfficialDatabaseService() }),
       fetchSources: createBriefFetcher(),
       encryptSecret: (value) => briefVault.encrypt(value),
-      decryptSecret: (value) => briefVault.decrypt(value)
+      decryptSecret: (value) => briefVault.decrypt(value),
+      recordDiagnostic: appendDiagnosticEntry
     }));
     registerCampusFeedHandlers(createCampusFeedService({
       database: getOfficialDatabaseService(),
