@@ -1,4 +1,5 @@
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
+import { computeRequestFingerprint } from "./requestFingerprint";
 
 const ZJU_AUTH_LOGIN_URL = "https://zjuam.zju.edu.cn/cas/login";
 const ZJU_AUTH_PUBLIC_KEY_URL =
@@ -106,6 +107,8 @@ export type ZjuUndergraduateServiceRequest =
 export interface ZjuUndergraduateServiceResponse {
   status: number;
   body: string;
+  /** 请求版本指纹（方法+主机+路径+静态字段名，脱敏），供上游兼容雷达。 */
+  requestFingerprint?: string;
 }
 
 export type ZjuGraduateTerm = 11 | 12 | 13 | 14 | 15 | 16;
@@ -126,6 +129,8 @@ export type ZjuGraduateServiceRequest =
 export interface ZjuGraduateServiceResponse {
   status: number;
   body: string;
+  /** 请求版本指纹（方法+主机+路径+静态字段名，脱敏），供上游兼容雷达。 */
+  requestFingerprint?: string;
 }
 
 export type ZjuLearningServiceRequest =
@@ -137,6 +142,8 @@ export type ZjuLearningServiceRequest =
 export interface ZjuLearningServiceResponse {
   status: number;
   body: string;
+  /** 请求版本指纹（方法+主机+路径+静态字段名，脱敏），供上游兼容雷达。 */
+  requestFingerprint?: string;
 }
 
 export interface ZjuLearningDownloadRequest {
@@ -153,6 +160,8 @@ export type ZjuQualityDevelopmentServiceRequest =
 export interface ZjuQualityDevelopmentServiceResponse {
   status: number;
   body: string;
+  /** 请求版本指纹（方法+主机+路径+静态字段名，脱敏），供上游兼容雷达。 */
+  requestFingerprint?: string;
 }
 
 export interface ZjuLearningDownloadTransportRequest {
@@ -1579,9 +1588,23 @@ class ZjuUnifiedAuthClient {
     credentials: ZjuAuthCredentials,
     request: ZjuLearningServiceRequest
   ): Promise<ZjuLearningServiceResponse> {
-    const endpoint = (() => {
-      if (request.operation === "todos") return LEARNING_TODOS_URL;
-      if (request.operation === "semesters") return LEARNING_SEMESTERS_URL;
+    // B4-1：请求版本指纹在发起 HTTP 处构造（方法+主机+路径+静态字段名，不含任何值）。
+    const { endpoint, requestFingerprint } = (() => {
+      if (request.operation === "todos") {
+        return {
+          endpoint: LEARNING_TODOS_URL,
+          requestFingerprint: computeRequestFingerprint("GET", LEARNING_TODOS_URL)
+        };
+      }
+      if (request.operation === "semesters") {
+        return {
+          endpoint: LEARNING_SEMESTERS_URL,
+          requestFingerprint: computeRequestFingerprint(
+            "GET",
+            LEARNING_SEMESTERS_URL
+          )
+        };
+      }
       if (request.operation === "courses") {
         if (!Number.isSafeInteger(request.page) || request.page < 1) {
           throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程页码无效。");
@@ -1611,12 +1634,29 @@ class ZjuUnifiedAuthClient {
         url.searchParams.set("page", String(request.page));
         url.searchParams.set("page_size", "100");
         url.searchParams.set("showScorePassedStatus", "false");
-        return url.href;
+        return {
+          endpoint: url.href,
+          // 指纹只含查询参数名（静态结构），不含参数值。
+          requestFingerprint: computeRequestFingerprint("GET", url.href, [
+            "conditions",
+            "fields",
+            "page",
+            "page_size",
+            "showScorePassedStatus"
+          ])
+        };
       }
       if (!/^[1-9]\d*$/.test(request.courseId)) {
         throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程标识无效。");
       }
-      return `https://courses.zju.edu.cn/api/courses/${request.courseId}/activities`;
+      // 路径中的动态 courseId 归一化为 {courseId}，避免课程列表变化引发上游变化误报。
+      return {
+        endpoint: `https://courses.zju.edu.cn/api/courses/${request.courseId}/activities`,
+        requestFingerprint: computeRequestFingerprint(
+          "GET",
+          "https://courses.zju.edu.cn/api/courses/{courseId}/activities"
+        )
+      };
     })();
 
     const username = credentials.username.trim();
@@ -1643,7 +1683,7 @@ class ZjuUnifiedAuthClient {
       }
 
       validateStatus(response, "学在浙大业务接口");
-      return { status: response.status, body: response.body };
+      return { status: response.status, body: response.body, requestFingerprint };
     }
 
     throw new ZjuUnifiedAuthError(
@@ -1723,6 +1763,10 @@ class ZjuUnifiedAuthClient {
     const requestUrl = request.operation === "practice"
       ? QUALITY_DEVELOPMENT_PRACTICE_URL
       : QUALITY_DEVELOPMENT_PROFILE_URL;
+    // B4-1：请求版本指纹在发起 HTTP 处构造（方法+主机+路径+静态字段名，不含任何值）。
+    const requestFingerprint = request.operation === "practice"
+      ? computeRequestFingerprint("GET", QUALITY_DEVELOPMENT_PRACTICE_URL)
+      : computeRequestFingerprint("GET", QUALITY_DEVELOPMENT_PROFILE_URL);
     const username = credentials.username.trim();
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -1770,7 +1814,7 @@ class ZjuUnifiedAuthClient {
           ? "素质拓展实践项目接口"
           : "素质拓展 getMyInfo 接口"
       );
-      return { status: response.status, body: response.body };
+      return { status: response.status, body: response.body, requestFingerprint };
     }
 
     throw new ZjuUnifiedAuthError(
@@ -1829,12 +1873,13 @@ class ZjuUnifiedAuthClient {
           ? GRADUATE_EXAMS_URL
           : GRADUATE_GRADES_URL
     );
+    let examQuery: Record<string, string> | null = null;
     if (request.operation === "timetable") {
       requestUrl.searchParams.set("xn", String(request.academicYearStart));
       requestUrl.searchParams.set("pkxq", String(request.term));
     } else if (request.operation === "exams") {
       const fields = "id,,kcbh,kcmc,rq,ksTime,xn,xq_dictText,ksdd,zwh";
-      const query = {
+      examQuery = {
         dm: "py_grks",
         mode: "2",
         role: "1",
@@ -1847,10 +1892,21 @@ class ZjuUnifiedAuthClient {
         xn: String(request.academicYearStart),
         xq: String(request.term)
       };
-      for (const [name, value] of Object.entries(query)) {
+      for (const [name, value] of Object.entries(examQuery)) {
         requestUrl.searchParams.set(name, value);
       }
     }
+
+    // B4-1：请求版本指纹在发起 HTTP 处构造（方法+主机+路径+静态字段名，不含任何值）。
+    const requestFingerprint = request.operation === "timetable"
+      ? computeRequestFingerprint("GET", requestUrl.href, ["xn", "pkxq"])
+      : request.operation === "exams"
+        ? computeRequestFingerprint(
+            "GET",
+            requestUrl.href,
+            examQuery !== null ? Object.keys(examQuery) : []
+          )
+        : computeRequestFingerprint("POST", requestUrl.href);
 
     const username = credentials.username.trim();
     const method = request.operation === "grades" ? "POST" : "GET";
@@ -1878,7 +1934,7 @@ class ZjuUnifiedAuthClient {
       }
 
       validateStatus(response, "研究生院业务接口");
-      return { status: response.status, body: response.body };
+      return { status: response.status, body: response.body, requestFingerprint };
     }
 
     throw new ZjuUnifiedAuthError(
@@ -1928,6 +1984,17 @@ class ZjuUnifiedAuthClient {
         : request.operation === "major-grades"
           ? "教务网主修成绩接口"
         : "教务网成绩接口";
+    // B4-1：请求版本指纹在发起 HTTP 处构造（方法+主机+路径+静态字段名，不含任何值）。
+    const requestFingerprint = request.operation === "timetable"
+      ? computeRequestFingerprint("POST", requestUrl, [
+          "xnm",
+          "xqm",
+          "captcha_value"
+        ])
+      : computeRequestFingerprint("POST", requestUrl, [
+          "doType",
+          "queryModel.showCount"
+        ]);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const session = await this.#getUndergraduateSession(credentials);
       const response = await this.#request("POST", requestUrl, {
@@ -1977,7 +2044,7 @@ class ZjuUnifiedAuthClient {
         );
       }
       validateStatus(response, requestContext);
-      return { status: response.status, body: response.body };
+      return { status: response.status, body: response.body, requestFingerprint };
     }
 
     throw new ZjuUnifiedAuthError(

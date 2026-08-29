@@ -40,6 +40,10 @@ import {
   requestOfficialAcademicCalendar,
   useE2eFixtureSources
 } from "./officialAcademicCalendarRequest";
+import {
+  createFingerprintCollector,
+  trackRefreshResultFingerprint
+} from "./requestFingerprint";
 
 const readVerifiedStudentId = async (): Promise<string | null> => {
   const record = await readAcademicCredentialRecord();
@@ -185,8 +189,10 @@ export const createOfficialHeadlessPluginLoaders = ({
       registerRefreshJob: (sourceId, job, options) =>
         pluginRefreshCoordinator.register(sourceId, job, options)
     }),
-  [zjuLearningManifest.id]: async () =>
-    createZjuLearningConnector({
+  [zjuLearningManifest.id]: async () => {
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuLearningConnector({
       loadAcademicProfileProof: async () => {
         const record = await readAcademicCredentialRecord();
         if (
@@ -202,6 +208,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           const response = await requestZjuLearningService({
             operation: "todos"
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -218,6 +225,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           const response = await requestZjuLearningService({
             operation: "semesters"
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -237,6 +245,7 @@ export const createOfficialHeadlessPluginLoaders = ({
             // CampusOS widens this adapter boundary because Materials must expose user-requested history.
             scope: "all"
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -253,6 +262,7 @@ export const createOfficialHeadlessPluginLoaders = ({
             operation: "course-activities",
             courseId
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -299,8 +309,12 @@ export const createOfficialHeadlessPluginLoaders = ({
         );
       },
       registerRefreshJob: (sourceId, job) =>
-        pluginRefreshCoordinator.register(sourceId, job)
-    }),
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
   [zjuCalendarConfigManifest.id]: async () =>
     createZjuCalendarConfigConnector({
       fetchCalendarPage: useE2eFixtureSources()
@@ -329,8 +343,10 @@ export const createOfficialHeadlessPluginLoaders = ({
       registerRefreshJob: (sourceId, job) =>
         pluginRefreshCoordinator.register(sourceId, job)
     }),
-  [zjuGraduateManifest.id]: async () =>
-    createZjuGraduateConnector({
+  [zjuGraduateManifest.id]: async () => {
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuGraduateConnector({
       loadAcademicProfileProof: async () => {
         const record = await readAcademicCredentialRecord();
         if (
@@ -357,6 +373,7 @@ export const createOfficialHeadlessPluginLoaders = ({
               academicYearStart: query.academicYearStart,
               term: query.term
             });
+            fingerprintCollector.add(response.requestFingerprint);
             results.push({ query, ok: true as const, body: response.body });
           } catch (error) {
             results.push({
@@ -388,6 +405,7 @@ export const createOfficialHeadlessPluginLoaders = ({
               academicYearStart: query.academicYearStart,
               term: query.term
             });
+            fingerprintCollector.add(response.requestFingerprint);
             results.push({ ...query, ok: true as const, body: response.body });
           } catch (error) {
             results.push({
@@ -415,6 +433,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           const response = await requestGraduateAcademicService({
             operation: "grades"
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -453,10 +472,16 @@ export const createOfficialHeadlessPluginLoaders = ({
         );
       },
       registerRefreshJob: (sourceId, job) =>
-        pluginRefreshCoordinator.register(sourceId, job)
-    }),
-  [zjuUndergraduateManifest.id]: async () =>
-    createZjuUndergraduateConnector({
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
+  [zjuUndergraduateManifest.id]: async () => {
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuUndergraduateConnector({
       loadAcademicProfileProof: async () => {
         const record = await readAcademicCredentialRecord();
         if (
@@ -489,6 +514,7 @@ export const createOfficialHeadlessPluginLoaders = ({
               academicYearStart: query.academicYearStart,
               season: query.season
             });
+            fingerprintCollector.add(response.requestFingerprint);
             results.push({ query, ok: true as const, body: response.body });
           } catch (error) {
             const message = formatUndergraduateRequestFailure(error);
@@ -520,6 +546,7 @@ export const createOfficialHeadlessPluginLoaders = ({
           const response = await requestUndergraduateAcademicService({
             operation: "exams"
           });
+          fingerprintCollector.add(response.requestFingerprint);
           return { ok: true as const, body: response.body };
         } catch (error) {
           return {
@@ -553,6 +580,10 @@ export const createOfficialHeadlessPluginLoaders = ({
             message: error instanceof Error ? error.message : "教务网成绩请求失败。"
           };
         }
+        fingerprintCollector.add(transcript.value.requestFingerprint);
+        if (major.status === "fulfilled") {
+          fingerprintCollector.add(major.value.requestFingerprint);
+        }
         return {
           ok: true as const,
           body: transcript.value.body,
@@ -585,6 +616,12 @@ export const createOfficialHeadlessPluginLoaders = ({
           ]);
           if (practice.status === "rejected" && summary.status === "rejected") {
             throw practice.reason;
+          }
+          if (practice.status === "fulfilled") {
+            fingerprintCollector.add(practice.value.requestFingerprint);
+          }
+          if (summary.status === "fulfilled") {
+            fingerprintCollector.add(summary.value.requestFingerprint);
           }
           return {
             ok: true as const,
@@ -632,6 +669,10 @@ export const createOfficialHeadlessPluginLoaders = ({
         );
       },
       registerRefreshJob: (sourceId, job) =>
-        pluginRefreshCoordinator.register(sourceId, job)
-    })
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
 });

@@ -186,16 +186,24 @@ describe("ZjuUnifiedAuthClient", () => {
       operation: "grades"
     });
 
-    expect(first).toEqual({ status: 200, body: JSON.stringify({ kbList: [] }) });
-    expect(second).toEqual({ status: 200, body: "null" });
-    expect(exams).toEqual({
-      status: 200,
-      body: JSON.stringify({ items: [] })
-    });
-    expect(grades).toEqual({
-      status: 200,
-      body: JSON.stringify({ items: [] })
-    });
+    expect(first).toEqual(
+      expect.objectContaining({ status: 200, body: JSON.stringify({ kbList: [] }) })
+    );
+    expect(second).toEqual(
+      expect.objectContaining({ status: 200, body: "null" })
+    );
+    expect(exams).toEqual(
+      expect.objectContaining({ status: 200, body: JSON.stringify({ items: [] }) })
+    );
+    expect(grades).toEqual(
+      expect.objectContaining({ status: 200, body: JSON.stringify({ items: [] }) })
+    );
+    // B4-1：请求版本指纹随响应返回——同操作稳定、不同端点不同、16 hex 脱敏格式。
+    expect(first.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(second.requestFingerprint).toBe(first.requestFingerprint);
+    expect(exams.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(exams.requestFingerprint).not.toBe(first.requestFingerprint);
+    expect(grades.requestFingerprint).not.toBe(exams.requestFingerprint);
     expect(JSON.stringify([first, second, exams, grades])).not.toContain(
       "academic-session"
     );
@@ -260,8 +268,16 @@ describe("ZjuUnifiedAuthClient", () => {
       operation: "grades"
     });
 
-    expect(timetable).toEqual({ status: 200, body: timetableBody });
-    expect(grades).toEqual({ status: 200, body: gradesBody });
+    expect(timetable).toEqual(
+      expect.objectContaining({ status: 200, body: timetableBody })
+    );
+    expect(grades).toEqual(
+      expect.objectContaining({ status: 200, body: gradesBody })
+    );
+    // B4-1：研究生院课表（GET）与成绩（POST）指纹不同且稳定。
+    expect(timetable.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(grades.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(grades.requestFingerprint).not.toBe(timetable.requestFingerprint);
     expect(JSON.stringify([timetable, grades])).not.toContain("graduate-token");
     expect(requests).toHaveLength(7);
     expect(requests[3].url).toContain(
@@ -387,7 +403,11 @@ describe("ZjuUnifiedAuthClient", () => {
       { operation: "todos" }
     );
 
-    expect(result).toEqual({ status: 200, body: todosBody });
+    expect(result).toEqual(
+      expect.objectContaining({ status: 200, body: todosBody })
+    );
+    // B4-1：学在浙大请求指纹稳定且为脱敏 16 hex。
+    expect(result.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
     expect(JSON.stringify(result)).not.toContain("learning-session");
     expect(requests).toHaveLength(7);
     expect(requests[3].url).toBe("https://courses.zju.edu.cn/user/index");
@@ -471,7 +491,9 @@ describe("ZjuUnifiedAuthClient", () => {
     await expect(client.requestLearningService(
       { username: "3240100001", password: "real password" },
       { operation: "todos" }
-    )).resolves.toEqual({ status: 200, body: '{"todo_list":[]}' });
+    )).resolves.toEqual(
+      expect.objectContaining({ status: 200, body: '{"todo_list":[]}' })
+    );
     expect(learningLoginAttempts).toBe(2);
   });
 
@@ -505,10 +527,12 @@ describe("ZjuUnifiedAuthClient", () => {
       await vi.advanceTimersByTimeAsync(99);
       expect(apiSignals).toHaveLength(1);
       await vi.advanceTimersByTimeAsync(1);
-      await expect(operation).resolves.toEqual({
-        status: 200,
-        body: '{"todo_list":[]}'
-      });
+      await expect(operation).resolves.toEqual(
+        expect.objectContaining({
+          status: 200,
+          body: '{"todo_list":[]}'
+        })
+      );
       expect(apiSignals).toHaveLength(2);
     } finally {
       vi.useRealTimers();
@@ -709,7 +733,10 @@ describe("ZjuUnifiedAuthClient", () => {
     await client.authenticate({ ...credentials, program: "undergraduate" });
     const todos = await client.requestLearningService(credentials, { operation: "todos" });
 
-    expect(todos).toEqual({ status: 200, body: todosBody });
+    expect(todos).toEqual(
+      expect.objectContaining({ status: 200, body: todosBody })
+    );
+    expect(todos.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
     expect(requests.filter((request) => request.method === "POST" && new URL(request.url).pathname === "/cas/login")).toHaveLength(1);
     const todoRequest = requests.find((request) => new URL(request.url).pathname === "/api/todos");
     expect(todoRequest?.headers.Cookie).toContain("session=learning-session");
