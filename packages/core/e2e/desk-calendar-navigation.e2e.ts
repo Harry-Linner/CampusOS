@@ -1,4 +1,4 @@
-import { expect, test, _electron as electron } from "@playwright/test";
+import { expect, test, _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -6,6 +6,18 @@ import { fileURLToPath } from "node:url";
 import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+// B3：开启桌历会同时创建桌历主窗 + 独立组件窗（均通过 "window" 事件），
+// 需等待 URL 为 desk-calendar.html 的桌历主窗，避免抢到组件窗。
+const waitForDeskCalendarPage = async (app: ElectronApplication): Promise<Page> => {
+  const timeout = Date.now() + 15_000;
+  while (Date.now() < timeout) {
+    const found = app.windows().find((window) => window.url().includes("desk-calendar.html"));
+    if (found) return found;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("桌面日历主窗未出现");
+};
 
 const completeOnboarding = async (page: Awaited<ReturnType<Awaited<ReturnType<typeof electron.launch>>["firstWindow"]>>): Promise<void> => {
   await page.getByRole("button", { name: "开始配置" }).click();
@@ -32,10 +44,9 @@ test("jumps to the exact event from the desk calendar and keeps in-place detail 
     await completeOnboarding(mainPage);
     await mainPage.getByLabel("主导航").getByRole("button", { name: "日程" }).click();
 
-    const floatingWindowPromise = app.waitForEvent("window");
     await mainPage.getByRole("button", { name: "桌面日历" }).click();
     await mainPage.getByRole("menu", { name: "桌面日历设置" }).getByRole("button", { name: "开启桌面日历" }).click();
-    const floatingPage = await floatingWindowPromise;
+    const floatingPage = await waitForDeskCalendarPage(app);
     floatingPage.setDefaultTimeout(15_000);
     attachRendererGuard(floatingPage);
     await floatingPage.waitForLoadState("domcontentloaded");

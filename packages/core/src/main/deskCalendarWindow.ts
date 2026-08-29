@@ -274,8 +274,9 @@ const disableAfterUserClose = async (): Promise<void> => {
   if (appIsQuitting) return;
   const current = await loadSettings();
   if (!current.enabled) return;
-  await saveSettings({ enabled: false });
+  const next = await saveSettings({ enabled: false });
   broadcastSettingsChanged();
+  syncWidgetWindows(next);
 };
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
@@ -420,11 +421,12 @@ export const registerDeskCalendarHandlers = (): void => {
 
   ipcMain.handle("campusos:desk-calendar:window:close", async (event) => {
     assertTrustedDeskCalendarCaller(event);
-    await saveSettings({ enabled: false });
+    const next = await saveSettings({ enabled: false });
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
       deskCalendarWindow.close();
     }
     broadcastSettingsChanged();
+    syncWidgetWindows(next);
   });
 
   ipcMain.handle("campusos:desk-calendar:window:open-main", async (event, input: unknown) => {
@@ -436,7 +438,14 @@ export const registerDeskCalendarHandlers = (): void => {
     if (!entityId || entityId.length > 512) {
       throw new Error("Invalid desktop calendar navigation target.");
     }
-    const mainWindow = BrowserWindow.getAllWindows().find((window) => window !== deskCalendarWindow && !window.isDestroyed());
+    // B3：现在桌面侧还有独立组件窗；必须排除桌历主窗与所有组件窗，才定位到主窗口。
+    const mainWindow = BrowserWindow.getAllWindows().find(
+      (window) =>
+        window !== deskCalendarWindow &&
+        !window.isDestroyed() &&
+        !(window.getTitle?.() ?? "").includes("桌面日历") &&
+        !(window.getTitle?.() ?? "").includes("桌面组件")
+    );
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();

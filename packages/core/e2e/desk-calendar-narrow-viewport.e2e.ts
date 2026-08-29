@@ -1,4 +1,4 @@
-import { expect, test, _electron as electron } from "@playwright/test";
+import { expect, test, _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -6,6 +6,17 @@ import { fileURLToPath } from "node:url";
 import { attachRendererGuard } from "./rendererGuard";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+// B3：开启桌历会同时创建桌历主窗 + 独立组件窗；等待 URL 为 desk-calendar.html 的桌历主窗。
+const waitForDeskCalendarPage = async (app: ElectronApplication): Promise<Page> => {
+  const timeout = Date.now() + 15_000;
+  while (Date.now() < timeout) {
+    const found = app.windows().find((window) => window.url().includes("desk-calendar.html"));
+    if (found) return found;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error("桌面日历主窗未出现");
+};
 
 const completeOnboarding = async (page: Awaited<ReturnType<Awaited<ReturnType<typeof electron.launch>>["firstWindow"]>>): Promise<void> => {
   await page.getByRole("button", { name: "开始配置" }).click();
@@ -35,10 +46,9 @@ test("keeps enabled widgets visible at the default narrow desk-calendar size wit
     await completeOnboarding(mainPage);
     await mainPage.getByLabel("主导航").getByRole("button", { name: "日程" }).click();
 
-    const floatingWindowPromise = app.waitForEvent("window");
     await mainPage.getByRole("button", { name: "桌面日历" }).click();
     await mainPage.getByRole("menu", { name: "桌面日历设置" }).getByRole("button", { name: "开启桌面日历" }).click();
-    const floatingPage = await floatingWindowPromise;
+    const floatingPage = await waitForDeskCalendarPage(app);
     floatingPage.setDefaultTimeout(15_000);
     attachRendererGuard(floatingPage);
     await floatingPage.waitForLoadState("domcontentloaded");
@@ -54,14 +64,14 @@ test("keeps enabled widgets visible at the default narrow desk-calendar size wit
       return floatingPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     };
 
-    // 640–900px 档（默认窗口尺寸落点）：启用的组件列必须可见。
+    // 640–900px 档（默认窗口尺寸落点）：B3 起组件已移到独立悬浮窗，
+    // 桌历主窗不再渲染组件列，只剩月历/待办/议程，仍不得横向溢出。
     await resizeFloating(720, 640);
-    await expect(floatingPage.locator(".desk-cal-widgets")).toBeVisible();
+    expect(await floatingPage.locator(".desk-cal-widgets").count()).toBe(0);
     expect(await horizontalOverflow()).toBeLessThanOrEqual(0);
 
-    // <640px 档：组件列收纳隐藏是设计行为，但页面同样不允许横向溢出。
+    // <640px 档：同样不允许横向溢出。
     await resizeFloating(560, 520);
-    await expect(floatingPage.locator(".desk-cal-widgets")).toBeHidden();
     expect(await horizontalOverflow()).toBeLessThanOrEqual(0);
 
     // 待办空态文案不得把 HTML 标签当文字渲染。

@@ -28,18 +28,22 @@
 - `4fed9fc` brief：`BriefFetchOutcome.requestFingerprints`；服务刷新后按 feed 源写带指纹的台账 entry
 - 设计 spec：`docs/specs/b4-1-request-fingerprints.md`；phase-a spec §8.1 跟进项已勾选
 
+### B3 独立悬浮组件窗（完整，2026-08-29）
+- `e30912e` DeskToDo 式：时钟/天气/倒计时/进度条拆为**独立透明贴底悬浮小窗**，可各自拖拽摆放、位置记忆（windowStateStore per-key）、关闭即禁用；桌历主窗移除组件显示区、保留组件管理面板；天气真实 Open-Meteo；组件窗主题跟随主应用。设计 spec `docs/specs/b3-float-widgets.md`（含 CDP 视觉验收记录）。
+
 ## 二、关键设计要点（接手必读）
 
 - **全局搜索导航链路**：GlobalSearch 结果携带 `navigation{viewId,entityId,semester}` → App `onNavigate` 里 `setActiveView(viewId)` + `setNavigationTarget(request)`（有 entityId/semester 时）→ `App.tsx:228` 把 `navigationTarget` 传给活跃插件视图（`viewId===activeView` 时）→ ScheduleView/MaterialsView/AcademicView 消费。注意 App 800ms 后清 `navigationTarget`（一次性消费），视图侧用 ref 存 pending 目标避免过期。
 - **快捷键**：`readSearchHotkey`/`saveSearchHotkey`（localStorage，键 `campusos.global-search-hotkey`），App 用 `searchHotkeyKey()` 判断按键；设置页 save 时派发 `campusos:search-hotkey-changed`。⚠️ `ActivityBar` 提示文案暂为静态 "Ctrl F"，未随配置联动（小瑕疵，可后续优化）。
 - **指纹（Phase A/B4-1）**：`requestFingerprint.ts` 的 `computeRequestFingerprint(method,url,formFieldNames?)` 已全覆盖六源族——zju-calendar-config（参考实现）+ zju-undergraduate/graduate/learning（`zjuUnifiedAuth.ts` 请求层构造 → 加载器 `trackRefreshResultFingerprint` 聚合 → `RefreshSourceResult.requestFingerprint`）+ campus-feed/brief（抓取层构造 → 服务按 feed 源写台账，module=feed 源 id）。⚠️ campus-feed/brief **不**经 `officialHeadlessPluginLoaders` 注册，健康视图「验证」探针对其不可用（已拍板接受）。
 - **campus-feed**：快照由 `buildItems()`（按源 `listCampusFeedItemsBySource` + 全局 `compareFeedItems` 排序）构建。
+- **B3 独立悬浮组件窗**：`deskCalendarWidgetWindow.ts` 按 `settings.widgets[].enabled` 创建/销毁组件窗（each = 透明无边框 BrowserWindow，贴底 `pinWindowToDesktopBottom`，位置 `windowStateStore` key=`desk-calendar-widget-{id}`）。**关闭组件窗 = 禁用该组件**（`closed` 事件）；桌历整体禁用/伴随销毁时 `suppressedDisable` 防误禁（注意区分）。桌历主窗无组件显示区，组件管理面板（启停/排序/添加倒计时/进度条/天气地点/透明度）保留在主窗「组件」按钮。组件窗主题用 `localStorage["campusos.theme"]`（与主窗同源），随 `data-theme`。天气窗复用 `campusos:desk-calendar:weather:refresh`（真实 Open-Meteo）。⚠️ 开启桌历会同时创建桌历主窗 + 组件窗，e2e 需等待 `desk-calendar.html` 而非盲抢 `window` 事件。
 
 ## 三、剩余项（未实施）
 
-1. **B3** DeskToDo 式独立悬浮组件窗（最大改造：把时钟/天气/倒计时/进度条拆成可独立摆放的小窗，参考 `.tmp/DeskToDo`；UI 大改需按 AGENTS.md 纪律做 CDP 视觉验收）。
-2. **B4-2** Phase E §5.1 重依赖动态 import 分块 —— **被 spec 标注为"后续小项"**："官方插件现有动态 import（如 materials 经 pluginHost 按需加载）已覆盖一部分；进一步的按 bundle 分析拆分需在构建产物验证阶段进行"。非本轮硬性必做。
-3. **campus-feed/brief「验证」探针**（B4-1 遗留的可选项）：两者按 feed 源写台账但未注册插件刷新协调器，健康视图探针按钮不可用；如需探针需另行设计（会引入调度/行为变更）。
+1. **B4-2** Phase E §5.1 重依赖动态 import 分块 —— **被 spec 标注为"后续小项"**："官方插件现有动态 import（如 materials 经 pluginHost 按需加载）已覆盖一部分；进一步的按 bundle 分析拆分需在构建产物验证阶段进行"。非本轮硬性必做。
+2. **campus-feed/brief「验证」探针**（B4-1 遗留的可选项）：两者按 feed 源写台账但未注册插件刷新协调器，健康视图探针按钮不可用；如需探针需另行设计（会引入调度/行为变更）。
+3. **组件窗贴底/拖拽位置的 OS 级实测**（B3 补充项）：组件窗复用 `pinWindowToDesktopBottom` 贴底与 `-webkit-app-region` 拖拽，但视觉验收仅 CDP 截图确认渲染与启停同步；Win32 贴底层叠效果与真实拖拽摆放可在后续 OS 截图对照补验。
 
 ## 四、建议下一步顺序
 B3（最大改造，需视觉验收；做完后汇报，切换到视觉模型按 `docs/agents/visual-verification.md` 验收）。B4-2 可待构建产物验证时再评估。每项先写 `docs/specs/`（影响面大的），按 Feature Completion 自查 + typecheck/lint/test + UI 用 CDP 视觉验收 + commit/push + `gh run watch` 直至绿。

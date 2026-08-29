@@ -62,6 +62,7 @@ vi.mock("electron", () => ({
           handle.writeBigUInt64LE(0x1234n, 0);
           return handle;
         }),
+        getTitle: vi.fn(() => "CampusOS"),
         setMenu: vi.fn(),
         getNormalBounds: vi.fn(() => ({ x: 0, y: 0, width: 720, height: 560 })),
         isMaximized: vi.fn(() => false)
