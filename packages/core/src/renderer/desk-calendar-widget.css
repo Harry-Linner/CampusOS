@@ -1,0 +1,253 @@
+/* 独立悬浮组件窗（B3）：配色沿用主应用主题 token（theme.css 的 data-theme），
+   与 desktop 日历同一语言；仅保留贴底所需的独立透明度。整窗可拖拽，交互区 no-drag。 */
+:root {
+  --desk-cal-panel-rgb: 248, 249, 247; /* --paper light */
+  --desk-cal-alpha: 0.92;
+  --desk-cal-text: var(--ink);
+  --desk-cal-muted: var(--ink-faint);
+  --desk-cal-border: var(--line);
+  --desk-cal-accent: var(--accent);
+  --desk-cal-soft: color-mix(in srgb, var(--ink) 5%, transparent);
+  --desk-cal-soft-strong: color-mix(in srgb, var(--ink) 12%, transparent);
+  --desk-cal-danger: var(--danger);
+  --desk-cal-danger-soft: color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+:root[data-theme="dark"] {
+  --desk-cal-panel-rgb: 26, 31, 38;
+}
+
+:root[data-theme="high-contrast"] {
+  --desk-cal-panel-rgb: 10, 10, 10;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--desk-cal-text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 组件窗壳：透明圆角背板（跟随主题），整窗可拖拽；关闭按钮与交互区 no-drag */
+.desk-widget-shell {
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 12px;
+  background: rgba(var(--desk-cal-panel-rgb), var(--desk-cal-alpha));
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  -webkit-app-region: drag;
+}
+
+.desk-widget-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: var(--desk-cal-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.desk-widget-close:hover {
+  background: var(--desk-cal-danger-soft);
+  color: #ffffff;
+}
+
+/* 复用桌面日历的组件卡片样式（时钟/天气/倒计时/进度条） */
+.desk-cal-widget {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 10px;
+  background: var(--desk-cal-soft);
+}
+
+.desk-cal-widget strong {
+  font-size: 12px;
+}
+
+.desk-cal-widget > span {
+  grid-column: 1 / -1;
+  color: var(--desk-cal-muted);
+}
+
+/* 每个倒计时/进度条项：标题 | 数值 | 删除 独立一行，进度轨道占整行 */
+.desk-cal-widget-item {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.desk-cal-widget-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-cal-widget-item-value {
+  color: var(--desk-cal-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.desk-cal-progress-track {
+  grid-column: 1 / -1;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--desk-cal-soft-strong);
+}
+
+.desk-cal-progress-track i {
+  display: block;
+  height: 100%;
+  background: var(--desk-cal-accent);
+}
+
+.desk-cal-widget button {
+  border: 1px solid var(--desk-cal-border);
+  border-radius: 5px;
+  background: var(--desk-cal-soft);
+  color: var(--desk-cal-text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 3px 6px;
+  -webkit-app-region: no-drag;
+}
+
+.desk-cal-widget-empty {
+  opacity: 0.75;
+}
+
+.desk-cal-widget-empty span {
+  font-style: italic;
+}
+
+.desk-cal-widget-clock .desk-cal-clock-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* DeskToDo 式天气卡片：今日 + 3 天预报 + 折线图 */
+.desk-cal-widget.desk-cal-weather {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+}
+
+.desk-cal-weather-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.desk-cal-weather-head strong {
+  font-size: 13px;
+}
+
+.desk-cal-weather-head span {
+  grid-column: auto;
+  color: var(--desk-cal-text);
+  font-size: 12px;
+}
+
+.desk-cal-weather-head small {
+  color: var(--desk-cal-muted);
+  font-size: 9px;
+}
+
+.desk-cal-weather-days {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.desk-cal-weather-day {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.desk-cal-weather-day span {
+  color: var(--desk-cal-muted);
+  font-size: 9px;
+}
+
+.desk-cal-weather-day i {
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.desk-cal-weather-day strong {
+  display: grid;
+  justify-items: center;
+  font-weight: normal;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.desk-cal-weather-day strong em {
+  font-style: normal;
+  font-size: 9px;
+}
+
+.desk-cal-weather-day .desk-cal-temp-max {
+  color: #ff7043;
+}
+
+.desk-cal-weather-day .desk-cal-temp-min {
+  color: #42a5f5;
+}
+
+.desk-cal-weather-chart {
+  display: block;
+  min-height: 40px;
+}
+
+.desk-widget-empty-hint {
+  color: var(--desk-cal-muted);
+  font-size: 11px;
+  font-style: italic;
+}

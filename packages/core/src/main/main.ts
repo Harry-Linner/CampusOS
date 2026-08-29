@@ -54,6 +54,7 @@ import {
   registerDeskCalendarHandlers,
   restoreDeskCalendarWindow
 } from "./deskCalendarWindow";
+import { registerDeskCalendarWidgetHandlers } from "./deskCalendarWidgetWindow";
 import {
   attachMainWindowLifecycle,
   createCampusTray,
@@ -234,6 +235,7 @@ const startCampusApp = (): void => {
       }
     });
     registerDeskCalendarHandlers();
+    registerDeskCalendarWidgetHandlers();
     registerUpdateHandlers();
     registerAppLifecycleHandlers();
     registerNotificationHandlers();

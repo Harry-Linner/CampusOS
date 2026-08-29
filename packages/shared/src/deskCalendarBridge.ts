@@ -126,6 +126,29 @@ export interface DeskCalendarWindowBridge {
   subscribe: (listener: (message: DeskCalendarSnapshotMessage) => void) => () => void;
 }
 
+/**
+ * 独立悬浮组件窗（B3）需要的数据：组件 id + 相关设置子集。
+ * 组件窗不关心工作区快照/任务，只需渲染对应组件。
+ */
+export interface DeskCalendarWidgetData {
+  id: DeskCalendarWidgetId;
+  enabled: boolean;
+  countdowns: DeskCalendarCountdown[];
+  progress: DeskCalendarProgress[];
+  weather: DeskCalendarWeather | null;
+  appearance: DeskCalendarAppearance;
+}
+
+/**
+ * 独立悬浮组件窗自身的桥：读组件数据、关闭（=禁用）、刷新天气、订阅设置变更。
+ */
+export interface DeskCalendarWidgetWindowBridge {
+  loadData: () => Promise<DeskCalendarWidgetData>;
+  refreshWeather: () => Promise<DeskCalendarWeather>;
+  close: () => Promise<void>;
+  subscribe: (listener: () => void) => () => void;
+}
+
 export const createDefaultDeskCalendarSettings = (
   storagePath: string
 ): DeskCalendarSettings => ({

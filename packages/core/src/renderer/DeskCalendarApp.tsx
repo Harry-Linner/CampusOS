@@ -15,64 +15,6 @@ const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 
 const pad = (value: number): string => String(value).padStart(2, "0");
 
-/** open-meteo WMO weather code → 天气符号（DeskToDo 用 QWeather 代码段，这里按 WMO 映射）。 */
-const weatherEmoji = (code: number): string => {
-  if (code === 0) return "☀️";
-  if (code === 1 || code === 2) return "🌤️";
-  if (code === 3) return "☁️";
-  if (code === 45 || code === 48) return "🌫️";
-  if (code >= 51 && code <= 67) return "🌧️";
-  if (code >= 71 && code <= 77) return "❄️";
-  if (code >= 80 && code <= 82) return "🌦️";
-  if (code >= 85 && code <= 86) return "🌨️";
-  if (code >= 95) return "⛈️";
-  return "🌡️";
-};
-
-const weatherText = (code: number): string => {
-  if (code === 0) return "晴";
-  if (code === 1 || code === 2) return "多云";
-  if (code === 3) return "阴";
-  if (code === 45 || code === 48) return "雾";
-  if (code >= 51 && code <= 57) return "毛毛雨";
-  if (code >= 61 && code <= 67) return "雨";
-  if (code >= 71 && code <= 77) return "雪";
-  if (code >= 80 && code <= 82) return "阵雨";
-  if (code >= 85 && code <= 86) return "阵雪";
-  if (code >= 95) return "雷雨";
-  return "未知";
-};
-
-/** DeskToDo 式最高/最低温折线图（SVG 自绘，不引入图表库）。 */
-const TemperatureChart = ({ days }: { days: ReadonlyArray<{ date: string; tempMax: number; tempMin: number }> }): JSX.Element | null => {
-  if (days.length < 2) return null;
-  const all = days.flatMap((day) => [day.tempMax, day.tempMin]);
-  const min = Math.min(...all);
-  const max = Math.max(...all);
-  const span = Math.max(max - min, 1);
-  const width = 160;
-  const height = 40;
-  const padX = 10;
-  const padTop = 8;
-  const padBottom = 4;
-  const x = (index: number): number => padX + (index / (days.length - 1)) * (width - padX * 2);
-  const y = (value: number): number => padTop + (1 - (value - min) / span) * (height - padTop - padBottom);
-  const highPoints = days.map((day, index) => `${x(index)},${y(day.tempMax)}`).join(" ");
-  const lowPoints = days.map((day, index) => `${x(index)},${y(day.tempMin)}`).join(" ");
-  return (
-    <svg className="desk-cal-weather-chart" viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-label="未来四天最高最低温折线图" preserveAspectRatio="none">
-      <polyline points={highPoints} fill="none" stroke="#ff7043" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <polyline points={lowPoints} fill="none" stroke="#42a5f5" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      {days.map((day, index) => (
-        <g key={day.date}>
-          <circle cx={x(index)} cy={y(day.tempMax)} r="2.5" fill="#ff7043" />
-          <circle cx={x(index)} cy={y(day.tempMin)} r="2.5" fill="#42a5f5" />
-        </g>
-      ))}
-    </svg>
-  );
-};
-
 const getShanghaiParts = (value: Date): Record<string, string> => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: SHANGHAI_TIME_ZONE,
@@ -318,10 +260,8 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
   const [latestMessage, setLatestMessage] = useState<DeskCalendarSnapshotMessage | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState<DeskCalendarEvent | null>(null);
-  const [showClock, setShowClock] = useState(true);
   const [deskSettings, setDeskSettings] = useState<DeskCalendarSettings | null>(null);
   const [showWidgetSettings, setShowWidgetSettings] = useState(false);
-  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState<string | null>(null);
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [taskForm, setTaskForm] = useState<DeskTaskForm | null>(null);
@@ -343,7 +283,6 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     };
     void Promise.all([api.loadSnapshot(), api.loadSettings()]).then(([message, settings]) => {
       apply(message);
-      setShowClock(settings.showClock);
       setDeskSettings(settings);
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "无法读取桌面日历数据。");
@@ -355,34 +294,14 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
     };
   }, [api]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const toggleClock = async (): Promise<void> => {
-    const next = !showClock;
-    try {
-      await api.setShowClock(next);
-      setShowClock(next);
-      setDeskSettings((current) => current ? { ...current, showClock: next } : current);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法保存时钟设置。");
-    }
-  };
-
   const saveWidgetSettings = async (patch: Partial<DeskCalendarSettings>): Promise<void> => {
     try {
       const next = await api.saveSettings(patch) as DeskCalendarSettings;
       setDeskSettings(next);
-      setShowClock(next.showClock);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "桌面组件设置保存失败。");
     }
   };
-
-  const widgetEnabled = (id: DeskCalendarSettings["widgets"][number]["id"]): boolean =>
-    deskSettings?.widgets.find((widget) => widget.id === id)?.enabled ?? false;
 
   const showFeedback = (message: string): void => {
     setWidgetFeedback(message);
@@ -685,56 +604,11 @@ export const DeskCalendarApp = ({ api }: { api: DeskCalendarWindowApi }): JSX.El
           <button className="desk-cal-today" type="button" onClick={() => setSelectedDate(new Date())}>今天</button>
           <button className="desk-cal-task-add" type="button" onClick={() => setTaskForm(createDeskTaskForm(selectedDate))}>新建任务</button>
           <button className="desk-cal-clock-toggle" type="button" aria-pressed={showWidgetSettings} onClick={() => setShowWidgetSettings((value) => !value)}>组件</button>
-          <button className="desk-cal-clock-toggle" type="button" aria-pressed={showClock} onClick={() => void toggleClock()}>时钟</button>
         </div>
         <button className="desk-cal-close" type="button" aria-label="关闭桌面日历" onClick={() => void api.close()}>
           ×
         </button>
       </header>
-      {deskSettings ? <section className="desk-cal-widgets">
-        {showClock && widgetEnabled("clock") ? <div className="desk-cal-widget desk-cal-widget-clock"><strong>时钟</strong><span className="desk-cal-clock-time">{new Intl.DateTimeFormat("zh-CN", { timeZone: SHANGHAI_TIME_ZONE, hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(now)}</span><button type="button" aria-pressed={showClock} onClick={() => void toggleClock()}>{showClock ? "显示" : "隐藏"}</button></div> : null}
-        {widgetEnabled("weather") ? (() => {
-          const weather = deskSettings.weather;
-          const relativeTime = weather?.cachedAt ? (() => {
-            const seconds = Math.max(0, Math.floor((now.getTime() - Date.parse(weather.cachedAt)) / 1000));
-            if (seconds < 60) return "刚刚更新";
-            if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
-            return `${Math.floor(seconds / 3600)} 小时前`;
-          })() : "尚未刷新";
-          const forecastDays = (weather?.forecast ?? []).map((day) => {
-            const parsed = new Date(`${day.date}T00:00:00`);
-            const weekday = new Intl.DateTimeFormat("zh-CN", { timeZone: SHANGHAI_TIME_ZONE, weekday: "short" }).format(parsed);
-            return { ...day, weekday };
-          });
-          return (
-            <div className="desk-cal-widget desk-cal-weather">
-              <div className="desk-cal-weather-head">
-                <strong>{weather?.location ?? "天气"}</strong>
-                <span>{weather ? `${weather.temperatureC.toFixed(0)}° ${weatherText(weather.weatherCode)}` : "未配置城市"}</span>
-                <small>{relativeTime}</small>
-                <button type="button" aria-label="刷新天气" onClick={() => void api.refreshWeather().then((next) => {
-                  setDeskSettings((current) => current ? { ...current, weather: next as DeskCalendarSettings["weather"] } : current);
-                  showFeedback("天气已刷新");
-                }).catch((cause) => setError(cause instanceof Error ? cause.message : "天气刷新失败。"))}>⟳</button>
-              </div>
-              {forecastDays.length > 0 ? (
-                <div className="desk-cal-weather-days">
-                  {forecastDays.map((day, index) => (
-                    <div className="desk-cal-weather-day" key={day.date}>
-                      <span>{index === 0 ? "今天" : day.weekday}</span>
-                      <i aria-hidden="true">{weatherEmoji(day.weatherCode)}</i>
-                      <strong><em className="desk-cal-temp-max">{day.tempMax.toFixed(0)}°</em><em className="desk-cal-temp-min">{day.tempMin.toFixed(0)}°</em></strong>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {forecastDays.length > 0 ? <TemperatureChart days={forecastDays} /> : null}
-            </div>
-          );
-        })() : null}
-        {widgetEnabled("countdown") ? (deskSettings.countdowns.length > 0 ? deskSettings.countdowns.map((item) => <div className="desk-cal-widget" key={item.id}><strong>{item.title}</strong><span>{Math.max(0, Math.ceil((Date.parse(item.targetAt) - now.getTime()) / 86_400_000))} 天</span><button type="button" onClick={() => void saveWidgetSettings({ countdowns: deskSettings.countdowns.filter((candidate) => candidate.id !== item.id) })}>删除</button></div>) : <div className="desk-cal-widget desk-cal-widget-empty"><strong>倒计时</strong><span>暂无，点「组件→添加倒计时」</span></div>) : null}
-        {widgetEnabled("progress") ? (deskSettings.progress.length > 0 ? deskSettings.progress.map((item) => { const percent = Math.max(0, Math.min(100, ((now.getTime() - Date.parse(item.startAt)) / (Date.parse(item.endAt) - Date.parse(item.startAt))) * 100)); return <div className="desk-cal-widget desk-cal-progress" key={item.id}><strong>{item.title}</strong><span>{percent.toFixed(0)}%</span><div role="progressbar" aria-label={item.title} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${percent}%` }} /></div><button type="button" onClick={() => void saveWidgetSettings({ progress: deskSettings.progress.filter((candidate) => candidate.id !== item.id) })}>删除</button></div>; }) : <div className="desk-cal-widget desk-cal-widget-empty"><strong>进度条</strong><span>暂无，点「组件→添加进度条」</span></div>) : null}
-      </section> : null}
 
       {showWidgetSettings && deskSettings ? <section className="desk-cal-widget-settings" aria-label="桌面组件设置">
         <header><strong>桌面组件</strong><button type="button" onClick={() => setShowWidgetSettings(false)}>关闭</button></header>

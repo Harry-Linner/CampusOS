@@ -234,25 +234,21 @@ describe("DeskCalendarApp", () => {
     expect(screen.getByRole("button", { name: "月" }).getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("shows the runtime clock widget and persists its visibility toggle", async () => {
+  it("integrates main-window calendar rendering, task rail and component management panel", async () => {
     const api = createApi();
     render(createElement(DeskCalendarApp, { api }));
     await screen.findAllByText("小学期课程");
 
-    expect(document.querySelector(".desk-cal-widget-clock")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "时钟" }));
+    // B3：组件显示区已从主窗移除（时钟/天气等现为独立悬浮窗），主窗不再渲染组件卡。
+    expect(document.querySelector(".desk-cal-widgets")).toBeNull();
+    expect(document.querySelector(".desk-cal-widget-clock")).toBeNull();
 
-    expect(api.setShowClock).toHaveBeenCalledWith(false);
-    await vi.waitFor(() => expect(document.querySelector(".desk-cal-widget-clock")).toBeNull());
+    // 组件管理面板仍可打开（管理组件启停/添加）。
+    fireEvent.click(screen.getByRole("button", { name: "组件" }));
+    expect(document.querySelector(".desk-cal-widget-settings")).toBeTruthy();
+    expect(screen.getByText("桌面组件")).toBeTruthy();
   });
 
-  it("refreshes weather through the renderer bridge", async () => {
-    const api = createApi();
-    render(createElement(DeskCalendarApp, { api }));
-    await screen.findAllByText("小学期课程");
-    fireEvent.click(screen.getByRole("button", { name: "刷新天气" }));
-    await vi.waitFor(() => expect(api.refreshWeather).toHaveBeenCalledOnce());
-  });
   it("projects local tasks and completes them through the desktop IPC", async () => {
     const api = createApi({
       loadSnapshot: vi.fn(async () => ({

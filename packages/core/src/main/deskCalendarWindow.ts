@@ -14,6 +14,7 @@ import { assertTrustedDeskCalendarCaller } from "./ipcSecurity";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
+import { syncWidgetWindows } from "./deskCalendarWidgetWindow";
 import {
   loadSchedulePeriods,
   loadScheduleTasks,
@@ -97,7 +98,7 @@ const normalizeDisplayProfiles = (value: unknown): DeskCalendarSettings["display
   })
   : [];
 
-const getDisplayKey = (): string => {
+export const getDisplayKey = (): string => {
   try {
     return screen.getAllDisplays().map((display) => `${display.bounds.x},${display.bounds.y},${display.bounds.width},${display.bounds.height}`).sort().join("|");
   } catch {
@@ -105,7 +106,7 @@ const getDisplayKey = (): string => {
   }
 };
 
-const isVisibleOnCurrentDisplays = (bounds: { x: number; y: number; width: number; height: number }): boolean => {
+export const isVisibleOnCurrentDisplays = (bounds: { x: number; y: number; width: number; height: number }): boolean => {
   try {
     return screen.getAllDisplays().some((display) => Math.max(bounds.x, display.workArea.x) < Math.min(bounds.x + bounds.width, display.workArea.x + display.workArea.width) && Math.max(bounds.y, display.workArea.y) < Math.min(bounds.y + bounds.height, display.workArea.y + display.workArea.height));
   } catch {
@@ -162,14 +163,14 @@ const readStoredSettings = async (): Promise<DeskCalendarSettings | null> => {
   }
 };
 
-const loadSettings = async (): Promise<DeskCalendarSettings> => {
+export const loadSettings = async (): Promise<DeskCalendarSettings> => {
   if (settings) return settings;
   const stored = await readStoredSettings();
   settings = stored ?? createDefaultDeskCalendarSettings(getSettingsPath());
   return settings;
 };
 
-const saveSettings = async (
+export const saveSettings = async (
   patch: Partial<Omit<DeskCalendarSettings, "savedAt" | "storagePath">>
 ): Promise<DeskCalendarSettings> => {
   const current = await loadSettings();
@@ -184,7 +185,7 @@ const saveSettings = async (
   return next;
 };
 
-const broadcastSettingsChanged = (): void => {
+export const broadcastSettingsChanged = (): void => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(DESK_CALENDAR_CHANGED_CHANNEL);
   }
@@ -218,7 +219,7 @@ const broadcastSnapshotSafely = (): void => {
   void broadcastSnapshot().catch(() => undefined);
 };
 
-const refreshWeather = async (): Promise<DeskCalendarWeather> => {
+export const refreshWeather = async (): Promise<DeskCalendarWeather> => {
   const current = await loadSettings();
   const location = current.weather?.location?.trim() || "Hangzhou";
   try {
@@ -382,6 +383,7 @@ export const registerDeskCalendarHandlers = (): void => {
     }
     if (next.enabled) broadcastSnapshotSafely();
     broadcastSettingsChanged();
+    syncWidgetWindows(next);
     return next;
   });
 
@@ -461,6 +463,7 @@ export const setDeskCalendarEnabled = async (enabled: boolean): Promise<DeskCale
   else if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) deskCalendarWindow.close();
   if (next.enabled) broadcastSnapshotSafely();
   broadcastSettingsChanged();
+  syncWidgetWindows(next);
   return next;
 };
 
@@ -486,9 +489,12 @@ export const restoreDeskCalendarWindow = async (): Promise<void> => {
   if (!current.enabled) return;
   await ensureDeskCalendarWindow();
   broadcastSnapshotSafely();
+  syncWidgetWindows(current);
 };
 
 /** 退出应用时保留启用偏好，避免把正常退出误判为用户关闭组件。 */
 export const markDeskCalendarAppQuitting = (): void => {
   appIsQuitting = true;
 };
+
+export const isDeskCalendarAppQuitting = (): boolean => appIsQuitting;
