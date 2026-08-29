@@ -4,6 +4,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItemRecord, LocalTaskInput } from "@campusos/shared";
 import { createCampusFeedService, type CampusFeedService } from "./campusFeedService";
+import {
+  MVP_CAMPUS_FEED_SOURCES,
+  feedSourceRequestFingerprint
+} from "./campusFeedSources";
 import type { AiProviderAdapter } from "./aiProviderAdapters";
 import { createDatabaseService } from "./databaseService";
 
@@ -167,6 +171,37 @@ describe("campusFeedService", () => {
     await expect(service.refreshSource("ckc-zxtz")).rejects.toThrow(/503/);
     const snapshot = await service.getSnapshot();
     expect(snapshot.items).toHaveLength(0);
+  });
+
+  it("B4-1: writes a fingerprint ledger entry per refresh on success and failure", async () => {
+    const xgb = MVP_CAMPUS_FEED_SOURCES.find((source) => source.id === "xgb-pingjiang")!;
+    const fetchFn = createFetch({ "http://www.xgb.zju.edu.cn/53395/list.htm": XGB_HTML });
+    const recordDiagnostic = vi.fn(async () => undefined);
+    service = createCampusFeedService({ database, fetchFn, recordDiagnostic, startScheduler: false });
+    await service.refreshSource("xgb-pingjiang");
+    expect(recordDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: "xgb-pingjiang",
+        operation: "refresh",
+        state: "live",
+        requestFingerprint: feedSourceRequestFingerprint(xgb)
+      })
+    );
+
+    recordDiagnostic.mockClear();
+    const failing = vi.fn(async () => new Response("boom", { status: 503 })) as unknown as typeof fetch;
+    service = createCampusFeedService({ database, fetchFn: failing, recordDiagnostic, startScheduler: false });
+    await expect(service.refreshSource("ckc-zxtz")).rejects.toThrow(/503/);
+    const ckc = MVP_CAMPUS_FEED_SOURCES.find((source) => source.id === "ckc-zxtz")!;
+    expect(recordDiagnostic).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: "ckc-zxtz",
+        operation: "refresh",
+        state: "unavailable",
+        requestFingerprint: feedSourceRequestFingerprint(ckc),
+        retryClassification: "retryable"
+      })
+    );
   });
 
   it("notifies subscribers after mutations", async () => {

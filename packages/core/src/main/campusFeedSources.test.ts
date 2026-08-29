@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FeedSourceDescriptor } from "@campusos/shared";
-import { MVP_CAMPUS_FEED_SOURCES, fetchSourceList } from "./campusFeedSources";
+import {
+  MVP_CAMPUS_FEED_SOURCES,
+  feedSourceRequestFingerprint,
+  fetchSourceList
+} from "./campusFeedSources";
 
 const descriptor = (id: string): FeedSourceDescriptor => {
   const found = MVP_CAMPUS_FEED_SOURCES.find((source) => source.id === id);
@@ -43,10 +47,11 @@ describe("campusFeedSources", () => {
   });
 
   it("parses an xgb-style list, preferring full titles from the title attribute", async () => {
-    const items = await fetchSourceList(descriptor("xgb-pingjiang"), {
+    const outcome = await fetchSourceList(descriptor("xgb-pingjiang"), {
       fetchFn: mockFetch(XGB_HTML),
       now: () => new Date("2026-08-23T00:00:00Z")
     });
+    const items = outcome.items;
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({
       sourceId: "xgb-pingjiang",
@@ -56,6 +61,11 @@ describe("campusFeedSources", () => {
     });
     expect(items[0].id).toMatch(/^[a-f0-9]{64}$/);
     expect(items[1].url).toBe("https://ygb.zju.edu.cn/2026/0324/c31582a3143759/page.htm");
+    // B4-1：抓取层返回请求版本指纹（脱敏 16 hex，与来源 URL 结构对应）。
+    expect(outcome.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
+    expect(outcome.requestFingerprint).toBe(
+      feedSourceRequestFingerprint(descriptor("xgb-pingjiang"))
+    );
   });
 
   it("parses an ugrs-style list with its own wrapper", async () => {
@@ -63,7 +73,7 @@ describe("campusFeedSources", () => {
     <ul class="cg-news-list" id="arthd">
       <li><a href="/dwjlfwpt/2025/0925/c42976a3085718/page.htm" target="_blank" title="第四课堂修读方式">第四课堂修读方式</a><span class="art-date">2025-11-26</span></li>
     </ul>`;
-    const items = await fetchSourceList(descriptor("ugrs-dwjl"), { fetchFn: mockFetch(html) });
+    const { items } = await fetchSourceList(descriptor("ugrs-dwjl"), { fetchFn: mockFetch(html) });
     expect(items).toHaveLength(1);
     expect(items[0].url).toBe("https://ugrs.zju.edu.cn/dwjlfwpt/2025/0925/c42976a3085718/page.htm");
     expect(items[0].publishedAt).toBe("2025-11-26T00:00:00+08:00");
@@ -74,7 +84,7 @@ describe("campusFeedSources", () => {
     <ul>
       <li class="clear"><i class="left icon icon-dot"></i><div class="a left el"><a href="/2026/0709/c32290a3187204/page.htm">校团委2026暑期值班安排表</a></div><div class="time right">2026-07-09</div></li>
     </ul>`;
-    const items = await fetchSourceList(descriptor("zjutw-tzgg"), { fetchFn: mockFetch(html) });
+    const { items } = await fetchSourceList(descriptor("zjutw-tzgg"), { fetchFn: mockFetch(html) });
     expect(items).toHaveLength(1);
     expect(items[0].title).toBe("校团委2026暑期值班安排表");
     expect(items[0].publishedAt).toBe("2026-07-09T00:00:00+08:00");
@@ -86,7 +96,7 @@ describe("campusFeedSources", () => {
       <li class="news n1 clearfix"><span class="news_title"><a href="/2026/0526/c53397a3166736/page.htm" title="相同标题">相同标题</a></span><span class="news_meta">2026-05-26</span></li>
       <li class="news n2 clearfix"><span class="news_title"><a href="/2026/0526/c53397a3166736/page.htm" title="相同标题">相同标题</a></span><span class="news_meta">2026-05-26</span></li>
     </ul>`;
-    const items = await fetchSourceList(descriptor("ckc-zxtz"), { fetchFn: mockFetch(html) });
+    const { items } = await fetchSourceList(descriptor("ckc-zxtz"), { fetchFn: mockFetch(html) });
     expect(items).toHaveLength(1);
   });
 

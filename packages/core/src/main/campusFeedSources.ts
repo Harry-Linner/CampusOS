@@ -11,6 +11,7 @@ import type {
   FeedItemRecord,
   FeedSourceDescriptor
 } from "@campusos/shared";
+import { computeRequestFingerprint } from "./requestFingerprint";
 
 /**
  * MVP 4 sources: 学工门户评奖评优 / 本科生对外交流(出国境) / 校团委通知公告 /
@@ -142,17 +143,32 @@ export interface FetchSourceListOptions {
 }
 
 /**
+ * 该订阅源列表请求的版本指纹（方法+主机+路径，脱敏），供上游兼容雷达。
+ * 成功与失败路径共用同一来源，保证台账中指纹一致。
+ */
+export const feedSourceRequestFingerprint = (
+  descriptor: FeedSourceDescriptor
+): string => computeRequestFingerprint("GET", descriptor.listUrl);
+
+export interface FeedSourceListResult {
+  items: FeedItemRecord[];
+  requestFingerprint: string;
+}
+
+/**
  * Fetches one source's list page and normalizes its items. Titles prefer the
  * anchor's title attribute (full titles) over its text (often truncated).
  */
 export const fetchSourceList = async (
   descriptor: FeedSourceDescriptor,
   options: FetchSourceListOptions = {}
-): Promise<FeedItemRecord[]> => {
+): Promise<FeedSourceListResult> => {
   const { fetchFn = fetch, now = () => new Date(), fetchTimeoutMs = 20_000 } = options;
   if (!descriptor.selectors) {
     throw new Error(`${descriptor.name} 没有可用的抓取规则。`);
   }
+  // B4-1：请求版本指纹在发起 HTTP 处构造，随结果穿透到刷新台账。
+  const requestFingerprint = feedSourceRequestFingerprint(descriptor);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
   let response: Response;
@@ -169,7 +185,10 @@ export const fetchSourceList = async (
     clearTimeout(timer);
   }
   if (!response.ok) {
-    throw new Error(`${descriptor.name} 返回 ${response.status}。`);
+    // 附带 status 供 classifyRetryError 按 408/429/5xx 判定为可重试。
+    throw Object.assign(new Error(`${descriptor.name} 返回 ${response.status}。`), {
+      status: response.status
+    });
   }
   const html = await response.text();
   const $ = cheerio.load(html);
@@ -219,5 +238,5 @@ export const fetchSourceList = async (
     });
   });
 
-  return items;
+  return { items, requestFingerprint };
 };

@@ -21,8 +21,10 @@ describe("campus-feed MVP sources live verification", () => {
     const results: string[] = [];
     for (const source of MVP_CAMPUS_FEED_SOURCES) {
       try {
-        const items = await fetchSourceList(source, { fetchTimeoutMs: 20_000 });
+        const outcome = await fetchSourceList(source, { fetchTimeoutMs: 20_000 });
+        const items = outcome.items;
         expect(items.length).toBeGreaterThan(0);
+        expect(outcome.requestFingerprint).toMatch(/^[a-f0-9]{16}$/);
         for (const item of items) {
           expect(item.title.length).toBeGreaterThan(0);
           expect(item.url).toMatch(/^https?:\/\//);

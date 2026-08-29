@@ -10,7 +10,10 @@ import {
 } from "./campusWorkspaceStore";
 import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
 import { registerPluginRuntimeHandlers } from "./pluginRuntimeIpc";
-import { registerDiagnosticHandlers } from "./diagnosticLogStore";
+import {
+  appendDiagnosticEntry,
+  registerDiagnosticHandlers
+} from "./diagnosticLogStore";
 import { pluginRefreshCoordinator } from "./refreshCoordinator";
 import { registerExportHandlers } from "./exportIpc";
 import {
@@ -206,6 +209,7 @@ const startCampusApp = (): void => {
       encryptSecret: (value) => briefVault.encrypt(value),
       decryptSecret: (value) => briefVault.decrypt(value),
       onItemsRead: () => markNotificationsReadByTarget("campus-feed"),
+      recordDiagnostic: appendDiagnosticEntry,
       saveTask: async (input) => {
         const result = await saveScheduleTask(input);
         return {

@@ -20,9 +20,12 @@ import type {
 } from "@campusos/shared";
 import {
   MVP_CAMPUS_FEED_SOURCES,
+  feedSourceRequestFingerprint,
   fetchSourceList,
   isFeedSourceUrl
 } from "./campusFeedSources";
+import { classifyRetryError } from "@campusos/shared";
+import type { DiagnosticAppendInput } from "./diagnosticLogStore";
 import {
   createAiProviderAdapter,
   AiProviderAdapterError,
@@ -66,6 +69,11 @@ export interface CampusFeedServiceDependencies {
   saveTask?: (input: LocalTaskInput) => Promise<CampusFeedScheduleImportResult>;
   /** Invoked after feed items are marked read, to sync the notification center (campus-feed target). */
   onItemsRead?: () => Promise<unknown> | void;
+  /**
+   * B4-1：刷新台账写入钩子（module=feed 源 id，operation=refresh）。
+   * 生产环境由 main.ts 注入 appendDiagnosticEntry；测试可注入 mock。
+   */
+  recordDiagnostic?: (input: DiagnosticAppendInput) => Promise<void> | void;
 }
 
 export interface CampusFeedService {
@@ -234,7 +242,8 @@ export const createCampusFeedService = ({
   encryptSecret,
   decryptSecret,
   saveTask,
-  onItemsRead
+  onItemsRead,
+  recordDiagnostic
 }: CampusFeedServiceDependencies): CampusFeedService => {
   let sources: FeedSourceDescriptor[] = [];
   const listeners = new Set<(snapshot: CampusFeedSnapshot) => void>();
@@ -244,6 +253,12 @@ export const createCampusFeedService = ({
   const lastRefresh: Record<string, string> = {};
   let hydrated = false;
   let hydration: Promise<void> | null = null;
+
+  /** B4-1：刷新台账写入（best-effort，失败不打断刷新流程）。 */
+  const record = (input: DiagnosticAppendInput): void => {
+    const pending = recordDiagnostic?.(input);
+    if (pending) void pending.catch(() => undefined);
+  };
 
   const hydrate = async (): Promise<void> => {
     if (hydrated) return;
@@ -303,14 +318,25 @@ export const createCampusFeedService = ({
       throw new Error("该订阅源正在刷新。");
     }
     inFlight.add(sourceId);
+    const startedAt = performance.now();
     try {
-      const items = await performRefresh(source);
+      const items = await performRefresh(source, startedAt);
       scheduleNext(source);
       broadcast();
       return items;
     } catch (cause) {
       failures.set(sourceId, (failures.get(sourceId) ?? 0) + 1);
       scheduleRetry(source);
+      // B4-1：失败也写刷新台账（指纹由请求层同源函数计算，URL 已知）。
+      record({
+        module: source.id,
+        operation: "refresh",
+        state: "unavailable",
+        durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        requestFingerprint: feedSourceRequestFingerprint(source),
+        retryClassification: classifyRetryError(cause),
+        message: cause instanceof Error ? cause.message : "刷新失败。"
+      });
       throw cause;
     } finally {
       inFlight.delete(sourceId);
@@ -344,15 +370,25 @@ export const createCampusFeedService = ({
   };
 
   const performRefresh = async (
-    source: FeedSourceDescriptor
+    source: FeedSourceDescriptor,
+    startedAt: number
   ): Promise<FeedItemRecord[]> => {
-    const items = await fetchSourceList(source, { fetchFn, now });
+    const outcome = await fetchSourceList(source, { fetchFn, now });
+    const items = outcome.items;
     const fresh: FeedItemRecord[] = [];
     for (const item of items) {
       if (database.upsertCampusFeedItem(item)) fresh.push(item);
     }
     lastRefresh[source.id] = now().toISOString();
     failures.delete(source.id);
+    // B4-1：每次成功刷新写一条带请求指纹的台账记录。
+    record({
+      module: source.id,
+      operation: "refresh",
+      state: "live",
+      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      requestFingerprint: outcome.requestFingerprint
+    });
     if (fresh.length > 0 && notify) {
       const body = fresh
         .slice(0, 5)
