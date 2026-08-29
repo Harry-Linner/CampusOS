@@ -8,6 +8,7 @@ import type {
 import { assertTrustedDeskCalendarWidgetCaller } from "./ipcSecurity";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
+import { useE2eFixtureSources } from "./officialAcademicCalendarRequest";
 import {
   broadcastSettingsChanged,
   isDeskCalendarAppQuitting,
@@ -138,6 +139,10 @@ const createComponentWindow = async (
 
 /** 根据桌历设置同步组件窗：启用的创建，禁用/桌历关闭的销毁。 */
 export const syncWidgetWindows = (settings: DeskCalendarSettings): void => {
+  // e2e fixture（headless，无真实桌面）下不创建组件窗：组件窗是透明 + Win32 贴底的桌面
+  // overlay，仅在有真实桌面的运行环境有意义；其功能由单元测试与 CDP 视觉验收覆盖，
+  // 避免 headless e2e 因创建/销毁组件窗产生框架错误、干扰桌历导航/布局回归。
+  if (useE2eFixtureSources()) return;
   const enabledIds = new Set<DeskCalendarWidgetId>(
     settings.enabled
       ? settings.widgets.filter((widget) => widget.enabled).map((widget) => widget.id)
