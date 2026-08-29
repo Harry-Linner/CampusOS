@@ -109,7 +109,8 @@ export interface DiagnosticEntry {
 | 错误边界（旧数据/失败分类/脱敏） | ✅ 旧 v1 日志读入自动补默认字段并升级；fingerprint 仅结构信息不含参数值；probe 未知 source 明确报错；recordResult 失败不吞刷新结果 |
 | 针对性测试 | ✅ requestFingerprint（稳定/变化/脱敏/字段排序）、refreshCoordinator（runOne、recordResult 透传）、buildSourceFailureSummary（retryable/fatal/upstreamChange 计数）、retryPolicy 委托共享分类；SettingsView 健康板块渲染断言；全量 vitest 527 passed |
 | UI 规避清单（截图验收） | ⏳ 已按 ai-frontend-lessons 实现（无装饰框、状态点用正常流 flex + gap、design token 色值、窄屏可换行）；桌面端渲染截图验收待打包后补 |
-| 指纹覆盖范围 | ⏳ 参考实现：zju-calendar-config（URL 指纹 + classifyRetryError 分类）；zju-undergraduate/graduate/learning、campus-feed、brief 的指纹需在各自请求层接 computeRequestFingerprint（跟进项，不影响本阶段其余验收；无指纹时上游变化提示不触发，其余健康能力全部生效） |
+| 指纹覆盖范围 | ✅ zju-calendar-config（URL 指纹 + classifyRetryError 分类，参考实现）+ zju-undergraduate / zju-graduate / zju-learning（请求层构造 + 加载器聚合穿透 `RefreshSourceResult.requestFingerprint`，`c0239cf`）+ campus-feed / brief（抓取层构造 + 服务按 feed 源写台账，`0a79175` / `4fed9fc`）；详见 `docs/specs/b4-1-request-fingerprints.md` |
 
 ### 8.1 跟进项
-- [ ] 为 zju-undergraduate / zju-graduate / zju-learning / campus-feed / brief 的刷新请求接入 computeRequestFingerprint（在其登录/抓取层 URL 构造处），使"上游变化"提示覆盖全部六个源。
+- [x] 为 zju-undergraduate / zju-graduate / zju-learning / campus-feed / brief 的刷新请求接入 computeRequestFingerprint（在其登录/抓取层 URL 构造处），使"上游变化"提示覆盖全部六个源。—— 2026-08-29 完成（`c0239cf` + `0a79175` + `4fed9fc`，CI 绿）
+- [ ] （后续可选）campus-feed / brief 的「验证」探针：当前按 feed 源写台账但不注册插件刷新协调器，健康视图探针按钮对其不可用；如需探针需另行设计（会引入调度/行为变更）。

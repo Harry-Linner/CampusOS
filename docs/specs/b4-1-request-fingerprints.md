@@ -93,8 +93,8 @@
 
 | 项 | 结果 |
 |---|---|
-| 正式链路（IPC/持久化/真实数据） |  |
-| 用户可见行为（健康台账/上游变化提示） |  |
-| 错误边界（失败 entry/脱敏/空聚合） |  |
-| 针对性测试 |  |
-| CI/CD |  |
+| 正式链路（IPC/持久化/真实数据） | ✅ zju 三连接器：`zjuUnifiedAuth.ts` 四服务方法在发起 HTTP 处构造指纹随响应返回 → `officialHeadlessPluginLoaders.ts` fetch 包装采集、`registerRefreshJob` 包装把聚合指纹写入 `RefreshSourceResult.requestFingerprint` → 既有 coordinator → diagnosticLogStore 持久化（插件包零改动）。campus-feed / brief：抓取层算指纹，服务注入 `recordDiagnostic`（main.ts 接 `appendDiagnosticEntry`）按 feed 源写台账 |
+| 用户可见行为（健康台账/上游变化提示） | ✅ 六个源族全部带指纹：健康台账新增 campus-feed 4 源（xgb-pingjiang/ugrs-dwjl/zjutw-tzgg/ckc-zxtz）与 brief 4 源（arxiv/hacker-news/infoq/solidot）的刷新记录；同源指纹稳定、结构变化即触发"上游可能已变化"；其「验证」探针因未注册协调器返回不可用（用户已拍板接受） |
+| 错误边界（失败 entry/脱敏/空聚合） | ✅ 连接器失败按参考实现记录 null 指纹（`fingerprint !== null` 守卫避免失败误报上游变化）；campus-feed 失败 entry 带指纹+`classifyRetryError`（非 200 错误已附 status）；brief 降级 entry 带指纹；聚合空输入返回 null；全部指纹为 16 hex，不含 URL 参数值 |
+| 针对性测试 | ✅ requestFingerprint（combine/collector/track 13 例）、zjuUnifiedAuth（26 例，含各 operation 指纹稳定性）、campusFeedSources 6 例、campusFeedService 16 例（含成功/失败台账断言）、briefInfoSources 6 例、briefService 15 例（含按源台账断言）；core 全量 638 passed |
+| CI/CD | ✅ `c0239cf` zju 三源 + `0a79175` campus-feed + `4fed9fc` brief 全部推送 main，`gh run watch` 至绿（lint/test:coverage/build/e2e） |

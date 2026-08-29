@@ -22,19 +22,25 @@
 - `039a440` 校园资讯重构调研落盘 + GLM 会话交接 + `phase-f` spec 对齐现实
 - `052518a` B5 改名候选调研归档（结论=不改名，2026-08-29）
 
+### B4-1 指纹接入其余源（完整，2026-08-29）
+- `c0239cf` zju 三源（undergraduate/graduate/learning）：`zjuUnifiedAuth.ts` 四个业务服务方法在发起 HTTP 处构造指纹随响应返回；`officialHeadlessPluginLoaders.ts` fetch 包装采集 + `registerRefreshJob` 包装把聚合指纹写入 `RefreshSourceResult.requestFingerprint`（插件包零改动）
+- `0a79175` campus-feed：`feedSourceRequestFingerprint` + `fetchSourceList` 返回 `{ items, requestFingerprint }`；服务每次成功/失败刷新按 feed 源写带指纹的台账 entry
+- `4fed9fc` brief：`BriefFetchOutcome.requestFingerprints`；服务刷新后按 feed 源写带指纹的台账 entry
+- 设计 spec：`docs/specs/b4-1-request-fingerprints.md`；phase-a spec §8.1 跟进项已勾选
+
 ## 二、关键设计要点（接手必读）
 
 - **全局搜索导航链路**：GlobalSearch 结果携带 `navigation{viewId,entityId,semester}` → App `onNavigate` 里 `setActiveView(viewId)` + `setNavigationTarget(request)`（有 entityId/semester 时）→ `App.tsx:228` 把 `navigationTarget` 传给活跃插件视图（`viewId===activeView` 时）→ ScheduleView/MaterialsView/AcademicView 消费。注意 App 800ms 后清 `navigationTarget`（一次性消费），视图侧用 ref 存 pending 目标避免过期。
 - **快捷键**：`readSearchHotkey`/`saveSearchHotkey`（localStorage，键 `campusos.global-search-hotkey`），App 用 `searchHotkeyKey()` 判断按键；设置页 save 时派发 `campusos:search-hotkey-changed`。⚠️ `ActivityBar` 提示文案暂为静态 "Ctrl F"，未随配置联动（小瑕疵，可后续优化）。
-- **指纹（Phase A）**：`requestFingerprint.ts` 的 `computeRequestFingerprint(method,url,formFieldNames?)` 已在 `officialAcademicCalendarRequest.ts` 接入；其余源未接（见剩余项）。
+- **指纹（Phase A/B4-1）**：`requestFingerprint.ts` 的 `computeRequestFingerprint(method,url,formFieldNames?)` 已全覆盖六源族——zju-calendar-config（参考实现）+ zju-undergraduate/graduate/learning（`zjuUnifiedAuth.ts` 请求层构造 → 加载器 `trackRefreshResultFingerprint` 聚合 → `RefreshSourceResult.requestFingerprint`）+ campus-feed/brief（抓取层构造 → 服务按 feed 源写台账，module=feed 源 id）。⚠️ campus-feed/brief **不**经 `officialHeadlessPluginLoaders` 注册，健康视图「验证」探针对其不可用（已拍板接受）。
 - **campus-feed**：快照由 `buildItems()`（按源 `listCampusFeedItemsBySource` + 全局 `compareFeedItems` 排序）构建。
 
 ## 三、剩余项（未实施）
 
-1. **B4-1 指纹接入其余源**：`officialHeadlessPluginLoaders.ts` 用 `registerRefreshJob(sourceId, job)` 注册插件化刷新任务，job 由各 `createXxxConnector` 工厂产出。需让 `zjuUndergraduate / zjuGraduate / zjuLearning / campus-feed / brief` 的请求层算出指纹并穿透到 `RefreshSourceResult.requestFingerprint`（参考 `officialAcademicCalendarRequest.ts` 范本）。⚠️ 已确认 `zjuUndergraduateConnector.ts` 无直接接触点，指纹要落在工厂/加载器层，跨多文件。
+1. **B3** DeskToDo 式独立悬浮组件窗（最大改造：把时钟/天气/倒计时/进度条拆成可独立摆放的小窗，参考 `.tmp/DeskToDo`；UI 大改需按 AGENTS.md 纪律做 CDP 视觉验收）。
 2. **B4-2** Phase E §5.1 重依赖动态 import 分块 —— **被 spec 标注为"后续小项"**："官方插件现有动态 import（如 materials 经 pluginHost 按需加载）已覆盖一部分；进一步的按 bundle 分析拆分需在构建产物验证阶段进行"。非本轮硬性必做。
-3. **B3** DeskToDo 式独立悬浮组件窗（最大改造：把时钟/天气/倒计时/进度条拆成可独立摆放的小窗）。
+3. **campus-feed/brief「验证」探针**（B4-1 遗留的可选项）：两者按 feed 源写台账但未注册插件刷新协调器，健康视图探针按钮不可用；如需探针需另行设计（会引入调度/行为变更）。
 
 ## 四、建议下一步顺序
-B4-1（需完整上下文，先做 id 映射与工厂穿透分析）→ B3（最大）。B4-2 可待构建产物验证时再评估。每项先写 `docs/specs/`（影响面大的），按 Feature Completion 自查 + typecheck/lint/test + UI 用 CDP 视觉验收 + commit/push + `gh run watch` 直至绿。
+B3（最大改造，需视觉验收；做完后汇报，切换到视觉模型按 `docs/agents/visual-verification.md` 验收）。B4-2 可待构建产物验证时再评估。每项先写 `docs/specs/`（影响面大的），按 Feature Completion 自查 + typecheck/lint/test + UI 用 CDP 视觉验收 + commit/push + `gh run watch` 直至绿。
 
