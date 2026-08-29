@@ -98,5 +98,5 @@
 | 用户可见行为（独立窗/拖拽/贴底/启停） | ✅ 4 组件各自独立透明悬浮窗；倒计时项/进度条项独立 grid 行（视觉验收发现并修复了挤行错乱）；桌历主窗月历/待办/议程保留，组件区移除，管理面板完整；启停同步双向生效（禁用→销毁、启用→创建并持久化） |
 | 错误边界（无数据/天气失败/组件缺失） | ✅ 组件数据缺失显示空态（"暂无…在桌历里添加"）；天气失败/未配置城市显示错误/提示不崩溃；`loadData` 失败显示错误信息 |
 | 针对性测试 | ✅ `deskCalendarWidgetWindow.test.ts` 8 例（启停创建/销毁/suppressedDisable/单独关闭=禁用/退出不改写/data+update+close IPC）、`DeskCalendarWidgetApp.test.tsx` 6 例（四组件渲染/删除/错误态）、`DeskCalendarApp.test.tsx` 更新为主窗组件区移除断言；core 全量 650 passed |
-| CDP 视觉验收 | ✅ `CAMPUSOS_DEV_CDP_PORT=9223 pnpm dev` + visual.mjs：4 组件窗 + 桌历主窗 + 管理面板逐张截图亲验（`.tmp/visual/b3/`，截图不入库）；发现并修复倒计时/进度条项布局挤行；天气真实（杭州 30.8°C + 4 天预报 + 双折线）；启停同步经 list 确认（禁用天气→3 窗，启用→4 窗） |
+| CDP 视觉验收 | ✅ `CAMPUSOS_DEV_CDP_PORT=9223 pnpm dev` + visual.mjs：4 组件窗 + 桌历主窗 + 管理面板逐张截图亲验（`.tmp/visual/b3/`，截图不入库）；发现并修复倒计时/进度条项布局挤行；天气真实（杭州 30.8°C + 4 天预报 + 双折线）；启停同步经 list 确认（禁用天气→3 窗，启用→4 窗）。**OS 级截图对照**（`.tmp/visual/b3-os/`）：组件窗贴底确认——被主窗/桌历窗盖住（"壁纸之上、普通窗口之下"语义成立）；背板半透明在 CDP 截图可见。拖拽摆放走 `-webkit-app-region: drag`（CSS）+ `windowStateStore` per-key 位置记忆（单测覆盖）；真 OS 鼠标拖拽手势依赖系统 NCHITTEST，CDP 无法合成，可由用户现场补验 |
 | CI/CD | ✅ `e30912e`（B3 实现）+ `02bd165`（组件窗联动/e2e 适配）+ `4c14472`（e2e fixture 不建组件窗，避免 headless 框架错误）全部推送 main，`gh run watch` 至绿（lint/test:coverage/build/e2e）。⚠️ e2e fixture 下不创建组件窗（透明+贴底仅真实桌面有意义），组件窗功能由单测+CDP 视觉验收覆盖 |
