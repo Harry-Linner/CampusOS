@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ActivityItemId, AppNavigationRequest } from "@campusos/shared";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentType,
+  type LazyExoticComponent
+} from "react";
+import type { ActivityItemId, AppNavigationRequest, PluginComponentProps } from "@campusos/shared";
 import { ActivityBar } from "./components/ActivityBar";
 import { GlobalSearch } from "./components/GlobalSearch";
 import {
@@ -10,6 +19,7 @@ import {
 import { useCampusWorkspace } from "./hooks/useCampusWorkspace";
 import { usePluginHost } from "./hooks/usePluginHost";
 import { buildActivityItems } from "./lib/pluginNavigation";
+import { loadPluginComponent } from "./lib/pluginHost";
 import { DashboardView } from "./views/DashboardView";
 import { ExtensionsView } from "./views/ExtensionsView";
 import { SettingsView } from "./views/SettingsView";
@@ -30,6 +40,53 @@ import { UpdatePrompt } from "./components/UpdatePrompt";
 
 const isDevelopmentBuild =
   (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
+
+/**
+ * B4-2：插件视图按需渲染——官方插件组件经 loadPluginComponent 动态加载
+ * （Suspense fallback 显示 loading；sandbox 插件已由 loadPlugins 提供 iframe 组件）。
+ */
+const EmptyPluginView = (): JSX.Element => (
+  <section className="empty-state">
+    <h2>未接入</h2>
+    <p>该视图暂不可用。</p>
+  </section>
+);
+
+const pluginLazyCache = new Map<string, LazyExoticComponent<ComponentType<PluginComponentProps>>>();
+
+const lazyPluginView = (
+  pluginId: string
+): LazyExoticComponent<ComponentType<PluginComponentProps>> => {
+  const cached = pluginLazyCache.get(pluginId);
+  if (cached) return cached;
+  const lazyComponent = lazy(() =>
+    loadPluginComponent(pluginId).then((component) => ({
+      default: component ?? EmptyPluginView
+    }))
+  );
+  pluginLazyCache.set(pluginId, lazyComponent);
+  return lazyComponent;
+};
+
+const PluginViewRenderer = ({
+  pluginId,
+  fallbackComponent,
+  props
+}: {
+  pluginId: string;
+  fallbackComponent?: ComponentType<PluginComponentProps>;
+  props: PluginComponentProps;
+}): JSX.Element => {
+  // sandbox 插件已预载 iframe 组件，直接渲染；官方插件走按需 lazy。
+  const Fallback = fallbackComponent;
+  if (Fallback) return <Fallback {...props} />;
+  const LazyComponent = lazyPluginView(pluginId);
+  return (
+    <Suspense fallback={<div className="view-loading" role="status">加载视图…</div>}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
 export const App = (): JSX.Element => {
   const [onboardingComplete, setOnboardingComplete] = useState(() =>
@@ -132,7 +189,8 @@ export const App = (): JSX.Element => {
     () =>
       pluginHost.plugins.flatMap((plugin) => {
         const Component = plugin.Component;
-        if (plugin.runtime.status !== "active" || !Component) return [];
+        // B4-2：视图组件按需加载（官方组件经 loadPluginComponent），元数据即可决定子 Tab。
+        if (plugin.runtime.status !== "active") return [];
 
         return (plugin.manifest.contributes.views ?? [])
           .filter(
@@ -216,25 +274,30 @@ export const App = (): JSX.Element => {
       activityPlugins.find((plugin) => plugin.key === selectedSubTab) ??
       activityPlugins[0];
     content = (
-      <selected.Component
-        capabilities={selected.capabilities}
-        loading={workspace.loading}
-        onRefresh={workspace.sync}
-        snapshot={workspace.snapshot}
-        downloads={{
-          enqueue: enqueueDownload,
-          pause: pauseDownload,
-          resume: resumeDownload,
-          cancel: cancelDownload,
-          open: openDownload,
-          reveal: revealDownload
+      <PluginViewRenderer
+        key={selected.key}
+        pluginId={selected.pluginId}
+        fallbackComponent={selected.Component}
+        props={{
+          capabilities: selected.capabilities,
+          loading: workspace.loading,
+          onRefresh: workspace.sync,
+          snapshot: workspace.snapshot,
+          downloads: {
+            enqueue: enqueueDownload,
+            pause: pauseDownload,
+            resume: resumeDownload,
+            cancel: cancelDownload,
+            open: openDownload,
+            reveal: revealDownload
+          },
+          schedule: window.campusos?.schedule,
+          assistant: window.campusos?.assistant,
+          brief: window.campusos?.brief,
+          campusFeed: window.campusos?.campusFeed,
+          deskCalendar: window.campusos?.deskCalendar,
+          navigationTarget: navigationTarget?.viewId === activeView ? navigationTarget : null
         }}
-        schedule={window.campusos?.schedule}
-        assistant={window.campusos?.assistant}
-        brief={window.campusos?.brief}
-        campusFeed={window.campusos?.campusFeed}
-        deskCalendar={window.campusos?.deskCalendar}
-        navigationTarget={navigationTarget?.viewId === activeView ? navigationTarget : null}
       />
     );
   } else {

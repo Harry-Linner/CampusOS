@@ -39,12 +39,27 @@ Vite 构建期警告：`diagnosticLogStore.ts` 被 `invariants.ts` 动态 import
 | 5 | 官方插件 main connectors 按需加载（`officialHeadlessPluginLoaders` 静态 import 6 插件 main → 按插件懒加载） | `main/officialHeadlessPluginLoaders.ts` | 大：main 607kB 大头之一 | 高：插件启动即注册刷新 job（workspace sync 依赖），懒加载需重构注册时机，风险高，不建议本轮做 |
 | 6 | 修复"动态 import 被静态 import 抵消"（`diagnosticLogStore`/`academicCredentialStore` 经 `invariants` 懒加载） | `main/invariants.ts` + 静态链 | 小-中 | 中：需消除静态 import 链 |
 
-## 4. 建议
+## 4. 实施结果（2026-08-29，用户拍板"B + 全部候选"）
 
-- **本轮值得做**：#1（插件视图按需加载，收益最大）+ #2/#3/#4（三个单点动态 import，成本极低）。合计 renderer 主包省 30%+、main 省一部分。
-- **暂缓**：#5（connectors 懒加载，架构风险高）、#6（可顺带做，收益有限）。
-- 精确收益在实施后以 `sourcemap`/`rollup metafile` 复核（本报告体积为产物实测，构成占比为特征探测，非逐模块精确）。
+### 已做
+- **#2 html2canvas 动态 import**（`renderer/lib/exportView.ts`）：仅导出 PNG 时加载。
+- **#3 cheerio 动态 import**（`main/campusFeedSources.ts`）：campus-feed 抓取时加载。
+- **#4 rss-parser 动态 import**（`main/briefInfoSources.ts`）：brief 抓取时加载（模块缓存）。
+- **#1 插件视图按需加载**：`renderer/lib/pluginHost.ts` 官方插件 manifest 静态、视图组件全部动态 import（`loadPluginComponent` + 模块缓存）；`App.tsx` 用 `React.lazy + Suspense` 渲染（`PluginViewRenderer`，sandbox 插件仍直接渲染 iframe）。注意：`pluginNavigation.buildActivityItems` 与 App 的 `activityPlugins` 改为只依赖 manifest 元数据（不要求已预载 Component）。
+- **#5 connectors 分块**：`main/officialHeadlessPluginLoaders.ts` 7 个插件 main（connector 工厂）全部改动态 import（B4-1 指纹采集逻辑不受影响）。
+
+### 体积对比（production build 实测）
+| Chunk | 之前 | 之后 |
+|---|---|---|
+| renderer 主包 | 1,030.62 kB | **339.46 kB**（+ 按需 chunk：dialog 79.75 / 113.84 / 70.14 / 47.34 / 40.49 kB 等） |
+| main 主进程 | 607.84 kB | **507.18 kB**（+ 7 个插件 chunk 共 ~105 kB） |
+
+### 切视图耗时实测（dev + CDP，B 方案 300ms 门槛）
+首次切换：学业 85ms / 日程 229ms / 校园资讯 169ms / 资料 51ms —— 全部 < 300ms；二次切换（模块缓存）：日程 34ms / 学业 26ms；无 React 错误。（dev 模式含 vite transform；production file:// 加载会更快。）
+
+### 决策记录
+- **#6（diagnosticLogStore 动态 import 抵消修复）评估后未改代码**：invariants 的懒加载意图被 refreshCoordinator / campusWorkspaceStore / main 的静态 import 链抵消；要生效需把主链（含每次刷新的 `recordResult` 热路径）改成动态 import、并重构 main 的 `recordDiagnostic` 传参为异步初始化——收益微小（diagnosticLogStore 占 main 比例小），风险/改动不成比例，故本轮不做，维持 vite 警告现状（功能正常，仅未分块）。
 
 ## 5. 决策等待
 
-- [ ] 用户拍板：做 #1、#2、#3、#4 中哪些；或先保持现状。
+- [x] 用户拍板：B（视图按需 + 300ms 实测门槛）+ 全部候选 #1–#5 完成；#6 评估后不做（见上）。

@@ -8,14 +8,11 @@ import {
   type PluginRuntimeSnapshot
 } from "@campusos/shared";
 import { createPluginCapabilityClient } from "./pluginBridge";
-import { Component as AcademicView } from "@campusos/plugin-academic";
 import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
-import { Component as ScheduleView } from "@campusos/plugin-schedule";
 import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
-import { Component as AssistantView } from "@campusos/plugin-ai-assistant";
 import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
-import { Component as CampusFeedView } from "@campusos/plugin-campus-feed";
 import { manifest as campusFeedManifest } from "@campusos/plugin-campus-feed/manifest";
+import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
 
 type PluginModule = {
   manifest: PluginManifestV2;
@@ -24,7 +21,8 @@ type PluginModule = {
 
 interface PluginDefinition {
   id: string;
-  load: () => Promise<PluginModule>;
+  manifest: PluginManifestV2;
+  loadComponent: () => Promise<PluginModule["Component"]>;
 }
 
 export interface LoadedPlugin {
@@ -48,38 +46,35 @@ const createSandboxedRendererComponent = (
   return SandboxedRenderer;
 };
 
+// B4-2：manifest 静态（轻量元数据，供侧栏/校验），视图组件全部动态 import——
+// 渲染到该视图时才加载，避免打进 renderer 首屏主包。
 const pluginDefinitions: PluginDefinition[] = [
   {
     id: academicManifest.id,
-    load: async () => ({ manifest: academicManifest, Component: AcademicView })
+    manifest: academicManifest,
+    loadComponent: () => import("@campusos/plugin-academic").then((m) => m.Component)
   },
   {
     id: scheduleManifest.id,
-    load: async () => ({ manifest: scheduleManifest, Component: ScheduleView })
+    manifest: scheduleManifest,
+    loadComponent: () => import("@campusos/plugin-schedule").then((m) => m.Component)
   },
   {
     id: assistantManifest.id,
-    load: async () => ({ manifest: assistantManifest, Component: AssistantView })
+    manifest: assistantManifest,
+    loadComponent: () => import("@campusos/plugin-ai-assistant").then((m) => m.Component)
   },
   {
     id: campusFeedManifest.id,
-    load: async () => ({ manifest: campusFeedManifest, Component: CampusFeedView })
+    manifest: campusFeedManifest,
+    loadComponent: () => import("@campusos/plugin-campus-feed").then((m) => m.Component)
   },
   {
-    id: "org.campusos.materials",
-    load: () => import("@campusos/plugin-materials")
+    id: materialsManifest.id,
+    manifest: materialsManifest,
+    loadComponent: () => import("@campusos/plugin-materials").then((m) => m.Component)
   }
 ];
-
-const pluginModuleCache = new Map<string, Promise<PluginModule>>();
-
-const loadPluginDefinition = (definition: PluginDefinition): Promise<PluginModule> => {
-  const cached = pluginModuleCache.get(definition.id);
-  if (cached) return cached;
-  const loading = definition.load();
-  pluginModuleCache.set(definition.id, loading);
-  return loading;
-};
 
 /** 判断一次 vite 热更新是否触及官方插件包源码（开发期插件 HMR 用）。 */
 export const isPluginModuleUpdate = (
@@ -112,7 +107,7 @@ export const setupPluginDevHmr = (onUpdate: () => void): (() => void) => {
       ? (payload as { updates: Array<{ type?: string; path?: string }> }).updates
       : [];
     if (!isPluginModuleUpdate(updates)) return;
-    pluginModuleCache.clear();
+    componentCache.clear();
     onUpdate();
   };
   hot.on("vite:afterUpdate", afterUpdate);
@@ -121,39 +116,49 @@ export const setupPluginDevHmr = (onUpdate: () => void): (() => void) => {
   };
 };
 
+const pluginDefinitionById = new Map(
+  pluginDefinitions.map((definition) => [definition.id, definition])
+);
+const componentCache = new Map<string, Promise<PluginModule["Component"] | null>>();
+
+/**
+ * B4-2：按需加载官方插件视图组件（渲染到该视图时才 import），模块缓存保证只加载一次。
+ * 第三方插件不在 pluginDefinitions 中，返回 null（其 sandbox iframe 由 loadPlugins 提供）。
+ */
+export const loadPluginComponent = (
+  pluginId: string
+): Promise<PluginModule["Component"] | null> => {
+  const cached = componentCache.get(pluginId);
+  if (cached) return cached;
+  const definition = pluginDefinitionById.get(pluginId);
+  const loading = definition ? definition.loadComponent() : Promise.resolve(null);
+  componentCache.set(pluginId, loading);
+  return loading;
+};
+
 export const loadPlugins = async (
   runtimeSnapshot: PluginRuntimeSnapshot
 ): Promise<LoadedPlugin[]> => {
-  const rendererModules = await Promise.all(
-    pluginDefinitions.map(async (definition) => {
-      const mod = await loadPluginDefinition(definition);
-      const validation = validateManifestV2(mod.manifest);
+  const loaded = runtimeSnapshot.plugins.map((runtime): LoadedPlugin => {
+    const definition = pluginDefinitionById.get(runtime.id);
+    let Component: PluginModule["Component"] | undefined;
 
+    if (definition) {
+      const validation = validateManifestV2(definition.manifest);
       if (!validation.ok) {
         throw new Error(
           `Plugin ${definition.id} failed validation: ${validation.issues.join(", ")}`
         );
       }
-
-      return mod;
-    })
-  );
-  const moduleById = new Map(
-    rendererModules.map((module) => [module.manifest.id, module])
-  );
-  const loaded = runtimeSnapshot.plugins.map((runtime): LoadedPlugin => {
-    const module = moduleById.get(runtime.id);
-    let Component = module?.Component;
-
-    if (module && runtime.manifest.version !== module.manifest.version) {
-      throw new Error(
-        `Plugin ${runtime.id} version mismatch between main and renderer.`
-      );
-    }
-    if (
+      if (runtime.manifest.version !== definition.manifest.version) {
+        throw new Error(
+          `Plugin ${runtime.id} version mismatch between main and renderer.`
+        );
+      }
+      // B4-2：官方插件视图组件按需加载（loadPluginComponent），此处不预载。
+    } else if (
       runtime.status === "active" &&
-      (runtime.manifest.contributes.views?.length ?? 0) > 0 &&
-      !module
+      (runtime.manifest.contributes.views?.length ?? 0) > 0
     ) {
       const sandboxIssue = getSandboxedRendererExecutionIssue(runtime.manifest);
       if (sandboxIssue) {

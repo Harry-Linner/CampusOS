@@ -1,4 +1,3 @@
-import html2canvas from "html2canvas";
 import { saveExportPng, saveExportText } from "./exportBridge";
 import {
   renderExportMarkdown,
@@ -19,6 +18,8 @@ export const exportElementAsPng = async (
   element: HTMLElement,
   suggestedName: string
 ): Promise<void> => {
+  // B4-2：html2canvas 只在此处使用，动态加载避免打进 renderer 首屏主包。
+  const { default: html2canvas } = await import("html2canvas");
   const canvas = await html2canvas(element, {
     backgroundColor: "#ffffff",
     scale: 2,

@@ -6,7 +6,6 @@
  * process; the renderer and plugin sandboxes never receive a network handle.
  */
 import { createHash } from "node:crypto";
-import * as cheerio from "cheerio";
 import type {
   FeedItemRecord,
   FeedSourceDescriptor
@@ -191,6 +190,8 @@ export const fetchSourceList = async (
     });
   }
   const html = await response.text();
+  // B4-2：cheerio 仅抓取解析时使用，动态加载避免打进 main 首包。
+  const cheerio = await import("cheerio");
   const $ = cheerio.load(html);
   const selectors = descriptor.selectors;
   const items: FeedItemRecord[] = [];

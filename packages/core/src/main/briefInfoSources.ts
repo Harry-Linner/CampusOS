@@ -6,7 +6,7 @@
  * renderer and plugin sandboxes never receive a network handle.
  */
 import { createHash } from "node:crypto";
-import Parser from "rss-parser";
+import type Parser from "rss-parser";
 import type { BriefCachedItem } from "@campusos/shared";
 import { BRIEF_MAX_RAW_SUMMARY, BRIEF_MAX_RAW_TITLE } from "@campusos/shared";
 import { createRetryState, withRetry } from "./retryPolicy";
@@ -124,7 +124,12 @@ export const createBriefFetcher = ({
   fetchTimeoutMs = 20_000,
   maxItemsPerSource = 20
 }: BriefFetcherOptions = {}): BriefFetcher => {
-  const parser = new Parser();
+  // B4-2：rss-parser 仅抓取时使用，动态加载避免打进 main 首包；模块缓存保证只解析一次。
+  let parserModule: Promise<{ default: typeof Parser }> | null = null;
+  const loadParser = (): Promise<{ default: typeof Parser }> => {
+    parserModule ??= import("rss-parser") as Promise<{ default: typeof Parser }>;
+    return parserModule;
+  };
 
   const fetchFeedXml = async (feedUrl: string): Promise<string> => {
     const state = createRetryState();
@@ -155,6 +160,8 @@ export const createBriefFetcher = ({
   const fetchSource = async (
     source: BriefSourceDefinition
   ): Promise<BriefCachedItem[]> => {
+    const { default: ParserCtor } = await loadParser();
+    const parser = new ParserCtor();
     const xml = await fetchFeedXml(source.feedUrl);
     const parsed = await parser.parseString(xml);
     const entries = Array.isArray(parsed.items) ? parsed.items : [];

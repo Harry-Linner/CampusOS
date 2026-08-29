@@ -67,7 +67,8 @@ interface CandidateView {
 const collectCandidates = (plugins: readonly LoadedPlugin[]): CandidateView[] =>
   plugins
     .flatMap((plugin) => {
-      if (plugin.runtime.status !== "active" || !plugin.Component) return [];
+      // 侧栏项基于 manifest 元数据（B4-2：视图组件按需加载，不要求已预载 Component）。
+      if (plugin.runtime.status !== "active") return [];
 
       return (plugin.manifest.contributes.views ?? [])
         .filter((view) => view.location === "activity" && view.activityTarget)

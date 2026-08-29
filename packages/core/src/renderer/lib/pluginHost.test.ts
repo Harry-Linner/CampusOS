@@ -11,7 +11,12 @@ import {
   toUserPluginSnapshot
 } from "../../main/officialPluginCatalog";
 import { resolvePluginRuntime } from "../../main/pluginRuntime";
-import { isPluginModuleUpdate, loadPlugins, type LoadedPlugin } from "./pluginHost";
+import {
+  isPluginModuleUpdate,
+  loadPluginComponent,
+  loadPlugins,
+  type LoadedPlugin
+} from "./pluginHost";
 import { buildActivityItems } from "./pluginNavigation";
 
 const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
@@ -32,7 +37,8 @@ describe("loadPlugins", () => {
       officialUserPluginManifests.map((manifest) => manifest.id).sort()
     );
     expect(plugins.some((plugin) => plugin.manifest.id === "org.campusos.daily-brief")).toBe(false);
-    expect(plugins.every((plugin) => plugin.Component !== undefined)).toBe(true);
+    // B4-2：官方插件视图组件不再预载（按需 loadPluginComponent），loadPlugins 只提供 manifest 元数据。
+    expect(plugins.every((plugin) => plugin.Component === undefined)).toBe(true);
     expect(plugins.every(
       (plugin) => (plugin.manifest.contributes.views?.length ?? 0) === 1
     )).toBe(true);
@@ -46,6 +52,15 @@ describe("loadPlugins", () => {
       "extensions",
       "settings"
     ]);
+  });
+
+  it("loads an official view component on demand with module caching (B4-2)", async () => {
+    const Component = await loadPluginComponent("org.campusos.academic");
+    expect(Component).toBeTypeOf("function");
+    const again = await loadPluginComponent("org.campusos.academic");
+    expect(again).toBe(Component);
+    // 未知插件（无 pluginDefinition）返回 null，不抛错。
+    await expect(loadPluginComponent("dev.example.unknown")).resolves.toBeNull();
   });
 
   it("removes exactly one sidebar entry when an official Module is disabled", async () => {

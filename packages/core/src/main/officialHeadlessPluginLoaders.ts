@@ -1,16 +1,9 @@
-import { createZjuUndergraduateConnector } from "@campusos/plugin-zju-undergraduate/main";
 import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
-import { createZjuCalendarConfigConnector } from "@campusos/plugin-zju-calendar-config/main";
 import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
-import { createZjuLearningConnector } from "@campusos/plugin-zju-learning/main";
 import { manifest as zjuLearningManifest } from "@campusos/plugin-zju-learning/manifest";
-import { createZjuGraduateConnector } from "@campusos/plugin-zju-graduate/main";
 import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/manifest";
-import { createAcademicExamsFeature } from "@campusos/plugin-academic-exams/main";
 import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
-import { createDeadlineAssistant } from "@campusos/plugin-deadline-assistant/main";
 import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
-import { createAcademicTimetableEventsFeature } from "@campusos/plugin-academic-timetable-events/main";
 import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
 import type {
   AcademicCalendarConfigData,
@@ -111,8 +104,10 @@ export const createOfficialHeadlessPluginLoaders = ({
 }: {
   capabilityRepository: CapabilityRepository;
 }): Record<string, HeadlessPluginLoader> => ({
-  [academicExamsManifest.id]: async () =>
-    createAcademicExamsFeature({
+  [academicExamsManifest.id]: async () => {
+    // B4-2：插件 main（connector 工厂）动态加载，避免打进主进程首包。
+    const { createAcademicExamsFeature } = await import("@campusos/plugin-academic-exams/main");
+    return createAcademicExamsFeature({
       loadExamsRecords: async (providerIds) => {
         const records = await capabilityRepository.read<AcademicExamsData>(
           "academic.exams@1"
@@ -132,9 +127,12 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       registerRefreshJob: (sourceId, job, options) =>
         pluginRefreshCoordinator.register(sourceId, job, options)
-    }),
-  [academicTimetableEventsManifest.id]: async () =>
-    createAcademicTimetableEventsFeature({
+    });
+  },
+  [academicTimetableEventsManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createAcademicTimetableEventsFeature } = await import("@campusos/plugin-academic-timetable-events/main");
+    return createAcademicTimetableEventsFeature({
       loadTimetableRecords: async (providerIds) => {
         const records = await capabilityRepository.read<AcademicTimetableData>(
           "academic.timetable@1"
@@ -168,9 +166,12 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       registerRefreshJob: (sourceId, job, options) =>
         pluginRefreshCoordinator.register(sourceId, job, options)
-    }),
-  [deadlineAssistantManifest.id]: async () =>
-    createDeadlineAssistant({
+    });
+  },
+  [deadlineAssistantManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createDeadlineAssistant } = await import("@campusos/plugin-deadline-assistant/main");
+    return createDeadlineAssistant({
       loadAssignmentsRecord: async () =>
         selectAccountRecord(
           await capabilityRepository.read<LearningAssignmentsData>(
@@ -188,8 +189,11 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       registerRefreshJob: (sourceId, job, options) =>
         pluginRefreshCoordinator.register(sourceId, job, options)
-    }),
+    });
+  },
   [zjuLearningManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuLearningConnector } = await import("@campusos/plugin-zju-learning/main");
     // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
     const fingerprintCollector = createFingerprintCollector();
     return createZjuLearningConnector({
@@ -315,8 +319,10 @@ export const createOfficialHeadlessPluginLoaders = ({
         )
     });
   },
-  [zjuCalendarConfigManifest.id]: async () =>
-    createZjuCalendarConfigConnector({
+  [zjuCalendarConfigManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuCalendarConfigConnector } = await import("@campusos/plugin-zju-calendar-config/main");
+    return createZjuCalendarConfigConnector({
       fetchCalendarPage: useE2eFixtureSources()
         ? requestE2eOfficialCalendar
         : requestOfficialAcademicCalendar,
@@ -342,8 +348,11 @@ export const createOfficialHeadlessPluginLoaders = ({
       },
       registerRefreshJob: (sourceId, job) =>
         pluginRefreshCoordinator.register(sourceId, job)
-    }),
+    });
+  },
   [zjuGraduateManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuGraduateConnector } = await import("@campusos/plugin-zju-graduate/main");
     // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
     const fingerprintCollector = createFingerprintCollector();
     return createZjuGraduateConnector({
@@ -479,6 +488,8 @@ export const createOfficialHeadlessPluginLoaders = ({
     });
   },
   [zjuUndergraduateManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuUndergraduateConnector } = await import("@campusos/plugin-zju-undergraduate/main");
     // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
     const fingerprintCollector = createFingerprintCollector();
     return createZjuUndergraduateConnector({
