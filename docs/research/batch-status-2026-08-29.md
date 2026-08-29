@@ -31,6 +31,9 @@
 ### B3 独立悬浮组件窗（完整，2026-08-29）
 - `e30912e` DeskToDo 式：时钟/天气/倒计时/进度条拆为**独立透明贴底悬浮小窗**，可各自拖拽摆放、位置记忆（windowStateStore per-key）、关闭即禁用；桌历主窗移除组件显示区、保留组件管理面板；天气真实 Open-Meteo；组件窗主题跟随主应用。设计 spec `docs/specs/b3-float-widgets.md`（含 CDP 视觉验收记录）。
 
+### B4-2 重依赖动态 import 分块（完整，2026-08-29）
+- `e865a10`：插件视图按需加载（pluginHost 官方视图组件全动态 + App React.lazy/Suspense）+ html2canvas/cheerio/rss-parser 动态化 + 7 个插件 main connectors 分块。效果：renderer 主包 1,030→339 kB、main 608→507 kB；切视图实测首次 51–229ms、二次 26–34ms。评估/实施记录：`docs/research/b4-2-bundle-analysis.md`。⚠️ #6（diagnosticLogStore 抵消修复）评估后不做（见报告）。
+
 ## 二、关键设计要点（接手必读）
 
 - **全局搜索导航链路**：GlobalSearch 结果携带 `navigation{viewId,entityId,semester}` → App `onNavigate` 里 `setActiveView(viewId)` + `setNavigationTarget(request)`（有 entityId/semester 时）→ `App.tsx:228` 把 `navigationTarget` 传给活跃插件视图（`viewId===activeView` 时）→ ScheduleView/MaterialsView/AcademicView 消费。注意 App 800ms 后清 `navigationTarget`（一次性消费），视图侧用 ref 存 pending 目标避免过期。
@@ -41,10 +44,9 @@
 
 ## 三、剩余项（未实施）
 
-1. **B4-2** Phase E §5.1 重依赖动态 import 分块 —— **被 spec 标注为"后续小项"**："官方插件现有动态 import（如 materials 经 pluginHost 按需加载）已覆盖一部分；进一步的按 bundle 分析拆分需在构建产物验证阶段进行"。非本轮硬性必做。
-2. **campus-feed/brief「验证」探针**（B4-1 遗留的可选项）：两者按 feed 源写台账但未注册插件刷新协调器，健康视图探针按钮不可用；如需探针需另行设计（会引入调度/行为变更）。
-3. **组件窗贴底/拖拽位置的 OS 级实测**（B3 补充项）：组件窗复用 `pinWindowToDesktopBottom` 贴底与 `-webkit-app-region` 拖拽，但视觉验收仅 CDP 截图确认渲染与启停同步；Win32 贴底层叠效果与真实拖拽摆放可在后续 OS 截图对照补验。
+1. **campus-feed/brief「验证」探针**（B4-1 遗留的可选项）：两者按 feed 源写台账但未注册插件刷新协调器，健康视图探针按钮不可用；如需探针需另行设计（会引入调度/行为变更）。
+2. **组件窗贴底/拖拽位置的 OS 级实测**（B3 补充项）：组件窗复用 `pinWindowToDesktopBottom` 贴底与 `-webkit-app-region` 拖拽，OS 截图已确认贴底层叠；真实鼠标拖拽手势依赖系统 NCHITTEST，CDP 无法合成，可后续人工补验。
 
 ## 四、建议下一步顺序
-B3（最大改造，需视觉验收；做完后汇报，切换到视觉模型按 `docs/agents/visual-verification.md` 验收）。B4-2 可待构建产物验证时再评估。每项先写 `docs/specs/`（影响面大的），按 Feature Completion 自查 + typecheck/lint/test + UI 用 CDP 视觉验收 + commit/push + `gh run watch` 直至绿。
+B1–B5 批次全部交付（B2/B1/B5/B4-1/B3/B4-2），剩余仅两个可选项（见上）。每项先写 `docs/specs/`（影响面大的），按 Feature Completion 自查 + typecheck/lint/test + UI 用 CDP 视觉验收 + commit/push + `gh run watch` 直至绿。
 
