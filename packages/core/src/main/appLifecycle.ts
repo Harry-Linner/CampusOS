@@ -17,6 +17,11 @@ import type {
   CloseBehavior
 } from "../shared/appLifecycleBridge";
 import { assertTrustedRenderer } from "./ipcSecurity";
+import {
+  launchDeskCalendar,
+  closeDeskCalendar,
+  isDeskCalendarRunning
+} from "./deskCalendarHost";
 
 const SETTINGS_FILE = "app-lifecycle.json";
 let settings: AppLifecycleSettings | null = null;
@@ -105,7 +110,17 @@ const developmentTrayIconPath = (): string => {
 const rebuildTrayMenu = async (): Promise<void> => {
   if (!tray) return;
   const template: MenuItemConstructorOptions[] = [
-    { label: "打开 CampusOS", click: showCampusMainWindow }
+    { label: "打开 CampusOS", click: showCampusMainWindow },
+    {
+      label: "桌面日历",
+      click: () => {
+        if (isDeskCalendarRunning()) {
+          closeDeskCalendar();
+        } else {
+          void launchDeskCalendar().catch(() => undefined);
+        }
+      }
+    }
   ];
   template.push(
     { type: "separator" },

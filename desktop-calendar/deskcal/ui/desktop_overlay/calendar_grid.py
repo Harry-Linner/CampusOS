@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 from deskcal.core.models import DatedTask
 from deskcal.core.storage import TaskStore
 from deskcal.services.lunar_holiday import get_day_lunar_info, get_special_day_label
+from deskcal.services.campus_feed import CampusFeedEvent, load_campus_feed
 from deskcal.ui.desktop_overlay.task_chip import TaskChipWidget
 from deskcal.ui.dialogs.task_dialog import PRIORITY_COLORS, TaskDialog
 from deskcal.ui.style_utils import ElidingLabel, make_scroll_area_transparent
@@ -95,6 +96,7 @@ class DayCellWidget(QFrame):
 
         self._tasks_container = QWidget()
         self._tasks_layout = QVBoxLayout(self._tasks_container)
+        self._feed_labels: list[QLabel] = []
         self._tasks_layout.setContentsMargins(0, 0, 0, 0)
         self._tasks_layout.setSpacing(0)
         self._tasks_layout.addStretch(1)
@@ -142,6 +144,21 @@ class DayCellWidget(QFrame):
 
             chip.toggleCompleteRequested.connect(_on_toggle)
             self._tasks_layout.insertWidget(self._tasks_layout.count() - 1, chip)
+
+    def set_feed_events(self, events: list[CampusFeedEvent]) -> None:
+        """叠加只读的校园事件（课程/考试/作业/任务），按类型上色，不可编辑。"""
+        for label in self._feed_labels:
+            label.deleteLater()
+        self._feed_labels = []
+        for event in events:
+            r, g, b = event.color
+            time_prefix = f"{event.time} " if event.time else ""
+            label = QLabel(f"{event.label} · {time_prefix}{event.title}")
+            label.setStyleSheet(
+                "color: rgb(%d,%d,%d); font-size: 10px; font-weight: bold; background: transparent;" % (r, g, b)
+            )
+            self._feed_labels.append(label)
+            self._tasks_layout.insertWidget(self._tasks_layout.count() - 1, label)
 
     def contextMenuEvent(self, event) -> None:
         self._on_create_requested(self._day)
@@ -241,6 +258,12 @@ class CalendarGrid(QWidget):
 
         today = date.today()
         all_dated_tasks = list(self._store.iter_active_dated_tasks())
+        feed_by_day: dict[date, list[CampusFeedEvent]] = {}
+        for event in load_campus_feed():
+            try:
+                feed_by_day.setdefault(date.fromisoformat(event.date), []).append(event)
+            except ValueError:
+                continue
 
         for index in range(ROWS * COLS):
             day = grid_start + timedelta(days=index)
@@ -253,6 +276,7 @@ class CalendarGrid(QWidget):
             day_tasks = [t for t in all_dated_tasks if t.recurrence.occurs_on(day)]
             day_tasks.sort(key=lambda t: t.sort_key(day))
             cell.set_tasks(day_tasks, self._open_edit_dialog, self._save_and_rerender)
+            cell.set_feed_events(feed_by_day.get(day, []))
 
             self._grid_layout.addWidget(cell, row + 1, col)
             self._day_cells.append(cell)

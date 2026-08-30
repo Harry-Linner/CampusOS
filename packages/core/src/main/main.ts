@@ -50,6 +50,10 @@ import { createBriefFetcher } from "./briefInfoSources";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { registerAcademicCalendarHandlers } from "./academicCalendarStore";
 import {
+  registerDeskCalendarHostHandlers,
+  closeDeskCalendar
+} from "./deskCalendarHost";
+import {
   attachMainWindowLifecycle,
   createCampusTray,
   markCampusAppQuitting,
@@ -180,6 +184,7 @@ const startCampusApp = (): void => {
     registerScheduleHandlers();
     registerExportHandlers();
     registerAcademicCalendarHandlers();
+    registerDeskCalendarHostHandlers();
     const academicQueryData: AcademicQueryDataReader = {
       loadVerifiedStudentId: async () => {
         const record = await readAcademicCredentialRecord();
@@ -263,5 +268,6 @@ app.on("window-all-closed", () => undefined);
 
 app.on("before-quit", () => {
   markCampusAppQuitting();
+  closeDeskCalendar();
   workspaceRefreshScheduler.stop();
 });
