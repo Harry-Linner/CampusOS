@@ -187,7 +187,9 @@ export const saveSettings = async (
 
 export const broadcastSettingsChanged = (): void => {
   for (const window of BrowserWindow.getAllWindows()) {
-    window.webContents.send(DESK_CALENDAR_CHANGED_CHANNEL);
+    // 关闭窗口的并发路径下，getAllWindows 返回后窗口可能已销毁；
+    // 对已销毁窗口 send 会抛 "Object has been destroyed"（主进程未捕获异常弹窗）。
+    if (!window.isDestroyed()) window.webContents.send(DESK_CALENDAR_CHANGED_CHANNEL);
   }
   if (settingsChangedListener) {
     void Promise.resolve(settingsChangedListener()).catch(() => undefined);

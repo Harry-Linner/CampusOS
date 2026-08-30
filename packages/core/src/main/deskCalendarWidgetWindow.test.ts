@@ -38,15 +38,29 @@ vi.mock("electron", () => ({
   },
   BrowserWindow: Object.assign(
     vi.fn().mockImplementation(() => {
+      let destroyed = false;
+      const webContentsId = electronState.windows.length;
+      const listeners = new Map<string, () => void>();
       const window = {
-        webContents: { id: electronState.windows.length, send: vi.fn() },
+        // 模拟真实 Electron：窗口销毁后访问 webContents 抛 "Object has been destroyed"。
+        get webContents(): { id: number; send: ReturnType<typeof vi.fn> } {
+          if (destroyed) throw new Error("Object has been destroyed");
+          return { id: webContentsId, send: vi.fn() };
+        },
         show: vi.fn(),
         showInactive: vi.fn(),
         focus: vi.fn(),
-        close: vi.fn(),
-        isDestroyed: () => false,
-        listeners: new Map<string, () => void>(),
-        on: vi.fn(),
+        close: vi.fn(() => {
+          // 真实 Electron 中 close 完成后窗口销毁并触发 closed。
+          destroyed = true;
+          const closed = listeners.get("closed");
+          if (closed) closed();
+        }),
+        isDestroyed: () => destroyed,
+        listeners,
+        on: vi.fn((event: string, callback: () => void) => {
+          listeners.set(event, callback);
+        }),
         loadURL: vi.fn(async () => undefined),
         loadFile: vi.fn(async () => undefined),
         getNativeWindowHandle: vi.fn(() => {
@@ -57,7 +71,7 @@ vi.mock("electron", () => ({
         setMenu: vi.fn(),
         getNormalBounds: vi.fn(() => ({ x: 0, y: 0, width: 220, height: 84 })),
         isMaximized: vi.fn(() => false),
-        nextWebContentsId: electronState.windows.length
+        nextWebContentsId: webContentsId
       };
       electronState.windows.push(window);
       return window;
@@ -141,8 +155,10 @@ const tick = async (): Promise<void> => {
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 };
 
-const closedCallback = (windowIndex: number): (() => void) | undefined =>
-  electronState.windows[windowIndex]?.on.mock.calls.find((call) => call[0] === "closed")?.[1] as (() => void) | undefined;
+// 模拟真实 Electron：close() 完成即销毁窗口并触发 closed 处理器。
+const closeWindow = (windowIndex: number): void => {
+  electronState.windows[windowIndex]?.close();
+};
 
 describe("deskCalendarWidgetWindow", () => {
   it("desk calendar enabled 时按 widgets 创建全部启用组件窗", async () => {
@@ -169,7 +185,7 @@ describe("deskCalendarWidgetWindow", () => {
     syncWidgetWindows(defaultSettings());
     await tick();
     const weatherWindow = electronState.windows[1];
-    expect(closedCallback(1)).toBeDefined();
+    expect(weatherWindow.listeners.has("closed")).toBe(true);
 
     syncWidgetWindows(defaultSettings({ weather: false }));
     await tick();
@@ -190,11 +206,24 @@ describe("deskCalendarWidgetWindow", () => {
     expect(saveSettingsMock).not.toHaveBeenCalled();
   });
 
+  it("回归：桌历关闭销毁组件窗时 closed 处理器不访问已销毁的 webContents（四联弹窗）", async () => {
+    const { syncWidgetWindows } = await loadWidgetModule();
+    syncWidgetWindows(defaultSettings());
+    await tick();
+    expect(electronState.windows).toHaveLength(4);
+    // 修复前：每个组件窗的 closed 处理器在销毁后访问 window.webContents.id，
+    // 抛 "Object has been destroyed"，主进程未捕获异常 → 每窗一个原生错误对话框。
+    // 这里 mock 的 webContents getter 会模拟销毁后抛错，旧实现会让同步调用链抛异常。
+    expect(() => syncWidgetWindows({ ...defaultSettings(), enabled: false })).not.toThrow();
+    await tick();
+    expect(saveSettingsMock).not.toHaveBeenCalled();
+  });
+
   it("单独关闭某组件窗会持久化禁用该组件", async () => {
     const { syncWidgetWindows } = await loadWidgetModule();
     syncWidgetWindows(defaultSettings());
     await tick();
-    closedCallback(0)?.();
+    closeWindow(0);
     await tick();
     expect(saveSettingsMock).toHaveBeenCalledWith(
       expect.objectContaining({ widgets: expect.arrayContaining([expect.objectContaining({ id: "clock", enabled: false })]) })
@@ -206,7 +235,7 @@ describe("deskCalendarWidgetWindow", () => {
     const { syncWidgetWindows } = await loadWidgetModule();
     syncWidgetWindows(defaultSettings());
     await tick();
-    closedCallback(0)?.();
+    closeWindow(0);
     await tick();
     expect(saveSettingsMock).not.toHaveBeenCalled();
   });

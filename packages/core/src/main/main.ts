@@ -244,7 +244,9 @@ const startCampusApp = (): void => {
     registerAnalyticsHandlers();
     await createMainWindow();
     await createCampusTray();
-    await restoreDeskCalendarWindow();
+    // 仅开机自启（--hidden 后台启动）时恢复用户已启用的桌面日历：正常启动
+    // 只呈现主窗口，桌面日历不应自动弹出，由用户在日程视图或托盘显式开启。
+    if (shouldStartHidden()) await restoreDeskCalendarWindow();
     // The updater is intentionally started after the first window exists so
     // packaged startup status is visible through the normal renderer event.
     void checkForUpdates();

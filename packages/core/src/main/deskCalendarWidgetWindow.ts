@@ -113,10 +113,15 @@ const createComponentWindow = async (
 
   window.setMenu(null);
   pinWindowToDesktopBottom(window);
-  widgetIdByWebContentsId.set(window.webContents.id, id);
+  // "closed" 事件触发时 window.webContents 已销毁，此时再访问
+  // window.webContents.id 会抛 "Object has been destroyed"，每个组件窗关闭都会
+  // 触发一次未捕获异常，导致主进程连弹原生错误对话框（实测 4 组件窗 = 4 弹窗）。
+  // webContents id 必须在窗口存活时捕获，供 closed 处理器清理映射。
+  const webContentsId = window.webContents.id;
+  widgetIdByWebContentsId.set(webContentsId, id);
   const detach = attachWindowStatePersistence(window, WIDGET_STATE_KEY[id]);
   window.on("closed", () => {
-    widgetIdByWebContentsId.delete(window.webContents.id);
+    widgetIdByWebContentsId.delete(webContentsId);
     detach();
     // 整体禁用/伴随销毁时 suppressedDisable 命中 → 不改设置；单独关组件窗才禁用该组件。
     if (suppressedDisable.delete(id)) return;
