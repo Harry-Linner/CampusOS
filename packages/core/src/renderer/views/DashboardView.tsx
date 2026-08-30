@@ -20,10 +20,7 @@ import {
 interface DashboardViewProps {
   loading: boolean;
   snapshot: CampusWorkspaceSnapshot | null;
-  deskCalendar?: {
-    loadSettings: () => Promise<import("@campusos/shared").DeskCalendarSettings>;
-    subscribe: (listener: () => void) => () => void;
-  };
+  academicCalendar?: import("@campusos/shared").AcademicCalendarBridge;
 }
 
 interface MakeupDayInfo {
@@ -137,7 +134,7 @@ const DashboardSkeleton = (): JSX.Element => (
 export const DashboardView = ({
   loading,
   snapshot,
-  deskCalendar
+  academicCalendar
 }: DashboardViewProps): JSX.Element => {
   const [makeupDays, setMakeupDays] = useState<MakeupDayInfo[]>([]);
   const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
@@ -147,16 +144,16 @@ export const DashboardView = ({
   const [showFartherDeadlines, setShowFartherDeadlines] = useState(false);
 
   useEffect(() => {
-    if (!deskCalendar) return undefined;
+    if (!academicCalendar) return undefined;
     const load = (): void => {
-      void deskCalendar.loadSettings().then((record) => {
+      void academicCalendar.loadSettings().then((record) => {
         setMakeupDays(record.makeupDays ?? []);
         setHolidays(record.statutoryHolidays ?? []);
       }).catch(() => undefined);
     };
     load();
-    return deskCalendar.subscribe(load);
-  }, [deskCalendar]);
+    return undefined;
+  }, [academicCalendar]);
 
   if (!snapshot) {
     return loading ? (

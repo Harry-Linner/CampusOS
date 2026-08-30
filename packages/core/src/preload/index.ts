@@ -125,20 +125,10 @@ contextBridge.exposeInMainWorld("campusos", {
       return () => ipcRenderer.removeListener(channel, handler);
     }
   },
-  deskCalendar: {
-    loadSettings: () => ipcRenderer.invoke("campusos:desk-calendar:settings:load"),
-    setEnabled: (enabled: boolean) =>
-      ipcRenderer.invoke("campusos:desk-calendar:settings:save", { enabled }),
-    setView: (view: "month" | "week" | "day") =>
-      ipcRenderer.invoke("campusos:desk-calendar:settings:save", { view }),
-    updateSettings: (patch: Record<string, unknown>) =>
-      ipcRenderer.invoke("campusos:desk-calendar:settings:save", patch),
-    subscribe: (listener: () => void) => {
-      const channel = "campusos:desk-calendar:changed";
-      const handler = () => listener();
-      ipcRenderer.on(channel, handler);
-      return () => ipcRenderer.removeListener(channel, handler);
-    }
+  academicCalendar: {
+    loadSettings: () => ipcRenderer.invoke("campusos:academic-calendar:settings:load"),
+    saveSettings: (input: unknown) =>
+      ipcRenderer.invoke("campusos:academic-calendar:settings:save", input)
   },
   assistant: {
     loadSettings: () => ipcRenderer.invoke("campusos:assistant:settings:load"),

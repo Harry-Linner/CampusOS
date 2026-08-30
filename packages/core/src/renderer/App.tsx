@@ -242,7 +242,7 @@ export const App = (): JSX.Element => {
       <DashboardView
         loading={workspace.loading}
         snapshot={workspace.snapshot}
-        deskCalendar={window.campusos?.deskCalendar}
+        academicCalendar={window.campusos?.academicCalendar}
       />
     );
   } else if (activeView === "extensions") {
@@ -295,7 +295,7 @@ export const App = (): JSX.Element => {
           assistant: window.campusos?.assistant,
           brief: window.campusos?.brief,
           campusFeed: window.campusos?.campusFeed,
-          deskCalendar: window.campusos?.deskCalendar,
+          academicCalendar: window.campusos?.academicCalendar,
           navigationTarget: navigationTarget?.viewId === activeView ? navigationTarget : null
         }}
       />

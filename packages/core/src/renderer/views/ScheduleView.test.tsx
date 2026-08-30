@@ -184,98 +184,6 @@ describe("ScheduleView", () => {
     expect(globalThis.localStorage?.getItem("campusos.schedule.event-style")).toBe("bar");
   });
 
-  it("opens the desk calendar from the schedule actions and persists the view choice", async () => {
-    const schedule = createSchedule();
-    const deskCalendar = {
-      loadSettings: vi.fn(async () => ({
-        enabled: false,
-        view: "month" as const,
-        showClock: true,
-        widgets: [],
-        countdowns: [],
-        progress: [],
-        weather: null,
-        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
-        statutoryHolidays: [],
-        makeupDays: [],
-        displayProfiles: [],
-        savedAt: "2026-08-15T00:00:00.000Z",
-        storagePath: "C:/settings/desk-calendar.json"
-      })),
-      setEnabled: vi.fn(async (enabled: boolean) => ({
-        enabled,
-        view: "month" as const,
-        showClock: true,
-        widgets: [],
-        countdowns: [],
-        progress: [],
-        weather: null,
-        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
-        statutoryHolidays: [],
-        makeupDays: [],
-        displayProfiles: [],
-        savedAt: "2026-08-15T00:00:00.000Z",
-        storagePath: "C:/settings/desk-calendar.json"
-      })),
-      setView: vi.fn(async (view: "month" | "week" | "day") => ({
-        enabled: true,
-        view,
-        showClock: true,
-        widgets: [],
-        countdowns: [],
-        progress: [],
-        weather: null,
-        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
-        statutoryHolidays: [],
-        makeupDays: [],
-        displayProfiles: [],
-        savedAt: "2026-08-15T00:00:00.000Z",
-        storagePath: "C:/settings/desk-calendar.json"
-      })),
-      updateSettings: vi.fn(async (patch: Record<string, unknown>) => ({
-        enabled: true,
-        view: "month" as const,
-        showClock: true,
-        widgets: [],
-        countdowns: [],
-        progress: [],
-        weather: null,
-        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
-        statutoryHolidays: (patch.statutoryHolidays ?? []) as { date: string; label: string }[],
-        makeupDays: (patch.makeupDays ?? []) as { date: string; weekday: number; source: "builtin" | "manual" }[],
-        displayProfiles: [],
-        savedAt: "2026-08-15T00:00:00.000Z",
-        storagePath: "C:/settings/desk-calendar.json"
-      })),
-      subscribe: vi.fn(() => () => undefined)
-    };
-    render(createElement(ScheduleView, {
-      loading: false,
-      snapshot,
-      capabilities: { read: vi.fn(async () => []) },
-      onRefresh: vi.fn(async () => undefined),
-      schedule,
-      deskCalendar
-    }));
-
-    await waitFor(() => expect(deskCalendar.loadSettings).toHaveBeenCalled());
-
-    fireEvent.click(screen.getByRole("button", { name: "桌面日历" }));
-    const menu = screen.getByRole("menu", { name: "桌面日历设置" });
-    expect(menu).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "开启桌面日历" }));
-    await waitFor(() => expect(deskCalendar.setEnabled).toHaveBeenCalledWith(true));
-
-    // Wait until the enabled state propagates so view buttons become enabled.
-    const menuViewButton = within(menu).getByRole("button", { name: "周视图" });
-    await waitFor(() => {
-      expect((menuViewButton as HTMLButtonElement).disabled).toBe(false);
-    });
-    fireEvent.click(menuViewButton);
-    await waitFor(() => expect(deskCalendar.setView).toHaveBeenCalledWith("week"));
-    expect((within(menu).getByRole("button", { name: "周视图" })).getAttribute("aria-pressed")).toBe("true");
-  });
-
   it("sends task status changes to the main-process bridge", async () => {
     const schedule = createSchedule();
     render(createElement(ScheduleView, {
@@ -549,27 +457,15 @@ describe("schedule event ranges", () => {
     });
   });
 
-  it("renders holiday and makeup marks from the desk calendar settings", async () => {
-    const deskCalendar = {
+  it("renders holiday and makeup marks from the academic calendar settings", async () => {
+    const academicCalendar = {
       loadSettings: vi.fn(async () => ({
-        enabled: true,
-        view: "month" as const,
-        showClock: true,
-        widgets: [],
-        countdowns: [],
-        progress: [],
-        weather: null,
-        appearance: { opacity: 0.88, background: "#111722", theme: "midnight" as const },
         statutoryHolidays: [{ date: "2026-10-01", label: "国庆节" }],
         makeupDays: [{ date: "2026-10-04", weekday: 1, source: "manual" as const }],
-        displayProfiles: [],
         savedAt: "2026-08-15T00:00:00.000Z",
-        storagePath: "C:/settings/desk-calendar.json"
+        storagePath: "C:/settings/academic-calendar.json"
       })),
-      setEnabled: vi.fn(),
-      setView: vi.fn(),
-      updateSettings: vi.fn(),
-      subscribe: vi.fn(() => () => undefined)
+      saveSettings: vi.fn()
     };
     const snapshotWithOctober: CampusWorkspaceSnapshot = { ...snapshot, generatedAt: "2026-10-01T00:00:00.000Z" };
     render(createElement(ScheduleView, {
@@ -578,10 +474,10 @@ describe("schedule event ranges", () => {
       capabilities: { read: vi.fn(async () => []) },
       onRefresh: vi.fn(async () => undefined),
       schedule: createSchedule(),
-      deskCalendar
+      academicCalendar
     }));
 
-    await waitFor(() => expect(deskCalendar.loadSettings).toHaveBeenCalled());
+    await waitFor(() => expect(academicCalendar.loadSettings).toHaveBeenCalled());
     // 跳转到 2026-10 月视图。
     fireEvent.change(screen.getByLabelText("跳转到日期"), { target: { value: "2026-10-01" } });
     await waitFor(() => expect(screen.getByText("国庆节")).toBeTruthy());

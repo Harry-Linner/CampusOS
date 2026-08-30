@@ -1,0 +1,14 @@
+secrets/
+__pycache__/
+*.pyc
+.venv/
+build_output/
+dist/
+build/
+installer_output/
+*.spec
+!desktodo.spec
+.pytest_cache/
+docs/adjustment/
+*.log
+DeskToDo-Setup-*.exe

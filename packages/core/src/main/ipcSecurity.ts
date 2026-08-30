@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
-type TrustedRendererPage = "index.html" | "desk-calendar.html" | "desk-calendar-widget.html";
+type TrustedRendererPage = "index.html";
 
 const isTrustedDevelopmentUrl = (
   senderUrl: URL,
@@ -76,12 +76,4 @@ const assertTrustedPages = (
 
 export const assertTrustedRenderer = (event: IpcMainInvokeEvent): void => {
   assertTrustedPages(event, ["index.html"]);
-};
-
-export const assertTrustedDeskCalendarCaller = (event: IpcMainInvokeEvent): void => {
-  assertTrustedPages(event, ["index.html", "desk-calendar.html"]);
-};
-
-export const assertTrustedDeskCalendarWidgetCaller = (event: IpcMainInvokeEvent): void => {
-  assertTrustedPages(event, ["desk-calendar-widget.html"]);
 };

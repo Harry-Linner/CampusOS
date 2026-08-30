@@ -8,7 +8,6 @@ import { assertTrustedRenderer } from "./ipcSecurity";
 import { getOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService";
 import { createPluginCapabilityAccess } from "./pluginCapabilityAccess";
-import { setSchedulePluginEnabled } from "./appLifecycle";
 import type { PluginUpdateCandidate } from "./pluginUpdateService";
 import {
   parseCapabilityReadInput,
@@ -62,7 +61,7 @@ export const registerPluginRuntimeHandlers = (): void => {
   };
   const applyDesktopCapabilityState = async (snapshot: PluginRuntimeSnapshot): Promise<void> => {
     const schedule = snapshot.plugins.find((plugin) => plugin.id === SCHEDULE_PLUGIN_ID);
-    await setSchedulePluginEnabled(schedule?.enabled === true && schedule.status === "active");
+    void schedule;
   };
   let initialCacheServed = false;
 

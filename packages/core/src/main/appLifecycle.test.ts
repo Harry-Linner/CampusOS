@@ -62,25 +62,6 @@ vi.mock("electron", () => ({
   })
 }));
 
-const deskCalendarState = vi.hoisted(() => ({
-  enabled: false,
-  view: "month",
-  setEnabled: vi.fn(async (enabled: boolean) => {
-    deskCalendarState.enabled = enabled;
-  }),
-  setView: vi.fn(async (view: string) => {
-    deskCalendarState.view = view;
-  }),
-  settingsChangedListener: vi.fn()
-}));
-
-vi.mock("./deskCalendarWindow", () => ({
-  getDeskCalendarSettings: vi.fn(async () => ({ enabled: deskCalendarState.enabled, view: deskCalendarState.view })),
-  setDeskCalendarEnabled: deskCalendarState.setEnabled,
-  setDeskCalendarView: deskCalendarState.setView,
-  setDeskCalendarSettingsChangedListener: deskCalendarState.settingsChangedListener
-}));
-
 vi.mock("./ipcSecurity", () => ({
   assertTrustedRenderer: vi.fn()
 }));
@@ -95,8 +76,6 @@ beforeEach(() => {
   electronState.trayInstances.length = 0;
   electronState.trayImagePaths.length = 0;
   electronState.menuTemplate = [];
-  deskCalendarState.enabled = false;
-  deskCalendarState.view = "month";
 });
 
 afterEach(async () => {
@@ -217,17 +196,6 @@ describe("app lifecycle", () => {
     expect(window.restore).toHaveBeenCalledOnce();
     expect(window.show).toHaveBeenCalledOnce();
     expect(window.focus).toHaveBeenCalledOnce();
-
-    await electronState.menuTemplate.find((item) => item.label === "显示桌面日历")?.click?.();
-    expect(deskCalendarState.setEnabled).toHaveBeenCalledWith(true);
-
-    const viewMenu = electronState.menuTemplate.find((item) => item.label === "桌面日历视图");
-    await viewMenu?.submenu?.find((item) => item.label === "周视图")?.click?.();
-    expect(deskCalendarState.setView).toHaveBeenCalledWith("week");
-
-    await lifecycle.setSchedulePluginEnabled(false);
-    expect(deskCalendarState.setEnabled).toHaveBeenCalledWith(false);
-    expect(electronState.menuTemplate.some((item) => item.label === "桌面日历视图")).toBe(false);
 
     electronState.menuTemplate.find((item) => item.label === "退出 CampusOS")?.click?.();
     expect(electronState.quit).toHaveBeenCalledOnce();

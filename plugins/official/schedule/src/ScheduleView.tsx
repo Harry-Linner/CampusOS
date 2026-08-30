@@ -5,7 +5,6 @@ import type {
   LocalTaskRecord,
   PluginComponentProps
 } from "@campusos/shared";
-import type { DeskCalendarView } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
 import { Button } from "@/components/ui/button";
@@ -355,8 +354,8 @@ const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Dat
 export const ScheduleView = ({
   snapshot,
   schedule,
-  deskCalendar,
-  navigationTarget
+  navigationTarget,
+  academicCalendar
 }: ScheduleViewProps): JSX.Element => {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -369,10 +368,6 @@ export const ScheduleView = ({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [deskCalendarOpen, setDeskCalendarOpen] = useState(false);
-  const [deskCalendarEnabled, setDeskCalendarEnabledState] = useState(false);
-  const [deskCalendarView, setDeskCalendarViewState] = useState<DeskCalendarView>("month");
-  const [deskCalendarBusy, setDeskCalendarBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
   const [moreDay, setMoreDay] = useState<string | null>(null);
@@ -411,74 +406,6 @@ export const ScheduleView = ({
     [tasks]
   );
 
-  const loadMakeupCalendar = useCallback(async (): Promise<void> => {
-    if (!deskCalendar) return;
-    try {
-      const record = await deskCalendar.loadSettings();
-      setMakeupDays(record.makeupDays ?? []);
-      setStatutoryHolidays(record.statutoryHolidays ?? []);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法读取调休校历。");
-    }
-  }, [deskCalendar]);
-
-  const persistMakeupCalendar = async (nextHolidays: ReadonlyArray<{ date: string; label: string }>, nextMakeup: ReadonlyArray<{ date: string; weekday: number; source: "builtin" | "manual" }>): Promise<void> => {
-    if (!deskCalendar) return;
-    try {
-      await deskCalendar.updateSettings({ statutoryHolidays: [...nextHolidays], makeupDays: [...nextMakeup] });
-      setStatutoryHolidays(nextHolidays);
-      setMakeupDays(nextMakeup);
-      setContextDay(null);
-      setNotice("调休校历已更新");
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "调休校历保存失败。");
-    }
-  };
-
-  const setDayHoliday = async (date: string, label: string): Promise<void> => {
-    const existing = statutoryHolidays.find((holiday) => holiday.date === date);
-    const next = existing ? statutoryHolidays.map((holiday) => holiday.date === date ? { ...holiday, label } : holiday) : [...statutoryHolidays, { date, label }];
-    // 节假日与补课互斥：设节假日时移除该天的补课。
-    const nextMakeup = makeupDays.filter((makeup) => makeup.date !== date);
-    await persistMakeupCalendar(next, nextMakeup);
-  };
-
-  const clearDay = async (date: string): Promise<void> => {
-    await persistMakeupCalendar(
-      statutoryHolidays.filter((holiday) => holiday.date !== date),
-      makeupDays.filter((makeup) => makeup.date !== date)
-    );
-  };
-
-  const setDayMakeup = async (date: string, weekday: number): Promise<void> => {
-    const existing = makeupDays.find((makeup) => makeup.date === date);
-    const next = existing ? makeupDays.map((makeup) => makeup.date === date ? { ...makeup, weekday, source: "manual" as const } : makeup) : [...makeupDays, { date, weekday, source: "manual" as const }];
-    // 补课与节假日互斥：设补课时移除该天的节假日。
-    const nextHolidays = statutoryHolidays.filter((holiday) => holiday.date !== date);
-    await persistMakeupCalendar(nextHolidays, next);
-  };
-
-  const loadDeskCalendarState = useCallback(async (): Promise<void> => {
-    if (!deskCalendar) return;
-    try {
-      const record = await deskCalendar.loadSettings();
-      setDeskCalendarEnabledState(record.enabled);
-      setDeskCalendarViewState(record.view);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法读取桌面日历设置。");
-    }
-  }, [deskCalendar]);
-
-  useEffect(() => {
-    void loadDeskCalendarState();
-    void loadMakeupCalendar();
-    if (!deskCalendar) return undefined;
-    return deskCalendar.subscribe(() => {
-      void loadDeskCalendarState();
-      void loadMakeupCalendar();
-    });
-  }, [deskCalendar, loadDeskCalendarState, loadMakeupCalendar]);
-
   useEffect(() => {
     try {
       globalThis.localStorage?.setItem("campusos.schedule.event-style", eventStyle);
@@ -498,35 +425,56 @@ export const ScheduleView = ({
   const setEventStyle = (next: "bar" | "dot"): void => setEventStyleState(next);
   const setDensity = (next: "comfortable" | "compact"): void => setDensityState(next);
 
-  const toggleDeskCalendar = async (enabled: boolean): Promise<void> => {
-    if (!deskCalendar) return;
-    setDeskCalendarBusy(true);
-    setError(null);
+  const loadAcademicCalendar = useCallback(async (): Promise<void> => {
+    if (!academicCalendar) return;
     try {
-      const record = await deskCalendar.setEnabled(enabled);
-      setDeskCalendarEnabledState(record.enabled);
-      setDeskCalendarViewState(record.view);
-      setNotice(enabled ? "桌面日历已开启" : "桌面日历已关闭");
+      const record = await academicCalendar.loadSettings();
+      setMakeupDays(record.makeupDays ?? []);
+      setStatutoryHolidays(record.statutoryHolidays ?? []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "桌面日历设置保存失败。");
-    } finally {
-      setDeskCalendarBusy(false);
+      setError(cause instanceof Error ? cause.message : "无法读取调休校历。");
+    }
+  }, [academicCalendar]);
+
+  const persistAcademicCalendar = async (nextHolidays: ReadonlyArray<{ date: string; label: string }>, nextMakeup: ReadonlyArray<{ date: string; weekday: number; source: "builtin" | "manual" }>): Promise<void> => {
+    if (!academicCalendar) return;
+    try {
+      await academicCalendar.saveSettings({ statutoryHolidays: [...nextHolidays], makeupDays: [...nextMakeup] });
+      setStatutoryHolidays(nextHolidays);
+      setMakeupDays(nextMakeup);
+      setContextDay(null);
+      setNotice("调休校历已更新");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "调休校历保存失败。");
     }
   };
 
-  const changeDeskCalendarView = async (view: DeskCalendarView): Promise<void> => {
-    if (!deskCalendar) return;
-    setDeskCalendarBusy(true);
-    setError(null);
-    try {
-      const record = await deskCalendar.setView(view);
-      setDeskCalendarViewState(record.view);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "桌面日历视图切换失败。");
-    } finally {
-      setDeskCalendarBusy(false);
-    }
+  const setDayHoliday = async (date: string, label: string): Promise<void> => {
+    const existing = statutoryHolidays.find((holiday) => holiday.date === date);
+    const next = existing ? statutoryHolidays.map((holiday) => holiday.date === date ? { ...holiday, label } : holiday) : [...statutoryHolidays, { date, label }];
+    // 节假日与补课互斥：设节假日时移除该天的补课。
+    const nextMakeup = makeupDays.filter((makeup) => makeup.date !== date);
+    await persistAcademicCalendar(next, nextMakeup);
   };
+
+  const clearDay = async (date: string): Promise<void> => {
+    await persistAcademicCalendar(
+      statutoryHolidays.filter((holiday) => holiday.date !== date),
+      makeupDays.filter((makeup) => makeup.date !== date)
+    );
+  };
+
+  const setDayMakeup = async (date: string, weekday: number): Promise<void> => {
+    const existing = makeupDays.find((makeup) => makeup.date === date);
+    const next = existing ? makeupDays.map((makeup) => makeup.date === date ? { ...makeup, weekday, source: "manual" as const } : makeup) : [...makeupDays, { date, weekday, source: "manual" as const }];
+    // 补课与节假日互斥：设补课时移除该天的节假日。
+    const nextHolidays = statutoryHolidays.filter((holiday) => holiday.date !== date);
+    await persistAcademicCalendar(nextHolidays, next);
+  };
+
+  useEffect(() => {
+    void loadAcademicCalendar();
+  }, [loadAcademicCalendar]);
 
   const loadTasks = useCallback(async (): Promise<void> => {
     if (!schedule) return;
@@ -916,49 +864,6 @@ export const ScheduleView = ({
           <Button variant="ghost" type="button" disabled={busy} onClick={() => void exportPng()}>
             导出图片
           </Button>
-          {deskCalendar ? (
-            <div className="desk-calendar-control">
-              <button
-                className={`text-button${deskCalendarEnabled ? " is-active" : ""}`}
-                type="button"
-                disabled={deskCalendarBusy}
-                aria-expanded={deskCalendarOpen}
-                onClick={() => setDeskCalendarOpen((open) => !open)}
-              >
-                桌面日历{deskCalendarEnabled ? "：开" : ""}
-              </button>
-              {deskCalendarOpen ? (
-                <div className="desk-calendar-menu" role="menu" aria-label="桌面日历设置">
-                  <button
-                    className="desk-calendar-menu-item"
-                    type="button"
-                    disabled={deskCalendarBusy}
-                    onClick={() => void toggleDeskCalendar(!deskCalendarEnabled)}
-                  >
-                    {deskCalendarEnabled ? "关闭桌面日历" : "开启桌面日历"}
-                  </button>
-                  <div className="desk-calendar-menu-label">悬浮窗视图</div>
-                  <div className="desk-calendar-view-options" role="group" aria-label="桌面日历视图">
-                    {(["month", "week", "day"] as const).map((view) => (
-                      <button
-                        className={deskCalendarView === view ? "is-active" : undefined}
-                        type="button"
-                        aria-pressed={deskCalendarView === view}
-                        key={view}
-                        disabled={deskCalendarBusy || !deskCalendarEnabled}
-                        onClick={() => void changeDeskCalendarView(view)}
-                      >
-                        {view === "month" ? "月视图" : view === "week" ? "周视图" : "日视图"}
-                      </button>
-                    ))}
-                  </div>
-                  {deskCalendarEnabled ? (
-                    <p className="desk-calendar-menu-hint">悬浮日历已显示在桌面上，可在悬浮窗内拖动与调整。</p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       </header>
 

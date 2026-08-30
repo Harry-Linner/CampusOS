@@ -17,19 +17,12 @@ import type {
   CloseBehavior
 } from "../shared/appLifecycleBridge";
 import { assertTrustedRenderer } from "./ipcSecurity";
-import {
-  getDeskCalendarSettings,
-  setDeskCalendarEnabled,
-  setDeskCalendarSettingsChangedListener,
-  setDeskCalendarView
-} from "./deskCalendarWindow";
 
 const SETTINGS_FILE = "app-lifecycle.json";
 let settings: AppLifecycleSettings | null = null;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let appIsQuitting = false;
-let schedulePluginEnabled = true;
 
 const settingsPath = (): string => join(app.getPath("userData"), "settings", SETTINGS_FILE);
 
@@ -111,39 +104,9 @@ const developmentTrayIconPath = (): string => {
 
 const rebuildTrayMenu = async (): Promise<void> => {
   if (!tray) return;
-  const deskCalendar = await getDeskCalendarSettings();
-  const viewItems: MenuItemConstructorOptions[] = ([
-    ["月视图", "month"],
-    ["周视图", "week"],
-    ["日视图", "day"]
-  ] as const).map(([label, view]) => ({
-    label,
-    type: "radio",
-    checked: deskCalendar.view === view,
-    click: async () => {
-      await setDeskCalendarView(view);
-      await rebuildTrayMenu();
-    }
-  }));
   const template: MenuItemConstructorOptions[] = [
     { label: "打开 CampusOS", click: showCampusMainWindow }
   ];
-  if (schedulePluginEnabled) {
-    template.push(
-      {
-        label: deskCalendar.enabled ? "隐藏桌面日历" : "显示桌面日历",
-        click: async () => {
-          await setDeskCalendarEnabled(!deskCalendar.enabled);
-          await rebuildTrayMenu();
-        }
-      },
-      {
-        label: "桌面日历视图",
-        enabled: deskCalendar.enabled,
-        submenu: viewItems
-      }
-    );
-  }
   template.push(
     { type: "separator" },
     {
@@ -203,13 +166,6 @@ export const createCampusTray = async (): Promise<void> => {
   tray = new Tray(iconPath);
   tray.setToolTip("CampusOS");
   tray.on("double-click", showCampusMainWindow);
-  setDeskCalendarSettingsChangedListener(rebuildTrayMenu);
-  await rebuildTrayMenu();
-};
-
-export const setSchedulePluginEnabled = async (enabled: boolean): Promise<void> => {
-  schedulePluginEnabled = enabled;
-  if (!enabled) await setDeskCalendarEnabled(false);
   await rebuildTrayMenu();
 };
 

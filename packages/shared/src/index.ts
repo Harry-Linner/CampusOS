@@ -2,6 +2,7 @@ import type { CampusDownloadRequest, CampusWorkspaceSnapshot } from "./campus";
 import type { AppNavigationRequest } from "./appNavigationBridge";
 import type { BriefBridge } from "./brief";
 import type { CampusFeedBridge } from "./campusFeed";
+import type { AcademicCalendarBridge } from "./academicCalendar";
 import type {
   AiAssistantExtractionResult,
   AiAssistantConnectionTestInput,
@@ -25,9 +26,9 @@ export * from "./campus";
 export * from "./academicSemester";
 export * from "./brief";
 export * from "./campusFeed";
+export * from "./academicCalendar";
 export * from "./pluginCapabilities";
 export * from "./assistantDraft";
-export * from "./deskCalendarBridge";
 export * from "./appNavigationBridge";
 export * from "./feedbackBridge";
 export * from "./retryClassification";
@@ -189,13 +190,7 @@ export interface PluginComponentProps {
   };
   brief?: BriefBridge;
   campusFeed?: CampusFeedBridge;
-  deskCalendar?: {
-    loadSettings: () => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
-    setEnabled: (enabled: boolean) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
-    setView: (view: import("./deskCalendarBridge").DeskCalendarView) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
-    updateSettings: (patch: Partial<Omit<import("./deskCalendarBridge").DeskCalendarSettings, "savedAt" | "storagePath">>) => Promise<import("./deskCalendarBridge").DeskCalendarSettings>;
-    subscribe: (listener: () => void) => () => void;
-  };
+  academicCalendar?: AcademicCalendarBridge;
 }
 
 export interface PluginValidationResult {

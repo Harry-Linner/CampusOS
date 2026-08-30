@@ -48,13 +48,7 @@ import { registerCampusFeedHandlers } from "./campusFeedIpc";
 import { saveScheduleTask } from "./scheduleIpc";
 import { createBriefFetcher } from "./briefInfoSources";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
-import {
-  markDeskCalendarAppQuitting,
-  notifyDeskCalendarWorkspaceChanged,
-  registerDeskCalendarHandlers,
-  restoreDeskCalendarWindow
-} from "./deskCalendarWindow";
-import { registerDeskCalendarWidgetHandlers } from "./deskCalendarWidgetWindow";
+import { registerAcademicCalendarHandlers } from "./academicCalendarStore";
 import {
   attachMainWindowLifecycle,
   createCampusTray,
@@ -73,7 +67,6 @@ const workspaceRefreshScheduler = createWorkspaceRefreshScheduler({
   refresh: async () => {
     const result = await syncCampusWorkspace({ notifyGradeChanges: true });
     notifyCampusWorkspaceChanged();
-    notifyDeskCalendarWorkspaceChanged();
     return result;
   }
 });
@@ -186,6 +179,7 @@ const startCampusApp = (): void => {
     registerDownloadHandlers();
     registerScheduleHandlers();
     registerExportHandlers();
+    registerAcademicCalendarHandlers();
     const academicQueryData: AcademicQueryDataReader = {
       loadVerifiedStudentId: async () => {
         const record = await readAcademicCredentialRecord();
@@ -234,8 +228,6 @@ const startCampusApp = (): void => {
         );
       }
     });
-    registerDeskCalendarHandlers();
-    registerDeskCalendarWidgetHandlers();
     registerUpdateHandlers();
     registerAppLifecycleHandlers();
     registerNotificationHandlers();
@@ -244,9 +236,6 @@ const startCampusApp = (): void => {
     registerAnalyticsHandlers();
     await createMainWindow();
     await createCampusTray();
-    // 仅开机自启（--hidden 后台启动）时恢复用户已启用的桌面日历：正常启动
-    // 只呈现主窗口，桌面日历不应自动弹出，由用户在日程视图或托盘显式开启。
-    if (shouldStartHidden()) await restoreDeskCalendarWindow();
     // The updater is intentionally started after the first window exists so
     // packaged startup status is visible through the normal renderer event.
     void checkForUpdates();
@@ -274,6 +263,5 @@ app.on("window-all-closed", () => undefined);
 
 app.on("before-quit", () => {
   markCampusAppQuitting();
-  markDeskCalendarAppQuitting();
   workspaceRefreshScheduler.stop();
 });
