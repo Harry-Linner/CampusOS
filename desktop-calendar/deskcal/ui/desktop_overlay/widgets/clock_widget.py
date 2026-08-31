@@ -55,5 +55,23 @@ class ClockWidget(QWidget):
         self._timer.start(1000)
         self._tick()
 
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_font()
+
+    def _fit_font(self) -> None:
+        """组件区被拖窄时，把数码管字号缩到能放下 HH:MM:SS，避免秒被截断。"""
+        text = self._time_label.text()
+        if not text or self.width() <= 0:
+            return
+        font = self._time_label.font()
+        font.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 105)
+        for size in range(28, 7, -1):
+            font.setPointSize(size)
+            self._time_label.setFont(font)
+            if self._time_label.fontMetrics().horizontalAdvance(text) <= self.width() - 8:
+                break
+
     def _tick(self) -> None:
         self._time_label.setText(datetime.now().strftime("%H:%M:%S"))
+        self._fit_font()
