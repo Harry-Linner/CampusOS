@@ -174,6 +174,8 @@ class CalendarGrid(QWidget):
         today = date.today()
         self._year = today.year
         self._month = today.month
+        self._view = "month"  # month | week
+        self._anchor = today
 
         self._outer_layout = QVBoxLayout(self)
         self._outer_layout.setContentsMargins(4, 4, 4, 4)
@@ -185,11 +187,20 @@ class CalendarGrid(QWidget):
         self._title_label = QLabel()
         self._title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._title_label.setStyleSheet("color: #ffffff; font-size: 16px; font-weight: bold;")
-        self._prev_btn.clicked.connect(self._go_prev_month)
-        self._next_btn.clicked.connect(self._go_next_month)
+        self._prev_btn.clicked.connect(self._go_prev)
+        self._next_btn.clicked.connect(self._go_next)
         header_row.addWidget(self._prev_btn)
         header_row.addWidget(self._title_label, 1)
         header_row.addWidget(self._next_btn)
+        self._month_btn = QPushButton("月")
+        self._week_btn = QPushButton("周")
+        self._month_btn.setCheckable(True)
+        self._week_btn.setCheckable(True)
+        self._month_btn.setChecked(True)
+        self._month_btn.clicked.connect(lambda: self._set_view("month"))
+        self._week_btn.clicked.connect(lambda: self._set_view("week"))
+        header_row.addWidget(self._month_btn)
+        header_row.addWidget(self._week_btn)
         self._outer_layout.addLayout(header_row)
 
         self._grid_widget = QWidget()
@@ -212,25 +223,45 @@ class CalendarGrid(QWidget):
         self._day_cells: list[DayCellWidget] = []
         self.render()
 
-    def _go_prev_month(self) -> None:
-        if self._month == 1:
-            self._year -= 1
-            self._month = 12
-        else:
-            self._month -= 1
+    def _go_prev(self) -> None:
+        self._shift(-1)
         self.render()
 
-    def _go_next_month(self) -> None:
-        if self._month == 12:
-            self._year += 1
-            self._month = 1
+    def _go_next(self) -> None:
+        self._shift(1)
+        self.render()
+
+    def _shift(self, direction: int) -> None:
+        """按当前视图切时间：月视图 ±1 月，周视图 ±1 周。"""
+        if self._view == "month":
+            if self._month == 1 and direction < 0:
+                self._year -= 1
+                self._month = 12
+            elif self._month == 12 and direction > 0:
+                self._year += 1
+                self._month = 1
+            else:
+                self._month += direction
+            # 以每月 1 号作为该月的锚点
+            self._anchor = date(self._year, self._month, 1)
         else:
-            self._month += 1
+            self._anchor = self._anchor + timedelta(days=7 * direction)
+
+    def _set_view(self, view: str) -> None:
+        self._view = view
+        self._month_btn.setChecked(view == "month")
+        self._week_btn.setChecked(view == "week")
+        self._prev_btn.setText("上月" if view == "month" else "上一周")
+        self._next_btn.setText("下月" if view == "month" else "下一周")
         self.render()
 
     def _jump_to_month(self, day: date) -> None:
+        self._view = "month"
         self._year = day.year
         self._month = day.month
+        self._anchor = day
+        self._month_btn.setChecked(True)
+        self._week_btn.setChecked(False)
         self.render()
 
     def _open_create_dialog(self, day: date) -> None:
@@ -244,17 +275,17 @@ class CalendarGrid(QWidget):
             self.render()
 
     def render(self) -> None:
-        self._title_label.setText(f"{self._year}年{self._month}月")
+        if self._view == "month":
+            self._title_label.setText(f"{self._year}年{self._month}月")
+        else:
+            start = self._anchor - timedelta(days=self._anchor.isoweekday() - 1)
+            self._title_label.setText(f"{start.year}年{start.month}月 第 {self._anchor.isocalendar()[1]} 周")
 
         # 只清掉日期格子（第 1..ROWS 行），第 0 行的星期表头是常驻的，不跟着每次 render 重建。
         for cell in self._day_cells:
             self._grid_layout.removeWidget(cell)
             cell.deleteLater()
         self._day_cells = []
-
-        first_weekday, _ = calendar_module.monthrange(self._year, self._month)
-        first_day_of_month = date(self._year, self._month, 1)
-        grid_start = first_day_of_month - timedelta(days=first_weekday)
 
         today = date.today()
         all_dated_tasks = list(self._store.iter_active_dated_tasks())
@@ -265,11 +296,19 @@ class CalendarGrid(QWidget):
             except ValueError:
                 continue
 
-        for index in range(ROWS * COLS):
-            day = grid_start + timedelta(days=index)
-            row, col = divmod(index, COLS)
+        if self._view == "week":
+            week_start = self._anchor - timedelta(days=self._anchor.isoweekday() - 1)
+            days = [week_start + timedelta(days=offset) for offset in range(COLS)]
+        else:
+            first_weekday, _ = calendar_module.monthrange(self._year, self._month)
+            first_day_of_month = date(self._year, self._month, 1)
+            grid_start = first_day_of_month - timedelta(days=first_weekday)
+            days = [grid_start + timedelta(days=index) for index in range(ROWS * COLS)]
+
+        for index, day in enumerate(days):
             is_current_month = day.month == self._month and day.year == self._year
             is_today = day == today
+            row, col = (1, index) if self._view == "week" else (index // COLS + 1, index % COLS)
 
             cell = DayCellWidget(day, is_current_month, is_today, self._open_create_dialog, self._jump_to_month)
 
@@ -278,7 +317,7 @@ class CalendarGrid(QWidget):
             cell.set_tasks(day_tasks, self._open_edit_dialog, self._save_and_rerender)
             cell.set_feed_events(feed_by_day.get(day, []))
 
-            self._grid_layout.addWidget(cell, row + 1, col)
+            self._grid_layout.addWidget(cell, row, col)
             self._day_cells.append(cell)
 
     def _save_and_rerender(self) -> None:
