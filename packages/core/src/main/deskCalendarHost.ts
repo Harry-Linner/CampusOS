@@ -29,10 +29,15 @@ const findDeskCalendarDir = (): string | null => {
 };
 
 const findPython = (): string | null => {
-  // 开发期优先用 Fork 自带的 venv；否则回退系统 python。
+  // 优先用 vendored 副本自带的 venv；其次开发期可用的 .tmp 参照 venv；最后回退系统 python。
+  // 系统 python 通常没有 PyQt6，会导致 deskcal 直接 ImportError。
   const dir = findDeskCalendarDir();
-  if (dir && existsSync(join(dir, ".venv", "Scripts", "python.exe"))) {
-    return join(dir, ".venv", "Scripts", "python.exe");
+  const candidates = [
+    dir ? join(dir, ".venv", "Scripts", "python.exe") : null,
+    resolve(dirname((dir ?? "")), ".tmp", "DeskToDo", ".venv", "Scripts", "python.exe")
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
   }
   return "python";
 };

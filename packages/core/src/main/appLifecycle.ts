@@ -117,7 +117,12 @@ const rebuildTrayMenu = async (): Promise<void> => {
         if (isDeskCalendarRunning()) {
           closeDeskCalendar();
         } else {
-          void launchDeskCalendar().catch(() => undefined);
+          void launchDeskCalendar().catch((cause: unknown) => {
+            void dialog.showErrorBox(
+              "桌面日历启动失败",
+              cause instanceof Error ? cause.message : "无法启动桌面日历。"
+            );
+          });
         }
       }
     }
