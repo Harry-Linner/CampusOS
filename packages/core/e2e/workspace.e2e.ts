@@ -175,10 +175,10 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
       fullPage: true
     });
     await page.setViewportSize({ width: 1440, height: 960 });
-    await page.getByLabel("服务商").selectOption("openai-compatible");
-    await page.getByLabel("模型").fill("fixture-model");
-    await page.getByLabel("API Key").fill("fixture-key");
-    await page.getByLabel("接口地址").fill(assistantBaseUrl);
+    await page.locator(".settings-fields").getByLabel("服务商").selectOption("openai-compatible");
+    await page.locator(".settings-fields").getByLabel("模型").last().fill("fixture-model");
+    await page.locator(".settings-fields").getByLabel("API Key").last().fill("fixture-key");
+    await page.locator(".settings-fields").getByLabel("接口地址").last().fill(assistantBaseUrl);
     await page.getByRole("button", { name: "测试连接" }).click();
     await expect(page.getByText(/结构化能力可用/)).toBeVisible();
     await page.getByRole("button", { name: "保存设置" }).click();
@@ -209,7 +209,7 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
 
     await page.getByLabel("主导航").getByRole("button", { name: "AI 助手" }).click();
     await page.getByLabel("AI 助手视图").getByRole("button", { name: "设置" }).click();
-    await expect(page.getByLabel("模型")).toHaveValue("fixture-model");
+    await expect(page.locator(".settings-fields").getByLabel("模型").last()).toHaveValue("fixture-model");
     await expect(page.getByRole("button", { name: "测试连接" })).toBeEnabled();
     await expectNoRootOverflow(page);
 
