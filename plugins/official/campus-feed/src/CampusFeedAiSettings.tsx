@@ -103,7 +103,7 @@ export const CampusFeedAiSettings = ({ feed }: { feed: CampusFeedBridge }): JSX.
       {busy === "load" ? <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-10 w-full" />)}</div> : <>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1.5"><span className="text-xs leading-5 text-muted-foreground">服务商</span><select className="h-9 rounded-md border border-input bg-transparent px-3 text-sm" aria-label="服务商" value={ai.provider} onChange={(event) => changeProvider(event.target.value as CampusFeedAiProvider)}>{Object.entries(BRIEF_AI_PROVIDER_LABELS).map(([provider, label]) => <option key={provider} value={provider}>{label}</option>)}</select></label>
-          <label className="grid gap-1.5"><span className="text-xs leading-5 text-muted-foreground">模型</span><Input aria-label="模型" value={ai.model} placeholder="例如：deepseek-chat" onChange={(event) => setAi((current) => ({ ...current, model: event.target.value }))} /></label>
+          <label className="grid gap-1.5"><span className="text-xs leading-5 text-muted-foreground">模型</span><Input aria-label="模型" value={ai.model} placeholder="例如：deepseek-v4-flash" onChange={(event) => setAi((current) => ({ ...current, model: event.target.value }))} /></label>
         </div>
         <label className="grid gap-1.5"><span className="text-xs leading-5 text-muted-foreground">接口地址</span><Input aria-label="接口地址" value={ai.baseUrl} placeholder="https://…" onChange={(event) => setAi((current) => ({ ...current, baseUrl: event.target.value }))} /></label>
         <div className="grid gap-3 sm:grid-cols-2">

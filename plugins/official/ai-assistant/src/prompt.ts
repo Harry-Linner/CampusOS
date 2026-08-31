@@ -26,8 +26,8 @@ export const AI_ASSISTANT_MODEL_OPTIONS = {
     { value: "o4-mini", label: "o4-mini · 推理任务" }
   ],
   deepseek: [
-    { value: "deepseek-chat", label: "DeepSeek Chat · 通用任务" },
-    { value: "deepseek-reasoner", label: "DeepSeek Reasoner · 复杂消息" }
+    { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash · 快速通用" },
+    { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro · 复杂任务" }
   ],
   anthropic: [
     { value: "claude-sonnet-4-5", label: "Claude Sonnet · 通用任务" },

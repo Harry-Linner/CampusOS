@@ -57,7 +57,7 @@ export const AssistantModelFields = ({
           <Input
             aria-label="模型"
             value={model}
-            placeholder="例如：deepseek-chat"
+            placeholder="例如：deepseek-v4-flash"
             onChange={(event) => onModelChange(event.target.value)}
           />
         </label>
