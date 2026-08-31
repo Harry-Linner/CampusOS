@@ -164,7 +164,6 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.getByRole("button", { name: "AI 助手" }).click();
     await page.getByLabel("AI 助手视图").getByRole("button", { name: "设置" }).click();
     await expect(page.getByRole("heading", { name: "模型连接" })).toBeVisible();
-    await expect(page.getByLabel("协议")).toBeDisabled();
     await page.screenshot({
       path: testInfo.outputPath("assistant-settings-desktop.png"),
       fullPage: true
@@ -177,12 +176,10 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     });
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.getByLabel("服务商").selectOption("openai-compatible");
-    await expect(page.getByLabel("协议")).toBeEnabled();
+    await page.getByLabel("模型").fill("fixture-model");
     await page.getByLabel("API Key").fill("fixture-key");
-    await page.getByLabel("API 地址").fill(assistantBaseUrl);
-    await page.locator('select:has(option[value="__custom__"])').selectOption("__custom__");
-    await page.getByLabel("自定义模型名称").fill("fixture-model");
-    await page.getByRole("button", { name: "测试结构化能力" }).click();
+    await page.getByLabel("接口地址").fill(assistantBaseUrl);
+    await page.getByRole("button", { name: "测试连接" }).click();
     await expect(page.getByText(/结构化能力可用/)).toBeVisible();
     await page.getByRole("button", { name: "保存设置" }).click();
     await page.getByLabel("AI 助手视图").getByRole("button", { name: "消息" }).click();
@@ -212,12 +209,8 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
 
     await page.getByLabel("主导航").getByRole("button", { name: "AI 助手" }).click();
     await page.getByLabel("AI 助手视图").getByRole("button", { name: "设置" }).click();
-    await expect(page.locator('select:has(option[value="__custom__"])')).toHaveValue("__custom__");
-    await expect(page.getByLabel("自定义模型名称")).toHaveValue("fixture-model");
-    await expect(page.getByRole("option", { name: /其他模型/ })).toBeAttached();
-    await expect(page.getByRole("button", { name: "测试结构化能力" })).toBeEnabled();
-    await page.getByRole("button", { name: "获取模型列表" }).click();
-    await expect(page.getByText(/已发现 1 个模型/)).toBeVisible();
+    await expect(page.getByLabel("模型")).toHaveValue("fixture-model");
+    await expect(page.getByRole("button", { name: "测试连接" })).toBeEnabled();
     await expectNoRootOverflow(page);
 
     await page.getByLabel("主导航").getByRole("button", { name: "学业" }).click();
