@@ -108,6 +108,7 @@ const TimetablePanel = ({
   const [termKey, setTermKey] = useState("");
   const [summerOnly, setSummerOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -119,6 +120,7 @@ const TimetablePanel = ({
       )
     ]).then(([timetableResult, calendarResult]) => {
       if (!active) return;
+      setLoading(false);
       if (timetableResult.status === "rejected") {
         setRecords([]);
         setError(
@@ -306,7 +308,13 @@ const TimetablePanel = ({
           {error}
         </p>
       ) : null}
-      {!selected ? (
+      {loading ? (
+        <article className="panel-card" aria-live="polite">
+          <h2>正在读取</h2>
+          <p className="muted">正在通过插件能力绑定读取当前账号的课表记录。</p>
+        </article>
+      ) : null}
+      {!loading && !selected ? (
         <p className="muted">当前没有可用课表。</p>
       ) : visibleSessions.length === 0 ? (
         <p className="muted">
@@ -347,6 +355,7 @@ const CourseCatalogPanel = ({
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -354,11 +363,13 @@ const CourseCatalogPanel = ({
       .read<AcademicCourseCatalogData>("academic.course-catalog@1")
       .then((next) => {
         if (!active) return;
+        setLoading(false);
         setRecords(next);
         setError(null);
       })
       .catch((reason: unknown) => {
         if (active) {
+          setLoading(false);
           setError(reason instanceof Error ? reason.message : "课程目录读取失败。");
         }
       });
@@ -406,6 +417,12 @@ const CourseCatalogPanel = ({
         <p className="panel-error" role="alert">
           {error}
         </p>
+      ) : null}
+      {loading ? (
+        <article className="panel-card" aria-live="polite">
+          <h2>正在读取</h2>
+          <p className="muted">正在通过插件能力绑定读取当前账号的课程目录。</p>
+        </article>
       ) : null}
       <div className="academic-course-layout">
         <ul className="academic-record-list academic-course-list">
@@ -480,6 +497,7 @@ const PracticePanel = ({
     []
   );
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -487,11 +505,13 @@ const PracticePanel = ({
       .read<AcademicPracticeData>("practice.records@1")
       .then((next) => {
         if (!active) return;
+        setLoading(false);
         setRecords(next);
         setError(null);
       })
       .catch((reason: unknown) => {
         if (active) {
+          setLoading(false);
           setError(reason instanceof Error ? reason.message : "素拓记录读取失败。");
         }
       });
@@ -513,7 +533,12 @@ const PracticePanel = ({
           {error}
         </p>
       ) : null}
-      {!data ? (
+      {loading ? (
+        <article className="panel-card" aria-live="polite">
+          <h2>正在读取</h2>
+          <p className="muted">正在通过插件能力绑定读取当前账号的素拓实践记录。</p>
+        </article>
+      ) : !data ? (
         <p className="muted">当前没有可用素拓记录。</p>
       ) : (
         <>
