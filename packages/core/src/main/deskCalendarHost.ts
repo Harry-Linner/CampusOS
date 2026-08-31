@@ -15,6 +15,17 @@ interface CampusFeedEvent {
 }
 
 let deskCalendarProcess: ChildProcess | null = null;
+let deskCalendarVisible = false;
+
+const getVisibilityPath = (): string =>
+  join(app.getPath("userData"), "desk-calendar-visible.json");
+
+const writeVisibilityFlag = async (visible: boolean): Promise<void> => {
+  deskCalendarVisible = visible;
+  const path = getVisibilityPath();
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, JSON.stringify({ visible }), "utf8");
+};
 
 const findDeskCalendarDir = (): string | null => {
   // 从应用启动目录向上逐级查找 desktop-calendar/deskcal/main.py。
@@ -114,6 +125,7 @@ export const writeDeskCalendarFeed = async (): Promise<void> => {
 };
 
 export const launchDeskCalendar = async (): Promise<void> => {
+  await writeVisibilityFlag(true);
   if (deskCalendarProcess && deskCalendarProcess.exitCode === null) return;
   const dir = findDeskCalendarDir();
   if (!dir) throw new Error("未找到桌面日历（desktop-calendar/）。");
@@ -131,15 +143,20 @@ export const launchDeskCalendar = async (): Promise<void> => {
   });
 };
 
-export const closeDeskCalendar = (): void => {
+/** 关闭（隐藏）：保留进程实现懒加载，下次唤起直接显示，避免冷启动开销。 */
+export const closeDeskCalendar = async (): Promise<void> => {
+  await writeVisibilityFlag(false);
+};
+
+/** 应用退出时再真正结束 DeskToDo 进程。 */
+export const killDeskCalendar = (): void => {
   if (deskCalendarProcess) {
     deskCalendarProcess.kill();
     deskCalendarProcess = null;
   }
 };
 
-export const isDeskCalendarRunning = (): boolean =>
-  deskCalendarProcess !== null && deskCalendarProcess.exitCode === null;
+export const isDeskCalendarRunning = (): boolean => deskCalendarVisible;
 
 export const registerDeskCalendarHostHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:process:start", async () => {
@@ -147,7 +164,7 @@ export const registerDeskCalendarHostHandlers = (): void => {
     return { running: isDeskCalendarRunning() };
   });
   ipcMain.handle("campusos:desk-calendar:process:stop", async () => {
-    closeDeskCalendar();
+    await closeDeskCalendar();
     return { running: false };
   });
   ipcMain.handle("campusos:desk-calendar:process:status", async () => ({

@@ -115,7 +115,7 @@ const rebuildTrayMenu = async (): Promise<void> => {
       label: "桌面日历",
       click: () => {
         if (isDeskCalendarRunning()) {
-          closeDeskCalendar();
+          void closeDeskCalendar().catch(() => undefined);
         } else {
           void launchDeskCalendar().catch((cause: unknown) => {
             void dialog.showErrorBox(

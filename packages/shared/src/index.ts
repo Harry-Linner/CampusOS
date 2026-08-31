@@ -191,6 +191,12 @@ export interface PluginComponentProps {
   brief?: BriefBridge;
   campusFeed?: CampusFeedBridge;
   academicCalendar?: AcademicCalendarBridge;
+  desktopCalendarHost?: {
+    start: () => Promise<{ running: boolean }>;
+    stop: () => Promise<{ running: boolean }>;
+    status: () => Promise<{ running: boolean }>;
+    refreshFeed: () => Promise<{ ok: boolean }>;
+  };
 }
 
 export interface PluginValidationResult {

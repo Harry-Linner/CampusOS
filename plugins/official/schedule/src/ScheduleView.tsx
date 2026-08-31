@@ -355,7 +355,8 @@ export const ScheduleView = ({
   snapshot,
   schedule,
   navigationTarget,
-  academicCalendar
+  academicCalendar,
+  desktopCalendarHost
 }: ScheduleViewProps): JSX.Element => {
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -475,6 +476,27 @@ export const ScheduleView = ({
   useEffect(() => {
     void loadAcademicCalendar();
   }, [loadAcademicCalendar]);
+
+  const [deskCalendarRunning, setDeskCalendarRunning] = useState(false);
+
+  useEffect(() => {
+    void desktopCalendarHost?.status().then((record) => setDeskCalendarRunning(record.running)).catch(() => undefined);
+  }, [desktopCalendarHost]);
+
+  const toggleDeskCalendar = async (): Promise<void> => {
+    const next = !deskCalendarRunning;
+    setDeskCalendarRunning(next);
+    try {
+      if (next) {
+        await desktopCalendarHost?.refreshFeed?.();
+        await desktopCalendarHost?.start();
+      } else {
+        await desktopCalendarHost?.stop();
+      }
+    } catch {
+      setDeskCalendarRunning(!next);
+    }
+  };
 
   const loadTasks = useCallback(async (): Promise<void> => {
     if (!schedule) return;
@@ -863,6 +885,14 @@ export const ScheduleView = ({
           </Button>
           <Button variant="ghost" type="button" disabled={busy} onClick={() => void exportPng()}>
             导出图片
+          </Button>
+          <Button
+            variant={deskCalendarRunning ? "destructive" : "default"}
+            type="button"
+            disabled={busy}
+            onClick={() => void toggleDeskCalendar()}
+          >
+            {deskCalendarRunning ? "关闭桌面日历" : "打开桌面日历"}
           </Button>
         </div>
       </header>

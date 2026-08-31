@@ -51,7 +51,7 @@ import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { registerAcademicCalendarHandlers } from "./academicCalendarStore";
 import {
   registerDeskCalendarHostHandlers,
-  closeDeskCalendar
+  killDeskCalendar
 } from "./deskCalendarHost";
 import {
   attachMainWindowLifecycle,
@@ -268,6 +268,6 @@ app.on("window-all-closed", () => undefined);
 
 app.on("before-quit", () => {
   markCampusAppQuitting();
-  closeDeskCalendar();
+  killDeskCalendar();
   workspaceRefreshScheduler.stop();
 });

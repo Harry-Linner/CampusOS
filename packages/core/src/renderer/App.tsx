@@ -296,6 +296,7 @@ export const App = (): JSX.Element => {
           brief: window.campusos?.brief,
           campusFeed: window.campusos?.campusFeed,
           academicCalendar: window.campusos?.academicCalendar,
+          desktopCalendarHost: window.campusos?.desktopCalendarHost,
           navigationTarget: navigationTarget?.viewId === activeView ? navigationTarget : null
         }}
       />
