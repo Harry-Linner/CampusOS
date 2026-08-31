@@ -94,6 +94,7 @@ Electron tests cover the controlled path.
 ## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
 
 - CampusOS 只有一个应用生命周期；桌面日历作为可选的桌面常驻能力，由 CampusOS 主进程启动托管（当前为 vendored 的 DeskToDo(PyQt6, MIT) 壳子，位于 `desktop-calendar/`，通过托盘“桌面日历”开关启停；课程/考试/作业/任务以只读 feed 注入渲染）。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
+- DeskToDo 依赖 PyQt6；`desktop-calendar/.venv`（被 .gitignore 忽略）存放其 Python 环境，首次使用执行 `desktop-calendar/scripts/setup-venv.ps1`。CampusOS 托管时会优先使用该 venv 的 python（系统 python 通常无 PyQt6，会导致 deskcal ImportError）。
 - 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
 - 任务删除采用软删除进入“最近删除”，默认保留 30 天；用户可恢复或永久删除。重复任务在回收站按系列/来源分组展示，已完成实例是否随系列删除由用户决断。
 - 恢复已过期实例由用户选择是否包含过期实例；已过期提醒永不恢复、不补发，未来提醒按原规则重新注册。
