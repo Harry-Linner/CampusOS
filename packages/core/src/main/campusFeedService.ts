@@ -265,17 +265,30 @@ export const createCampusFeedService = ({
     if (!hydration) {
       hydration = (async () => {
         const stored = database.listCampusFeedSources();
+        const savedAt = now().toISOString();
         if (stored.length === 0) {
           sources = MVP_CAMPUS_FEED_SOURCES.map((source) => ({ ...source }));
-          const savedAt = now().toISOString();
           for (const source of sources) {
             database.saveCampusFeedSource(source.id, source, savedAt);
           }
         } else {
+          const known = new Set(
+            stored
+              .map((entry) => entry.config)
+              .filter(isDescriptor)
+              .map((source) => source.id)
+          );
           sources = stored
             .map((entry) => entry.config)
             .filter(isDescriptor)
             .map((source) => ({ ...source }));
+          // 老安装补种缺失的默认源（保留用户已做的启停/间隔设置）。
+          for (const source of MVP_CAMPUS_FEED_SOURCES) {
+            if (!known.has(source.id)) {
+              sources.push({ ...source });
+              database.saveCampusFeedSource(source.id, source, savedAt);
+            }
+          }
         }
         hydrated = true;
       })();

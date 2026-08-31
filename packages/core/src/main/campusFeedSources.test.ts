@@ -30,19 +30,26 @@ const XGB_HTML = `
 </body></html>`;
 
 describe("campusFeedSources", () => {
-  it("defines the four MVP sources with selectors", () => {
-    expect(MVP_CAMPUS_FEED_SOURCES.map((source) => source.id)).toEqual([
-      "xgb-pingjiang",
-      "ugrs-dwjl",
-      "zjutw-tzgg",
-      "ckc-zxtz"
-    ]);
-    for (const source of MVP_CAMPUS_FEED_SOURCES) {
+  it("defines default sources: enabled ones carry selectors or an adapter, candidates are disabled", () => {
+    const ids = MVP_CAMPUS_FEED_SOURCES.map((source) => source.id);
+    // 原有 MVP 四源保留
+    for (const id of ["xgb-pingjiang", "ugrs-dwjl", "zjutw-tzgg", "ckc-zxtz"]) {
+      expect(ids).toContain(id);
+    }
+    // 唯一 id
+    expect(new Set(ids).size).toBe(ids.length);
+    // 默认启用源：声明式选择器（或 rss adapter）+ 合法间隔
+    const enabled = MVP_CAMPUS_FEED_SOURCES.filter((source) => source.enabled);
+    expect(enabled.length).toBeGreaterThan(10);
+    for (const source of enabled) {
+      expect(source.selectors?.container || source.adapterId === "rss").toBeTruthy();
+      expect(source.intervalMinutes).toBeGreaterThanOrEqual(1);
+    }
+    // 候选源（默认关闭，开发期待核验 selectors）也必须带选择器
+    for (const source of MVP_CAMPUS_FEED_SOURCES.filter((candidate) => !candidate.enabled)) {
       expect(source.selectors?.container).toBeTruthy();
       expect(source.selectors?.title).toBeTruthy();
       expect(source.selectors?.link).toBeTruthy();
-      expect(source.intervalMinutes).toBe(60);
-      expect(source.enabled).toBe(true);
     }
   });
 
@@ -105,5 +112,49 @@ describe("campusFeedSources", () => {
     await expect(
       fetchSourceList(descriptor("xgb-pingjiang"), { fetchFn: failing })
     ).rejects.toThrow(/500/);
+  });
+
+  it("parses a Drupal RSS feed via the rss adapter", async () => {
+    const rss = `
+    <rss version="2.0"><channel><title>Intl Campus</title>
+      <item><title>Opening of the new library wing</title><link>https://www.intl.zju.edu.cn/news/opening</link><pubDate>Wed, 20 Aug 2026 08:00:00 +0000</pubDate><description>Grand opening ceremony.</description></item>
+      <item><title>No-link item skipped</title></item>
+    </channel></rss>`;
+    const { items } = await fetchSourceList(descriptor("intl-rss"), { fetchFn: mockFetch(rss) });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      sourceId: "intl-rss",
+      title: "Opening of the new library wing",
+      url: "https://www.intl.zju.edu.cn/news/opening",
+      summary: "Grand opening ceremony."
+    });
+    expect(items[0].publishedAt).not.toBeNull();
+  });
+
+  it("decodes GBK-encoded list pages when encoding is set", async () => {
+    const ascii = (value: string): number[] => [...new TextEncoder().encode(value)];
+    // “中文”的 GBK 字节：D6 D0 CE C4
+    const gbkHtml = new Uint8Array([
+      ...ascii('<li class="news"><span class="news_title"><a href="/2026/0101/c1a1/page.htm" title="'),
+      0xd6, 0xd0, 0xce, 0xc4,
+      ...ascii('">x</a></span><span class="news_meta">2026-01-01</span></li>')
+    ]);
+    const fetchGbk = vi.fn(async () => new Response(gbkHtml, { status: 200 })) as unknown as typeof fetch;
+    const { items } = await fetchSourceList(descriptor("tyys-tzgg"), { fetchFn: fetchGbk });
+    expect(items).toHaveLength(1);
+    expect(items[0].title).toBe("中文");
+  });
+
+  it("fetches additional sudic pages when maxPages is set", async () => {
+    const page1 = `<li class="news"><span class="news_title"><a href="/2026/0101/c1a1/page.htm" title="一">一</a></span><span class="news_meta">2026-01-01</span></li>`;
+    const page2 = `<li class="news"><span class="news_title"><a href="/2026/0102/c1a2/page.htm" title="二">二</a></span><span class="news_meta">2026-01-02</span></li>`;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("list.htm")) return new Response(page1, { status: 200 });
+      if (url.endsWith("list2.htm")) return new Response(page2, { status: 200 });
+      return new Response("", { status: 404 });
+    }) as unknown as typeof fetch;
+    const { items } = await fetchSourceList(descriptor("bksy-tzgg"), { fetchFn: fetcher });
+    expect(items.map((item) => item.title)).toEqual(["一", "二"]);
   });
 });

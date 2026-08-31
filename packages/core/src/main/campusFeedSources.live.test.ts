@@ -17,9 +17,11 @@ const liveVerificationRequested =
 const liveIt = liveVerificationRequested ? it : it.skip;
 
 describe("campus-feed MVP sources live verification", () => {
-  liveIt("fetches and parses every MVP list page", async () => {
+  liveIt("fetches and parses every enabled list page", async () => {
     const results: string[] = [];
-    for (const source of MVP_CAMPUS_FEED_SOURCES) {
+    // 只验证默认启用的源（本环境可达、selectors 已核实）；候选源在校内网核验后打开。
+    const targets = MVP_CAMPUS_FEED_SOURCES.filter((source) => source.enabled);
+    for (const source of targets) {
       try {
         const outcome = await fetchSourceList(source, { fetchTimeoutMs: 20_000 });
         const items = outcome.items;
@@ -32,10 +34,13 @@ describe("campus-feed MVP sources live verification", () => {
         results.push(`${source.id}: ${items.length} 条`);
       } catch (cause) {
         results.push(`${source.id}: 失败 ${cause instanceof Error ? cause.message : String(cause)}`);
-        throw cause;
       }
     }
+    // 打印聚合结果（仅计数，不打印条目内容）
+    console.log(results.join("\n"));
+    const failures = results.filter((line) => line.includes("失败"));
+    expect(failures).toEqual([]);
     // Aggregate counts only, never item bodies.
-    expect(results).toHaveLength(MVP_CAMPUS_FEED_SOURCES.length);
+    expect(results).toHaveLength(targets.length);
   }, 120_000);
 });

@@ -49,6 +49,8 @@ export interface FeedSourceDescriptor {
   extraHosts?: string[];
   /** List page URL. */
   listUrl: string;
+  /** 声明式抓取页数（苏迪分页 list2.htm…），默认 1（只抓第 1 页）。 */
+  maxPages?: number;
   /** Declarative selectors; absent when a code adapter handles this source. */
   selectors?: FeedListSelectorConfig;
   /** Code adapter id used when selectors are absent. */

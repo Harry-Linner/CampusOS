@@ -50,15 +50,14 @@ afterEach(async () => {
 });
 
 describe("campusFeedService", () => {
-  it("seeds the four MVP sources on first run and reports them in the snapshot", async () => {
+  it("seeds the default sources on first run and reports them in the snapshot", async () => {
     service = createCampusFeedService({ database, startScheduler: false });
     const snapshot = await service.getSnapshot();
-    expect(snapshot.sources.map((source) => source.id)).toEqual([
-      "xgb-pingjiang",
-      "ugrs-dwjl",
-      "zjutw-tzgg",
-      "ckc-zxtz"
-    ]);
+    // 原有 MVP 四源保留 + 新增默认源全部入库
+    expect(snapshot.sources.map((source) => source.id)).toEqual(
+      MVP_CAMPUS_FEED_SOURCES.map((source) => source.id)
+    );
+    expect(snapshot.sources.filter((source) => source.enabled).length).toBeGreaterThan(10);
     expect(snapshot.items).toEqual([]);
   });
 
