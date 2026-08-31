@@ -266,7 +266,6 @@ class OverlayWindow(QWidget):
         self.setWindowTitle("DeskToDo")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.WindowStaysOnBottomHint
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)

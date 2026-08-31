@@ -1,5 +1,4 @@
 import type { CampusDownloadRequest } from "@campusos/shared";
-import { isDevelopmentCoursewareSemester } from "./developmentDataPolicy";
 
 export type CampusDownloadClassification =
   | { kind: "public" }
@@ -32,9 +31,6 @@ export const classifyCampusDownloadRequest = (
   input: CampusDownloadRequest
 ): CampusDownloadClassification => {
   if (input.sourceId !== "learning-platform") return { kind: "public" };
-  if (!isDevelopmentCoursewareSemester(input.semester)) {
-    throw new Error("开发阶段只允许下载 2025-2026 学年春夏学期课件。");
-  }
 
   const referenceId = parseExactLearningId(
     input.url,

@@ -44,11 +44,4 @@ describe("campus download request policy", () => {
       fallbackUrl: undefined
     })).toEqual({ kind: "public" });
   });
-
-  it("rejects learning materials outside the development baseline semester", () => {
-    expect(() => classifyCampusDownloadRequest({
-      ...validRequest(),
-      semester: "2025-2026秋冬"
-    })).toThrow("开发阶段只允许下载 2025-2026 学年春夏学期课件");
-  });
 });

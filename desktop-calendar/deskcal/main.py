@@ -16,6 +16,7 @@ from deskcal.ui.desktop_overlay.overlay_window import OverlayWindow
 from deskcal.ui.desktop_overlay.widgets.registry import WidgetConfigStore
 from deskcal.ui.onboarding.wizard import OnboardingWizard
 from deskcal.utils import crypto
+from deskcal.utils.desktop_pin import pin_window_to_desktop
 from deskcal.utils.icons import app_icon
 
 
@@ -36,6 +37,11 @@ def main() -> None:
 
     window = OverlayWindow(store)
     window.show()
+    # 由 CampusOS 托盘启用时跳到前台，让用户立刻看到；用户可自行移动/贴合。
+    window.raise_()
+    window.activateWindow()
+    # Win+D"显示桌面"免疫：把窗口钉入桌面层(WorkerW)，Win+D 后它在桌面可见、不会消失。
+    pin_window_to_desktop(int(window.winId()))
     app.aboutToQuit.connect(window.persist_geometry)
 
     tray = TrayIcon(window)
