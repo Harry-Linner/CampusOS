@@ -12,6 +12,7 @@ interface GlobalSearchProps {
   open: boolean;
   snapshot: CampusWorkspaceSnapshot | null;
   schedule?: PluginComponentProps["schedule"];
+  campusFeed?: { getSnapshot: () => Promise<{ items: Array<{ id: string; title: string; sourceId: string; summary: string | null }> }> };
   onClose: () => void;
   onNavigate: (navigation: GlobalSearchNavigation) => void;
 }
@@ -19,22 +20,25 @@ interface GlobalSearchProps {
 const kindLabels: Record<GlobalSearchKind, string> = {
   course: "课程",
   item: "事项",
-  material: "资料"
+  material: "资料",
+  feed: "资讯"
 };
 
 export const GlobalSearch = ({
   open,
   snapshot,
   schedule,
+  campusFeed,
   onClose,
   onNavigate
 }: GlobalSearchProps): JSX.Element | null => {
   const [query, setQuery] = useState("");
   const [tasks, setTasks] = useState<LocalTaskRecord[]>([]);
+  const [feedItems, setFeedItems] = useState<Array<{ id: string; title: string; sourceId: string; summary: string | null }>>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const index = useMemo(
-    () => buildGlobalSearchIndex(snapshot, tasks),
-    [snapshot, tasks]
+    () => buildGlobalSearchIndex(snapshot, tasks, feedItems),
+    [snapshot, tasks, feedItems]
   );
   const results = useMemo(() => searchGlobalIndex(index, query), [index, query]);
 
@@ -51,6 +55,16 @@ export const GlobalSearch = ({
     });
     return () => { active = false; unsubscribe?.(); };
   }, [open, schedule]);
+
+  // Load campus-feed items so 校园资讯 content is searchable.
+  useEffect(() => {
+    if (!open || !campusFeed) return;
+    let active = true;
+    void campusFeed.getSnapshot().then((snapshot) => {
+      if (active) setFeedItems(snapshot.items);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [open, campusFeed]);
 
   useEffect(() => {
     if (!open) return;

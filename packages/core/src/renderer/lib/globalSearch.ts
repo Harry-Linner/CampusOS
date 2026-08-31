@@ -1,6 +1,6 @@
 import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 
-export type GlobalSearchKind = "course" | "item" | "material";
+export type GlobalSearchKind = "course" | "item" | "material" | "feed";
 
 /** Where to navigate when a result is clicked, and what to locate inside the target view. */
 export interface GlobalSearchNavigation {
@@ -38,9 +38,19 @@ const semesterKeyFromStartAt = (startAt: string): string | undefined => {
 
 export const buildGlobalSearchIndex = (
   snapshot: CampusWorkspaceSnapshot | null,
-  tasks: readonly LocalTaskRecord[] = []
+  tasks: readonly LocalTaskRecord[] = [],
+  campusFeedItems: ReadonlyArray<{ id: string; title: string; sourceId: string; summary: string | null }> = []
 ): GlobalSearchResult[] => {
   if (!snapshot) return [];
+
+  const feedIndex = campusFeedItems.map<GlobalSearchResult>((item) => ({
+    id: `feed:${item.id}`,
+    kind: "feed",
+    title: item.title,
+    detail: compact([item.sourceId]),
+    searchableText: compact([item.title, item.summary]),
+    navigation: { viewId: "campus-feed", entityId: item.id }
+  }));
 
   const courses = new Map<string, GlobalSearchResult>();
   for (const course of snapshot.courses) {
@@ -114,7 +124,7 @@ export const buildGlobalSearchIndex = (
       navigation: { viewId: "schedule", entityId: task.id }
     }));
 
-  return [...courses.values(), ...items, ...materialIndex, ...taskIndex];
+  return [...courses.values(), ...items, ...materialIndex, ...taskIndex, ...feedIndex];
 };
 
 const scoreResult = (result: GlobalSearchResult, query: string): number => {

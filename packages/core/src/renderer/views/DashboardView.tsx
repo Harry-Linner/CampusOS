@@ -175,6 +175,13 @@ export const DashboardView = ({
   const courseStates = getCourseStates(courses, now);
   const deadlines = sortDeadlines(snapshot.deadlines);
 
+  const isTodayInShanghai = (iso: string): boolean => {
+    const tz = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" });
+    const todayKey = tz.format(new Date(now));
+    return tz.format(new Date(iso)) === todayKey;
+  };
+  const todayDeadlines = deadlines.filter((deadline) => isTodayInShanghai(deadline.dueAt));
+
   const exportMarkdown = async (): Promise<void> => {
     setExportBusy(true);
     setExportError(null);
@@ -288,10 +295,10 @@ export const DashboardView = ({
         <section className="content-section schedule-section" aria-labelledby="today-heading">
           <header className="section-heading">
             <h2 id="today-heading">今日事项预览</h2>
-            <span>{courses.length} 项</span>
+            <span>{courses.length + todayDeadlines.length} 项</span>
           </header>
 
-          {courses.length === 0 ? (
+          {courses.length === 0 && todayDeadlines.length === 0 ? (
             <div className="quiet-empty-state quiet-empty-compact">今日暂无课程安排</div>
           ) : (
             <ol className="course-timeline">
@@ -321,6 +328,22 @@ export const DashboardView = ({
                   </li>
                 );
               })}
+              {todayDeadlines.map((deadline) => (
+                <li key={`today-deadline:${deadline.id}`} className={`course-item is-${deadline.priority === "urgent" ? "current" : "next"}`}>
+                  <div className="course-time">
+                    <strong>{formatDateTime(deadline.dueAt)}</strong>
+                    <span>{deadlineKindLabelMap[deadline.kind]}</span>
+                  </div>
+                  <div className="timeline-marker" aria-hidden="true">
+                    <span />
+                  </div>
+                  <div className="course-content">
+                    <strong>{deadline.title}</strong>
+                    <span>{deadline.courseName ?? deadlineKindLabelMap[deadline.kind]}</span>
+                    {deadline.note ? <small>{deadline.note}</small> : null}
+                  </div>
+                </li>
+              ))}
             </ol>
           )}
         </section>

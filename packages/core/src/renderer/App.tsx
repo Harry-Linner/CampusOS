@@ -358,6 +358,7 @@ export const App = (): JSX.Element => {
         open={searchOpen}
         snapshot={workspace.snapshot}
         schedule={window.campusos?.schedule}
+        campusFeed={window.campusos?.campusFeed}
         onClose={() => setSearchOpen(false)}
         onNavigate={(navigation) => {
           setActiveView(navigation.viewId as ActivityItemId);
