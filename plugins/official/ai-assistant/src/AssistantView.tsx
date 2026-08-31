@@ -15,6 +15,7 @@ import {
   toEditable
 } from "@campusos/shared";
 import { AssistantModelFields } from "./AssistantModelFields";
+import { AI_ASSISTANT_PROVIDER_OPTIONS } from "./prompt";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   AI_ASSISTANT_DEFAULT_BASE_URL,
   AI_ASSISTANT_DEFAULT_MODEL,
-  AI_ASSISTANT_DEFAULT_PROVIDER,
-  AI_ASSISTANT_DEFAULT_PROTOCOL
+  AI_ASSISTANT_DEFAULT_PROVIDER
 } from "./prompt";
 
 type AssistantSection = "message" | "settings";
@@ -39,10 +39,8 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
   const [settings, setSettings] = useState<AiAssistantSettingsRecord | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<AiAssistantProvider>(AI_ASSISTANT_DEFAULT_PROVIDER);
-  const [protocol, setProtocol] = useState<AiAssistantProtocol>(AI_ASSISTANT_DEFAULT_PROTOCOL);
   const [baseUrl, setBaseUrl] = useState(AI_ASSISTANT_DEFAULT_BASE_URL);
   const [model, setModel] = useState(AI_ASSISTANT_DEFAULT_MODEL);
-  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
   const [busy, setBusy] = useState<BusyAction>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -54,7 +52,7 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
     setBusy("load-settings");
     void assistant.loadSettings().then((record) => {
       if (!active) return;
-      setSettings(record); setProvider(record.provider); setProtocol(record.protocol); setBaseUrl(record.baseUrl); setModel(record.model); setError(null);
+      setSettings(record); setProvider(record.provider); setBaseUrl(record.baseUrl); setModel(record.model); setError(null);
     }).catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "无法读取 AI 助手配置。"); }).finally(() => { if (active) setBusy(null); });
     return () => { active = false; };
   }, [assistant]);
@@ -74,10 +72,13 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
     } catch (cause) { setError(cause instanceof Error ? cause.message : "AI 解析失败。"); } finally { setBusy(null); }
   };
 
+  const protocolFor = (p: AiAssistantProvider): AiAssistantProtocol =>
+    AI_ASSISTANT_PROVIDER_OPTIONS.find((option) => option.value === p)?.protocol ?? "openai-chat-completions";
+
   const saveSettings = async (): Promise<void> => {
     if (!assistant) return;
     setBusy("save-settings"); setError(null); setNotice(null);
-    try { const record = await assistant.saveSettings({ apiKey, provider, protocol, baseUrl, model }); setSettings(record); setApiKey(""); setNotice("AI 连接配置已安全保存。"); }
+    try { const record = await assistant.saveSettings({ apiKey, provider, protocol: protocolFor(provider), baseUrl, model }); setSettings(record); setApiKey(""); setNotice("AI 连接配置已安全保存。"); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "AI 连接配置保存失败。"); }
     finally { setBusy(null); }
   };
@@ -85,23 +86,15 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
   const testConnection = async (): Promise<void> => {
     if (!assistant) return;
     setBusy("test-connection"); setError(null); setNotice(null);
-    try { const result = await assistant.testConnection({ apiKey, provider, protocol, baseUrl, model }); setNotice(`结构化能力可用 · ${result.provider} / ${result.model} · ${result.latencyMs} ms`); }
+    try { const result = await assistant.testConnection({ apiKey, provider, protocol: protocolFor(provider), baseUrl, model }); setNotice(`结构化能力可用 · ${result.provider} / ${result.model} · ${result.latencyMs} ms`); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "连接测试失败。"); }
-    finally { setBusy(null); }
-  };
-
-  const discoverModels = async (): Promise<void> => {
-    if (!assistant) return;
-    setBusy("discover-models"); setError(null); setNotice(null);
-    try { const result = await assistant.discoverModels({ apiKey, provider, protocol, baseUrl }); setDiscoveredModels(result.models); setNotice(`已发现 ${result.models.length} 个模型 · ${result.latencyMs} ms`); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "模型列表获取失败；可以继续手动填写模型 ID。"); }
     finally { setBusy(null); }
   };
 
   const clearSettings = async (): Promise<void> => {
     if (!assistant) return;
     setBusy("clear-settings"); setError(null); setNotice(null);
-    try { const record = await assistant.clearSettings(); setSettings(record); setProvider(record.provider); setProtocol(record.protocol); setBaseUrl(record.baseUrl); setModel(record.model); setApiKey(""); setExtraction(null); setEditable([]); setAcademicResult(null); setNotice("已清除 AI 连接密钥。"); }
+    try { const record = await assistant.clearSettings(); setSettings(record); setProvider(record.provider); setBaseUrl(record.baseUrl); setModel(record.model); setApiKey(""); setExtraction(null); setEditable([]); setAcademicResult(null); setNotice("已清除 AI 连接密钥。"); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "连接清除失败。"); }
     finally { setBusy(null); }
   };
@@ -147,11 +140,10 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
               <h2 id="assistant-model-heading" className="text-base font-semibold leading-7">模型连接</h2>
               <span className="text-xs text-muted-foreground">{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span>
             </div>
-            <div className="settings-fields"><AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} protocol={protocol} baseUrl={baseUrl} model={model} discoveredModels={discoveredModels} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); setDiscoveredModels([]); }} onProtocolChange={(value) => { setProtocol(value); setDiscoveredModels([]); }} onBaseUrlChange={(value) => { setBaseUrl(value); setDiscoveredModels([]); }} onModelChange={setModel} /></div>
+            <div className="settings-fields"><AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} baseUrl={baseUrl} model={model} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); }} onBaseUrlChange={setBaseUrl} onModelChange={setModel} /></div>
             <p className="text-xs leading-5 text-muted-foreground">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
             <div className="settings-actions">
-              <Button variant="outline" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试结构化能力"}</Button>
-              <Button variant="outline" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !baseUrl.trim() || busy !== null} onClick={() => void discoverModels()}>{busy === "discover-models" ? "正在获取模型" : "获取模型列表"}</Button>
+              <Button variant="outline" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试连接"}</Button>
               {settings?.configured ? <Button variant="ghost" className="text-destructive" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</Button> : null}
             </div>
           </section>

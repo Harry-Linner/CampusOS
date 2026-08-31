@@ -81,7 +81,12 @@ def main() -> None:
     tray = TrayIcon(window)
     tray.show()
 
-    if load_appearance()["autostart_enabled"]:
+    # 由 CampusOS 托管启动时（存在 CAMPUSOS_USER_DATA 环境变量）禁用 DeskToDo 自身的开机自启，
+    # 避免与 CampusOS 的开机自启重复；独立运行时才按用户设置处理。
+    managed_by_campusos = os.environ.get("CAMPUSOS_USER_DATA") is not None
+    if managed_by_campusos:
+        autostart.disable_autostart()
+    elif load_appearance()["autostart_enabled"]:
         autostart.enable_autostart()
     else:
         autostart.disable_autostart()
