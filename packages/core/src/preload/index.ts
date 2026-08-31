@@ -130,6 +130,12 @@ contextBridge.exposeInMainWorld("campusos", {
     saveSettings: (input: unknown) =>
       ipcRenderer.invoke("campusos:academic-calendar:settings:save", input)
   },
+  desktopCalendarHost: {
+    start: () => ipcRenderer.invoke("campusos:desk-calendar:process:start"),
+    stop: () => ipcRenderer.invoke("campusos:desk-calendar:process:stop"),
+    status: () => ipcRenderer.invoke("campusos:desk-calendar:process:status"),
+    refreshFeed: () => ipcRenderer.invoke("campusos:desk-calendar:feed:refresh")
+  },
   assistant: {
     loadSettings: () => ipcRenderer.invoke("campusos:assistant:settings:load"),
     saveSettings: (input: { apiKey: string; provider: string; protocol: string; baseUrl: string; model: string }) =>

@@ -54,6 +54,12 @@ export interface CampusosBridge {
   brief?: BriefBridge;
   campusFeed?: CampusFeedBridge;
   academicCalendar?: AcademicCalendarBridge;
+  desktopCalendarHost?: {
+    start: () => Promise<{ running: boolean }>;
+    stop: () => Promise<{ running: boolean }>;
+    status: () => Promise<{ running: boolean }>;
+    refreshFeed: () => Promise<{ ok: boolean }>;
+  };
   plugins: PluginRuntimeBridge;
   diagnostics: DiagnosticBridge;
   exports: ExportBridge;

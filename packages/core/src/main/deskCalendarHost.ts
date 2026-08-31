@@ -17,13 +17,25 @@ interface CampusFeedEvent {
 let deskCalendarProcess: ChildProcess | null = null;
 
 const findDeskCalendarDir = (): string | null => {
-  const candidates = [
-    resolve(process.cwd(), "desktop-calendar"),
-    resolve(app.getAppPath(), "desktop-calendar"),
-    resolve(dirname(app.getAppPath()), "desktop-calendar")
+  // 从应用启动目录向上逐级查找 desktop-calendar/deskcal/main.py。
+  // dev 下 process.cwd()/app.getAppPath() 是 packages/core，桌面历在仓库根，需向上找。
+  const starts = [
+    process.cwd(),
+    app.getAppPath(),
+    resolve(dirname(app.getAppPath()))
   ];
-  for (const candidate of candidates) {
-    if (existsSync(join(candidate, "deskcal", "main.py"))) return candidate;
+  const seen = new Set<string>();
+  for (const start of starts) {
+    let dir = start;
+    for (let i = 0; i < 8; i++) {
+      if (seen.has(dir)) break;
+      seen.add(dir);
+      const candidate = join(dir, "desktop-calendar");
+      if (existsSync(join(candidate, "deskcal", "main.py"))) return candidate;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
   }
   return null;
 };
