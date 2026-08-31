@@ -1,0 +1,592 @@
+﻿[
+    {
+        "url":  "https://www.zju.edu.cn/41533/listm.htm",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  16838,
+        "title":  "æ±æ¯æ°é»ç½ç»¼å",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://bksy.zju.edu.cn/gksybwhyw_83935/list.htm",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  84182,
+        "title":  "å·¥ç§è¯éªç­ï¼æµ·æ´ï¼",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://zulg.zju.edu.cn/notice.htm",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  27979,
+        "title":  "éç¥å\u0085¬å-æµæ±å¤§å­¦åå¤éå¢",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://pi.zju.edu.cn/67027/list68.psp",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  20786,
+        "title":  "学生工作",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.career.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  7570,
+        "title":  "浙江大学就业服务平台",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://sztz.zju.edu.cn/",
+        "status":  200,
+        "charset":  "",
+        "length":  134,
+        "title":  "正在跳转...",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://libweb.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  92796,
+        "title":  "æµæ±å¤§å­¦å¾ä¹¦é¦ä¸­æç½",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "http://www.xlzx.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  73703,
+        "title":  "æµæ±å¤§å­¦å¿çå¥åº·æè²ä¸å¨è¯¢ä¸­å¿",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "http://tzzd.zju.edu.cn",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  3235,
+        "title":  "",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://courses.zju.edu.cn/user/index",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  23041,
+        "title":  "",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://zdbk.zju.edu.cn/",
+        "status":  200,
+        "charset":  "",
+        "length":  68,
+        "title":  "",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://yjsy.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  9068,
+        "title":  "ç ç©¶çæè²ç®¡çä¿¡æ¯ç³»ç»",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://research.zju.edu.cn",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  18694,
+        "title":  "研在浙大",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://xwfw.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  51414,
+        "title":  "我的浙大",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://zhfw.zju.edu.cn/65686/list.htm",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  40401,
+        "title":  "å­¦é¢ï¼ç³»ï¼",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://ugrs.zju.edu.cn/dwjlfwpt/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  91459,
+        "title":  "æµæ±å¤§å­¦æ¬ç§çå¯¹å¤äº¤æµæå¡å¹³å°",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://itc.zju.edu.cn/main.htm",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  156484,
+        "title":  "ä¿¡æ¯ææ¯ä¸­å¿",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://mq.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027mq.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.cs.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://cs.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21526,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.cst.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://isee.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21530,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://cse.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://ee.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://me.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://cee.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21528,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.opt.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.opt.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://civil.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027civil.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://aero.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027aero.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://mse.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  76978,
+        "title":  "æµæ±å¤§å­¦ææç§å­¦ä¸å·¥ç¨å­¦é¢ä¸­æç½",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://che.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://www.ocean.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.ocean.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://math.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21530,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://phys.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027phys.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://chem.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027chem.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://cls.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21528,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://bfs.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027bfs.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.cer.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.cer.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.cab.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://www.cas.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://www.medicine.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.medicine.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://pharm.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027pharm.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://cec.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  21528,
+        "title":  "浙江大学邮件系统",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.som.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://ls.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  1431,
+        "title":  "æµæ±å¤§å­¦åå²å­¦é¢",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.gse.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.gse.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.humanities.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.humanities.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://sis.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027sis.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.cmc.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "远程服务器返回错误: (503) 服务器不可用。"
+    },
+    {
+        "url":  "https://www.sps.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027www.sps.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://mks.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027mks.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://www.psych.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://yunfeng.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  1414,
+        "title":  "æµæ±å¤§å­¦ç´«äºç¢§å³°å­¦å­",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://lantian.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://danqing.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "未能解析此远程名称: \u0027danqing.zju.edu.cn\u0027"
+    },
+    {
+        "url":  "https://ckc.zju.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "无法连接到远程服务器"
+    },
+    {
+        "url":  "https://www.intl.zju.edu.cn/",
+        "status":  200,
+        "charset":  "utf-8",
+        "length":  121104,
+        "title":  "Home | International Campus Zhejiang University",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://pi.zju.edu.cn/",
+        "status":  200,
+        "charset":  "UTF-8",
+        "length":  227260,
+        "title":  "æµæ±å¤§å­¦å·¥ç¨å¸å­¦é¢",
+        "reachable":  true,
+        "redirect":  "",
+        "note":  ""
+    },
+    {
+        "url":  "https://www.zucc.edu.cn/",
+        "status":  "ERR",
+        "charset":  "",
+        "length":  0,
+        "title":  "",
+        "reachable":  false,
+        "redirect":  "",
+        "note":  "基础连接已经关闭: 未能为 SSL/TLS 安全通道建立信任关系。"
+    }
+]
