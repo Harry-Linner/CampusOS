@@ -2,6 +2,14 @@
 
 > 背景：CampusOS 是"分体式"应用——主窗口 + 桌面日历 overlay 副窗口。OS 级截图和无障碍树对副窗口不可靠（遮挡/副屏/iframe 阻断）。本文记录经过实际验证的操作+截图方案，以及每轮代码改动后的自测要求。本文由真实闭环验证得出（当天用该方案发现并修复了桌面日历两个真实 UI bug）。
 
+## 0. 抓取方式（不依赖桌面全屏截图）
+
+**不要用 `CopyFromScreen` 全屏截图**（会把 DSH/命令行等上层窗口盖上来）。两个窗口各自用"窗口内容"抓取：
+
+- **CampusOS 主窗口 / 任何 Electron 窗口**：CDP `Page.screenshot` —— `node scripts/visual.mjs shot "5173" out.png`（抓的是页面渲染内容，不是桌面）。
+- **桌面日历 DeskToDo（PyQt/Qt，非 Chromium）**：`PrintWindow(hwnd, hdc, 2)` 抓窗口句柄内容（不受底层/遮挡/前置窗口影响）。示例在 `.tmp/visual/app/02-desktodo.png`（枚举标题为 `DeskToDo` 的窗口 → PrintWindow）。
+- 触发桌面历：跑起的应用里 `window.campusos.desktopCalendarHost.start()`（CDP eval），返回 `{running:true}` 即成功；feed 由主进程写入 `%userData%/desk-calendar-feed.json`，含真实课程/考试/任务。
+
 ## 1. 标准方案：CDP 逐窗口截图与操作（已验证 ✅）
 
 Electron 是 Chromium。应用以调试端口启动后，**每个 BrowserWindow 都是独立的 CDP target**，可以独立截图、独立注入真实输入、独立读 DOM——不受遮挡、多显示器、OS 无障碍树限制影响，且能穿透插件 iframe（输入走 CDP Input 域，是真实 DOM 事件）。
