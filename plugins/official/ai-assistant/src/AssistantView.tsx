@@ -140,11 +140,10 @@ export const AssistantView = ({ snapshot, schedule, assistant }: PluginComponent
               <h2 id="assistant-model-heading" className="text-base font-semibold leading-7">模型连接</h2>
               <span className="text-xs text-muted-foreground">{busy === "load-settings" ? "读取中" : settings?.configured ? "已配置" : "未配置"}</span>
             </div>
-            <div className="settings-fields"><AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} baseUrl={baseUrl} model={model} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); }} onBaseUrlChange={setBaseUrl} onModelChange={setModel} /></div>
+            <div className="settings-fields"><AssistantModelFields apiKey={apiKey} configured={settings?.configured === true} provider={provider} baseUrl={baseUrl} model={model} onApiKeyChange={setApiKey} onProviderChange={(value) => { setProvider(value); }} onBaseUrlChange={setBaseUrl} onModelChange={setModel} onClearKey={() => void clearSettings()} /></div>
             <p className="text-xs leading-5 text-muted-foreground">输入和粘贴不会自动上传；只有解析或连接测试会把请求发送到上面选定的服务商。API Key 由系统安全存储加密。</p>
             <div className="settings-actions">
               <Button variant="outline" type="button" disabled={!assistant || (!apiKey.trim() && !settings?.configured) || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void testConnection()}>{busy === "test-connection" ? "正在测试" : "测试连接"}</Button>
-              {settings?.configured ? <Button variant="ghost" className="text-destructive" type="button" disabled={busy !== null} onClick={() => void clearSettings()}>{busy === "clear-settings" ? "正在清除" : "清除 API Key"}</Button> : null}
             </div>
           </section>
           <div className="flex justify-end"><Button type="button" disabled={!assistant || !model.trim() || !baseUrl.trim() || busy !== null} onClick={() => void saveSettings()}>{busy === "save-settings" ? "正在保存" : "保存设置"}</Button></div>

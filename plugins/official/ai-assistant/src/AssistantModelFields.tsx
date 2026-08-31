@@ -1,11 +1,7 @@
 import type { AiAssistantProvider } from "@campusos/shared";
-import {
-  AI_ASSISTANT_CUSTOM_MODEL,
-  AI_ASSISTANT_MODEL_OPTIONS,
-  AI_ASSISTANT_PROVIDER_OPTIONS
-} from "./prompt";
+import { AI_ASSISTANT_PROVIDER_OPTIONS } from "./prompt";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 interface AssistantModelFieldsProps {
   apiKey: string;
@@ -18,8 +14,10 @@ interface AssistantModelFieldsProps {
   onProviderChange: (value: AiAssistantProvider) => void;
   onBaseUrlChange: (value: string) => void;
   onModelChange: (value: string) => void;
+  onClearKey: () => void;
 }
 
+/** 与【校园资讯-设置-AI处理】一比一复刻：服务商下拉 + 模型文本框 + 接口地址 + API Key。 */
 export const AssistantModelFields = ({
   apiKey,
   autoFocusApiKey = false,
@@ -30,22 +28,17 @@ export const AssistantModelFields = ({
   onApiKeyChange,
   onProviderChange,
   onBaseUrlChange,
-  onModelChange
+  onModelChange,
+  onClearKey
 }: AssistantModelFieldsProps): JSX.Element => {
-  const presets = AI_ASSISTANT_MODEL_OPTIONS[provider] ?? [];
-  const selectedModel = presets.some((option) => option.value === model)
-    ? model
-    : model
-      ? AI_ASSISTANT_CUSTOM_MODEL
-      : presets[0]?.value ?? AI_ASSISTANT_CUSTOM_MODEL;
-
   return (
-    <>
+    <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="field-stack">
-          <Label htmlFor="assistant-model-provider">服务商</Label>
+        <label className="grid gap-1.5">
+          <span className="text-xs leading-5 text-muted-foreground">服务商</span>
           <select
-            id="assistant-model-provider"
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+            aria-label="服务商"
             value={provider}
             onChange={(event) => {
               const next = AI_ASSISTANT_PROVIDER_OPTIONS.find((option) => option.value === event.target.value);
@@ -53,52 +46,50 @@ export const AssistantModelFields = ({
               onApiKeyChange("");
               onProviderChange(next.value);
               onBaseUrlChange(next.baseUrl);
-              onModelChange(AI_ASSISTANT_MODEL_OPTIONS[next.value][0]?.value ?? "");
+              onModelChange("");
             }}
           >
             {AI_ASSISTANT_PROVIDER_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
-        </div>
-        <div className="field-stack">
-          <Label htmlFor="assistant-model-select">模型</Label>
-          <select
-            id="assistant-model-select"
-            value={selectedModel}
-            onChange={(event) => onModelChange(event.target.value === AI_ASSISTANT_CUSTOM_MODEL ? "" : event.target.value)}
-          >
-            {presets.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            <option value={AI_ASSISTANT_CUSTOM_MODEL}>其他模型</option>
-          </select>
-        </div>
+        </label>
+        <label className="grid gap-1.5">
+          <span className="text-xs leading-5 text-muted-foreground">模型</span>
+          <Input
+            aria-label="模型"
+            value={model}
+            placeholder="例如：deepseek-chat"
+            onChange={(event) => onModelChange(event.target.value)}
+          />
+        </label>
       </div>
-      {selectedModel === AI_ASSISTANT_CUSTOM_MODEL ? (
-        <div className="field-stack">
-          <Label htmlFor="assistant-model-custom">自定义模型名称</Label>
-          <Input id="assistant-model-custom" value={model} onChange={(event) => onModelChange(event.target.value)} placeholder="填写服务商返回的模型 ID" />
-        </div>
-      ) : null}
-      <div className="field-stack">
-        <Label htmlFor="assistant-model-base-url">接口地址</Label>
+      <label className="grid gap-1.5">
+        <span className="text-xs leading-5 text-muted-foreground">接口地址</span>
         <Input
-          id="assistant-model-base-url"
-          type="url"
+          aria-label="接口地址"
           value={baseUrl}
-          onChange={(event) => onBaseUrlChange(event.target.value)}
           placeholder="https://…"
+          onChange={(event) => onBaseUrlChange(event.target.value)}
         />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1.5">
+          <span className="text-xs leading-5 text-muted-foreground">API Key</span>
+          <Input
+            aria-label="API Key"
+            type="password"
+            autoFocus={autoFocusApiKey}
+            autoComplete="off"
+            value={apiKey}
+            placeholder={configured ? "已配置，留空保持不变" : "输入 API Key"}
+            onChange={(event) => onApiKeyChange(event.target.value)}
+          />
+        </label>
+        {configured ? (
+          <label className="flex items-end gap-2 pb-0.5">
+            <Button type="button" variant="outline" size="sm" className="text-destructive" onClick={onClearKey}>清除已保存的密钥</Button>
+          </label>
+        ) : null}
       </div>
-      <div className="field-stack">
-        <Label htmlFor="assistant-model-api-key">API Key</Label>
-        <Input
-          id="assistant-model-api-key"
-          type="password"
-          autoFocus={autoFocusApiKey}
-          autoComplete="off"
-          value={apiKey}
-          onChange={(event) => onApiKeyChange(event.target.value)}
-          placeholder={configured ? "已配置，留空保持不变" : "输入 API Key"}
-        />
-      </div>
-    </>
+    </div>
   );
 };
