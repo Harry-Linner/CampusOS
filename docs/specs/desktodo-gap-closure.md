@@ -1,5 +1,7 @@
 # DeskToDo 差异闭环计划
 
+> **状态校正（2026-09-03）：** 本文记录的 DTD-01 至 DTD-10 与自查证据对应此前已移除的桌历实现。当前运行桌历是 `deskCalendarHost.ts`/`desk-calendar.tsx` 的 Electron 路径，不能据此自动继承“已完成”状态。本文保留为 DeskToDo 对照和历史证据；当前桌历的功能回归与视觉验收应另按 `plan.md` 的开发期工作台执行。
+
 ## 目的
 
 本文件记录 CampusOS 与仓库内 `.tmp/DeskToDo` 对照实现之间的十项桌面效率能力差异。GitHub Gist/日历同步不在范围内：该能力已确认不可用，不作为 CampusOS 的缺口或验收项。

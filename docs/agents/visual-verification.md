@@ -7,8 +7,8 @@
 **不要用 `CopyFromScreen` 全屏截图**（会把 DSH/命令行等上层窗口盖上来）。两个窗口各自用"窗口内容"抓取：
 
 - **CampusOS 主窗口 / 任何 Electron 窗口**：CDP `Page.screenshot` —— `node scripts/visual.mjs shot "5173" out.png`（抓的是页面渲染内容，不是桌面）。
-- **桌面日历 DeskToDo（PyQt/Qt，非 Chromium）**：`PrintWindow(hwnd, hdc, 2)` 抓窗口句柄内容（不受底层/遮挡/前置窗口影响）。示例在 `.tmp/visual/app/02-desktodo.png`（枚举标题为 `DeskToDo` 的窗口 → PrintWindow）。
-- 触发桌面历：跑起的应用里 `window.campusos.desktopCalendarHost.start()`（CDP eval），返回 `{running:true}` 即成功；feed 由主进程写入 `%userData%/desk-calendar-feed.json`，含真实课程/考试/任务。
+- **桌面日历（当前 Electron `BrowserWindow`）**：CDP `Page.screenshot` —— `node scripts/visual.mjs shot "desk-calendar" out.png`。它和主窗口一样是 Chromium target，可独立截图和操作，不受桌面遮挡影响。
+- 触发桌面历：通过当前应用提供的桌历开关或受信桥启动，再以 `list` 确认 `/desk-calendar.html` target 出现。`desktop-calendar/` 的 PyQt DeskToDo 仅是对照实现；如单独研究它才使用 `PrintWindow`，其截图不构成 CampusOS 当前桌历验收。
 
 ## 1. 标准方案：CDP 逐窗口截图与操作（已验证 ✅）
 
@@ -46,11 +46,11 @@ node scripts/visual.mjs eval "desk-calendar" "<js 表达式>"      # 读状态/�
 2. **better-sqlite3 双重构建**：`CAMPUSOS_DEV_CDP_PORT=... pnpm dev` 启动会把 better-sqlite3 重编为 Electron 版；随后直接跑 `pnpm --filter @campusos/core test` 会报 `NODE_MODULE_VERSION` 不匹配。跑单测用仓库根 `pnpm test`（会先重编 Node 版）。反过来：**dev/Electron 进程开着时不要跑重编**（`EBUSY/EPERM` 锁文件失败）——先停 dev、`taskkill /F /IM electron.exe`，跑完测试再重启 dev。
 3. **透明窗口截图丢 alpha**：CDP 截图会把桌面日历的毛玻璃透明底合成到不透明底色上，看不到"透出壁纸"的真实效果。验收主题/透明度时，需补一张 OS 级全屏截图做对照（显示"最小化所有窗口"后桌面上的真实层叠效果）。
 4. **陈旧帧**：隐藏/遮挡窗口有 backgroundThrottling。如截图内容明显滞后，先对目标窗口做一次交互（click/eval）再截，或在 overlay 的 webPreferences 里加 `backgroundThrottling: false`（尚未加，暂无需要）。
-5. **OS 无障碍路线的局限（备忘）**：computer-use 的 AXPress 对 Core 渲染的侧栏有效，但对插件 iframe 内的按钮无效（按压被接受但界面无反应）；Qt 类外部应用（DeskToDo）窗口枚举不到。这些场景一律走 CDP 脚本或 OS 截图+坐标。
+5. **OS 无障碍路线的局限（备忘）**：computer-use 的 AXPress 对 Core 渲染的侧栏有效，但对插件 iframe 内的按钮无效（按压被接受但界面无反应）。当前桌历也应走 CDP；仅在验证透明贴底层叠效果时补 OS 截图。
 
 ### 纯浏览器直开 renderer 的结论
 
-不可行（已验证代码级原因）：`DeskCalendarApp.tsx` 等直接读取 `window.deskCalendar` / `window.campusos`，无降级防护；SQLite、safeStorage、多窗口协调、天气 fetch 全在主进程。为浏览器单独造全量 mock 桥成本高且必然漂移，违反真实链路验收纪律。调试 UI 一律用 CDP attach 真 Electron。
+不可行（已验证代码级原因）：`desk-calendar.tsx` 等直接读取 `window.deskCalendar` / `window.campusos`，无降级防护；SQLite、safeStorage、多窗口协调、天气 fetch 全在主进程。为浏览器单独造全量 mock 桥成本高且必然漂移，违反真实链路验收纪律。调试 UI 一律用 CDP attach 真 Electron。
 
 ## 2. 操作链路清单（每轮改动后自己跑一遍、看一遍）
 
@@ -58,13 +58,11 @@ node scripts/visual.mjs eval "desk-calendar" "<js 表达式>"      # 读状态/�
 
 ### 桌面日历（desk-calendar）
 
-- P1 月视图渲染：`list` → `shot`。检查：三列布局（组件/待办/月格）、农历、今日描边高亮、当日议程、空态文案无裸露 HTML。
-- P1 组件开关：`click` 组件 → 截图菜单（四个复选框+排序+主题+透明度）→ 切主题各截一张（深夜/纸白/极光/森林）→ 关闭菜单验证列渲染与勾选一致。
-- P1 天气链路：`click` "刷新天气" → 截图。检查：4 天预报 + 最高/最低双折线 + 相对更新时间；**组件列宽 218px 内是否溢出**（已知问题：温度行会横向溢出并出现底部横向滚动条）。
-- P1 新建待办弹窗：`click` "＋ 添加待办" → 截图（Dialog：任务名称+取消/保存）→ 填入 → 保存 → 截图验证列表 → 测试数据须删除。
-- P2 待办 tab 切换/完成/恢复：点击 进行中/已完成、✓/↺。
-- P2 月/周/日切换 + 今天按钮 + 月份导航。
-- P2 与主窗口联动：日历内点事件 → 主窗口跳转 Dialog；右键 → 原位详情。
+- P1 当前桌历首屏：启动 → `list` → `shot`。检查日期网格、今日高亮、农历/节假日开关（如启用）、事件文本和空态均无溢出或裸露 HTML。
+- P1 月/周/日切换、今天按钮、月份导航和设置面板：逐步操作并截图，确认运行时状态与保存后的状态一致。
+- P1 新建或完成本地任务：走当前窗口提供的真实交互，截图确认写入后的显示；测试数据须删除。
+- P2 与主窗口联动：日历事件详情、只读上游事件和本地任务编辑边界各走一次。
+- 组件独立悬浮窗不是当前代码功能；若恢复，必须先重新立项并将其链路补回本清单。
 
 ### 主窗口·日程（localhost:5173）
 
@@ -85,7 +83,9 @@ node scripts/visual.mjs eval "desk-calendar" "<js 表达式>"      # 读状态/�
 4. 验收结论写进对应 spec 的自查记录（引用截图文件路径，截图存 `.tmp/visual/`，不入库）。
 5. e2e（`pnpm --filter @campusos/core test:e2e`，需先停 dev）+ commit + push + `gh run watch` CI 绿。
 
-## 4. DeskToDo 对照首查（2026-08-28，两 overlay 并排实测）
+## 4. DeskToDo 对照首查（2026-08-28，历史研究）
+
+> 以下内容对应已移除的旧桌历实现，仅用于理解 DeskToDo 的交互取舍；不得作为当前 Electron 桌历的功能或视觉验收结论。
 
 DeskToDo（PyQt6，`.tmp/DeskToDo`，`python -m venv .venv && .venv/Scripts/pip install -r requirements.txt && .venv/Scripts/python -m deskcal.main`）与 CampusOS 桌面日历并排观察：
 
@@ -101,7 +101,7 @@ DeskToDo（PyQt6，`.tmp/DeskToDo`，`python -m venv .venv && .venv/Scripts/pip 
 - **教室地点映射、考试座位：要做**，严格对照 Celechron 1.3.0 对应实现（`location_mapper`、考试 seat 字段）迁移。
 - **研究生教务真实链路**：等用户拿到研究生账号后再验收。
 - **桌面日历必须默认贴底**：壁纸之上、所有普通窗口之下（DeskToDo 同款行为，用户 2026-08-28 明确：当前顶层悬浮"影响我使用了"，属错误行为）。贴底是 #2 独立悬浮组件方向的硬性前提，不是可选项。
-- **桌历形态：直接做独立悬浮组件**（用户跳过原型阶段拍板，DeskToDo 式）。
+- **桌历形态：直接做独立悬浮组件**（历史决策：其 Electron 实现已被删除，当前不生效；重新启动该方向前须按 B3 重立 spec）。
 - 前任 agent 的视觉验收结论一律不采信（无自主多模态能力），涉及 UI 的判断以本方案重新实测为准。
 - 验证时反复开关桌历会打扰用户实际使用：验证应快速开合、验完即关，贴底实现前不让桌历常驻。
 

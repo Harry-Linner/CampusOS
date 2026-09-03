@@ -19,11 +19,11 @@
 
 ## 2. 验收要点（Feature Completion 自查项）
 
-- [ ] 真实/夹具刷新均产生台账记录（每个 source 至少一条含 fingerprint 与分类的 entry）
-- [ ] retryable/fatal 分类与 retryPolicy.classifyError 语义一致（timeout/abort/ECONN*/408/429/5xx → retryable；其余 → fatal）
-- [ ] 上游变化提示：同一 source 的 fingerprint 与上一条不同时置 upstreamChange=true，并在视图/导出中可见
-- [ ] 导出脱敏不变（fingerprint 经 sanitizeDiagnosticText；不含凭证/私有 URL 参数值）
-- [ ] 手动探针：对单个 source 触发一次刷新并立即产生台账记录
+- [x] 真实/夹具刷新均产生台账记录（每个 source 至少一条含 fingerprint 与分类的 entry）
+- [x] retryable/fatal 分类与 retryPolicy.classifyError 语义一致（timeout/abort/ECONN*/408/429/5xx → retryable；其余 → fatal）
+- [x] 上游变化提示：同一 source 的 fingerprint 与上一条不同时置 upstreamChange=true，并在视图/导出中可见
+- [x] 导出脱敏不变（fingerprint 经 sanitizeDiagnosticText；不含凭证/私有 URL 参数值）
+- [x] 手动探针：对单个 source 触发一次刷新并立即产生台账记录
 - [ ] 视图遵循 docs/research/ai-frontend-lessons.md（无意义框、对齐、间距、溢出等），以渲染截图验收
 
 ## 3. 数据模型

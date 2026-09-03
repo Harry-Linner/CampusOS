@@ -21,11 +21,11 @@
 
 ## 2. 验收要点
 
-- [ ] 正样例（代码仅使用已声明权限）→ status "verified"，无 findings
-- [ ] 反样例（未声明即 fetch/WebSocket/读写 storage/触特权面）→ status "suspicious"，findings 逐条列出
-- [ ] 误报控制：字符串/注释里的 "fetch(" 不算；仅匹配真实调用形态
-- [ ] 官方模块不受影响（审计只作用于 user campusmod 的 inspect 路径）
-- [ ] UI：徽章与 findings 在 package-review 区展示；suspicious 时确认安装禁用
+- [x] 正样例（代码仅使用已声明权限）→ status "verified"，无 findings
+- [x] 反样例（未声明即 fetch/WebSocket/读写 storage/触特权面）→ status "suspicious"，findings 逐条列出
+- [x] 误报控制：字符串/注释里的 "fetch(" 不算；仅匹配真实调用形态
+- [x] 官方模块不受影响（审计只作用于 user campusmod 的 inspect 路径）
+- [x] UI：徽章与 findings 在 package-review 区展示；suspicious 时确认安装禁用
 - [ ] 遵循 docs/research/ai-frontend-lessons.md（UI 部分，无装饰框/对齐/溢出）
 
 ## 3. 静态扫描器（新模块 `packages/core/src/main/capabilityAudit.ts`，纯函数无依赖）

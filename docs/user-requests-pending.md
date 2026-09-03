@@ -1,10 +1,11 @@
-# 用户待办记录（未实现）
+# 用户待办记录（开发期台账）
 
-> 状态：**记录 + 调研已启动。** 用户 2026-08-29 提出的若干问题与需求，原样记录于此；要求**先不要改动任何代码**，等用户明确说“可以改代码”后再动手。
-> 本文件只作备忘和开工定位用，不代表已实现；实现前须与用户逐一确认范围，并遵守仓库 Feature Completion / 视觉验收手势。
+> 状态：**记录、调研与局部工作区实现并存。** 本文件是当前开发期的需求台账，不以历史调研、旧提交或未验证的工作区修改宣称功能完成。实现前仍须确认范围，并遵守仓库 Feature Completion / 视觉验收流程。
 > 注：用户 2026-08-29 追加说明——**所有“调研”类任务可以直接启动**（不涉及改代码），因此在第 4、5 条与音效调研中，”调研/选型“可以先行；代码落地仍待用户指令。
 
 ## 1. 【通知】背景颜色过浅，透明度调为完全不透明
+
+**当前状态（2026-09-03）：进行中，未验收。** 工作区已有主题 token `--notification-panel-bg`，且 `.notification-popover` 已消费该 token；改动尚未经过当前 Electron/CDP 截图验收、测试、提交或 CI，不得标记完成。
 
 - 现象：通知中心弹层背景色过浅/带透明度，观感不佳。
 - 目标：把通知弹层背景改为**完全不透明**。
@@ -14,6 +15,8 @@
 - 备注：改动属 UI 视觉类，须走 CDP 截图亲验（见 `docs/agents/visual-verification.md`）。
 
 ## 2. 【资料 - 下载队列】若干交互增强
+
+**当前状态（2026-09-03）：进行中，未验收。** 工作区已有未提交改动：向 renderer 传递 `createdAt`、按入队时间倒序、清除终态记录 IPC/UI、全部下载完成通知和本地 MP3 播放。仍缺针对性测试、真实下载完成链路、资料页视觉验收、提交和 CI。`build/download-complete.mp3` 目前没有仓内来源/许可证证据，不能作为可分发资产视为完成。
 
 - 现状：`plugins/official/materials/src/index.tsx` 下载队列以 `{n} 个进行中` 显示进行中数量（约 516-518 行）。
 - 需求点：
@@ -190,7 +193,9 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 
 ## 5. 桌面日历与主界面日程设计风格差异过大 —— 调研可复用开源桌面日历
 
-- 现状：CampusOS 主界面日程（主窗口内 `ScheduleView`）与“桥接的 DeskToDo 桌面日历”（`desktop-calendar/`，PyQt/Qt 单窗三栏：月历 + 待办侧栏 + 组件区）**设计风格差别过大**。
+**当前架构校正（2026-09-03）：** 下方 2026-08-29 的 PyQt/DeskToDo 描述是当时的研究背景，不是当前运行代码。当前桌历由 `packages/core/src/main/deskCalendarHost.ts` 创建 Electron `BrowserWindow` 并加载 `packages/core/src/renderer/desk-calendar.tsx`；`desktop-calendar/` 仅为 DeskToDo 对照实现。调研结论中“复用自家日程设计语言”的方向仍有效，但当前任务是评估/改造现有 Electron 桌历，不是继续维护 Python 子进程或其 feed 桥。
+
+- 2026-08-29 勘察时的现状：CampusOS 主界面日程（主窗口内 `ScheduleView`）与“桥接的 DeskToDo 桌面日历”（`desktop-calendar/`，PyQt/Qt 单窗三栏：月历 + 待办侧栏 + 组件区）**设计风格差别过大**。
 - 目标：找一个**开源、可拿来直接复用**的桌面日历，并且**风格要与主界面日程设计保持一致/接近**，避免两套风格割裂。
 - 定位入口：
   - 主界面日程：`plugins/official/schedule/src/ScheduleView.tsx`（月历 / 周视图 / 日程 / 日视图）。
@@ -198,13 +203,13 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
   - 既有形态差异分析：`docs/agents/visual-verification.md`（“形态差异（根本性）”一节）。
 - 备注：这是一条**纯调研**，不涉及改代码，可以先行；需权衡“复用开源日历技术栈 vs 统一 CampusOS 设计语言”再立项。
 - **已核对的替代路线（调研时重点考虑了它，代码侧已确认可行）**：
-  - 现有桌面日历是“独立 Python/PyQt 进程”，由 `packages/core/src/main/deskCalendarHost.ts` 在启动时 spawn 拉起，并写 `desk-calendar-feed.json` 喂事件数据（`launchDeskCalendar` / `writeDeskCalendarFeed`，约 80-144 行）。
+  - 当时的桌面日历是“独立 Python/PyQt 进程”，由当时版本的 `packages/core/src/main/deskCalendarHost.ts` 在启动时 spawn 拉起，并写 `desk-calendar-feed.json` 喂事件数据。
   - **替代路线**：不引入第三方桌面日历，而是复用 CampusOS 主界面日程组件（`plugins/official/schedule/src/ScheduleView.tsx`），用一个 Electron 透明无边框置顶/置底 BrowserWindow 把它渲染成桌面悬浮日历，从而天然与主界面同风格。
   - **置底能力已存在、可复用**：`packages/core/src/main/desktopPinning.ts` 已有通用 `pinWindowToDesktopBottom(window)`，用 koffi 调 Win32 `SetWindowPos` 把窗口压到“壁纸之上、普通窗口之下”（`Progman`/`GW_HWNDNEXT` 锚点，含虚桌面自愈守护，仅 Windows，失败静默降级）。这条替代路线无需再造“贴底”基建。
 
 ### 调研结论（2026-08-29，纯研究，未改代码）
 
-**关键事实：** 当前 `desktop-calendar/` 并不是自研组件，而是第三方项目 **DeskToDo**（`ShawnXu01/DeskToDo`，MIT，Python/PyQt6）。风格割裂的**根因是“换了一个渲染栈（PyQt6）+ 换了一个项目”**，而不是“缺一个开源日历”。`deskCalendarHost.ts` 用 `spawn(python, ["-m","deskcal.main"])` 另起进程、写 `desk-calendar-feed.json` 喂数据；贴底由 `desktopPinning.ts` 用 Win32 `SetWindowPos` 实现。
+**当时的关键事实：** `desktop-calendar/` 不是自研组件，而是第三方项目 **DeskToDo**（`ShawnXu01/DeskToDo`，MIT，Python/PyQt6）。当时风格割裂的根因是“换了一个渲染栈（PyQt6）+ 换了一个项目”，而不是“缺一个开源日历”。当时的 `deskCalendarHost.ts` 用 `spawn(python, ["-m","deskcal.main"])` 另起进程、写 `desk-calendar-feed.json` 喂数据；贴底由 `desktopPinning.ts` 用 Win32 `SetWindowPos` 实现。
 
 **候选开源桌面日历核验结果（GitHub API）：**
 
@@ -242,6 +247,8 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 **第 4 条桌宠外部补充**：`gh search repos "desktop pet electron"` 搜到一批，但多为 **0-5 star 冷门项目**且**大量无 LICENSE 文件**（如 `qijiamin0822/deepseek-whale-pet` MIT 5 star、其余多为 0 star 无 license）。**没有比之前深读的 AgentPet 更好、且许可证更干净的外部桌宠**——佐证"自建 + AgentPet 作架构参考（但无 LICENSE 需谨慎）"的结论不变。
 
 ## 6. 【资料】下载队列“按选中该任务的时间戳”倒序（字段缺失则新增并加采集器）
+
+**当前状态（2026-09-03）：字段已存在，展示链路进行中。** `DownloadQueueItem.createdAt` 已在新任务入队时写入，并作为 SQLite 队列 JSON 的一部分持久化；无需新建字段或数据库 migration。当前未提交修改只是将其公开到 `CampusDownloadTask` 并在资料页排序，旧记录缺失该字段时仍需定义并测试稳定回退行为。
 
 - 澄清（对第 2 点“倒序排列”的补充）：
   - 排序键 = **选中/加入该任务的时间戳**（即任务被加入下载队列的时刻），**不是**下载完成时间或其他时间戳。
@@ -530,4 +537,3 @@ if is_today:
 ### 八、结论（待与用户确认后再动手）
 
 桌历窗口应**完全仿 DeskToDo**：自适应格子(无整体滚动条)、显示农历+节假日、今天高亮、双击新增/编辑弹窗、单击信息卡片；**新增设置面板**(仿 6-tab)+**托盘【日历设置】**；贴底用 `desktopPinning`(去 setAlwaysOnTop)；**农历数据需新增源**；主题读主界面。
-

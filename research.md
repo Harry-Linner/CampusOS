@@ -504,7 +504,7 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 
 ### DeskToDo 对照结论
 
-2026-08-16 复核结果：上述十项差异已在 CampusOS 中完成正式任务/设置存储、受信任 IPC、天气主进程 provider、组件 registry、多显示器 profile 和日历文化信息闭环；GitHub Gist/日历同步仍明确排除。具体代码入口、测试和远端验收记录以 `docs/specs/desktodo-gap-closure.md` 为准。
+2026-08-16 的十项差异闭环是当时桌历实现的历史证据。当前（2026-09-03）运行路径已变为 `deskCalendarHost.ts`/`desk-calendar.tsx` 的 Electron 桌历，原 DTD 实现和 B3 组件窗均不在当前代码中；因此不得将历史闭环宣称为当前功能或视觉验收通过。当前差距和开发期任务以 `plan.md` 的 Current Development Workboard 为准；GitHub Gist/日历同步仍明确排除。
 
 `.tmp/DeskToDo` 的有效可迁移经验集中在桌面常驻效率层，而不是 GitHub Gist 同步。对照得到十项差异：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件启用/排序/配置、多显示器布局记忆，以及农历/节日/法定假期/外观配置。CampusOS 的校园连接器、资料下载、插件安全边界和提醒链不被 DeskToDo 流程替代。正式范围和验收标准见 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)。
 

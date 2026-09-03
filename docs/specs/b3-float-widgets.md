@@ -1,8 +1,10 @@
 # B3 — 桌面日历独立悬浮组件窗（DeskToDo 式，Feature Spec）
 
 **Phase:** B3 · 来源：`docs/research/batch-status-2026-08-29.md` §三.1 + `docs/agents/visual-verification.md` §5（用户 2026-08-28 拍板）
-**状态:** 已决议（用户本会话再次确认"独立悬浮组件窗"形态）· 本文档为实施基线
-**关联:** `deskCalendarWindow.ts` / `DeskCalendarApp.tsx` / `desk-calendar.css` / `desk-calendar.html` / `deskCalendar.ts`(preload) / `windowStateStore.ts` / `desktopPinning.ts` / `electron.vite.config.ts`
+**状态:** 已归档，尚未在当前代码交付
+**关联:** 当前桌历为 `deskCalendarHost.ts` / `desk-calendar.tsx` / `desk-calendar.html` / `deskCalendar.ts`(preload)；`desktopPinning.ts`
+
+> **当前代码校正（2026-09-03）：** 本 spec 的 Electron 组件窗实现曾在 `e30912e` 落地并完成当时的测试/视觉验收，但随后由 `2c9c726` 删除。当前分支不含 `deskCalendarWidgetWindow.ts`、`DeskCalendarWidgetApp.tsx` 或对应多页面入口，桌历实现也已改为另一套 `deskCalendarHost.ts`/`desk-calendar.tsx` 路径。因此第 6 节的记录仅是已移除实现的历史证据，不能标记为当前完成。若恢复本功能，必须以当前桌历接口重新实现，并重新完成本 spec 的全部验收项。
 
 ---
 
@@ -90,7 +92,7 @@
 - `DeskCalendarApp.test.tsx`：更新——主窗不再渲染组件显示区；组件管理面板仍可用。
 - `deskCalendarWindow.test.ts`：组件窗注册/销毁与主窗生命周期联动（若需要）。
 
-## 6. 自查记录（实现后填写）
+## 6. 历史自查记录（已移除实现，不代表当前状态）
 
 | 项 | 结果 |
 |---|---|

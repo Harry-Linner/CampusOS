@@ -60,6 +60,30 @@
 
 ---
 
+## Current Development Workboard (2026-09-03)
+
+**阶段：** 仍处于开发期。当前目标是完成正式代码链、测试和受影响界面的亲眼验收；私有 Alpha 现场、发布和外部分发不构成本阶段的完成条件。
+
+### 当前应完成
+
+- [ ] **收尾下载队列工作区改动。** 当前未提交改动已开始传递既有 `createdAt` 入队时间、按其倒序展示、清除终态记录、全部下载完成通知和提示音。仍需补齐针对性测试、完整 `typecheck`/`lint`/`test`/E2E、资料页 CDP 操作与截图验收。`build/download-complete.mp3` 尚无可复核的来源和许可证记录，不能随安装包提交或分发，除非先补齐该证据或换成有明确再分发许可的素材。
+- [ ] **完成本轮 UI 验收债。** 通知中心不透明改动与下载队列改动必须按 `docs/agents/visual-verification.md` 走真实 Electron/CDP 链路并查看截图。连接器健康、能力审计、导出、子 Tab 和学业问答各 spec 已记录代码/测试完成，但仍缺当前代码的桌面截图证据；应逐项补录，而不是以旧的测试或历史截图替代。
+- [ ] **重新确认桌面日历的当前契约。** 当前运行实现是 `deskCalendarHost.ts` 创建的 Electron `BrowserWindow`，不是 `desktop-calendar/` 的 PyQt 进程。历史 DeskToDo/B3 记录不能证明当前实现具备组件独立悬浮窗或与主日程一致的视觉。以主日程为设计基线，明确桌历最终范围后，再实现并走多窗口 CDP/OS 层验收。
+- [ ] **完成子 Tab 的真实动态分块验证。** Phase E 已完成视图按需挂载，但官方重依赖的 `React.lazy`/动态 import 分块及构建产物检查仍未完成。
+
+### 已立项但须先确认范围
+
+- [ ] AI 助手“课程日程记事本”：课程/上游日程目前只读；需要先确定可写注释的数据模型、提醒语义和冲突边界。
+- [ ] AI 桌宠：已有技术调研和自建透明 Electron 窗口建议，但尚未立项实现；拖放目标、权限、数据最小化和模式切换必须先形成独立 spec。
+- [ ] 桌历与主日程视觉统一：已有调研结论，尚未完成范围决策和实现验收。
+
+### 明确不属于当前开发完成条件
+
+- 私有 Alpha 的多设备首次引导、全新 Windows、真实桌面通知、研究生真实账号、外部开发者文档验证、GitHub Release 与 CC98 发布，统一留在发布准备阶段。
+- 第三方插件的网络权限、headless/main 生命周期、connector 包、跨 origin 进程隔离和签名信任目录仍保持关闭，不因开发期清单而开放。
+
+---
+
 ## 1. User journey — primary flow
 
 ### Text walkthrough
@@ -383,11 +407,11 @@ flowchart TD
 - [x] 成绩多口径、主修标记、隐私遮罩与真实账号验收
 - [x] `academic` 插件内的考试倒计时视图
 - [x] 插件热更新
-- [ ] App 内 feedback 通道
+- [x] App 内 feedback 通道（固定 GitHub Issues 模板，不附带私有数据）
 - [ ] Cookie 导入方案（备选登录）
-- [ ] 钉钉登录/消息导入入口占位
+- [x] 钉钉登录/消息导入入口占位（明确禁用，不读取数据或发起登录）
 - [ ] 至少 5 个社区贡献插件
-- [ ] PostHog funnel analytics (opt-in)
+- [x] PostHog funnel analytics (opt-in) 实现；未配置项目 Key 时不可用且不会发送数据
 
 ---
 
@@ -449,7 +473,7 @@ flowchart TD
 
 ### DeskToDo 差异闭环（2026-08-16）
 
-桌面效率层按 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md) 执行。DTD-01 至 DTD-10 已完成正式数据、IPC、持久化、用户交互和 CI 验收；GitHub Gist/日历同步不迁入。
+DeskToDo 差异闭环记录保留在 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)，但其完成证据对应已移除的旧桌历实现。当前 Electron 桌历必须重新按本计划的开发期工作台验收；GitHub Gist/日历同步不迁入。
 
 > 以下决策已随实现落定并关闭，保留历史记录；新决策在此追加。
 

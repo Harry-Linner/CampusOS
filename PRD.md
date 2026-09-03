@@ -23,9 +23,9 @@ CampusOS 只有一个应用生命周期。开机自启是默认关闭的 Core �
 
 主窗口首次关闭时询问“隐藏到托盘”或“退出 CampusOS”，并提供“设为默认，以后不再询问”。未勾选时本次选择只执行一次，下次继续询问；设置页持续提供“每次询问 / 隐藏到托盘 / 退出 CampusOS”三种行为。托盘负责重新打开主窗口、控制日程插件的桌面日历及其月/周/日视图，并明确退出；自动同步不提供全局手动入口。退出 CampusOS 时，主窗口、托盘、桌面日历、刷新与提醒调度一起停止。完整决策见 [ADR-0005](docs/adr/0005-desktop-background-lifecycle.md)。
 
-### DeskToDo 差异闭环（2026-08-16）
+### Desktop Calendar Current State (2026-09-03)
 
-CampusOS 已完成桌面效率层十项差异闭环：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件 registry、多显示器布局记忆，以及农历/节日/法定假期/桌面外观。GitHub Gist/日历同步明确排除。具体实现证据见 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)。
+当前桌面日历由 `packages/core/src/main/deskCalendarHost.ts` 创建独立 Electron `BrowserWindow` 并加载 `desk-calendar.html`；`desktop-calendar/` 中的 DeskToDo/PyQt6 代码仅保留为本地对照资产，不是当前运行路径。此前 DeskToDo 差异闭环和 B3 独立组件窗的验收记录对应已移除的实现，不能作为当前桌历功能或视觉一致性的证据。当前开发期需以主日程为设计基线重新确定桌历范围，并在当前代码上完成多窗口 CDP 与 OS 层验收；GitHub Gist/日历同步仍明确排除。
 
 ---
 
