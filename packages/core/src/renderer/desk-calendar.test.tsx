@@ -14,7 +14,7 @@ const baseSettings = {
   showWeeks: true, showHolidays: true, showLunar: false, showFestival: false, showJieqi: false, showJiyi: false,
   glass: false, bgColor: "", opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
-  autoStart: false
+  autoStart: false, alwaysOnTop: false, locked: false
 };
 const getSettings = vi.fn(async () => ({ ...baseSettings, colors: { ...baseSettings.colors } }));
 const saveSettings = vi.fn(async (patch: Record<string, unknown>) => ({
@@ -128,6 +128,8 @@ describe("desk calendar", () => {
     for (const label of [/日历文字/, /单元格背景/, /今天边框/, /农历文字/, /节假日文字/]) fireEvent.change(screen.getByLabelText(label), { target: { value: "#ff0000" } });
     // 通用
     fireEvent.click(screen.getByLabelText(/开机自启/));
+    fireEvent.click(screen.getByLabelText(/置顶/));
+    fireEvent.click(screen.getByLabelText(/图钉/));
     fireEvent.click(screen.getByText("关闭"));
     await waitFor(() => expect(saveSettings).toHaveBeenCalled());
   });

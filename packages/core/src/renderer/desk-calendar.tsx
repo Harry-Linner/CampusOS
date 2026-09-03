@@ -42,6 +42,8 @@ interface DeskCalendarSettings {
   opacity: number;
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
+  alwaysOnTop: boolean;
+  locked: boolean;
 }
 
 interface CalData {
@@ -214,7 +216,9 @@ const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
   bgColor: "",
   opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
-  autoStart: false
+  autoStart: false,
+  alwaysOnTop: false,
+  locked: false
 };
 
 export default function DeskCalendar(): JSX.Element {
@@ -610,6 +614,8 @@ export default function DeskCalendar(): JSX.Element {
             <section className="dk-settings-section">
               <h4>通用</h4>
               <label className="dk-settings-row">开机自启<input type="checkbox" checked={settings.autoStart} onChange={(e) => patchSetting({ autoStart: e.target.checked })} /></label>
+              <label className="dk-settings-row">置顶<input type="checkbox" checked={settings.alwaysOnTop} onChange={(e) => patchSetting({ alwaysOnTop: e.target.checked })} /></label>
+              <label className="dk-settings-row">锁定位置/大小（图钉）<input type="checkbox" checked={settings.locked} onChange={(e) => patchSetting({ locked: e.target.checked })} /></label>
             </section>
             <div className="dk-form-actions"><button type="button" onClick={() => setShowSettings(false)}>关闭</button></div>
           </div>

@@ -21,6 +21,7 @@ import { pinWindowToDesktopBottom } from "./desktopPinning";
 
 type WindowStub = {
   getNativeWindowHandle: () => Buffer;
+  isAlwaysOnTop: () => boolean;
   on: (event: string, callback: () => void) => void;
 };
 
@@ -30,6 +31,7 @@ const createWindowStub = ({ handleBytes = 8, hwnd = 0x51a5c }: { handleBytes?: n
   const listeners: Record<string, Array<() => void>> = {};
   const stub: WindowStub = {
     getNativeWindowHandle: () => handle,
+    isAlwaysOnTop: () => false,
     on: (event, callback) => {
       (listeners[event] ??= []).push(callback);
     }

@@ -229,13 +229,10 @@ const setupSelfHeal = (window: BrowserWindow, repin: () => void): void => {
   window.on("closed", () => clearInterval(guard));
 };
 
-// 贴底层级开关：true=尝试 WorkerW 挂载（真 Win+D 免疫：Win+D 只隐藏顶层普通窗口，WorkerW 桌面子窗口不受影响）；
-// false=只用 GW_HWNDNEXT 贴底（窗口稳定可见，Win+D 用 hide 事件即拉回 + 快速轮询自愈）。
-// 挂载后按物理坐标(GetWindowRect/SetWindowPos)对齐并减去父 WorkerW 屏幕原点；若坐标错乱(多屏/混合DPI)
-// 则兜底还原为普通窗口回退 GW，保证"绝不看不到"。
-// 备注：本开发虚拟机虚拟桌面 WorkerW client 原点在 t=-720，挂载后窗口会被拖到屏幕外(环境特例)，
-// 因此在此环境无法展示"免疫且可见"，需真实桌面验证(标准 DPI 下物理对齐正确、真免疫+可见)。
-const ENABLE_WORKERW_ATTACH = true;
+// 贴底层级开关：true=尝试 WorkerW 桌面层挂载（真 Win+D 免疫）；false=只用 GW_HWNDNEXT 贴底（窗口稳定可见）。
+// Win+D 免疫另交由专门处理(用户安排)；为避免内置桌面层挂载导致日历打不开/跑到屏幕外，
+// 这里默认关闭以保证日历稳定可见、可打开。需要真机 Win+D 免疫时再置 true。
+const ENABLE_WORKERW_ATTACH = false;
 
 export const pinWindowToDesktopBottom = (window: BrowserWindow): void => {
   if (process.platform !== "win32") return;
@@ -252,6 +249,7 @@ export const pinWindowToDesktopBottom = (window: BrowserWindow): void => {
   // 兜底（默认）：以 Progman 为基准，把窗口插到 GW_HWNDNEXT（壁纸之上、其它窗口之下）。
   // 压底时机 = 创建后 + 每次获得焦点（激活会抬到普通层顶部，随后压回）。
   const repin = (): void => {
+    if (window.isAlwaysOnTop()) return; // 置顶时保持置顶，不压回底部
     if (!api || !api.getWindow || !api.findWindow) return;
     try {
       const progman = api.findWindow("Progman", null);

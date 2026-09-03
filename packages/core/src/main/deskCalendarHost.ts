@@ -49,6 +49,8 @@ export interface DeskCalendarSettings {
   opacity: number;
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
+  alwaysOnTop: boolean;
+  locked: boolean;
 }
 
 const SETTINGS_FILE = "desk-calendar-settings.json";
@@ -63,7 +65,9 @@ const DEFAULT_SETTINGS: DeskCalendarSettings = {
   bgColor: "",
   opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
-  autoStart: false
+  autoStart: false,
+  alwaysOnTop: false,
+  locked: false
 };
 const getSettingsPath = (): string => join(app.getPath("userData"), "settings", SETTINGS_FILE);
 const loadDeskCalendarSettings = (): DeskCalendarSettings => {
@@ -421,6 +425,9 @@ export const registerDeskCalendarHostHandlers = (): void => {
     deskCalendarTransparency = next.opacity;
     applyTransparency();
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
+      deskCalendarWindow.setAlwaysOnTop(next.alwaysOnTop);
+      deskCalendarWindow.setResizable(!next.locked);
+      deskCalendarWindow.setMovable(!next.locked);
       deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", next);
     }
     return next;
