@@ -6,7 +6,6 @@ import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { loadAcademicCalendarSettings } from "./academicCalendarStore";
-import { resolveWindowPlacement } from "./windowStateStore";
 
 /** 桌面日历窗口对外暴露的数据（渲染层 CalData）。 */
 interface DeskCalendarData {
@@ -200,15 +199,12 @@ const applyTransparency = (): void => {
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const primary = screen.getPrimaryDisplay();
   const { x, y, width: aw, height: ah } = primary.workArea;
-  // 尺寸/位置：恢复记忆时钳制到主屏内（不跨屏、留在 1 号主屏）；否则默认居中。
+  // 尺寸/位置：若用户拖过则按显示器签名记忆恢复；否则默认中/大尺寸居中。
   const savedGeometry = getSavedDeskCalendarGeometry();
   const winWidth = savedGeometry?.width ?? 940;
   const winHeight = savedGeometry?.height ?? 700;
-  const placed = savedGeometry
-    ? resolveWindowPlacement({ x: savedGeometry.x, y: savedGeometry.y, width: winWidth, height: winHeight }, screen.getAllDisplays(), primary.workArea)
-    : { x: x + Math.max(0, Math.round((aw - winWidth) / 2)), y: y + Math.max(0, Math.round((ah - winHeight) / 2)), width: winWidth, height: winHeight };
-  const bx = placed.x;
-  const by = placed.y;
+  const bx = savedGeometry?.x ?? x + Math.max(0, Math.round((aw - winWidth) / 2));
+  const by = savedGeometry?.y ?? y + Math.max(0, Math.round((ah - winHeight) / 2));
 
   const win = new BrowserWindow({
     width: winWidth,
