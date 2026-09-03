@@ -11,6 +11,20 @@ contextBridge.exposeInMainWorld("deskCalendar", {
     return () => ipcRenderer.removeListener(channel, handler);
   },
   setTransparency: (value: number) => ipcRenderer.send("campusos:desk-calendar:transparency", value),
+  getSettings: () => ipcRenderer.invoke("campusos:desk-calendar:settings:load"),
+  saveSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke("campusos:desk-calendar:settings:save", patch),
+  subscribeSettings: (listener: (settings: unknown) => void) => {
+    const channel = "campusos:desk-calendar:settings-changed";
+    const handler = (_event: Electron.IpcRendererEvent, settings: unknown) => listener(settings);
+    ipcRenderer.on(channel, handler);
+    return () => ipcRenderer.removeListener(channel, handler);
+  },
+  onOpenSettings: (listener: () => void) => {
+    const channel = "campusos:desk-calendar:open-settings";
+    const handler = () => listener();
+    ipcRenderer.on(channel, handler);
+    return () => ipcRenderer.removeListener(channel, handler);
+  },
   completeTask: (id: string, completed: boolean) =>
     ipcRenderer.invoke("campusos:desk-calendar:complete-task", id, completed),
   createEvent: (input: Record<string, unknown>) =>

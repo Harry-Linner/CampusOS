@@ -5481,3 +5481,43 @@ input:focus-visible {
 .dk-form-actions button { border: 0; background: var(--paper-deep); color: var(--ink); border-radius: 4px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
 .dk-form-actions .dk-primary { background: var(--accent); color: #fff; }
 
+/* ====== 设置面板 ====== */
+.dk-settings-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.22); cursor: pointer;
+}
+.dk-settings-card {
+  width: 360px; max-height: 82vh; overflow-y: auto;
+  background: var(--paper); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: var(--shadow-elevated); padding: 16px; cursor: default;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.dk-settings-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ink); }
+.dk-settings-section { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; }
+.dk-settings-section h4 { margin: 0; font-size: 12px; color: var(--ink-faint); }
+.dk-settings-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+.dk-settings-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+.dk-settings-row input[type="color"] { width: 34px; height: 22px; border: 1px solid var(--line-strong); background: var(--surface-raised); padding: 0; }
+.dk-settings-row input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; }
+
+/* 显示项开关：周数列 / 节假日标注 */
+.desk-cal-root[data-show-weeks="off"] .dk-weeknum-head,
+.desk-cal-root[data-show-weeks="off"] .dk-weeknum-cell { display: none; }
+.desk-cal-root[data-show-holidays="off"] .dk-holiday,
+.desk-cal-root[data-show-holidays="off"] .dk-makeup { display: none; }
+
+/* 外观/颜色设置覆盖(默认继承主题，设置后覆盖)：
+ * 背景色 --dk-bg；日历文字 --dk-calendar-fg；单元格背景 --dk-cell-bg；
+ * 今天边框 --dk-today-border；农历 --dk-lunar-fg；节假日 --dk-holiday-fg。 */
+.desk-cal-root { background: var(--dk-bg, transparent); }
+.desk-cal-root .dk-month-cell-head time,
+.desk-cal-root .dk-week-col header strong,
+.desk-cal-root .schedule-event { color: var(--dk-calendar-fg, inherit); }
+.desk-cal-root .dk-month-cell { background: var(--dk-cell-bg, rgba(248, 249, 247, 0.52)); }
+.desk-cal-root .dk-month-cell.is-today,
+.desk-cal-root .dk-week-col.is-today { border-color: var(--dk-today-border, var(--accent)); box-shadow: inset 0 0 0 1.5px var(--dk-today-border, var(--accent)); }
+.dk-holiday { color: var(--dk-holiday-fg, var(--warning)); }
+.dk-makeup { color: var(--dk-holiday-fg, var(--danger)); }
+.desk-cal-root .dk-lunar { color: var(--dk-lunar-fg, var(--ink-faint)); }
+

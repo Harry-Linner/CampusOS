@@ -29,6 +29,20 @@ interface RawItem {
   location?: string;
   status?: string;
 }
+interface DeskCalendarSettings {
+  showWeeks: boolean;
+  showHolidays: boolean;
+  showLunar: boolean;
+  showFestival: boolean;
+  showJieqi: boolean;
+  showJiyi: boolean;
+  glass: boolean;
+  bgColor: string;
+  opacity: number;
+  colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
+  autoStart: boolean;
+}
+
 interface CalData {
   today: string;
   items: RawItem[];
@@ -48,6 +62,10 @@ declare global {
       moveWindow: (dx: number, dy: number) => void;
       dragEnd: () => void;
       closeWindow: () => void;
+      getSettings: () => Promise<DeskCalendarSettings>;
+      saveSettings: (patch: Partial<DeskCalendarSettings>) => Promise<DeskCalendarSettings>;
+      subscribeSettings: (cb: (s: DeskCalendarSettings) => void) => () => void;
+      onOpenSettings: (cb: () => void) => () => void;
       completeTask: (id: string, completed: boolean) => Promise<{ ok: boolean; error?: string }>;
       createEvent: (input: {
         date: string;
@@ -173,8 +191,24 @@ const emptyForm = (date: string): TaskForm => ({
   remindUnit: "分钟"
 });
 
+const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
+  showWeeks: true,
+  showHolidays: true,
+  showLunar: false,
+  showFestival: false,
+  showJieqi: false,
+  showJiyi: false,
+  glass: false,
+  bgColor: "",
+  opacity: 0.98,
+  colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
+  autoStart: false
+};
+
 export default function DeskCalendar(): JSX.Element {
   const [data, setData] = useState<CalData>({ today: "", items: [] });
+  const [settings, setSettings] = useState<DeskCalendarSettings>(DEFAULT_DESK_SETTINGS);
+  const [showSettings, setShowSettings] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [cursor, setCursor] = useState<{ y: number; m: number; d: number } | null>(null);
   const [, setSelected] = useState<string | null>(null);
@@ -182,22 +216,51 @@ export default function DeskCalendar(): JSX.Element {
   const [form, setForm] = useState<TaskForm | null>(null);
   const [glass, setGlass] = useState(false);
 
+  const applySettings = useCallback((s: DeskCalendarSettings): void => {
+    const next: DeskCalendarSettings = {
+      ...DEFAULT_DESK_SETTINGS,
+      ...s,
+      colors: { ...DEFAULT_DESK_SETTINGS.colors, ...(s.colors ?? /* istanbul ignore next */ DEFAULT_DESK_SETTINGS.colors) }
+    };
+    setSettings(next);
+    setGlass(next.glass);
+    window.deskCalendar?.setTransparency(next.opacity);
+    const root = document.documentElement;
+    const setVar = (name: string, value: string): void => {
+      if (value) root.style.setProperty(name, value);
+      else root.style.removeProperty(name);
+    };
+    setVar("--dk-calendar-fg", next.colors.calendar);
+    setVar("--dk-cell-bg", next.colors.cell);
+    setVar("--dk-today-border", next.colors.todayBorder);
+    setVar("--dk-lunar-fg", next.colors.lunar);
+    setVar("--dk-holiday-fg", next.colors.holiday);
+    setVar("--dk-bg", next.bgColor);
+  }, []);
+  const patchSetting = (patch: Partial<DeskCalendarSettings>): void => {
+    void window.deskCalendar?.saveSettings(patch).then(applySettings);
+  };
+
   const load = useCallback(async (): Promise<void> => {
     const bridge = window.deskCalendar;
     if (!bridge) return;
-    const d = await bridge.getCalendarData();
+    const [d, s] = await Promise.all([bridge.getCalendarData(), bridge.getSettings()]);
     setData(d);
+    applySettings(s);
     document.documentElement.setAttribute("data-theme", d.theme ?? "light");
     if (d.today) {
       const t = d.today;
       setCursor({ y: Number(t.slice(0, 4)), m: Number(t.slice(5, 7)), d: Number(t.slice(8, 10)) });
       setSelected(d.today);
     }
-  }, []);
+  }, [applySettings]);
   useEffect(() => {
     void load();
-    return window.deskCalendar?.subscribe(() => { void load(); });
-  }, [load]);
+    const unsub = window.deskCalendar?.subscribe(() => { void load(); });
+    const unsubSettings = window.deskCalendar?.subscribeSettings(applySettings);
+    const unsubOpen = window.deskCalendar?.onOpenSettings(() => setShowSettings(true));
+    return () => { unsub?.(); unsubSettings?.(); unsubOpen?.(); };
+  }, [load, applySettings]);
 
   const events: ScheduleEvent[] = useMemo(
     () =>
@@ -332,7 +395,7 @@ export default function DeskCalendar(): JSX.Element {
   const headerLabel = viewMode === "week" ? weekLabel : viewMode === "day" ? dayLabel : monthLabel;
 
   return (
-    <div className="desk-cal-root" data-glass={glass ? "on" : "off"}>
+    <div className="desk-cal-root" data-glass={glass ? "on" : "off"} data-show-weeks={settings.showWeeks ? "on" : "off"} data-show-holidays={settings.showHolidays ? "on" : "off"}>
       <header className="desk-cal-header">
         <div className="desk-cal-title">
           <button className="desk-cal-nav" type="button" onClick={() => shiftView(-1)} aria-label="上一段">‹</button>
@@ -347,6 +410,7 @@ export default function DeskCalendar(): JSX.Element {
           </nav>
           <button className="desk-cal-mini" type="button" onClick={goToday}>今天</button>
           <button className="desk-cal-mini" type="button" onClick={() => setGlass((g) => !g)} aria-pressed={glass}>玻璃</button>
+          <button className="desk-cal-mini" type="button" onClick={() => setShowSettings(true)}>⚙ 设置</button>
         </div>
       </header>
 
@@ -478,6 +542,43 @@ export default function DeskCalendar(): JSX.Element {
               <button type="button" onClick={() => setForm(null)}>取消</button>
               <button type="button" className="dk-primary" onClick={() => void saveEvent()}>保存</button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 设置面板：显示项/外观/颜色/通用 */}
+      {showSettings ? (
+        <div className="dk-settings-backdrop" onClick={() => setShowSettings(false)}>
+          <div className="dk-settings-card" onClick={(e) => e.stopPropagation()}>
+            <h3>日历设置</h3>
+            <section className="dk-settings-section">
+              <h4>显示</h4>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showWeeks} onChange={(e) => patchSetting({ showWeeks: e.target.checked })} /> 周数列</label>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showHolidays} onChange={(e) => patchSetting({ showHolidays: e.target.checked })} /> 节假日 / 补班</label>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showLunar} onChange={(e) => patchSetting({ showLunar: e.target.checked })} /> 农历</label>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showFestival} onChange={(e) => patchSetting({ showFestival: e.target.checked })} /> 节日</label>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showJieqi} onChange={(e) => patchSetting({ showJieqi: e.target.checked })} /> 24 节气</label>
+              <label className="dk-settings-row"><input type="checkbox" checked={settings.showJiyi} onChange={(e) => patchSetting({ showJiyi: e.target.checked })} /> 宜忌黄历</label>
+            </section>
+            <section className="dk-settings-section">
+              <h4>外观</h4>
+              <label className="dk-settings-row">背景玻璃<input type="checkbox" checked={settings.glass} onChange={(e) => patchSetting({ glass: e.target.checked })} /></label>
+              <label className="dk-settings-row">透明度 <input type="range" min={0.3} max={1} step={0.01} value={settings.opacity} onChange={(e) => patchSetting({ opacity: Number(e.target.value) })} /> {Math.round(settings.opacity * 100)}%</label>
+              <label className="dk-settings-row">背景色 <input type="color" value={settings.bgColor || "#f3efe6"} onChange={(e) => patchSetting({ bgColor: e.target.value })} /></label>
+            </section>
+            <section className="dk-settings-section">
+              <h4>颜色</h4>
+              <label className="dk-settings-row">日历文字 <input type="color" value={settings.colors.calendar || "#111111"} onChange={(e) => patchSetting({ colors: { ...settings.colors, calendar: e.target.value } })} /></label>
+              <label className="dk-settings-row">单元格背景 <input type="color" value={settings.colors.cell || "#f8f9f7"} onChange={(e) => patchSetting({ colors: { ...settings.colors, cell: e.target.value } })} /></label>
+              <label className="dk-settings-row">今天边框 <input type="color" value={settings.colors.todayBorder || "#b8860b"} onChange={(e) => patchSetting({ colors: { ...settings.colors, todayBorder: e.target.value } })} /></label>
+              <label className="dk-settings-row">农历文字 <input type="color" value={settings.colors.lunar || "#888888"} onChange={(e) => patchSetting({ colors: { ...settings.colors, lunar: e.target.value } })} /></label>
+              <label className="dk-settings-row">节假日文字 <input type="color" value={settings.colors.holiday || "#c0392b"} onChange={(e) => patchSetting({ colors: { ...settings.colors, holiday: e.target.value } })} /></label>
+            </section>
+            <section className="dk-settings-section">
+              <h4>通用</h4>
+              <label className="dk-settings-row">开机自启<input type="checkbox" checked={settings.autoStart} onChange={(e) => patchSetting({ autoStart: e.target.checked })} /></label>
+            </section>
+            <div className="dk-form-actions"><button type="button" onClick={() => setShowSettings(false)}>关闭</button></div>
           </div>
         </div>
       ) : null}

@@ -36,6 +36,63 @@ let deskCalendarVisible = false;
 let deskCalendarTransparency = 0.98;
 let dragStartBounds: Electron.Rectangle | null = null;
 
+/** 桌历设置（设置面板内容，持久化到 settings/desk-calendar-settings.json）。 */
+export interface DeskCalendarSettings {
+  showWeeks: boolean;
+  showHolidays: boolean;
+  showLunar: boolean;
+  showFestival: boolean;
+  showJieqi: boolean;
+  showJiyi: boolean;
+  glass: boolean;
+  bgColor: string;
+  opacity: number;
+  colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
+  autoStart: boolean;
+}
+
+const SETTINGS_FILE = "desk-calendar-settings.json";
+const DEFAULT_SETTINGS: DeskCalendarSettings = {
+  showWeeks: true,
+  showHolidays: true,
+  showLunar: false,
+  showFestival: false,
+  showJieqi: false,
+  showJiyi: false,
+  glass: false,
+  bgColor: "",
+  opacity: 0.98,
+  colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
+  autoStart: false
+};
+const getSettingsPath = (): string => join(app.getPath("userData"), "settings", SETTINGS_FILE);
+const loadDeskCalendarSettings = (): DeskCalendarSettings => {
+  try {
+    const parsed = JSON.parse(readFileSync(getSettingsPath(), "utf8")) as Partial<DeskCalendarSettings>;
+    return { ...DEFAULT_SETTINGS, ...parsed, colors: { ...DEFAULT_SETTINGS.colors, ...(parsed.colors ?? {}) } };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+};
+const saveDeskCalendarSettings = (patch: Partial<DeskCalendarSettings>): DeskCalendarSettings => {
+  const current = loadDeskCalendarSettings();
+  const next: DeskCalendarSettings = {
+    ...current,
+    ...patch,
+    colors: { ...current.colors, ...(patch.colors ?? {}) }
+  };
+  try {
+    mkdirSync(dirname(getSettingsPath()), { recursive: true });
+    writeFileSync(getSettingsPath(), JSON.stringify(next, null, 2), "utf8");
+  } catch {
+    // 写失败静默。
+  }
+  return next;
+};
+const applyDeskCalendarAutoStart = (enable: boolean): void => {
+  try { app.setLoginItemSettings({ openAtLogin: enable }); } catch { /* 某些环境不支持，忽略。 */ }
+};
+
 // 桌历窗口几何记忆（简化：单份 json；阶段2可按显示器签名记忆）。
 const GEOMETRY_FILE = "desk-calendar-geometry.json";
 const getGeometryPath = (): string =>
@@ -316,6 +373,15 @@ export const launchDeskCalendar = async (): Promise<void> => {
   await sendDataToWindow();
 };
 
+/** 打开桌历的设置面板：确保桌历窗口存在并显示，然后通知渲染层打开设置。 */
+export const openDeskCalendarSettings = async (): Promise<void> => {
+  await launchDeskCalendar();
+  if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
+    deskCalendarWindow.showInactive();
+    deskCalendarWindow.webContents.send("campusos:desk-calendar:open-settings");
+  }
+};
+
 /** 关闭（隐藏/销毁）：真正销毁窗口，避免贴底守护把隐藏窗口重新拉回（问题：点关闭后又弹出）。 */
 export const closeDeskCalendar = async (): Promise<void> => {
   await writeVisibilityFlag(false);
@@ -348,6 +414,17 @@ export const registerDeskCalendarHostHandlers = (): void => {
     running: isDeskCalendarRunning()
   }));
   ipcMain.handle("campusos:desk-calendar:data", async () => buildDeskCalendarData());
+  ipcMain.handle("campusos:desk-calendar:settings:load", async () => loadDeskCalendarSettings());
+  ipcMain.handle("campusos:desk-calendar:settings:save", async (_event, patch) => {
+    const next = saveDeskCalendarSettings((patch ?? {}) as Partial<DeskCalendarSettings>);
+    applyDeskCalendarAutoStart(next.autoStart);
+    deskCalendarTransparency = next.opacity;
+    applyTransparency();
+    if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
+      deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", next);
+    }
+    return next;
+  });
   ipcMain.handle("campusos:desk-calendar:complete-task", async (_event, id, completed) => {
     if (typeof id !== "string" || !id) return { ok: false, error: "任务不存在。" };
     try {

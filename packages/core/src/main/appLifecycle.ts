@@ -20,7 +20,8 @@ import { assertTrustedRenderer } from "./ipcSecurity";
 import {
   launchDeskCalendar,
   closeDeskCalendar,
-  isDeskCalendarRunning
+  isDeskCalendarRunning,
+  openDeskCalendarSettings
 } from "./deskCalendarHost";
 
 const SETTINGS_FILE = "app-lifecycle.json";
@@ -124,6 +125,17 @@ const rebuildTrayMenu = async (): Promise<void> => {
             );
           });
         }
+      }
+    },
+    {
+      label: "日历设置",
+      click: () => {
+        void openDeskCalendarSettings().catch((cause: unknown) => {
+          void dialog.showErrorBox(
+            "日历设置打开失败",
+            cause instanceof Error ? cause.message : "无法打开日历设置。"
+          );
+        });
       }
     }
   ];

@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
 import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 
 const electronState = vi.hoisted(() => ({
@@ -89,8 +91,11 @@ const deadline = (id: string, dueAt: string, kind: "exam" | "assignment"): Campu
   priority: "routine"
 });
 
-beforeEach(() => {
-  electronState.userData = process.env.TEMP ?? process.cwd();
+const tmpDirs: string[] = [];
+beforeEach(async () => {
+  const dir = await mkdtemp(join(process.env.TEMP ?? process.cwd(), "campusos-desk-cal-"));
+  tmpDirs.push(dir);
+  electronState.userData = dir;
   electronState.handlers.clear();
   electronState.webContentsSend.mockReset();
   saveTask.mockReset();
@@ -124,8 +129,9 @@ beforeEach(() => {
   registerDeskCalendarHostHandlers();
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.restoreAllMocks();
+  await Promise.all(tmpDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
 describe("desk calendar host", () => {
@@ -218,6 +224,17 @@ describe("desk calendar host", () => {
   it("reports running status and refresh feed", async () => {
     expect(await invoke<{ running: boolean }>("campusos:desk-calendar:process:status")).toEqual({ running: false });
     expect(await invoke<{ ok: boolean }>("campusos:desk-calendar:feed:refresh")).toEqual({ ok: true });
+  });
+
+  it("loads default settings and persists a partial update", async () => {
+    const loaded = await invoke<{ opacity: number; showWeeks: boolean }>("campusos:desk-calendar:settings:load");
+    expect(loaded.opacity).toBe(0.98);
+    const saved = await invoke<{ opacity: number; showWeeks: boolean; colors?: unknown }>("campusos:desk-calendar:settings:save", { opacity: 0.6, showWeeks: false });
+    expect(saved.opacity).toBe(0.6);
+    expect(saved.showWeeks).toBe(false);
+    const reloaded = await invoke<{ opacity: number; showWeeks: boolean }>("campusos:desk-calendar:settings:load");
+    expect(reloaded.opacity).toBe(0.6);
+    expect(reloaded.showWeeks).toBe(false);
   });
 });
 

@@ -10,6 +10,18 @@ const getData = vi.fn();
 const subscribe = vi.fn(() => () => undefined);
 const completeTask = vi.fn(async () => ({ ok: true }));
 const createEvent = vi.fn(async () => ({ ok: true }));
+const baseSettings = {
+  showWeeks: true, showHolidays: true, showLunar: false, showFestival: false, showJieqi: false, showJiyi: false,
+  glass: false, bgColor: "", opacity: 0.98,
+  colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
+  autoStart: false
+};
+const getSettings = vi.fn(async () => ({ ...baseSettings, colors: { ...baseSettings.colors } }));
+const saveSettings = vi.fn(async (patch: Record<string, unknown>) => ({
+  ...baseSettings, ...patch, colors: { ...baseSettings.colors, ...((patch as { colors?: Record<string, string> })?.colors ?? {}) }
+}));
+const subscribeSettings = vi.fn(() => () => undefined);
+const onOpenSettings = vi.fn(() => () => undefined);
 
 beforeEach(() => {
   (window as unknown as { deskCalendar: unknown }).deskCalendar = {
@@ -17,6 +29,10 @@ beforeEach(() => {
     subscribe,
     completeTask,
     createEvent,
+    getSettings,
+    saveSettings,
+    subscribeSettings,
+    onOpenSettings,
     setTransparency: vi.fn(),
     moveWindow: vi.fn(),
     dragEnd: vi.fn(),
@@ -95,5 +111,24 @@ describe("desk calendar", () => {
     fireEvent.doubleClick(screen.getByText("任务A"));
     await screen.findByText("编辑事件");
     expect((screen.getByLabelText("名称") as HTMLInputElement).value).toBe("任务A");
+  });
+
+  it("opens the settings panel and applies display/appearance/general changes", async () => {
+    render(<DeskCalendar />);
+    await screen.findByText("2026年9月");
+    fireEvent.click(screen.getByText("⚙ 设置"));
+    await screen.findByText("日历设置");
+    // 显示项
+    for (const label of [/周数列/, /补班/, /农历$/, /节日$/, /24 节气/, /宜忌黄历/]) fireEvent.click(screen.getByLabelText(label));
+    // 外观
+    fireEvent.click(screen.getByLabelText(/背景玻璃/));
+    fireEvent.change(screen.getByLabelText(/透明度/), { target: { value: "0.7" } });
+    fireEvent.change(screen.getByLabelText(/背景色/), { target: { value: "#112233" } });
+    // 颜色
+    for (const label of [/日历文字/, /单元格背景/, /今天边框/, /农历文字/, /节假日文字/]) fireEvent.change(screen.getByLabelText(label), { target: { value: "#ff0000" } });
+    // 通用
+    fireEvent.click(screen.getByLabelText(/开机自启/));
+    fireEvent.click(screen.getByText("关闭"));
+    await waitFor(() => expect(saveSettings).toHaveBeenCalled());
   });
 });
