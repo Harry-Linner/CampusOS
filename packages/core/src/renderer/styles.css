@@ -5521,3 +5521,13 @@ input:focus-visible {
 .dk-makeup { color: var(--dk-holiday-fg, var(--danger)); }
 .desk-cal-root .dk-lunar { color: var(--dk-lunar-fg, var(--ink-faint)); }
 
+/* 农历/节气/节日/宜忌 行（月视图格子内） */
+.dk-lunar-line {
+  display: flex; gap: 4px; align-items: center; flex: none; min-height: 0;
+  overflow: hidden; white-space: nowrap; font-size: 0.58rem; line-height: 1.2;
+}
+.dk-lunar { color: var(--dk-lunar-fg, var(--ink-faint)); }
+.dk-jieqi { color: var(--dk-jieqi-fg, var(--accent-deep)); }
+.dk-festival { color: var(--dk-holiday-fg, var(--danger)); }
+.dk-jiyi { color: var(--dk-jiyi-fg, var(--ink-soft)); overflow: hidden; text-overflow: ellipsis; }
+

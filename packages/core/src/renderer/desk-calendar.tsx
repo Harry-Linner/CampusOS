@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, Fragment, useRef } from "react";
 import { createRoot } from "react-dom/client";
+import { Solar } from "lunar-typescript";
 import "./globals.css";
 import "./theme.css";
 import "./styles.css";
@@ -112,6 +113,17 @@ const startOfWeek = (value: Date): Date => {
 };
 const dayKey = (value: Date | string): string => toDateInput(typeof value === "string" ? new Date(value) : value);
 const monthKey = (value: Date | string): string => dayKey(value).slice(0, 7);
+// 农历/节气/节日/宜忌：用 lunar-typescript(6tail,MIT) 计算，供显示项开关展示。
+const lunarOf = (y: number, m: number, d: number): { day: string; jieqi: string; festivals: string[]; yi: string[]; ji: string[] } => {
+  const lunar = Solar.fromYmd(y, m, d).getLunar();
+  return {
+    day: lunar.getDayInChinese(),
+    jieqi: lunar.getJieQi() ?? "",
+    festivals: [...lunar.getFestivals(), ...lunar.getOtherFestivals()],
+    yi: lunar.getDayYi(),
+    ji: lunar.getDayJi()
+  };
+};
 // 自然周 = 该日期在"其所在月份"的第几周（周一起始；月初所在的周为第 1 周）。
 // 校历周(已导入)优先，否则回退月内周。
 const monthWeekNumber = (value: Date, refMonth: Date): number => {
@@ -300,6 +312,15 @@ export default function DeskCalendar(): JSX.Element {
   }, [data.holidays]);
   // 周次：有校历周（已导入）用校历周，否则回退月内自然周（该月第几周）。
   const weekNumberFor = (day: Date): number => data.weeks?.[dayKey(day)] ?? monthWeekNumber(day, selDate);
+  // 月视图 42 天的农历/节气/节日/宜忌（供显示项开关），一次算好。
+  const lunarMap = useMemo(() => {
+    const m = new Map<string, { day: string; jieqi: string; festivals: string[]; yi: string[]; ji: string[] }>();
+    for (const day of monthDays) {
+      const p = getShanghaiDateParts(day);
+      m.set(dayKey(day), lunarOf(Number(p.year), Number(p.month), Number(p.day)));
+    }
+    return m;
+  }, [monthDays]);
 
   const shiftMonth = (delta: number): void => {
     if (!cursor) return;
@@ -441,6 +462,18 @@ export default function DeskCalendar(): JSX.Element {
                             {today ? <span className="dk-today-badge">今天</span> : null}
                             {holiday ? <span className={holiday.holiday ? "dk-holiday" : "dk-makeup"}>{holiday.label}</span> : null}
                           </div>
+                          {(() => {
+                            const lunar = lunarMap.get(k);
+                            if (!lunar || !(settings.showLunar || settings.showJieqi || settings.showFestival || settings.showJiyi)) return null;
+                            return (
+                              <div className="dk-lunar-line">
+                                {settings.showLunar ? <span className="dk-lunar">{lunar.day}</span> : null}
+                                {settings.showJieqi && lunar.jieqi ? <span className="dk-jieqi">{lunar.jieqi}</span> : null}
+                                {settings.showFestival ? lunar.festivals.slice(0, 1).map((f) => <span key={f} className="dk-festival">{f}</span>) : null}
+                                {settings.showJiyi ? <span className="dk-jiyi" title={`宜：${lunar.yi.join("，")} 忌：${lunar.ji.join("，")}`}>{[lunar.yi[0] && `宜 ${lunar.yi[0]}`, lunar.ji[0] && `忌 ${lunar.ji[0]}`].filter(Boolean).join(" ")}</span> : null}
+                              </div>
+                            );
+                          })()}
                           <div className="dk-month-cell-list">
                             {items.map((event) => (
                               <button key={event.id} className={eventClassName(event)} type="button"
