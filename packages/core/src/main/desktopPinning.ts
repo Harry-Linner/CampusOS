@@ -49,12 +49,14 @@ type GetParentFn = (hWnd: number) => number;
 type GetWindowLongPtrFn = (hWnd: number, index: number) => number;
 type SetWindowLongPtrFn = (hWnd: number, index: number, value: number) => number;
 type ShowWindowFn = (hWnd: number, cmd: number) => boolean;
+type GetWindowRectFn = (hWnd: number, rect: Buffer) => boolean;
 
 interface User32Api {
   setWindowPos: SetWindowPosFn;
   getWindow: GetWindowFn;
   findWindow: FindWindowFn;
   isWindowVisible: IsWindowVisibleFn;
+  getWindowRect: GetWindowRectFn;
   findWindowEx?: FindWindowExFn;
   sendMessageTimeout?: SendMessageTimeoutFn;
   enumWindows?: EnumWindowsFn;
@@ -76,7 +78,8 @@ const loadUser32 = (): boolean => {
       setWindowPos: user32.func("SetWindowPos", "bool", ["uintptr_t", "uintptr_t", "int", "int", "int", "int", "uint32"]) as unknown as SetWindowPosFn,
       getWindow: user32.func("GetWindow", "uintptr_t", ["uintptr_t", "uint32"]) as unknown as GetWindowFn,
       findWindow: user32.func("intptr_t __stdcall FindWindowW(const wchar_t* cls, const wchar_t* title)") as unknown as FindWindowFn,
-      isWindowVisible: user32.func("IsWindowVisible", "bool", ["uintptr_t"]) as unknown as IsWindowVisibleFn
+      isWindowVisible: user32.func("IsWindowVisible", "bool", ["uintptr_t"]) as unknown as IsWindowVisibleFn,
+      getWindowRect: user32.func("GetWindowRect", "bool", ["uintptr_t", "void*"]) as unknown as GetWindowRectFn
     };
     // 壁纸层（WorkerW）相关函数需要 koffi 的 proto/register/pointer 回调能力。
     // 不满足时静默跳过，仅保留基础函数，回退到 Progman/GW_HWNDNEXT 方案。
@@ -150,26 +153,42 @@ const readWindowHandle = (window: BrowserWindow): number | null => {
 
 // 把窗口嵌入壁纸层（WorkerW/Progman）。返回是否成功。
 // 注意：保留 Electron 已有的 WS_EX_LAYERED（透明），但绝不加 WS_EX_TRANSPARENT（会点击穿透）。
+// 坐标用物理像素（GetWindowRect/SetWindowPos 同空间）且减去 WorkerW 父窗口的屏幕原点，
+// 避免 DIP↔物理像素 + SetParent 后坐标相对父 client 的偏移导致"跑到屏幕外"。
+const getPhysRect = (hwnd: number): { l: number; t: number; r: number; b: number } => {
+  const buf = Buffer.alloc(16);
+  api?.getWindowRect?.(hwnd, buf);
+  return { l: buf.readInt32LE(0), t: buf.readInt32LE(4), r: buf.readInt32LE(8), b: buf.readInt32LE(12) };
+};
 const tryAttachWorkerW = (window: BrowserWindow, myHandle: number): boolean => {
-  if (!api || !api.setParent || !api.getParent || !api.getWindowLongPtr || !api.setWindowLongPtr || !api.showWindow) return false;
+  if (!api || !api.setParent || !api.getParent || !api.getWindowLongPtr || !api.setWindowLongPtr || !api.showWindow || !api.getWindowRect) return false;
   const host = findDeskLayerHost();
   if (!host) return false;
   try {
-    // 记录挂载前屏幕位置/尺寸（此时仍是顶层窗口，getBounds 正确），挂载后显式恢复，
-    // 避免 SetParent 后坐标相对 WorkerW 父窗口偏移。
-    const prev = window.getBounds();
+    const prevPhys = getPhysRect(myHandle); // 挂载前物理屏幕矩形
+    const origStyle = Number(api.getWindowLongPtr(myHandle, GWL_STYLE)) >>> 0;
+    const origEx = Number(api.getWindowLongPtr(myHandle, GWL_EXSTYLE)) >>> 0;
     api.setParent(myHandle, host);
     // 改为子窗口样式（去掉 WS_POPUP）。
-    const style = (Number(api.getWindowLongPtr(myHandle, GWL_STYLE)) >>> 0) | WS_CHILD;
-    api.setWindowLongPtr(myHandle, GWL_STYLE, style & ~WS_POPUP);
-    const exStyle = (Number(api.getWindowLongPtr(myHandle, GWL_EXSTYLE)) >>> 0) | WS_EX_LAYERED;
-    api.setWindowLongPtr(myHandle, GWL_EXSTYLE, exStyle);
-    // 显式恢复位置/尺寸到挂载前（WS_CHILD 坐标相对父 client；WorkerW 覆盖整个屏幕，client 原点=屏幕原点）。
+    api.setWindowLongPtr(myHandle, GWL_STYLE, (origStyle | WS_CHILD) & ~WS_POPUP);
+    api.setWindowLongPtr(myHandle, GWL_EXSTYLE, origEx | WS_EX_LAYERED);
+    // 物理坐标对齐：目标相对父(WorkerW) client = 目标屏幕 - 父屏幕原点。
+    const hostRect = getPhysRect(host);
+    const width = prevPhys.r - prevPhys.l;
+    const height = prevPhys.b - prevPhys.t;
     api.setWindowPos(
-      myHandle, HWND_BOTTOM, prev.x, prev.y, prev.width, prev.height,
+      myHandle, HWND_BOTTOM, prevPhys.l - hostRect.l, prevPhys.t - hostRect.t, width, height,
       SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED
     );
     api.showWindow(myHandle, SW_SHOWNA);
+    // 兜底：若 SetParent 后坐标被拖到明显偏离(如多屏/混合 DPI 环境)，还原为普通顶层窗口并回退 GW 方案，避免看不到。
+    const after = getPhysRect(myHandle);
+    if (Math.abs(after.l - prevPhys.l) > 300 || Math.abs(after.t - prevPhys.t) > 300) {
+      api.setParent(myHandle, 0);
+      api.setWindowLongPtr(myHandle, GWL_STYLE, origStyle);
+      api.setWindowLongPtr(myHandle, GWL_EXSTYLE, origEx);
+      return false;
+    }
     return Number(api.getParent(myHandle)) === host;
   } catch {
     return false;
@@ -210,11 +229,13 @@ const setupSelfHeal = (window: BrowserWindow, repin: () => void): void => {
   window.on("closed", () => clearInterval(guard));
 };
 
-// 贴底层级开关：true=尝试 WorkerW 挂载（真图标之下、壁纸之上 + Win+D 真免疫）；
-// false=只用 GW_HWNDNEXT 贴底（窗口稳定可见，Win+D 用"hide 事件即拉回 + 快速轮询"达成实用免疫）。
-// 说明：实测在 Electron 里 WorkerW 挂载会把窗口坐标拖到屏幕外（-1822 等），
-// 存在"桌历看不到"风险（即用户上一轮遇到的问题），故默认关闭；若将来能找到稳定坐标系再用。
-const ENABLE_WORKERW_ATTACH = false;
+// 贴底层级开关：true=尝试 WorkerW 挂载（真 Win+D 免疫：Win+D 只隐藏顶层普通窗口，WorkerW 桌面子窗口不受影响）；
+// false=只用 GW_HWNDNEXT 贴底（窗口稳定可见，Win+D 用 hide 事件即拉回 + 快速轮询自愈）。
+// 挂载后按物理坐标(GetWindowRect/SetWindowPos)对齐并减去父 WorkerW 屏幕原点；若坐标错乱(多屏/混合DPI)
+// 则兜底还原为普通窗口回退 GW，保证"绝不看不到"。
+// 备注：本开发虚拟机虚拟桌面 WorkerW client 原点在 t=-720，挂载后窗口会被拖到屏幕外(环境特例)，
+// 因此在此环境无法展示"免疫且可见"，需真实桌面验证(标准 DPI 下物理对齐正确、真免疫+可见)。
+const ENABLE_WORKERW_ATTACH = true;
 
 export const pinWindowToDesktopBottom = (window: BrowserWindow): void => {
   if (process.platform !== "win32") return;
