@@ -66,6 +66,14 @@ const getSavedDeskCalendarGeometry = (): SavedDeskCalendarGeometry | null => {
 const saveDeskCalendarGeometry = (window: BrowserWindow): void => {
   try {
     const bounds = window.getBounds();
+    // 防 WorkerW 子窗口 getBounds 异常(巨负坐标/超屏尺寸)：仅当与某显示器可见区有交集才保存，
+    // 避免把异常值覆盖进有效记忆(否则恢复时窗口会跑到屏幕外)。
+    const onScreen = screen.getAllDisplays().some((display) => {
+      const area = display.workArea;
+      return Math.max(bounds.x, area.x) < Math.min(bounds.x + bounds.width, area.x + area.width) &&
+        Math.max(bounds.y, area.y) < Math.min(bounds.y + bounds.height, area.y + area.height);
+    });
+    if (!onScreen) return;
     mkdirSync(dirname(getGeometryPath()), { recursive: true });
     writeFileSync(getGeometryPath(), JSON.stringify(bounds, null, 2), "utf8");
   } catch {

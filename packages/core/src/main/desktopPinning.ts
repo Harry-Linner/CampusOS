@@ -31,9 +31,9 @@ const SW_SHOWNA = 8;
 const SWP_NOSIZE = 0x1;
 const SWP_NOMOVE = 0x2;
 const SWP_NOACTIVATE = 0x10;
+const SWP_FRAMECHANGED = 0x0020;
 const SWP_SHOWWINDOW = 0x40;
 const SWP_NOOWNERZORDER = 0x200;
-const SWP_ASYNCWINDOWPOS = 0x4000;
 const SWP_FLAGS = SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER;
 const GW_HWNDNEXT = 2;
 
@@ -155,15 +155,19 @@ const tryAttachWorkerW = (window: BrowserWindow, myHandle: number): boolean => {
   const host = findDeskLayerHost();
   if (!host) return false;
   try {
+    // 记录挂载前屏幕位置/尺寸（此时仍是顶层窗口，getBounds 正确），挂载后显式恢复，
+    // 避免 SetParent 后坐标相对 WorkerW 父窗口偏移。
+    const prev = window.getBounds();
     api.setParent(myHandle, host);
     // 改为子窗口样式（去掉 WS_POPUP）。
     const style = (Number(api.getWindowLongPtr(myHandle, GWL_STYLE)) >>> 0) | WS_CHILD;
     api.setWindowLongPtr(myHandle, GWL_STYLE, style & ~WS_POPUP);
     const exStyle = (Number(api.getWindowLongPtr(myHandle, GWL_EXSTYLE)) >>> 0) | WS_EX_LAYERED;
     api.setWindowLongPtr(myHandle, GWL_EXSTYLE, exStyle);
+    // 显式恢复位置/尺寸到挂载前（WS_CHILD 坐标相对父 client；WorkerW 覆盖整个屏幕，client 原点=屏幕原点）。
     api.setWindowPos(
-      myHandle, HWND_BOTTOM, 0, 0, 0, 0,
-      SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS
+      myHandle, HWND_BOTTOM, prev.x, prev.y, prev.width, prev.height,
+      SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_FRAMECHANGED
     );
     api.showWindow(myHandle, SW_SHOWNA);
     return Number(api.getParent(myHandle)) === host;
@@ -172,29 +176,44 @@ const tryAttachWorkerW = (window: BrowserWindow, myHandle: number): boolean => {
   }
 };
 
-// Win+D 自愈守护：每 2s 查真实可见性，必要时拉回（showInactive 不抢焦点，随后重新压底）。
+// Win+D 显示桌面自愈：Electron 窗口会被 Explorer ShowWindow(SW_HIDE) 隐藏（isVisible 仍为 true 绕过感知）。
+// 这里用两条路保证桌历不消失：
+//  1) 即时：监听 Electron 'hide' 事件（系统把原生窗口隐藏时触发），立即把窗口拉回可见；
+//  2) 兜底：每 500ms 查一次 Win32 真实可见性（IsWindowVisible），必要时 hide()+showInactive() 拉回。
 const setupSelfHeal = (window: BrowserWindow, repin: () => void): void => {
-  const guard = setInterval(() => {
-    if (window.isDestroyed()) {
-      clearInterval(guard);
-      return;
-    }
+  const pullBack = (): void => {
+    if (window.isDestroyed()) return;
     try {
       const handle = readWindowHandle(window);
-      if (handle === null || !api || !api.isWindowVisible || api.isWindowVisible(handle)) return;
+      if (handle === null || (api && api.isWindowVisible && api.isWindowVisible(handle))) return;
+      // 强制两侧状态对齐后重新显示，避免 showInactive 空转。
       window.hide();
       window.showInactive();
       repin();
     } catch {
-      // 销毁竞态；下一 tick 由 isDestroyed 拦截。
+      // 销毁竞态；忽略。
     }
-  }, 2000);
+  };
+  const onHide = (): void => {
+    // Win+D 隐藏会触发 hide 事件：先同步两侧状态，再立即拉回可见。
+    try {
+      if (window.isDestroyed()) return;
+      window.showInactive();
+      repin();
+    } catch {
+      // 忽略。
+    }
+  };
+  window.on("hide", onHide);
+  window.on("closed", () => window.removeListener("hide", onHide));
+  const guard = setInterval(pullBack, 500);
   window.on("closed", () => clearInterval(guard));
 };
 
-// 贴底层级开关：true=尝试 WorkerW 挂载（图标之下、壁纸之上）；false=只用 GW_HWNDNEXT 贴底（保证窗口可见）。
-// 注意：WorkerW 挂载会把窗口变成 WorkerW 的 WS_CHILD 子窗口；在部分机器/桌面结构（尤其用户改动过
-// 虚拟桌面/Explorer 后）该 WorkerW 层不可见，导致桌历直接"看不到"。故默认关闭，待真机确认可靠后开启。
+// 贴底层级开关：true=尝试 WorkerW 挂载（真图标之下、壁纸之上 + Win+D 真免疫）；
+// false=只用 GW_HWNDNEXT 贴底（窗口稳定可见，Win+D 用"hide 事件即拉回 + 快速轮询"达成实用免疫）。
+// 说明：实测在 Electron 里 WorkerW 挂载会把窗口坐标拖到屏幕外（-1822 等），
+// 存在"桌历看不到"风险（即用户上一轮遇到的问题），故默认关闭；若将来能找到稳定坐标系再用。
 const ENABLE_WORKERW_ATTACH = false;
 
 export const pinWindowToDesktopBottom = (window: BrowserWindow): void => {

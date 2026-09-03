@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, Fragment } from "react";
+import { useEffect, useMemo, useState, useCallback, Fragment, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import "./globals.css";
 import "./theme.css";
@@ -94,16 +94,12 @@ const startOfWeek = (value: Date): Date => {
 };
 const dayKey = (value: Date | string): string => toDateInput(typeof value === "string" ? new Date(value) : value);
 const monthKey = (value: Date | string): string => dayKey(value).slice(0, 7);
-// ISO 自然周号（周一为一周之始；校历尚未导入阶段用自然周，有校历周后回退/优先校历周）。
-const isoWeekOfYear = (value: Date): number => {
-  const p = getShanghaiDateParts(value);
-  const d = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day)));
-  const dayNum = (d.getUTCDay() + 6) % 7; // 周一=0 … 周日=6
-  d.setUTCDate(d.getUTCDate() - dayNum + 3); // 就近的周四（本年度第几周由它决定）
-  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
-  const firstDayNum = (firstThu.getUTCDay() + 6) % 7;
-  firstThu.setUTCDate(firstThu.getUTCDate() - firstDayNum + 3);
-  return 1 + Math.round((d.getTime() - firstThu.getTime()) / (7 * 86400000));
+// 自然周 = 该日期在"其所在月份"的第几周（周一起始；月初所在的周为第 1 周）。
+// 校历周(已导入)优先，否则回退月内周。
+const monthWeekNumber = (value: Date, refMonth: Date): number => {
+  const p = getShanghaiDateParts(refMonth);
+  const firstMonday = startOfWeek(fromShanghaiParts(Number(p.year), Number(p.month), 1));
+  return 1 + Math.round((startOfWeek(value).getTime() - firstMonday.getTime()) / (7 * 86400000));
 };
 const getShanghaiDayNumber = (value: Date): number => Number(getShanghaiDateParts(value).day);
 const weekdayLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -239,8 +235,8 @@ export default function DeskCalendar(): JSX.Element {
     for (const h of data.holidays ?? []) m.set(h.date, { label: h.label, holiday: h.holiday });
     return m;
   }, [data.holidays]);
-  // 周次：有校历周（已导入）用校历周，否则回退自然周（ISO）。
-  const weekNumberFor = (day: Date): number => data.weeks?.[dayKey(day)] ?? isoWeekOfYear(day);
+  // 周次：有校历周（已导入）用校历周，否则回退月内自然周（该月第几周）。
+  const weekNumberFor = (day: Date): number => data.weeks?.[dayKey(day)] ?? monthWeekNumber(day, selDate);
 
   const shiftMonth = (delta: number): void => {
     if (!cursor) return;
@@ -283,6 +279,24 @@ export default function DeskCalendar(): JSX.Element {
   };
   // 单击事件条 → 信息卡片，显示节次/时间/教师/地点
   const onInfoClick = (event: ScheduleEvent): void => setInfoEvent(event);
+  // 单击/双击区分：单击延迟 ~250ms 等待第二次左键；若期间来了第二次则为双击(编辑)，取消信息卡片。
+  // 否则到点弹信息卡片。避免"单击已弹卡片、双击编辑"冲突。
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onEventClick = (event: ScheduleEvent): void => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      onInfoClick(event);
+    }, 250);
+  };
+  const onEventDoubleClick = (event: ScheduleEvent): void => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = null;
+    onDoubleEvent(event);
+  };
+  useEffect(() => () => {
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+  }, []);
 
   const saveEvent = async (): Promise<void> => {
     if (!form) return;
@@ -313,7 +327,7 @@ export default function DeskCalendar(): JSX.Element {
   };
 
   const monthLabel = cursor ? `${cursor.y}年${cursor.m}月` : "";
-  const weekLabel = cursor ? `${cursor.y}年${cursor.m}月 第${isoWeekOfYear(fromShanghaiParts(cursor.y, cursor.m, cursor.d))}周` : "";
+  const weekLabel = cursor ? `${cursor.y}年${cursor.m}月 第${monthWeekNumber(fromShanghaiParts(cursor.y, cursor.m, cursor.d), fromShanghaiParts(cursor.y, cursor.m, 1))}周` : "";
   const dayLabel = cursor ? `${cursor.y}年${cursor.m}月${cursor.d}日` : "";
   const headerLabel = viewMode === "week" ? weekLabel : viewMode === "day" ? dayLabel : monthLabel;
 
@@ -366,8 +380,8 @@ export default function DeskCalendar(): JSX.Element {
                           <div className="dk-month-cell-list">
                             {items.map((event) => (
                               <button key={event.id} className={eventClassName(event)} type="button"
-                                onClick={(e) => { e.stopPropagation(); onInfoClick(event); }}
-                                onDoubleClick={(e) => { e.stopPropagation(); onDoubleEvent(event); }}>
+                                onClick={(e) => { e.stopPropagation(); onEventClick(event); }}
+                                onDoubleClick={(e) => { e.stopPropagation(); onEventDoubleClick(event); }}>
                                 {event.title}
                               </button>
                             ))}
@@ -391,7 +405,7 @@ export default function DeskCalendar(): JSX.Element {
                 <div className="dk-week-col-list">
                   {(eventsByDay.get(dayKey(day)) ?? []).map((event) => (
                     <button key={event.id} className={eventClassName(event)} type="button"
-                      onClick={() => onInfoClick(event)} onDoubleClick={() => onDoubleEvent(event)}>
+                      onClick={() => onEventClick(event)} onDoubleClick={() => onEventDoubleClick(event)}>
                       <strong>{event.title}</strong><small>{formatEventMeta(event)}</small>
                     </button>
                   ))}
@@ -405,7 +419,7 @@ export default function DeskCalendar(): JSX.Element {
         {viewMode === "day" ? (
           <div className="dk-day-timeline">
             {(eventsByDay.get(dayKey(selDate)) ?? []).map((event) => (
-              <button key={event.id} className={eventClassName(event)} type="button" onClick={() => onInfoClick(event)} onDoubleClick={() => onDoubleEvent(event)}>
+              <button key={event.id} className={eventClassName(event)} type="button" onClick={() => onEventClick(event)} onDoubleClick={() => onEventDoubleClick(event)}>
                 <strong>{event.title}</strong><small>{formatEventMeta(event)}</small>
               </button>
             ))}
