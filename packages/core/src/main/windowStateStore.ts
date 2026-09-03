@@ -16,6 +16,15 @@ const isRectangle = (value: unknown): value is Rectangle => {
   return [candidate.x, candidate.y, candidate.width, candidate.height].every((item) => typeof item === "number" && Number.isFinite(item));
 };
 
+/** 把窗口 bounds 钳制到指定工作区内，确保完全落在该区域（不跨屏、不回中贴边）。 */
+export const clampBoundsToWorkArea = (bounds: Rectangle, area: Rectangle): Rectangle => {
+  const width = Math.min(Math.max(1, Math.round(bounds.width)), Math.round(area.width));
+  const height = Math.min(Math.max(1, Math.round(bounds.height)), Math.round(area.height));
+  const x = Math.min(Math.max(Math.round(bounds.x), Math.round(area.x)), Math.round(area.x) + Math.round(area.width) - width);
+  const y = Math.min(Math.max(Math.round(bounds.y), Math.round(area.y)), Math.round(area.y) + Math.round(area.height) - height);
+  return { x, y, width, height };
+};
+
 export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ workArea: Rectangle }> = screen.getAllDisplays(), options: { minimumWidth?: number; minimumHeight?: number } = {}): StoredWindowState | null => {
   if (typeof value !== "object" || value === null) return null;
   const candidate = value as Partial<StoredWindowState>;

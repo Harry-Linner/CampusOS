@@ -61,7 +61,7 @@ import {
   showCampusMainWindow,
   shouldStartHidden
 } from "./appLifecycle";
-import { attachWindowStatePersistence, loadWindowState } from "./windowStateStore";
+import { attachWindowStatePersistence, clampBoundsToWorkArea, loadWindowState } from "./windowStateStore";
 import { registerFeedbackHandlers } from "./feedbackIpc";
 import { registerAnalyticsHandlers } from "./analyticsIpc";
 
@@ -79,36 +79,28 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   const savedState = await loadWindowState();
   const defaultWidth = 1340;
   const defaultHeight = 900;
-  // Without a saved position, prefer a secondary display so the primary
-  // screen stays free for the user; fall back to the primary display.
-  // E2E fixture runs use a fresh user-data dir (no saved state) and must not
-  // pop up on the user's working screen, so they always center on the
-  // primary display (the user's designated screen 1).
-  const isE2eFixture = process.env.CAMPOS_E2E_FIXTURE === "1";
-  let position: { x?: number; y?: number } = {};
-  if (!savedState) {
-    const primary = screen.getPrimaryDisplay();
-    const secondary = isE2eFixture
-      ? undefined
-      : screen.getAllDisplays().find((display) => display.id !== primary.id);
-    if (secondary) {
-      const { x, y, width, height } = secondary.workArea;
-      position = {
-        x: x + Math.max(0, Math.round((width - defaultWidth) / 2)),
-        y: y + Math.max(0, Math.round((height - defaultHeight) / 2))
-      };
-    } else {
-      const { x, y, width, height } = primary.workArea;
-      position = {
-        x: x + Math.max(0, Math.round((width - defaultWidth) / 2)),
-        y: y + Math.max(0, Math.round((height - defaultHeight) / 2))
-      };
-    }
+  // 一律落在主屏（当前主显示器），跨屏/偏到其它屏时钳制到主屏内，避免横在 2 号屏。
+  const primary = screen.getPrimaryDisplay();
+  const mainArea = primary.workArea;
+  let bounds: { x: number; y: number; width: number; height: number };
+  if (savedState) {
+    bounds = clampBoundsToWorkArea(
+      { x: savedState.bounds.x, y: savedState.bounds.y, width: savedState.bounds.width, height: savedState.bounds.height },
+      mainArea
+    );
+  } else {
+    bounds = {
+      x: mainArea.x + Math.max(0, Math.round((mainArea.width - defaultWidth) / 2)),
+      y: mainArea.y + Math.max(0, Math.round((mainArea.height - defaultHeight) / 2)),
+      width: defaultWidth,
+      height: defaultHeight
+    };
   }
   const window = new BrowserWindow({
-    width: savedState?.bounds.width ?? defaultWidth,
-    height: savedState?.bounds.height ?? defaultHeight,
-    ...(savedState ? { x: savedState.bounds.x, y: savedState.bounds.y } : position),
+    width: bounds.width,
+    height: bounds.height,
+    x: bounds.x,
+    y: bounds.y,
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: "#f3efe6",
