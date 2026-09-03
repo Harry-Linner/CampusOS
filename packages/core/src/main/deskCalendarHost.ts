@@ -1,7 +1,7 @@
 import { mkdir as mkdirAsync, writeFile as writeFileAsync } from "node:fs/promises";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { app, BrowserWindow, ipcMain, nativeTheme, screen } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, type Rectangle } from "electron";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
@@ -71,6 +71,28 @@ const saveDeskCalendarGeometry = (window: BrowserWindow): void => {
   } catch {
     // 保存失败静默，不影响窗口。
   }
+};
+
+/** 桌历窗口恢复位置/尺寸：记忆位置若仍落在某显示器可见区则沿用；否则(含被 WorkerW 挂载污染的
+ * 巨负坐标/全屏尺寸)回退主屏默认居中(940x700)，避免桌历跑到屏幕外看不到。 */
+export const resolveDeskCalendarPlacement = (
+  savedGeometry: SavedDeskCalendarGeometry | null,
+  displays: ReadonlyArray<{ workArea: Rectangle }>,
+  primaryWorkArea: Rectangle
+): { width: number; height: number; x: number; y: number; useDefault: boolean } => {
+  const savedVisible = savedGeometry
+    ? displays.some((display) => {
+      const area = display.workArea;
+      return Math.max(savedGeometry.x, area.x) < Math.min(savedGeometry.x + savedGeometry.width, area.x + area.width) &&
+        Math.max(savedGeometry.y, area.y) < Math.min(savedGeometry.y + savedGeometry.height, area.y + area.height);
+    })
+    : false;
+  const useDefault = !savedGeometry || !savedVisible;
+  const width = useDefault ? 940 : savedGeometry.width;
+  const height = useDefault ? 700 : savedGeometry.height;
+  const x = useDefault ? primaryWorkArea.x + Math.max(0, Math.round((primaryWorkArea.width - width) / 2)) : savedGeometry.x;
+  const y = useDefault ? primaryWorkArea.y + Math.max(0, Math.round((primaryWorkArea.height - height) / 2)) : savedGeometry.y;
+  return { width, height, x, y, useDefault };
 };
 
 const getVisibilityPath = (): string =>
@@ -198,13 +220,11 @@ const applyTransparency = (): void => {
 
 const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const primary = screen.getPrimaryDisplay();
-  const { x, y, width: aw, height: ah } = primary.workArea;
-  // 尺寸/位置：若用户拖过则按显示器签名记忆恢复；否则默认中/大尺寸居中。
-  const savedGeometry = getSavedDeskCalendarGeometry();
-  const winWidth = savedGeometry?.width ?? 940;
-  const winHeight = savedGeometry?.height ?? 700;
-  const bx = savedGeometry?.x ?? x + Math.max(0, Math.round((aw - winWidth) / 2));
-  const by = savedGeometry?.y ?? y + Math.max(0, Math.round((ah - winHeight) / 2));
+  const placement = resolveDeskCalendarPlacement(getSavedDeskCalendarGeometry(), screen.getAllDisplays(), primary.workArea);
+  const bx = placement.x;
+  const by = placement.y;
+  const winWidth = placement.width;
+  const winHeight = placement.height;
 
   const win = new BrowserWindow({
     width: winWidth,

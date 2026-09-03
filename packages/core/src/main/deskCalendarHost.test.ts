@@ -61,7 +61,7 @@ vi.mock("./desktopPinning", () => ({
   pinWindowToDesktopBottom: pinWindow
 }));
 
-import { registerDeskCalendarHostHandlers } from "./deskCalendarHost";
+import { registerDeskCalendarHostHandlers, resolveDeskCalendarPlacement } from "./deskCalendarHost";
 
 const invoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
   const handler = electronState.handlers.get(channel);
@@ -218,5 +218,38 @@ describe("desk calendar host", () => {
   it("reports running status and refresh feed", async () => {
     expect(await invoke<{ running: boolean }>("campusos:desk-calendar:process:status")).toEqual({ running: false });
     expect(await invoke<{ ok: boolean }>("campusos:desk-calendar:feed:refresh")).toEqual({ ok: true });
+  });
+});
+
+describe("resolveDeskCalendarPlacement", () => {
+  const primary = { x: 0, y: 0, width: 1920, height: 1080 };
+  const oneDisplay = [{ workArea: primary }];
+
+  it("keeps a saved position that is still on-screen", () => {
+    const result = resolveDeskCalendarPlacement({ x: 200, y: 150, width: 940, height: 700 }, oneDisplay, primary);
+    expect(result).toEqual({ width: 940, height: 700, x: 200, y: 150, useDefault: false });
+  });
+
+  it("falls back to default center when the saved position is off-screen (e.g. WorkerW-polluted)", () => {
+    const result = resolveDeskCalendarPlacement({ x: -2, y: -7841, width: 1282, height: 756 }, oneDisplay, primary);
+    expect(result.useDefault).toBe(true);
+    expect(result).toMatchObject({ width: 940, height: 700 });
+    expect(result.x).toBe(primary.x + Math.round((primary.width - 940) / 2));
+    expect(result.y).toBe(primary.y + Math.round((primary.height - 700) / 2));
+  });
+
+  it("falls back to default when no saved geometry exists", () => {
+    const result = resolveDeskCalendarPlacement(null, oneDisplay, primary);
+    expect(result.useDefault).toBe(true);
+    expect(result).toMatchObject({ width: 940, height: 700 });
+  });
+
+  it("keeps a saved position entirely on a secondary display (no straddle)", () => {
+    const twoDisplays = [
+      { workArea: primary },
+      { workArea: { x: 1920, y: 0, width: 1920, height: 1080 } }
+    ];
+    const result = resolveDeskCalendarPlacement({ x: 2000, y: 100, width: 940, height: 700 }, twoDisplays, primary);
+    expect(result).toMatchObject({ x: 2000, y: 100, useDefault: false });
   });
 });
