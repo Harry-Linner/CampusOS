@@ -192,19 +192,24 @@ const setupSelfHeal = (window: BrowserWindow, repin: () => void): void => {
   window.on("closed", () => clearInterval(guard));
 };
 
+// 贴底层级开关：true=尝试 WorkerW 挂载（图标之下、壁纸之上）；false=只用 GW_HWNDNEXT 贴底（保证窗口可见）。
+// 注意：WorkerW 挂载会把窗口变成 WorkerW 的 WS_CHILD 子窗口；在部分机器/桌面结构（尤其用户改动过
+// 虚拟桌面/Explorer 后）该 WorkerW 层不可见，导致桌历直接"看不到"。故默认关闭，待真机确认可靠后开启。
+const ENABLE_WORKERW_ATTACH = false;
+
 export const pinWindowToDesktopBottom = (window: BrowserWindow): void => {
   if (process.platform !== "win32") return;
   if (!loadUser32()) return;
   const myHandle = readWindowHandle(window);
   if (myHandle === null) return;
 
-  // 首选：嵌入壁纸层（图标之下、壁纸之上）。成功则只需自愈守护，无需 GW 压底。
-  if (tryAttachWorkerW(window, myHandle)) {
+  // 可选：嵌入壁纸层（图标之下、壁纸之上）。成功则只需自愈守护，无需 GW 压底。
+  if (ENABLE_WORKERW_ATTACH && tryAttachWorkerW(window, myHandle)) {
     setupSelfHeal(window, () => undefined);
     return;
   }
 
-  // 回退：老方案 —— 以 Progman 为基准，把窗口插到 GW_HWNDNEXT（壁纸之上、其它窗口之下）。
+  // 兜底（默认）：以 Progman 为基准，把窗口插到 GW_HWNDNEXT（壁纸之上、其它窗口之下）。
   // 压底时机 = 创建后 + 每次获得焦点（激活会抬到普通层顶部，随后压回）。
   const repin = (): void => {
     if (!api || !api.getWindow || !api.findWindow) return;
