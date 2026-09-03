@@ -122,7 +122,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(rootDir, "src/preload/index.ts")
+          index: resolve(rootDir, "src/preload/index.ts"),
+          deskCalendar: resolve(rootDir, "src/preload/deskCalendar.ts")
         },
         output: {
           entryFileNames: "[name].cjs",
@@ -156,7 +157,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(rootDir, "src/renderer/index.html")
+          index: resolve(rootDir, "src/renderer/index.html"),
+          "desk-calendar": resolve(rootDir, "src/renderer/desk-calendar.html")
         }
       }
     },

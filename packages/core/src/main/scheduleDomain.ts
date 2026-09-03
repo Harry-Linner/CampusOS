@@ -296,11 +296,13 @@ export const applyTaskMutation = (
   return tasks.map((task) => {
     const isTarget = task.id === mutation.id;
     const isSeriesMember = matchesSeries(task);
+    // 非"删除"的状态变更（completed/suspended/running）与 timeSpentMinutes 一律作用于直接目标；
+    // 删除保留 scope（single/future/series）语义；restore 作用于直接目标。
     const shouldApply = mutation.action === "restore"
       ? isTarget
-      : mutation.status === "deleted" && (
-        scope === "series" ? isSeriesMember : scope === "future" ? isTarget || (seriesId !== null && task.fromId === seriesId && Date.parse(task.startAt) >= Date.parse(target.startAt)) : isTarget
-      );
+      : mutation.status === "deleted"
+        ? (scope === "series" ? isSeriesMember : scope === "future" ? isTarget || (seriesId !== null && task.fromId === seriesId && Date.parse(task.startAt) >= Date.parse(target.startAt)) : isTarget)
+        : isTarget;
     if (!shouldApply) return task;
     const next = { ...task };
     if (mutation.action === "restore") {

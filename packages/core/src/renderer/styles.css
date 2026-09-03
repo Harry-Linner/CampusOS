@@ -470,6 +470,27 @@ input:focus-visible {
   font-size: 0.72rem;
 }
 
+/* 下载队列"进行中"计数：放大、加粗并突出，让用户一眼看到还有多少在下。 */
+.section-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.download-in-progress-count,
+.section-heading-actions .download-in-progress-count {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.section-heading-actions .download-in-progress-count:empty {
+  display: none;
+}
+
 .course-timeline,
 .todo-list {
   margin: 0;
@@ -4928,7 +4949,7 @@ input:focus-visible {
   outline-offset: 2px;
 }
 .notification-badge { display: inline-flex; min-width: 18px; justify-content: center; margin-left: 6px; border-radius: 999px; background: var(--accent); color: white; font-size: 11px; }
-.notification-popover { position: absolute; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-gutter: stable; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
+.notification-popover { position: absolute; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-gutter: stable; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--notification-panel-bg); box-shadow: var(--shadow-elevated); }
 .notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 10px; }
 .notification-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .notification-filters { display: flex; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
@@ -5017,3 +5038,446 @@ input:focus-visible {
     top: 168px;
   }
 }
+
+/* ===== 桌面日历（桌面日历窗口，透明贴底悬浮）=====
+ * 月历部分完全复用主界面 ScheduleView 的现成类（schedule-month-grid /
+ * schedule-weekday / schedule-month-cell / schedule-event 等，见上方定义），
+ * 这里只提供本窗口的容器、头部控件与 body 滚动容器。 */
+.desk-cal-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  box-sizing: border-box;
+  overflow: hidden;
+  user-select: none;
+}
+
+.desk-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+}
+.desk-cal-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.desk-cal-title strong {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+  min-width: 82px;
+  text-align: center;
+}
+.desk-cal-nav {
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.desk-cal-nav:hover {
+  color: var(--ink);
+  background: var(--paper-deep);
+}
+.desk-cal-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.desk-cal-mini {
+  border: 1px solid var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.desk-cal-mini:hover {
+  border-color: var(--accent);
+}
+.desk-cal-trans {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.desk-cal-trans input[type="range"] {
+  width: 64px;
+  accent-color: var(--accent);
+}
+
+.desk-cal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 14px 14px;
+}
+/* 月历完全复用主界面 schedule-month-grid / schedule-month-cell 的原始尺寸，
+ * 不在这里做任何尺寸覆盖 —— 保证与主界面逐像素一致。 */
+
+/* 视图切换 tab（月/周/日） */
+.schedule-view-tabs {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.schedule-view-tabs button {
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--ink-soft);
+  padding: 3px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.schedule-view-tabs button + button {
+  border-left: 1px solid var(--line);
+}
+.schedule-view-tabs button.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+.schedule-view-tabs button:hover:not(.is-active) {
+  background: var(--paper-deep);
+}
+
+/* 桌历窗口：周/日视图（复用主界面 schedule-week-grid/schedule-day-timeline） */
+.desk-cal-body .schedule-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(180px, 1fr);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  min-height: 0;
+}
+.desk-cal-body .schedule-week-column {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 6px;
+  overflow-y: auto;
+}
+.desk-cal-body .schedule-day-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+.desk-cal-body .schedule-day-timeline .schedule-event {
+  display: block;
+  width: 100%;
+  border-width: 0 0 0 3px;
+  border-left-style: solid;
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  text-align: left;
+}
+.desk-cal-body .schedule-day-timeline .schedule-event strong {
+  display: block;
+}
+
+/* 单击事件条 -> 信息小卡片 */
+.desk-cal-info-card {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 40px;
+  background: rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+.desk-cal-info-card > div {
+  min-width: 240px;
+  max-width: 320px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-elevated);
+  padding: 14px;
+  cursor: default;
+}
+.desk-cal-info-card strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.desk-cal-info-card p {
+  margin: 2px 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.desk-cal-info-card .desk-cal-info-card-loc {
+  color: var(--ink);
+}
+.desk-cal-info-card button {
+  margin-top: 10px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 玻璃效果（毛玻璃）：桌面历面板文字与内容叠加半透明底 */
+.desk-cal-root[data-glass="on"] {
+  background-blend-mode: screen;
+}
+.desk-cal-root[data-glass="on"] .desk-cal-body {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+/* 格子上的法定节假日/补班标注 */
+.schedule-month-cell .desk-cal-holiday {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--warning);
+  margin-top: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.schedule-month-cell .desk-cal-makeup {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--danger);
+  margin-top: 1px;
+}
+
+/* ====== 桌面日历（阶段1：自适应月/周/日三视图 + 信息卡片 + 新增/编辑弹窗）======
+ * 月/周/日格子随窗口均分（CSS Grid 1fr），无整体滚动条；
+ * 某天任务多时在格内 list 滚动。设计语言沿用主界面 token。 */
+
+/* 头顶部：视图切换 tabs */
+.desk-cal-header .desk-cal-tabs {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.desk-cal-header .desk-cal-tabs button {
+  border: 0;
+  background: var(--surface-raised);
+  color: var(--ink-soft);
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.desk-cal-header .desk-cal-tabs button + button { border-left: 1px solid var(--line); }
+.desk-cal-header .desk-cal-tabs button.is-active { background: var(--accent); color: #fff; }
+.desk-cal-header .desk-cal-tabs button:hover:not(.is-active) { background: var(--paper-deep); }
+
+/* 月历：DeskToDo 拆解式 —— 顶部横条标题(header) → 细周名行 → 视图区(左侧第N周列 + 7天) */
+.dk-month-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.dk-month-weekrow {
+  display: grid;
+  grid-template-columns: 26px repeat(7, 1fr);
+  flex: none;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.dk-weeknum-head {
+  border-right: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-align: center;
+  align-self: center;
+  line-height: 1;
+}
+.dk-month-weekday {
+  border-right: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  line-height: 1;
+  text-align: center;
+  padding: 4px 2px;
+}
+.dk-month-grid {
+  display: grid;
+  grid-template-columns: 26px repeat(7, 1fr);
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.dk-weeknum-cell {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 249, 247, 0.3);
+}
+.dk-month-cell {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(248, 249, 247, 0.52);
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+.dk-month-cell.is-outside { background: var(--paper-muted); }
+.dk-month-cell.is-today { background: var(--accent-wash); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.dk-month-cell-head { display: flex; align-items: center; gap: 3px; flex: none; min-height: 0; }
+.dk-month-cell-head time {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+.dk-month-cell.is-today .dk-month-cell-head time { color: var(--accent-deep); font-weight: 700; }
+.dk-today-badge { color: var(--danger); font-size: 0.6rem; font-weight: 700; flex: none; }
+.dk-holiday { color: var(--warning); font-size: 0.58rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dk-makeup { color: var(--danger); font-size: 0.58rem; }
+.dk-month-cell-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dk-month-cell-list .schedule-event {
+  display: block;
+  width: 100%;
+  border-width: 0 0 0 2px;
+  border-left-style: solid;
+  border-radius: 0;
+  background: transparent;
+  padding: 1px 4px;
+  font-size: 0.66rem;
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.dk-month-cell-list .schedule-event.is-complete {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* 周视图：7 列自适应 */
+.dk-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+}
+.dk-week-col {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+.dk-week-col.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.dk-week-col header { display: flex; align-items: center; gap: 6px; flex: none; }
+.dk-week-col header span { color: var(--ink-faint); font-size: 11px; }
+.dk-week-col header strong { color: var(--ink); font-size: 16px; font-family: var(--font-mono); }
+.dk-week-col-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.dk-week-col-list .schedule-event {
+  display: block; width: 100%;
+  border-width: 0 0 0 2px; border-left-style: solid; border-radius: 0;
+  background: transparent; padding: 3px 5px; text-align: left;
+}
+.dk-week-col-list .schedule-event strong { display: block; font-size: 0.72rem; }
+.dk-week-col-list .schedule-event small { color: var(--ink-faint); font-size: 0.64rem; }
+
+/* 日视图：时间线 */
+.dk-day-timeline { display: flex; flex-direction: column; gap: 5px; padding: 8px 0; }
+.dk-day-timeline .schedule-event {
+  display: block; width: 100%;
+  border-width: 0 0 0 3px; border-left-style: solid; border-radius: 0;
+  background: transparent; padding: 6px 8px; text-align: left;
+}
+.dk-day-timeline .schedule-event strong { display: block; }
+.dk-day-timeline .schedule-event small { color: var(--ink-faint); }
+.dk-empty { color: var(--ink-faint); font-size: 13px; text-align: center; padding: 20px 0; }
+
+/* 信息卡片 */
+.dk-info-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 46px;
+  background: rgba(0,0,0,0.18); cursor: pointer;
+}
+.dk-info-card {
+  min-width: 230px; max-width: 320px;
+  background: var(--paper); border: 1px solid var(--line-strong);
+  border-radius: 8px; box-shadow: var(--shadow-elevated); padding: 14px; cursor: default;
+}
+.dk-info-card strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 6px; }
+.dk-info-card p { margin: 2px 0; font-size: 12px; color: var(--ink-soft); }
+.dk-info-card .dk-info-note { color: var(--ink); }
+.dk-info-card button { margin-top: 10px; border: 0; background: var(--accent); color: #fff; border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+
+/* 新增/编辑事件 */
+.dk-form-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.22); cursor: pointer;
+}
+.dk-form-card {
+  width: 340px; background: var(--paper); border: 1px solid var(--line-strong);
+  border-radius: 10px; box-shadow: var(--shadow-elevated); padding: 16px; cursor: default;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.dk-form-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ink); }
+.dk-form-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); }
+.dk-form-card input[type="text"], .dk-form-card input[type="datetime-local"], .dk-form-card input[type="number"], .dk-form-card select, .dk-form-card textarea {
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 4px 6px; font-size: 12px; background: var(--surface-raised); color: var(--ink);
+}
+.dk-form-card .dk-form-row { display: flex; gap: 8px; align-items: flex-end; }
+.dk-form-card .dk-form-row label { flex: 1; }
+.dk-form-row input[type="number"] { width: 54px; }
+/* 信息卡片按钮（完成/关闭） */
+.dk-info-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.dk-info-actions button { margin-top: 0; flex: none; border: 0; background: var(--paper-deep); color: var(--ink); border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.dk-info-actions button.dk-info-primary { background: var(--accent); color: #fff; }
+
+/* 新增/编辑事件：提醒分组（勾选开启，值/单位不再 disable，改值时自动开启） */
+.dk-form-remind { display: flex; flex-direction: column; gap: 6px; }
+.dk-form-card .dk-remind-toggle { flex-direction: row; align-items: center; gap: 6px; cursor: pointer; }
+.dk-remind-toggle input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent); }
+.dk-form-remind .dk-form-row select { flex: 0 0 auto; width: auto; }
+.dk-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.dk-form-actions button { border: 0; background: var(--paper-deep); color: var(--ink); border-radius: 4px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+.dk-form-actions .dk-primary { background: var(--accent); color: #fff; }
+
