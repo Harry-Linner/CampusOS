@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 
+// 基础/回退路径：无 proto/register/pointer 回调能力，WorkerW 嵌入不可用 → 回退 GW_HWNDNEXT。
 const setWindowPos = vi.fn(() => true);
 
 vi.mock("koffi", () => ({
