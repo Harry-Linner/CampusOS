@@ -61,7 +61,7 @@ import {
   showCampusMainWindow,
   shouldStartHidden
 } from "./appLifecycle";
-import { attachWindowStatePersistence, clampBoundsToWorkArea, loadWindowState } from "./windowStateStore";
+import { attachWindowStatePersistence, loadWindowState, resolveWindowPlacement } from "./windowStateStore";
 import { registerFeedbackHandlers } from "./feedbackIpc";
 import { registerAnalyticsHandlers } from "./analyticsIpc";
 
@@ -84,8 +84,10 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   const mainArea = primary.workArea;
   let bounds: { x: number; y: number; width: number; height: number };
   if (savedState) {
-    bounds = clampBoundsToWorkArea(
+    // 恢复记忆位置；仅当横跨多个显示器时才归位到主屏，避免横在 1 号屏和 2 号屏之间。
+    bounds = resolveWindowPlacement(
       { x: savedState.bounds.x, y: savedState.bounds.y, width: savedState.bounds.width, height: savedState.bounds.height },
+      screen.getAllDisplays(),
       mainArea
     );
   } else {

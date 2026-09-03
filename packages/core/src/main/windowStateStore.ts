@@ -25,6 +25,26 @@ export const clampBoundsToWorkArea = (bounds: Rectangle, area: Rectangle): Recta
   return { x, y, width, height };
 };
 
+/**
+ * 决定恢复窗口时应放置的位置：
+ * - 只在「横跨多个显示器」时才归位到主屏（避免窗口横在 1 号屏和 2 号屏之间）；
+ * - 若窗口只落在单个显示器内（即便略超出 workArea 边界），保持原位置不动，
+ *   这既满足"不跨屏"，又保留用户设定的位置、不强制缩小。
+ */
+export const resolveWindowPlacement = (
+  bounds: Rectangle,
+  displays: ReadonlyArray<{ workArea: Rectangle }>,
+  primaryWorkArea: Rectangle
+): Rectangle => {
+  const intersecting = displays.filter((display) => {
+    const area = display.workArea;
+    return Math.max(bounds.x, area.x) < Math.min(bounds.x + bounds.width, area.x + area.width) &&
+      Math.max(bounds.y, area.y) < Math.min(bounds.y + bounds.height, area.y + area.height);
+  }).length;
+  if (intersecting <= 1) return bounds;
+  return clampBoundsToWorkArea(bounds, primaryWorkArea);
+};
+
 export const normalizeWindowState = (value: unknown, displays: ReadonlyArray<{ workArea: Rectangle }> = screen.getAllDisplays(), options: { minimumWidth?: number; minimumHeight?: number } = {}): StoredWindowState | null => {
   if (typeof value !== "object" || value === null) return null;
   const candidate = value as Partial<StoredWindowState>;

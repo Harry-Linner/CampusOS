@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampBoundsToWorkArea, normalizeWindowState } from "./windowStateStore";
+import { clampBoundsToWorkArea, normalizeWindowState, resolveWindowPlacement } from "./windowStateStore";
 
 const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }];
 
@@ -41,5 +41,25 @@ describe("window state store", () => {
 
   it("uses the desktop calendar minimum dimensions without inheriting main-window sizing", () => {
     expect(normalizeWindowState({ bounds: { x: 10, y: 10, width: 200, height: 200 }, maximized: false }, displays, { minimumWidth: 420, minimumHeight: 320 })?.bounds).toMatchObject({ width: 420, height: 320 });
+  });
+
+  it("repositions only when the saved bounds straddle two displays", () => {
+    const twoDisplays = [
+      { workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
+      { workArea: { x: 1920, y: 0, width: 1920, height: 1080 } }
+    ];
+    const primary = { x: 0, y: 0, width: 1920, height: 1080 };
+    // 横跨 1 号屏(0..1920)与 2 号屏(1920..3840)：归位到主屏。
+    const straddling = resolveWindowPlacement({ x: 1700, y: 200, width: 1280, height: 800 }, twoDisplays, primary);
+    expect(straddling.x + straddling.width).toBeLessThanOrEqual(primary.width);
+    expect(straddling.x).toBe(primary.width - straddling.width);
+  });
+
+  it("preserves bounds that live entirely on a single display (even if narrow)", () => {
+    const oneNarrowDisplay = [{ workArea: { x: 0, y: 0, width: 1100, height: 720 } }];
+    const primary = { x: 0, y: 0, width: 1100, height: 720 };
+    // 窗口 1100 宽、x=160 会略超出 1100 宽屏幕，但只落在单个屏 → 保持原位置。
+    const placement = resolveWindowPlacement({ x: 160, y: 120, width: 1100, height: 720 }, oneNarrowDisplay, primary);
+    expect(placement).toEqual({ x: 160, y: 120, width: 1100, height: 720 });
   });
 });

@@ -6,7 +6,7 @@ import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { loadAcademicCalendarSettings } from "./academicCalendarStore";
-import { clampBoundsToWorkArea } from "./windowStateStore";
+import { resolveWindowPlacement } from "./windowStateStore";
 
 /** 桌面日历窗口对外暴露的数据（渲染层 CalData）。 */
 interface DeskCalendarData {
@@ -205,7 +205,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const winWidth = savedGeometry?.width ?? 940;
   const winHeight = savedGeometry?.height ?? 700;
   const placed = savedGeometry
-    ? clampBoundsToWorkArea({ x: savedGeometry.x, y: savedGeometry.y, width: winWidth, height: winHeight }, primary.workArea)
+    ? resolveWindowPlacement({ x: savedGeometry.x, y: savedGeometry.y, width: winWidth, height: winHeight }, screen.getAllDisplays(), primary.workArea)
     : { x: x + Math.max(0, Math.round((aw - winWidth) / 2)), y: y + Math.max(0, Math.round((ah - winHeight) / 2)), width: winWidth, height: winHeight };
   const bx = placed.x;
   const by = placed.y;
