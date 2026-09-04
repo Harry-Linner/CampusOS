@@ -9,7 +9,7 @@
 - 工具链：`gh` 可执行文件位于 `C:\Program Files\GitHub CLI\gh.exe`，版本与认证状态已在本机确认。
 **Tier:** T3 · S3
 **Currency:** CNY (¥)
-**Related docs:** [PRD](PRD.md) · [research](research.md) · [技术规格](docs/specs/ideazjuermodapp.md)
+**Related docs:** [PRD](PRD.md) · [research](research.md) · [技术规格](docs/specs/campusos-interface-v3.md)
 
 > _This is the build roadmap. Someone reading this alone should know exactly what to do Monday morning._
 
@@ -473,7 +473,7 @@ flowchart TD
 
 ### DeskToDo 差异闭环（2026-08-16）
 
-DeskToDo 差异闭环记录保留在 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)，但其完成证据对应已移除的旧桌历实现。当前 Electron 桌历必须重新按本计划的开发期工作台验收；GitHub Gist/日历同步不迁入。
+DeskToDo 差异闭环记录对应已移除的旧桌历实现，相关 spec（`desktodo-gap-closure.md`/`b3-float-widgets.md`）已在文档清理时删除，其完成证据不得视为当前实现。当前 Electron 桌历必须重新按本计划的开发期工作台验收；桌历需求决策见 [docs/desk-calendar-decisions.md](docs/desk-calendar-decisions.md)；GitHub Gist/日历同步不迁入。
 
 > 以下决策已随实现落定并关闭，保留历史记录；新决策在此追加。
 

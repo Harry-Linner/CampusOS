@@ -2,6 +2,8 @@
 
 **Date:** 2026-06-17
 
+> **阅读说明（2026-09 文档清理）：** 本文件是按日期追加的调研/验收日志，早期条目描述的是当时状态（如"三个/四个官方模块"、自动排程在范围内、早期桌历形态），不代表当前实现。**当前范围、模块集合（五个官方模块）与运行时决策以 CONTEXT.md 与 PRD.md 文件头口径为准**；与代码不一致处一律以代码与上述文档为准。
+
 ### 用户验收记录（2026-08-03）
 
 用户在暑假期间需要直接查看真实的下个学期课表（大三上），并反馈界面可能仍显示大二秋冬。脱敏数据库核验显示 `2026-2027` 秋、冬课表和事件已经由真实账号链路成功写入；问题是启动 hydrate 先返回旧快照，后台刷新完成后 renderer 没有收到变更通知。本轮增加 workspace changed IPC 订阅和完整秋冬/春夏学期标签，保持 Celechron 请求、缓存与失败边界不变。`gh` 已确认可访问，安装路径为 `C:\Program Files\GitHub CLI\gh.exe`。
@@ -17,7 +19,7 @@
 
 ## Assumptions in lieu of answers
 
-This research was generated in autonomous mode based on the dense spec at `docs/specs/ideazjuermodapp.md` (14 rounds of Lisa interviews). The following assumptions are carried forward from that spec — each is flagged `[load-bearing]` where the rest of the analysis breaks if it's wrong.
+This research was generated in autonomous mode based on the dense v1 spec `docs/specs/ideazjuermodapp.md` (14 rounds of Lisa interviews; that spec was superseded by `campusos-interface-v3.md` and has since been removed — see git history). The following assumptions are carried forward from that spec — each is flagged `[load-bearing]` where the rest of the analysis breaks if it's wrong.
 
 - ZJU student is the beachhead user; ZJU教务系统 has automatable login (no mandatory interactive captcha). `[load-bearing]`
 - Core framework and official capabilities remain fully open source. The current roadmap is non-commercial; if a plugin directory is ever added, the preferred default is open, community-driven distribution rather than a paid marketplace.
@@ -506,27 +508,9 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 
 2026-08-16 的十项差异闭环是当时桌历实现的历史证据。当前（2026-09-03）运行路径已变为 `deskCalendarHost.ts`/`desk-calendar.tsx` 的 Electron 桌历，原 DTD 实现和 B3 组件窗均不在当前代码中；因此不得将历史闭环宣称为当前功能或视觉验收通过。当前差距和开发期任务以 `plan.md` 的 Current Development Workboard 为准；GitHub Gist/日历同步仍明确排除。
 
-`.tmp/DeskToDo` 的有效可迁移经验集中在桌面常驻效率层，而不是 GitHub Gist 同步。对照得到十项差异：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件启用/排序/配置、多显示器布局记忆，以及农历/节日/法定假期/外观配置。CampusOS 的校园连接器、资料下载、插件安全边界和提醒链不被 DeskToDo 流程替代。正式范围和验收标准见 [DeskToDo 差异闭环计划](docs/specs/desktodo-gap-closure.md)。
+`.tmp/DeskToDo` 的有效可迁移经验集中在桌面常驻效率层，而不是 GitHub Gist 同步。对照得到十项差异：桌面日历直接操作、无日期待办、托盘验收、时钟、天气、通用倒计时、进度条、组件启用/排序/配置、多显示器布局记忆，以及农历/节日/法定假期/外观配置。CampusOS 的校园连接器、资料下载、插件安全边界和提醒链不被 DeskToDo 流程替代。桌历需求决策见 [docs/desk-calendar-decisions.md](docs/desk-calendar-decisions.md)（旧的 DeskToDo 差异闭环计划文件已删除）。
 
-- CampusOS 只有一个应用生命周期；桌面日历是 Schedule 插件能力，不是独立应用或独立开机项。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
-- 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
-- 任务删除采用软删除进入“最近删除”，默认保留 30 天；用户可恢复或永久删除。重复任务在回收站按系列/来源分组展示，已完成实例是否随系列删除由用户决断。
-- 恢复已过期实例由用户选择是否包含过期实例；已过期提醒永不恢复、不补发，未来提醒按原规则重新注册。
-- 开发期任务状态直接使用 `overdue`，不保留 `failed` 兼容别名或历史迁移。
-- 主程序更新只检查并展示版本信息，不自动下载；用户选择【现在更新】后才下载、校验和安装。用户选择【稍后】不下载、不重复打扰，直到出现新版本。下载中允许取消，失败保持当前版本并提供重试。
-- 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
-- 插件后台热更新已接入可信 HTTPS 更新清单、版本发现、用户按插件批准、摘要与开发者签名校验、原子替换和失败边界；权限/能力/schema 变化会要求重新确认，API 版本变化拒绝热更新。
-- 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
-
-## 2026-08-16 实现状态同步
-
-- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；单实例唤醒、托盘视图选择和插件停用联动已实现。
-- 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
-- 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
-- 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
-- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
-- 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
-- 单任务提醒覆盖已进入正式存储与调度链；插件更新协议和默认清单已接入，生产环境只接受受信 HTTPS 更新源。
+（"2026-08-16 决策同步"与"实现状态同步"的重复条目清单已移除；生命周期/回收站/更新/插件热更新等口径见 CONTEXT.md 同日期章节——CONTEXT.md 是运行时决策的单一事实源。）
 
 ## 2026-08-16 课表、历史资料与桌面运行时修复
 

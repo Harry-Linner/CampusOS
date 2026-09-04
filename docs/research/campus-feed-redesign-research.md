@@ -3,6 +3,8 @@
 > 状态：调研完成（2026-08-29；现状=代码逐文件核实，竞品=web_search 实检，新源=实网抓取；§5.5 推荐组合已定稿）
 > 起因：用户点名要重构【校园资讯】板块；前一份 GLM 子代理报告（`agent_ea698369`）用户未认可——竞品部分多处"抓取超时按公开口径引用"未实测、新源可行性完全未调研。本次重新认真调研，覆盖原 C1/C2/C4 全部待议项。
 
+> **⚠️ 现状快照提示（2026-09 文档清理）：** 本文 §2"现状"是 **2026-08-29 的代码快照**，其后 campus-feed 已迭代（三键排序含 published_at、每源未读与通知中心打通、AI 转日程等），§2 描述可能与当前代码不一致。当前实现与规格以 [phase-f-feed-calendar-notices.md](../specs/phase-f-feed-calendar-notices.md) 与 `packages/core/src/main/campusFeedService.ts` 为准；本调研仅作设计决策历史。
+
 ## 1. 需求背景
 
 - 多源校园通知聚合（评奖评优/出国境/校园活动等），用户痛点：看最下面订阅源最新消息要一直往下划拉；多源消息混排不符合使用习惯。
@@ -271,5 +273,5 @@
 ## 7. 参考
 
 - 前 GLM 子代理报告：`C:\Users\666\.zcode\cli\agents\sess_79e8fc65-...\agent_ea698369-...\output.txt`
-- 构想文档：`docs/ideas/campus-notice-aggregator/{research,final-sources,source-sites}.md`
+- 构想文档（保留）：`docs/ideas/campus-notice-aggregator/final-sources.md`；同目录 `research.md` 与 `source-sites.md` 已在文档清理时删除（结论已由 campus-feed 实现承载，见 git 历史）
 - 现有实现：`plugins/official/campus-feed/` + `packages/core/src/main/campusFeedService.ts`、`databaseService.ts`

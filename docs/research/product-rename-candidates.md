@@ -1,7 +1,7 @@
 # 产品改名候选（归档 · 结论=不改名）
 
 > **状态:** 已归档（2026-08-29）。**用户最终拍板：不改名，沿用 CampusOS**（08-27 原话「算了，就这个名字了，不改了，反正我这软件受众比较集中」）。
-> **完整候选与命名约束见：** [`docs/research/product-rename-proposal.md`](./product-rename-proposal.md)（本文件仅作归档索引，不重复正文）。
+> **完整候选与命名约束正文**见 git 历史中的 `docs/research/product-rename-proposal.md`（已于文档清理时删除；本文件保留为归档索引）。
 > **背景:** 因市面上已存在多个同名 "CampusOS" 产品（Devpost CampusOS 项目、Trae 论坛帖子、Pitch Deck 等），曾调研改名；后因受众集中、改名收益有限而放弃。
 
 ## 一、调研结论速览
