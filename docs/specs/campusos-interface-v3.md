@@ -6,7 +6,7 @@
 
 **Date:** 2026-07-17  
 **Status:** Current UX baseline  
-**Supersedes:** UX portions of `campusos-round2.md` and `ideazjuermodapp.md`
+**Supersedes:** UX portions of the earlier `campusos-round2.md` / `ideazjuermodapp.md` interface specs（两者已删除，见 git 历史）
 
 ## Product stance
 
@@ -20,7 +20,7 @@ The primary navigation contains three fixed Core destinations:
 2. **扩展** — installed extensions as a compact management list.
 3. **设置** — data refresh, account, and reminder controls.
 
-Every enabled plugin contributes exactly one additional first-level destination with a complete user-facing workspace. The four official destinations are **学业**, **日程**, **资料**, and **AI 助手**. They are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient.
+Every enabled plugin contributes exactly one additional first-level destination with a complete user-facing workspace. The official destinations are **学业**, **日程**, **资料**, **AI 助手**, and **校园资讯** (campus-feed, added to the module set in 2026-08). 早报 daily-brief 已于 2026-08-25 决议暂停，不是官方目的地。They are derived from validated runtime contributions, disappear when the plugin is disabled or blocked, and use a scrollable navigation container when space is insufficient.
 
 Data connectors, event projectors, schedulers, search providers, notification policies, and export adapters never contribute navigation or appear as separately installable extensions. Grades live inside 学业; calendar and tasks live inside 日程; course materials live inside 资料; message extraction lives inside AI 助手.
 
@@ -50,6 +50,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 - Use a Monday-first, continuous 7 × 6 monthly grid with thin shared borders.
 - Provide exactly four views in one page: 月历, 周视图, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
+- 自动排程已于 2026-08-22 决议删除（见文末"决策同步"节）；"规划（plan）"类能力不再属于日程，`campusos:schedule:plan:*` 的 preload 死桩与 `planner_schedules` 空表待代码清理。
 - Provide additional internal tabs for 接下来、任务、规划 and 导出. Deadline tasks, fixed/repeating schedules and planner periods do not create separate first-level destinations.
 - 周视图 uses the available desktop content width directly and must not create a nested horizontal scroll container. At narrow widths, horizontal scrolling is allowed on the calendar page itself.
 - 月历 places courses, assignments, and exams directly inside the matching date cell.
@@ -113,7 +114,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 ## Acceptance checks
 
-- The main navigation always exposes 总览、扩展、设置; enabled plugins add exactly one reachable destination each. With all official plugins enabled, the order is 总览、学业、日程、资料、扩展、设置.
+- The main navigation always exposes 总览、扩展、设置; enabled plugins add exactly one reachable destination each. With all official plugins enabled, the five official destinations 学业、日程、资料、AI 助手、校园资讯 each contribute exactly one entry.
 - The homepage contains one course timeline and one to-do list, without duplicate reminder items.
 - The calendar switches correctly among 月历、周视图、日程、日视图; month, week, and day navigation retain their appropriate period granularity.
 - The monthly grid is usable at desktop width and can horizontally scroll at narrow widths; agenda and day timeline remain readable on narrow screens.
@@ -166,7 +167,7 @@ should appear from the last validated runtime cache
 without waiting for the fresh scan; the host applies the background refresh
 when the main process emits `campusos:plugins:changed`. Cached third-party
 modules remain non-executable until that fresh package integrity check passes.
-This section supersedes the earlier three-destination baseline: the current four official destinations are Academic, Schedule, Materials, and AI Assistant.
+This section supersedes the earlier three-destination baseline: the current official destinations are Academic, Schedule, Materials, AI Assistant, and Campus Feed (campus-feed); daily-brief is paused.
 
 ## Future-term timetable integrity (2026-08-03)
 
@@ -212,3 +213,15 @@ graduate-account, or Release-distribution acceptance.
 - 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 自建任务的单项提醒已接入正式调度；插件后台热更新已接入可信 HTTPS 清单、按插件批准、签名校验和原子替换。
+
+## 决策同步 2026-08-22 → 2026-09（文档清理收录）
+
+> 2026-08-16 之后的界面/产品决策此前只记录在各 spec 与 research 中，本节收口到 UX 基线文档；冲突处以本节为准。
+
+- **自动排程删除（2026-08-22）**：日程模块不再包含"自动排程/规划"；`campusos:schedule:plan:generate/load` 仅剩 preload 死桩、`planner_schedules` 为从未读写的空表，属待清理残留，不是产品能力。
+- **日程"全部课程"区块删除（2026-08-23）**：以学期分组课表与课程目录替代。
+- **设置页重构（2026-08-23）**：分栏设置（账号/通知/后台/数据/更新/关于/高级），诊断与连接器健康并入"高级"。
+- **早报 daily-brief 暂停（2026-08-25）**：移出官方模块名单，代码与 IPC 保留未删除、不挂载；恢复前不得按"第 5 模块"口径推进。
+- **校园资讯成为官方第五模块（2026-08）**：Core 主进程抓取信息源 + 插件视图 + AI 受控抽取转日程（spec 见 phase-f-feed-calendar-notices.md，决策/边界见 ADR-0004 与 docs/desk-calendar-decisions.md 无关的 campus-feed 记录）。
+- **桌历组件窗删除、保持独立设计（2026-09-03）**：B3 独立悬浮组件窗与 DeskToDo 桌历均为历史实现；当前桌历是 Electron `deskCalendarHost` 独立 BrowserWindow，需求决策见 [docs/desk-calendar-decisions.md](../desk-calendar-decisions.md)，实现缺口清单见 plan.md Current Development Workboard。
+- 相关旧规格（campusos-round2 / ideazjuermodapp / b3-float-widgets / desktodo-gap-closure）已在文档清理时删除，历史见 git。

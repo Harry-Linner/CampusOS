@@ -1,13 +1,15 @@
-# CampusOS 插件市场合规风险分析
+# CampusOS 合规分析（本地数据处理 · 信息源抓取与 AI 外发 · 未来插件市场假设）
 
-**Date:** 2026-06-18
+**Date:** 2026-06-18（2026-09 文档清理扩展范围）
 **Tier:** T3 · S3
-**Scope:** 假设未来引入 Mod 市场（V2）并进行商业化运营时的合规评估（当前路线未采用）
-**Related docs:** [PRD](..\PRD.md) · [plan](..\plan.md) · [research](..\research.md)
+**Scope:** 覆盖三层：(1) 当前运行面——纯本地数据处理、校内外信息源抓取（campus-feed）与"通知文本 → 第三方 LLM"的 AI 受控抽取；(2) V2 假设分支——未来 Mod 市场商业化运营（当前路线未采用，仅作预案）；(3) MIT/GPL 等许可与个人信息保护基线。
+**Related docs:** [PRD](..\PRD.md) · [plan](..\plan.md) · [research](..\research.md) · [信息源指南](campus-feed/zju-sources-guide.md)
 
 > ⚠️ **免责声明：** 本文档基于公开法律法规的检索分析，不构成正式法律意见。在作出任何商业化决策前，建议咨询持证律师。
 
 > **状态说明（2026-07-12）：** CampusOS 当前路线是完全开源、非商业、无收费、无插件市场。本文保留为"如果未来策略变化"时的假设分支，不属于当前 roadmap。
+
+> **范围更新（2026-09 文档清理）：** 官方用户模块现为五个（学业/日程/资料/AI 助手/校园资讯）。校园资讯（campus-feed）在主进程内真实抓取校内外公开信息源，并可把用户选中的通知文本经确认后发送给其自配的第三方 LLM 做日程抽取——因此本文新增"信息源抓取与 AI 外发合规"一节（见文末），该节覆盖当前运行面，其余章节仍是 V2 市场假设预案。模块口径见 CONTEXT.md。
 
 > **范围更新（2026-08-03）：** 插件现收敛为恰好贡献一个左侧栏入口的用户模块，官方模块仅为学业、日程、资料；数据连接器和无头服务由 Core 托管。桌面端不纳入移动端专属的动态支付凭据能力，因此不会新增对应的高敏凭据处理面。该变化不改变本文对未来第三方插件市场、许可和个人信息保护的既有判断。
 
@@ -196,7 +198,7 @@
 - 数据泄露需 72 小时内报告
 - 向境外传输需安全评估或认证
 
-**V1 阶段：** 纯本地存储，不收集任何用户数据 → PIPL 不适用（不构成"处理"）
+**V1/当前阶段：** 数据默认只在用户本机处理（本地 SQLite/文件），不设自有云后端，这不等于"不构成个人信息处理"——账号、课表、成绩与下载记录仍属个人信息，只是处理者与数据主体同机、无第三方接收与云端存储，风险面集中在"本地泄露""抓取他站内容"与"经用户自配 LLM 对外传输"。因此仍需：最小必要、本地加密（safeStorage/DPAPI）、脱敏诊断、可清理可删除；涉及向第三方 LLM 外发文本时必须告知并最小化（见文末"AI 外发与告知"）。
 
 **实操建议：**
 - 统一认证密码只允许在用户主动点击“连接并保存”后经 context-isolated IPC 进入主进程；验证失败不得持久化，Cookie、Session 和 ticket 不得进入 renderer、插件、日志或磁盘缓存
@@ -335,31 +337,17 @@ desktop-pet behavior, and official bot/webhook integrations remain outside this
 release and require separate consent, security, platform-policy, and data
 minimization review.
 
-## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
+## 信息源抓取与 AI 外发合规（2026-09 新增，覆盖当前运行面）
 
-- CampusOS 只有一个应用生命周期；桌面日历是 Schedule 插件能力，不是独立应用或独立开机项。开机自启询问针对 CampusOS 全局能力，首次引导询问，默认关闭，并允许用户选择“默认且以后不再提醒”。
-- 自动同步持续工作，不增加全局“立即同步全部”按钮，也不显示全局“正在同步”状态；各模块保留原有独立刷新反馈。
-- 任务删除采用软删除进入“最近删除”，默认保留 30 天；用户可恢复或永久删除。重复任务在回收站按系列/来源分组展示，已完成实例是否随系列删除由用户决断。
-- 恢复已过期实例由用户选择是否包含过期实例；已过期提醒永不恢复、不补发，未来提醒按原规则重新注册。
-- 开发期任务状态直接使用 `overdue`，不保留 `failed` 兼容别名或历史迁移。
-- 主程序更新只检查并展示版本信息，不自动下载；用户选择【现在更新】后才下载、校验和安装。用户选择【稍后】不下载、不重复打扰，直到出现新版本。下载中允许取消，失败保持当前版本并提供重试。
-- 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
-- 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
-- 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+> 官方第五模块 校园资讯（campus-feed）在主进程内按源码清单抓取校内外公开信息源，并支持把用户选中的通知文本经确认后发给其自配的第三方 LLM 抽取日程（走 ADR-0004 确认边界）。本节基于当前代码记录该运行面的合规边界；源清单见 [docs/campus-feed/zju-sources-guide.md](campus-feed/zju-sources-guide.md)，抽取/写入边界见 [ADR-0004](adr/0004-controlled-ai-message-extraction.md) 与 [phase-f spec](specs/phase-f-feed-calendar-notices.md)。
 
-## 2026-08-16 实现状态同步
+- **抓取对象与默认关闭项**：默认启用的源是公开栏目/RSS（教务、学工、图书馆、研究生招生、国际校区等）；学院级候选源与需登录/校园网内可达的源（bksy、grs、itc、tyys 等）在 `campusFeedSources.ts` 中以 `enabled:false` 默认关闭，开启前必须在真实网络环境核对可达性与来源站使用条款。
+- **节制与缓存**：抓取只取列表页/条目元数据（标题、链接、摘要、时间），条目按源配额与 90 天窗口裁剪、以 contentHash 识别内容改动；刷新受服务调度、启动错峰与失败退避约束；匿名抓取，不携带会话/登录态。若未来上调频率或改为正文级抓取，须回到本节复核 robots/条款与负载合理性。
+- **著作权与转引**：界面只展示标题/摘要/链接，正文经"阅读原文"跳转源站展示。若未来在应用内聚合正文，需另行评估来源站许可、合理引用边界与署名规则。
+- **个人信息最小化**：条目正文可能含个人信息时仅保留展示所需字段；feed 只存本机 SQLite，源可停用/删除；诊断正文与日志不记录条目正文；不随遥测、备份或导出离开本机。
+- **AI 外发与告知（对应 AI Assistant 的 ADR-0004 边界之外的第二个外发面）**：campus-feed 的 AI 抽取把用户显式选中的通知文本发送至其自配的第三方 LLM provider。约束：(1) 首次使用前明示 provider、接口地址与"选中条目将被发送给该服务商"；(2) 仅传输用户显式选中的条目；(3) 原文不入库（仅存本地指纹 + 结构化结果）；(4) 密钥经 safeStorage 加密、仅主进程解密；(5) 传输目的与合规责任随用户所选 provider 配置，UI 须持续明示当前 provider 与接口地址。
+- **未来扩展检查点**：任何"按学院身份自动订阅""自由新增任意源""自动常驻高频抓取""应用内正文聚合"或"自动全量通知转发 LLM"落地前，须回到本节逐条复核并更新本文件。
 
-- CampusOS 生命周期已统一：主窗口关闭支持每次询问、隐藏到托盘或退出；支持“设为默认，以后不再询问”；桌面日历不注册独立开机项，开机自启只启动 CampusOS 后台能力。
-- 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
-- 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
-- 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
-- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
-- 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
-- 插件后台热更新已接入可信 HTTPS 更新清单、版本发现、摘要/开发者签名校验和用户按插件批准；权限/能力/schema 变化重新确认，API 版本变化拒绝热更新。
+## 历史重复段收口（2026-09）
 
-
-## 2026-08-16 implementation addendum
-
-- Anonymous analytics is disabled by default and requires explicit user consent. The event set is fixed and contains no academic, task, file, credential, URL, or AI-key fields. If no PostHog project key is configured, no analytics request is sent.
-- DingTalk is currently a disabled UI placeholder and performs no data access.
-- Cookie fallback login is not represented as available functionality until real upstream validation is implemented; the application must not persist or expose unverified cookie material.
+> CONTEXT.md 是运行时决策的单一事实源。本文此前逐字重复的"2026-08-16 决策同步 / 实现状态同步 / implementation addendum"大段已移除；相关口径（应用生命周期、任务回收站与更新、匿名分析、钉钉占位、Cookie 兜底登录）见 CONTEXT.md 对应章节与 [docs/alpha-acceptance.md](alpha-acceptance.md)。

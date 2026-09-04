@@ -12,7 +12,7 @@
 
 CampusOS 的“插件”是用户可选择启用、禁用，并在左侧栏占据一个一级入口的完整功能模块。技术实现中的数据抓取、协议适配、事件投影、排程算法、搜索索引和系统导出都不是独立插件。
 
-Celechron 对照功能收敛为三个官方插件：
+Celechron 对照功能最初收敛为三个官方插件（下表为 Celechron 对照的三个原始模块）。官方用户模块集合此后扩展为五个——`academic`、`schedule`、`materials`、`ai-assistant`（2026-08-07）、`campus-feed`（2026-08）；daily-brief 已于 2026-08-25 暂停。当前模块集合口径以 ADR-0002 的"2026-08 增补"节为准，本文件只作 Celechron 迁移的历史对照。
 
 | 插件 | 左侧栏入口 | 包含功能 |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ Celechron 对照功能收敛为三个官方插件：
 
 - 日历：月、周、日程和日视图。
 - 接下来：未来 48 小时内课程、固定日程和任务的连续时间流。
-- 全部课程：所有学期（含过去与未来）的课程同时列出，按学期分组；不依赖校历窗口的学期也在此可见。
+- 全部课程：~~所有学期课程按学期分组同时列出~~（该区块已于 2026-08-23 移除；跨学期课程由学业"课表/课程目录"按学期分组承载）。
 - 任务：截止任务、固定/重复日程、预计/已用时间、暂停、继续、完成和删除。
 - 导出：系统日历和 iCal，按学期选择并保持幂等。
 
@@ -152,7 +152,7 @@ Celechron 对照功能收敛为三个官方插件：
 
 **偏离记录（用户明确需求，2026-08-22）：**
 
-1. **删除自动排程**。对照位置：Celechron `lib/model/scholar.dart`、`lib/utils/gpa_helper.dart` 之外，Celechron 并无自动排程；自动排程是 CampusOS 自研扩展（原 `scheduleDomain.generatePlannerSchedule` + `planner.schedule@1` + `schedule-plan-section`）。偏离原因：用户明确要求删除"自动排程"，日程回归"统一查看课程、考试、截止事项与个人安排"的定位。影响：排程 UI、IPC（`campusos:schedule:plan:generate/load`）、域逻辑、`planner.schedule@1` 声明与备份载荷中的 planner 字段一并移除；任务数据模型中的 `breakable`/`blocksPlanning` 字段保留用于数据兼容，UI 不再暴露。验证：typecheck/lint 零错误、479 tests 通过、实机 DOM 确认"自动排程"文案消失。
+1. **删除自动排程**。对照位置：Celechron `lib/model/scholar.dart`、`lib/utils/gpa_helper.dart` 之外，Celechron 并无自动排程；自动排程是 CampusOS 自研扩展（原 `scheduleDomain.generatePlannerSchedule` + `planner.schedule@1` + `schedule-plan-section`）。偏离原因：用户明确要求删除"自动排程"，日程回归"统一查看课程、考试、截止事项与个人安排"的定位。影响：排程 UI、域逻辑与 `planner.schedule@1` 声明一并移除；任务数据模型中的 `breakable`/`blocksPlanning` 字段保留用于数据兼容，UI 不再暴露。验证：typecheck/lint 零错误、479 tests 通过、实机 DOM 确认"自动排程"文案消失。（2026-09 文档清理注：实际代码中 `campusos:schedule:plan:generate/load` 的 preload 死桩与 `planner_schedules` 空表仍在，属待清理残留，不是已实现能力。）
 2. **日程展示全部学期课程**。对照位置：Celechron `lib/model/scholar.dart:97-110` 只暴露当前学期；CampusOS 原 `deriveTimetableCalendarEvents` 只投影 `selectAcademicSemesterWindow` 选中的学期。偏离原因：用户明确要求"所有课程同时展示，能看到下学期的也能看到两年前的"。影响：日历事件投影改为投影所有有校历窗口的学期；无校历窗口的学期在"全部课程"按学期分组列表中可见。验证：`academicTimetableEvents.test.ts` 新增跨学期投影用例，479 tests 通过。
 
 ## 7. 数据与交互规则
@@ -173,11 +173,11 @@ Celechron 对照功能收敛为三个官方插件：
 
 ### 7.3 日历统一
 
-课程、考试、DDL 和用户日程统一投影为 `calendar.events@1`。课表事件投影覆盖所有有校历窗口的学期（偏离 Celechron 的当前学期限定，见 §6），无窗口学期由日程"全部课程"列表兜底展示。
+课程、考试、DDL 和用户日程统一投影为 `calendar.events@1`。课表事件投影覆盖所有有校历窗口的学期（偏离 Celechron 的当前学期限定，见 §6）；无校历窗口的学期由学业模块按学期分组兜底展示（原日程"全部课程"区块已于 2026-08-23 移除）。
 
 ### 7.4 导航
 
-固定 Core 入口为“总览、扩展、设置”。启用三个官方插件后，标准左侧栏顺序为“总览、学业、日程、资料、扩展、设置”。插件禁用或阻塞时，其唯一入口消失。
+固定 Core 入口为“总览、扩展、设置”。官方用户模块启用后各贡献一个一级入口：学业、日程、资料、AI 助手、校园资讯（AI 助手加入见 ADR-0002"AI Assistant MVP"节；校园资讯加入见 ADR-0002"2026-08 增补"节）。插件禁用或阻塞时，其唯一入口消失。
 
 ## 8. 当前包迁移
 
@@ -224,7 +224,7 @@ Celechron 对照功能收敛为三个官方插件：
 - 消费者契约：本科和研究生数据对同一学业 contract 运行同一套契约测试。
 - UI：插件禁用后入口消失；插件内部标签可达；空态、错误态、键盘和窄宽度可用。
 - 任务：状态流转、天/月/年重复、结束日期、历史实例和跨日切片。
-- 排程：确定性、截止时间、不可用时段、休息压缩、不可拆分任务和不可行解释。
+- 排程：~~自动排程已删除~~（2026-08-22 决议，见 §6 偏离记录 1），不作为验收项。
 - 日历导出：按学期选择、幂等更新和删除。
 - 真实链路：以授权账号的真实输入、实际请求、脱敏上游反馈和用户可见结果闭环验收。
 - 许可证：构建产物不得包含 `.tmp/celechron-1.3.0` 或 Celechron 源文件。
@@ -232,6 +232,8 @@ Celechron 对照功能收敛为三个官方插件：
 ## Current implementation acceptance (2026-08-04)
 
 The four user modules are the only left-navigation products. Academic owns timetable, course catalog, exams, grades, and practice as internal tabs; Schedule owns the unified event/task projection; Materials owns course browsing, batch selection, and the download queue; AI Assistant owns explicit-message parsing and confirmed task creation through Schedule IPC. Core-owned connectors are never listed as installable modules, and Campus Card is excluded from the desktop scope. Core now also owns global search, update state, About, and MIT license presentation. On 2026-08-04 the authorized undergraduate live path and private baselines closed the 2026-2027 autumn-winter timetable and 2025-2026 spring-summer materials gates, including authenticated download byte validation. Graduate real-account closure is not claimed.
+
+> （2026-09 文档清理更新：官方用户模块集合现为五个——学业、日程、资料、AI 助手与校园资讯(campus-feed，2026-08 加入)；daily-brief 已于 2026-08-25 暂停。campus-feed 的抓取/AI 抽取转日程见 [phase-f-feed-calendar-notices.md](../specs/phase-f-feed-calendar-notices.md)。）
 
 The same redacted undergraduate chain passed again on 2026-08-05. Combined
 with the 2026-07-29 and 2026-08-04 observations, repeated time-separated
@@ -245,7 +247,7 @@ The Core background refresh owns the Celechron-compatible grade fuse. It compare
 
 ## 11. 完成定义
 
-当前状态（2026-08-04）：核心任务、重复实例、四种日历视图、未来 48 小时、Celechron 排程、不可行解释、SQLite 持久化和 RFC 5545/Windows 文件交接已实现并完成自动化测试；真实账号日程与系统日历导入仍需按验收矩阵执行。
+当前状态（2026-09 更新）：核心任务、重复实例、四种日历视图、未来 48 小时、SQLite 持久化和 RFC 5545/Windows 文件交接已实现并完成自动化测试；Celechron 对照的自动排程/不可行解释已于 2026-08-22 删除，不再是当前能力。真实账号日程与系统日历导入仍需按验收矩阵执行。
 
 一个官方插件只有同时满足以下条件才能标记为可用：
 

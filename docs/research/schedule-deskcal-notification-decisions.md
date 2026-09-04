@@ -1,6 +1,7 @@
 # 日程 / 桌面日历 / 通知中心 设计决议（2026-08-25 问答敲定）
 
 **状态:** 已与用户逐项问答敲定（本文件为实施基线）
+> **状态更新（2026-09 文档清理）：** 本文"桌面日历"部分的决议已被 [docs/desk-calendar-decisions.md](../desk-calendar-decisions.md)（2026-09-03 逐项确认定稿）取代，以该文件为准；"日程页"相关决议以 [campusos-interface-v3.md](../specs/campusos-interface-v3.md) 与当前实现为准（自动排程已于 2026-08-22 删除）。本文件保留为 2026-08-25 的问答基线历史记录。
 **关联:** `calendar-ui-gap-research.md`（差距调研）、`notification-center-interaction.md`（通知交互调研）、`docs/research/ai-frontend-lessons.md`（UI 纪律）、`.tmp/celechron-1.3.0`（业务对照）
 **视觉说明:** 视觉风格基于调研文字描述归纳（当前会话视觉模型不可用，未直接截图对照 DeskToDo 与其他日历；以"先做后验收迭代"流程落实）
 

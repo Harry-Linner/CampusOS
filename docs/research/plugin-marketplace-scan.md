@@ -4,6 +4,8 @@
 **范围:** dshfind.com 插件超市（GitHub `dsh-plugin` topic，11051 个插件）重点插件详情页 + 本机 `@deepseek-ai/dsh` v0.1.1-rc.2 内核源码核对
 **状态:** 调研结论与 Phase 提案，待用户圈定后按 Feature Completion 纪律立项实施；本文件不修改 PRD/plan 口径，Phase 决策后再同步 plan.md / research.md
 
+> **状态更新（2026-09 文档清理）：** 本文件已转为**决策日志**性质：其后续决策均已落盘——早报 daily-brief 暂停（2026-08-25，见 §5.4）、产品不改名（见 product-rename-candidates.md）、Phase F 通知面板收敛为 campus-feed 视图内 AI 受控转日程（见 phase-f spec 与 campus-feed-redesign-research.md）。文中 Phase 提案不再处于"待圈定"状态；未立项项若需推进，须在 plan.md 重新立项后再实施。
+
 > 数据来源为第三方社区站点，star/下载量为站点自报，采纳前以对应 GitHub 仓库 README 为准；个别自称"官方"的插件实为社区作品。
 
 ---

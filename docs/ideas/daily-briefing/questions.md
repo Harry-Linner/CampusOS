@@ -1,5 +1,7 @@
 # 澄清问题问卷 — 个人早报（Daily Brief）
 
+> **⚠️ 已暂停（2026-08-25 用户决议）：** 早报已移出官方模块名单并暂停开发；代码与 IPC 保留未删除（`plugins/official/daily-brief` + main 注册的 brief handler），不挂载、不进入左侧栏/引导推荐。本文件及本目录其余文件是暂停前的历史规划/调研记录，不作为实施依据；恢复前须重新立项。当前模块集合见 CONTEXT.md。
+
 **Date:** 2026-08-22
 **Tier:** T2 · S3
 **Related docs:** [research](research.md) · [PRD](PRD.md) · [plan](plan.md)

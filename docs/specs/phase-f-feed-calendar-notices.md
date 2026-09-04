@@ -2,13 +2,13 @@
 
 **Phase:** F（P2 · L）· 来源：docs/research/plugin-marketplace-scan.md §4 Phase F（dsh-openbiliclaw 式）+ 用户决议（2026-08-24）
 **状态:** ✅ 部分实现 + **范围修正（2026-08-29 用户拍板）**——"日历视图内通知板块"不实施、从本 spec 移除口径；仅保留"校园资讯视图内 AI 受控提取进日程"（已实现）。修正原因：`docs/research/campus-feed-redesign-research.md` §2.7-8 代码核实确认原 spec 声称的"日历通知板块/confidence/证据引用"在代码中不存在（`plugins/official/schedule` 无任何 campusFeed 引用）。
-**关联:** `plugins/official/campus-feed/src/CampusFeedView.tsx`（"转为日程"入口）/ `packages/core/src/main/campusFeedService.ts`（extractScheduleCandidates / createScheduleTasks）/ `packages/core/src/main/campusFeedPrompt.ts`（schema `campus-feed-schedule-v1`）/ ADR-0004（受控提取与确认边界）/ ADR-0003（日程写入契约）
+**关联:** `plugins/official/campus-feed/src/CampusFeedView.tsx`（"转为日程"入口）/ `packages/core/src/main/campusFeedService.ts`（extractScheduleCandidates / createScheduleTasks）/ `packages/core/src/main/campusFeedPrompt.ts`（schema `campus-feed-schedule-v1`）/ ADR-0004（受控提取、确认与提交边界，§7）。注意：ADR-0003 是"Windows 系统日历 = RFC 5545 文件交接"决策，与本功能无关（历史版本曾误引为"日程写入契约"）。
 
 ---
 
 ## 1. 目标（修正后）
 
-1. **AI 受控提取进日程**（✅ 已实现）：校园资讯视图内，通知条目 → AI 提取 {标题, 开始, 结束, 地点} → 用户确认 → 写入日程（走 ADR-0004 确认边界 + ADR-0003 契约）。实现位置：CampusFeedView 卡片"转为日程" → `extractScheduleCandidates`（结构化生成，schema `campus-feed-schedule-v1`）→ 候选预览对话框 → 确认 → `createScheduleTasks` 写日程（task source `{kind:"ai-assistant", fingerprint:"campus-feed:"+itemId}`，原始通知文本不入库）。
+1. **AI 受控提取进日程**（✅ 已实现）：校园资讯视图内，通知条目 → AI 提取 {标题, 开始, 结束, 地点} → 用户确认 → 写入日程（走 ADR-0004 确认边界与 §7 提交边界）。实现位置：CampusFeedView 卡片"转为日程" → `extractScheduleCandidates`（结构化生成，schema `campus-feed-schedule-v1`）→ 候选预览对话框 → 确认 → `createScheduleTasks` 写日程（task source `{kind:"ai-assistant", fingerprint:"campus-feed:"+itemId}`，原始通知文本不入库）。
 2. ~~**日历通知板块**：在日程日历视图（ScheduleView）内开辟"通知"板块~~ —— **❌ 不实施（2026-08-29 拍板移除）**。原口径描述的功能从未落地；若未来需要，作为独立需求另行立项，不在本 spec 内。
 
 **不做什么：** 推荐与画像（后置）；不做消息导入；不改 campus-feed 抓取/去重核心。

@@ -1,7 +1,7 @@
 # UI 迁移 Spec — CampusOS renderer 迁入 shadcn/ui
 
 **Date:** 2026-08-22
-**Status:** Draft（待 Phase A 开工）
+**Status:** 已完成并记录（2026-08-23；renderer 迁 shadcn/ui 各阶段见文末自查记录）。desk-calendar 悬浮窗按文末收口决定**保持独立设计、不迁移**，本文 §2 决策 5 的"二期再迁"表述已被该收口取代。
 **范围（严格限定）：** 仅 renderer 表现层。campusmod 插件运行时、数据层、IPC、插件协议、主进程一概不动。
 
 ---

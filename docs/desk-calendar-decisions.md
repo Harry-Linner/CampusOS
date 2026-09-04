@@ -2,6 +2,8 @@
 
 > 本文档记录「桌面日历」功能/设计的**所有已确认决策**，以及待确认项（见文末「待确认」）。所有题均以选择题形式向用户逐一确认过；确认结果在此落盘，避免返工/忘。
 
+> **⚠️ 本文是"需求决策依据"，不是验收证据（2026-09 文档清理）**。当前 Electron 桌历（`deskCalendarHost`）与此处决策的**实现差距**（代码审计证据）：① 校历周次仍为空占位（`deskCalendarHost.ts` 的 `weeks/currentWeek` 恒空，UI 回退"月内自然周"，对应决策三/23 未完成）；② "双击事件=编辑"实际保存为**新建**单次 deadline（渲染层 createEvent 不传 id、主进程忽略 repeatType/priority，决策六.5 未实现）；③ 窗口拖动/关闭 IPC（preload `deskCalendar.ts` + 主进程 handler）在渲染层**零调用**（窗口拖不动、无自关入口，决策四.8 入口不完整）；④ 桌历可见状态只写不读、重启不恢复（决策一.3 位置记忆不完整）；⑤ 置顶/图钉/毛玻璃设置只作用于存活窗口或本地 state，重建窗口不重放（决策七.13/14/15 部分实现）；⑥ WorkerW 嵌入被 `desktopPinning.ts` 的 `ENABLE_WORKERW_ATTACH=false` 关闭，仅降级"贴底+轮询"路径在跑（决策一贴底层级未按首选实现）。开发期收尾任务见 [plan.md](../plan.md) 的 Current Development Workboard。
+
 ## 一、窗口行为（已确认）
 - **贴底层级**：目标层级 = **图标之下、壁纸之上**（与 DesktopCal 一致）。实现：向 `Progman` 发 `WM_SPAWN_WORKERW(0x052C)` 生成壁纸 `WorkerW`，用 `SetParent` 把桌历窗口挂到该 WorkerW（改 `WS_CHILD`、去 `WS_POPUP`；**绝不能加 `WS_EX_TRANSPARENT`**，否则整窗点击穿透、无法交互）；找不到 WorkerW 时回退 Progman。**去掉 setAlwaysOnTop 置顶**。`desktopPinning.pinWindowToDesktopBottom` 首选 WorkerW 嵌入，失败回退（Progman + `GW_HWNDNEXT`）。
 - **格子布局自适应**：完全仿 DeskToDo —— 格子随窗口均分拉伸、**无整体滚动条**；某天任务多时**只在格内滚**（透明隐藏滚动条），不撑宽窗口。

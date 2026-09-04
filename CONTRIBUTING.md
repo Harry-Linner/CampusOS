@@ -16,7 +16,7 @@ CampusOS is a local-first desktop workspace for ZJU students. A plugin is a user
 - Do not register connectors, event projectors, schedulers, search providers, notification policies, or export adapters as user-visible plugins.
 - Keep subfeatures inside their owning module. A plugin must not add multiple first-level navigation destinations.
 - Add focused tests for observable behavior. Mock only external network or data-source boundaries.
-- Update `PRD.md`, `plan.md`, `research.md`, and applicable `docs/specs/` files when product scope, assumptions, or implementation status changes.
+- Update `CONTEXT.md`（运行时决策/术语单一事实源）、`README.md`、`PRD.md`、`plan.md`（Current Development Workboard）和 applicable `docs/specs/` files when product scope, assumptions, or implementation status changes. Never create a second source of truth for runtime decisions that already live in `CONTEXT.md`.
 
 ## Pull requests
 
