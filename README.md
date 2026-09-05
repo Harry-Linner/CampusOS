@@ -10,7 +10,7 @@
 
 CampusOS 是一个面向浙江大学学生的桌面校园工作台。当前仍处于**开发期收尾**（工作台见 [plan.md](plan.md) Current Development Workboard）：插件地基、真实账号链路（认证/教务/素拓/学在浙大/在线校历/课件下载）与桌面日历等核心能力已落地，桌面截图验收、发布准备与多设备现场验收未完成，因此尚不可作为可发布 MVP。
 
-项目采用 [MIT License](LICENSE)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。领域术语与运行时决策以 [CONTEXT.md](CONTEXT.md) 为单一事实源。
+项目源代码采用 [MIT License](LICENSE)，第三方媒体资源及其许可见 [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。领域术语与运行时决策以 [CONTEXT.md](CONTEXT.md) 为单一事实源。
 
 - Electron + React 桌面骨架
 - `总览`、`扩展`、`设置` 三个 Core 入口 + 五个官方模块入口（**学业 · 日程 · 资料 · 校园资讯 · AI 助手**）+ 由已激活插件动态生成的入口；每个插件恰好占用一个一级侧栏入口。早报 daily-brief 已暂停开发，不在模块集合中

@@ -6,7 +6,9 @@ export interface DownloadBridge {
   pause: (id: string) => Promise<boolean>;
   resume: (id: string) => Promise<boolean>;
   cancel: (id: string) => Promise<boolean>;
+  clearAll: () => Promise<number>;
   open: (id: string) => Promise<void>;
   reveal: (id: string) => Promise<void>;
   subscribe: (listener: () => void) => () => void;
+  subscribeToCompletionSound: (listener: () => void) => () => void;
 }

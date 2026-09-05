@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CampusDownloadTask } from "@campusos/shared";
+import type { NotificationKind, NotificationRecord } from "../shared/notificationBridge";
 
 const electronState = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -25,7 +26,10 @@ vi.mock("electron", () => ({
   }
 }));
 
-import { registerDownloadHandlers } from "./downloadIpc";
+import {
+  createDownloadCompletionTracker,
+  registerDownloadHandlers
+} from "./downloadIpc";
 
 const readyTask: CampusDownloadTask = {
   id: "ready-download",
@@ -65,7 +69,8 @@ describe("download IPC", () => {
     enqueue: vi.fn(async () => ({ id: readyTask.id })),
     pause: vi.fn(async () => true),
     resume: vi.fn(async () => true),
-    cancel: vi.fn(async () => true)
+    cancel: vi.fn(async () => true),
+    clearAll: vi.fn(async () => 2)
   };
 
   beforeEach(() => {
@@ -95,6 +100,11 @@ describe("download IPC", () => {
     );
   });
 
+  it("clears the full queue through the trusted IPC handler", async () => {
+    await expect(invoke<number>("campusos:downloads:clear-all")).resolves.toBe(2);
+    expect(engine.clearAll).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unfinished, unknown, and OS-rejected open requests", async () => {
     await expect(
       invoke("campusos:downloads:open", failedTask.id)
@@ -108,5 +118,53 @@ describe("download IPC", () => {
       invoke("campusos:downloads:open", readyTask.id)
     ).rejects.toThrow("系统无法打开该文件");
     expect(electronState.showItemInFolder).not.toHaveBeenCalled();
+  });
+
+  it("announces a naturally settled failed batch once and suppresses manual clearing", async () => {
+    const notify = vi.fn(async (input: {
+      kind: NotificationKind;
+      title: string;
+      body: string;
+      actionTarget?: string | null;
+      showDesktop?: boolean;
+    }): Promise<NotificationRecord> => ({
+      id: "notification-1",
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      state: "unread" as const,
+      createdAt: "2026-09-05T00:00:00.000Z",
+      expiresAt: "2026-10-05T00:00:00.000Z",
+      actionTarget: input.actionTarget ?? null
+    }));
+    const broadcastSound = vi.fn();
+    const tracker = createDownloadCompletionTracker({
+      notify,
+      isSoundEnabled: async () => true,
+      broadcastSound
+    });
+    const activeTask: CampusDownloadTask = {
+      ...readyTask,
+      id: "active-download",
+      progress: 50,
+      status: "syncing"
+    };
+
+    tracker.observe([activeTask]);
+    tracker.observe([failedTask]);
+    await vi.waitFor(() => {
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+        title: "资料下载已结束",
+        body: "下载队列已结束，其中 1 项失败。"
+      }));
+      expect(broadcastSound).toHaveBeenCalledTimes(1);
+    });
+
+    tracker.observe([activeTask]);
+    await tracker.suppressDuring(async () => {
+      tracker.observe([]);
+    });
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(broadcastSound).toHaveBeenCalledTimes(1);
   });
 });

@@ -21,7 +21,7 @@ test("renders the dashboard overview without renderer crashes across the loading
   const userDataPath = await mkdtemp(join(tmpdir(), "campusos-dashboard-e2e-"));
   const app = await electron.launch({
     args: [join(packageRoot, "out/main/main.js"), `--user-data-dir=${userDataPath}`],
-    env: { ...process.env, CAMPOS_E2E_FIXTURE: "1" }
+    env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1" }
   });
 
   try {

@@ -289,6 +289,26 @@ export class DownloadEngine {
     return true;
   }
 
+  /** 清空整个下载队列。活动任务会先取消，最终文件保留，仅删除临时文件。 */
+  async clearAll(): Promise<number> {
+    const items = [...this.items.values()];
+    if (items.length === 0) return 0;
+
+    for (const item of items) {
+      const jobId = this.jobIdFor(item.id);
+      if (jobId !== null) this.registry.cancel(jobId);
+    }
+    await this.registry.waitForIdle();
+
+    this.items.clear();
+    await Promise.all(
+      items.map((item) => rm(item.temporaryPath, { force: true }).catch(() => undefined))
+    );
+    await this.persist();
+    this.onChanged?.();
+    return items.length;
+  }
+
   getSummary(): CampusDownloadTask[] {
     return [...this.items.values()].map((item) => ({
       id: item.id,
@@ -300,7 +320,8 @@ export class DownloadEngine {
         : 0,
       status: item.status,
       targetPath: item.targetPath,
-      failureMessage: item.failureMessage
+      failureMessage: item.failureMessage,
+      createdAt: item.createdAt
     }));
   }
 
@@ -450,6 +471,10 @@ export class DownloadEngine {
     } finally {
       clearTimeout(timeout);
     }
+    if (controller.signal.aborted) {
+      await response.body?.cancel();
+      throw new DOMException("下载已取消。", "AbortError");
+    }
     if (!response.ok && response.status !== 206) {
       throw new Error(`下载失败：HTTP ${response.status}`);
     }
@@ -500,6 +525,9 @@ export class DownloadEngine {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        if (controller.signal.aborted) {
+          throw new DOMException("下载已取消。", "AbortError");
+        }
         if (value) {
           await file.write(value);
           item.downloadedBytes += value.byteLength;

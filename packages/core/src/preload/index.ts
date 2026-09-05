@@ -64,10 +64,17 @@ contextBridge.exposeInMainWorld("campusos", {
     pause: (id: string) => ipcRenderer.invoke("campusos:downloads:pause", id),
     resume: (id: string) => ipcRenderer.invoke("campusos:downloads:resume", id),
     cancel: (id: string) => ipcRenderer.invoke("campusos:downloads:cancel", id),
+    clearAll: () => ipcRenderer.invoke("campusos:downloads:clear-all", undefined),
     open: (id: string) => ipcRenderer.invoke("campusos:downloads:open", id),
     reveal: (id: string) => ipcRenderer.invoke("campusos:downloads:reveal", id),
     subscribe: (listener: () => void) => {
       const channel = "campusos:downloads:changed";
+      const handler = () => listener();
+      ipcRenderer.on(channel, handler);
+      return () => ipcRenderer.removeListener(channel, handler);
+    },
+    subscribeToCompletionSound: (listener: () => void) => {
+      const channel = "campusos:downloads:completion-sound";
       const handler = () => listener();
       ipcRenderer.on(channel, handler);
       return () => ipcRenderer.removeListener(channel, handler);

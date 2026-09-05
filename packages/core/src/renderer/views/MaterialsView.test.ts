@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { createElement } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusWorkspaceSnapshot, PluginCapabilityClient } from "@campusos/shared";
 import { Component as MaterialsView } from "@campusos/plugin-materials";
@@ -121,6 +121,7 @@ describe("MaterialsView", () => {
         pause: vi.fn(async () => undefined),
         resume: vi.fn(async () => undefined),
         cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
         open: vi.fn(async () => undefined),
         reveal: vi.fn(async () => undefined)
       },
@@ -161,6 +162,7 @@ describe("MaterialsView", () => {
         pause: vi.fn(async () => undefined),
         resume,
         cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
         open: vi.fn(async () => undefined),
         reveal: vi.fn(async () => undefined)
       },
@@ -193,6 +195,7 @@ describe("MaterialsView", () => {
         pause: vi.fn(async () => undefined),
         resume: vi.fn(async () => undefined),
         cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
         open,
         reveal
       },
@@ -209,6 +212,49 @@ describe("MaterialsView", () => {
     await waitFor(() => {
       expect(reveal).toHaveBeenCalledWith("ready-download");
       expect(onRefresh).not.toHaveBeenCalled();
+    });
+  });
+
+  it("sorts the queue by enqueue time and excludes finished records from the in-progress count", async () => {
+    const clearAll = vi.fn(async () => 3);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue: vi.fn(async () => undefined),
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined),
+        clearAll,
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
+      },
+      loading: false,
+      onRefresh: vi.fn(async () => undefined),
+      snapshot: {
+        ...snapshot,
+        downloads: [
+          { ...snapshot.downloads[0], title: "旧记录", createdAt: "2026-07-28T00:00:00.000Z" },
+          { ...snapshot.downloads[1], title: "新记录", createdAt: "2026-07-29T00:00:00.000Z" },
+          { ...snapshot.downloads[2], title: "进行中", status: "syncing", createdAt: "2026-07-28T12:00:00.000Z" }
+        ]
+      }
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    const queue = screen.getByRole("region", { name: "下载队列" });
+    expect(within(queue).getByText("1 个进行中")).toBeTruthy();
+    const rows = within(queue).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("新记录"),
+      expect.stringContaining("进行中"),
+      expect.stringContaining("旧记录")
+    ]);
+    fireEvent.click(within(queue).getByRole("button", { name: "清空记录" }));
+    await waitFor(() => expect(clearAll).toHaveBeenCalledTimes(1));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("取消正在进行的下载"));
+    await waitFor(() => {
+      expect(screen.getByText("已清空 3 条下载任务。")).toBeTruthy();
     });
   });
 });

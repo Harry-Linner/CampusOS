@@ -25,13 +25,16 @@ import { ExtensionsView } from "./views/ExtensionsView";
 import { SettingsView } from "./views/SettingsView";
 import {
   cancelDownload,
+  clearAllDownloads,
   enqueueDownload,
   openDownload,
   pauseDownload,
   revealDownload,
   resumeDownload,
+  subscribeToDownloadCompletionSound,
   subscribeToDownloadChanges
 } from "./lib/downloadBridge";
+import { playDownloadCompletionSound } from "./lib/downloadCompletionSound";
 import { subscribeToCampusWorkspaceChanges } from "./lib/campusBridge";
 import { subscribeToPluginRuntimeChanges } from "./lib/pluginBridge";
 import { readSearchHotkey, searchHotkeyKey, type SearchHotkey } from "./lib/searchHotkey";
@@ -145,6 +148,10 @@ export const App = (): JSX.Element => {
 
   useEffect(() => subscribeToDownloadChanges(() => {
     void workspace.refreshDownloads();
+  }), []);
+
+  useEffect(() => subscribeToDownloadCompletionSound(() => {
+    void playDownloadCompletionSound();
   }), []);
 
   useEffect(() => {
@@ -288,6 +295,7 @@ export const App = (): JSX.Element => {
             pause: pauseDownload,
             resume: resumeDownload,
             cancel: cancelDownload,
+            clearAll: clearAllDownloads,
             open: openDownload,
             reveal: revealDownload
           },

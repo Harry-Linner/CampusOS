@@ -244,6 +244,14 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await page.getByLabel("主导航").getByRole("button", { name: "资料" }).click();
     await expect(page.getByRole("button", { name: "课程资料", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "下载队列", exact: true })).toBeVisible();
+    await page.evaluate(async () => {
+      await window.campusos?.lifecycle.save({ notificationEnabled: true });
+      const state = window as unknown as { downloadCompletionSoundEvents: number };
+      state.downloadCompletionSoundEvents = 0;
+      window.campusos?.downloads.subscribeToCompletionSound(() => {
+        state.downloadCompletionSoundEvents += 1;
+      });
+    });
     await page.evaluate(async (url) => {
       await window.campusos?.downloads.enqueue({
         url,
@@ -257,6 +265,14 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
     await expect.poll(async () => page.evaluate(async () =>
       (await window.campusos?.downloads.list())?.[0]?.status
     )).toBe("ready");
+    await expect.poll(() => page.evaluate(() =>
+      (window as unknown as { downloadCompletionSoundEvents: number })
+        .downloadCompletionSoundEvents
+    )).toBe(1);
+    const completedDownloadPath = await page.evaluate(async () =>
+      (await window.campusos?.downloads.list())?.[0]?.targetPath
+    );
+    expect(completedDownloadPath).toBeTruthy();
     await page.getByRole("button", { name: /^下载队列/ }).click();
     await expect(page.getByText("e2e-completed.pdf", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "打开" })).toBeVisible();
@@ -267,6 +283,12 @@ test("validates the complete fixture-backed workspace at desktop and narrow widt
       path: testInfo.outputPath("materials-desktop.png"),
       fullPage: true
     });
+    await page.getByRole("button", { name: "清空记录" }).click();
+    await expect(page.getByText("下载队列为空。")).toBeVisible();
+    await expect(page.getByText("已清空 1 条下载任务。")).toBeVisible();
+    await expect(readFile(completedDownloadPath!, "utf8")).resolves.toBe(
+      downloadPayload.toString("utf8")
+    );
 
     await page.getByRole("button", { name: "搜索" }).click();
     const search = page.getByRole("searchbox", { name: "搜索课程、事项和资料" });

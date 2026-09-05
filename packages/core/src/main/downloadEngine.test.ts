@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DownloadEngine } from "./downloadEngine";
+import { DownloadEngine, type DownloadQueueItem } from "./downloadEngine";
 
 const temporaryDirectories: string[] = [];
 
@@ -349,5 +349,75 @@ describe("DownloadEngine", () => {
       progress: 100,
       failureMessage: undefined
     }));
+  });
+
+  it("clears every record, aborts active downloads, removes partial files, and keeps completed files", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-clear-download-test-"));
+    temporaryDirectories.push(storageRoot);
+    const save = vi.fn(async () => undefined);
+    let activeRequestStarted!: () => void;
+    const activeStarted = new Promise<void>((resolve) => {
+      activeRequestStarted = resolve;
+    });
+    const baseItem = (id: string, status: DownloadQueueItem["status"]): DownloadQueueItem => ({
+      id,
+      url: `https://example.com/${id}.bin`,
+      title: `${id}.bin`,
+      courseName: "Systems",
+      sourceId: "academic-affairs",
+      semester: "2026-fall",
+      targetPath: join(storageRoot, "materials", `${id}.bin`),
+      temporaryPath: join(storageRoot, "materials", `${id}.bin.part`),
+      totalBytes: 1,
+      downloadedBytes: status === "ready" ? 1 : 0,
+      status,
+      createdAt: "2026-07-28T00:00:00.000Z",
+      updatedAt: "2026-07-28T00:00:00.000Z"
+    });
+    const engine = new DownloadEngine({
+      downloadRoot: join(storageRoot, "materials"),
+      persistencePath: join(storageRoot, "queue.json"),
+      queuePersistence: {
+        load: async () => [
+          baseItem("ready", "ready"),
+          baseItem("failed", "failed"),
+          baseItem("paused", "paused")
+        ],
+        save
+      },
+      maxConcurrent: 1,
+      resolveResponse: async ({ signal }) => {
+        activeRequestStarted();
+        await new Promise<void>((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("Aborted", "AbortError")),
+            { once: true }
+          );
+        });
+        throw new Error("unreachable");
+      }
+    });
+
+    await engine.loadPersisted();
+    const completedPath = engine.allTasks.find((item) => item.id === "ready")!.targetPath;
+    await mkdir(join(completedPath, ".."), { recursive: true });
+    await writeFile(completedPath, "completed", "utf8");
+    const active = await engine.enqueue({
+      url: "https://example.com/active.bin",
+      title: "active.bin",
+      courseName: "Systems",
+      sourceId: "academic-affairs",
+      semester: "2026-fall"
+    });
+    await activeStarted;
+    await mkdir(join(active.temporaryPath, ".."), { recursive: true });
+    await writeFile(active.temporaryPath, "partial", "utf8");
+
+    await expect(engine.clearAll()).resolves.toBe(4);
+    expect(engine.allTasks).toEqual([]);
+    expect(save).toHaveBeenLastCalledWith([]);
+    await expect(readFile(active.temporaryPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(completedPath, "utf8")).resolves.toBe("completed");
   });
 });

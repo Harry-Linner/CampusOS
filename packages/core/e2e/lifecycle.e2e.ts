@@ -65,8 +65,14 @@ test("persists close choice, window bounds, hidden startup, and rejects off-scre
     const restored = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
     expect(restored?.x).toBe(storedWindowState.bounds.x);
     expect(restored?.y).toBe(storedWindowState.bounds.y);
-    expect(Math.abs((restored?.width ?? 0) - storedWindowState.bounds.width)).toBeLessThanOrEqual(4);
-    expect(Math.abs((restored?.height ?? 0) - storedWindowState.bounds.height)).toBeLessThanOrEqual(4);
+    expect(
+      Math.abs((restored?.width ?? 0) - storedWindowState.bounds.width),
+      JSON.stringify({ restored, stored: storedWindowState.bounds })
+    ).toBeLessThanOrEqual(4);
+    expect(
+      Math.abs((restored?.height ?? 0) - storedWindowState.bounds.height),
+      JSON.stringify({ restored, stored: storedWindowState.bounds })
+    ).toBeLessThanOrEqual(4);
     await app.close();
 
     app = await launch(userDataPath, ["--hidden"]);

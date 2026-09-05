@@ -94,6 +94,8 @@ export interface CampusDownloadTask {
   status: CampusDownloadStatus;
   targetPath: string;
   failureMessage?: string;
+  /** 任务加入下载队列的时间（ISO 字符串），用于按入队时间倒序。 */
+  createdAt?: string;
 }
 
 export interface CampusDownloadRequest {

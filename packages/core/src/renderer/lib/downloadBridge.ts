@@ -27,6 +27,10 @@ export const cancelDownload = async (id: string): Promise<void> => {
   await requireCampusosBridge().downloads.cancel(id);
 };
 
+export const clearAllDownloads = async (): Promise<number> => {
+  return requireCampusosBridge().downloads.clearAll();
+};
+
 export const openDownload = async (id: string): Promise<void> => {
   await requireCampusosBridge().downloads.open(id);
 };
@@ -37,3 +41,8 @@ export const revealDownload = async (id: string): Promise<void> => {
 
 export const subscribeToDownloadChanges = (listener: () => void): (() => void) =>
   requireCampusosBridge().downloads.subscribe(listener);
+
+export const subscribeToDownloadCompletionSound = (
+  listener: () => void
+): (() => void) =>
+  requireCampusosBridge().downloads.subscribeToCompletionSound(listener);

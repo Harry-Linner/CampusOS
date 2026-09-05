@@ -84,7 +84,7 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   // E2E fixture runs use a fresh user-data dir (no saved state) and must not
   // pop up on the user's working screen, so they always center on the
   // primary display (the user's designated screen 1).
-  const isE2eFixture = process.env.CAMPOS_E2E_FIXTURE === "1";
+  const isE2eFixture = process.env.CAMPUSOS_E2E_FIXTURE === "1";
   let position: { x?: number; y?: number } = {};
   if (!savedState) {
     const primary = screen.getPrimaryDisplay();

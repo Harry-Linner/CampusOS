@@ -27,6 +27,8 @@
     linear-gradient(150deg, #fbfcfa 0%, var(--paper-muted) 100%);
   --dot-opacity: 0.16;
   --card-bg: rgba(255, 255, 255, 0.86);
+  /* 通知中心弹层专用：完全不透明，避免背景过浅/泛白（见 styles.css .notification-popover） */
+  --notification-panel-bg: #ffffff;
 }
 
 :root[data-theme="dark"] {
@@ -51,6 +53,7 @@
     linear-gradient(150deg, #1e242c 0%, var(--paper-muted) 100%);
   --dot-opacity: 0.08;
   --card-bg: rgba(30, 36, 44, 0.92);
+  --notification-panel-bg: #1e242c;
 }
 
 :root[data-theme="high-contrast"] {
@@ -74,6 +77,7 @@
   --brand-gradient: linear-gradient(150deg, #0a0a0a 0%, #000000 100%);
   --dot-opacity: 0;
   --card-bg: rgba(10, 10, 10, 0.95);
+  --notification-panel-bg: #0a0a0a;
 }
 
 /* Override body background to use theme token */

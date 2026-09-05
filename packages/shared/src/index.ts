@@ -169,6 +169,7 @@ export interface PluginComponentProps {
     pause: (id: string) => Promise<void>;
     resume: (id: string) => Promise<void>;
     cancel: (id: string) => Promise<void>;
+    clearAll: () => Promise<number>;
     open: (id: string) => Promise<void>;
     reveal: (id: string) => Promise<void>;
   };

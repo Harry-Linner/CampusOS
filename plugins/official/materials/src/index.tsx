@@ -28,6 +28,9 @@ const statusLabel: Record<CampusDownloadTask["status"], string> = {
   ready: "已完成"
 };
 
+const isDownloadInProgress = (status: CampusDownloadTask["status"]): boolean =>
+  status === "queued" || status === "syncing";
+
 interface MaterialCourseGroup {
   key: string;
   name: string;
@@ -160,6 +163,18 @@ export const Component = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // 下载队列按"入队时间"倒序：越新加入的排越靠上。旧数据可能没有 createdAt，
+  // 回退用 id/次序。
+  const orderedDownloads = useMemo(() => {
+    const list = snapshot?.downloads ?? [];
+    return [...list].sort((a, b) => {
+      const ta = a.createdAt ? Date.parse(a.createdAt) : 0;
+      const tb = b.createdAt ? Date.parse(b.createdAt) : 0;
+      if (ta !== tb) return tb - ta;
+      return 0;
+    });
+  }, [snapshot]);
 
   const semesterGroups = useMemo(
     () => (snapshot ? buildMaterialSemesterGroups(snapshot) : []),
@@ -513,13 +528,54 @@ export const Component = ({
         <section className="materials-downloads" aria-label="下载队列">
           <header className="section-heading">
             <h2>下载队列</h2>
-            <span>
-              {snapshot.downloads.filter((item) => item.status !== "ready").length} 个进行中
-            </span>
+            <div className="section-heading-actions">
+              <span className="download-in-progress-count">
+                {snapshot.downloads.filter((item) => isDownloadInProgress(item.status)).length} 个进行中
+              </span>
+              {downloads && snapshot.downloads.length > 0 ? (
+                <Button
+                  variant="ghost"
+                  type="button"
+                  size="sm"
+                  disabled={busyId === "clear-all"}
+                  onClick={() => {
+                    const hasActiveDownloads = snapshot.downloads.some(
+                      (item) => isDownloadInProgress(item.status)
+                    );
+                    if (
+                      hasActiveDownloads &&
+                      !window.confirm(
+                        "清空下载队列会取消正在进行的下载，并删除未完成的临时文件。已下载文件会保留。确定继续吗？"
+                      )
+                    ) {
+                      return;
+                    }
+                    setBusyId("clear-all");
+                    setActionError(null);
+                    setNotice(null);
+                    void downloads
+                      .clearAll()
+                      .then((count) => {
+                        if (count > 0) setNotice(`已清空 ${count} 条下载任务。`);
+                        else setNotice("下载队列已经为空。");
+                      })
+                      .catch((error: unknown) => {
+                        setActionError(error instanceof Error ? error.message : "清空下载记录失败。");
+                      })
+                      .finally(() => {
+                        setBusyId(null);
+                        void onRefresh();
+                      });
+                  }}
+                >
+                  清空记录
+                </Button>
+              ) : null}
+            </div>
           </header>
-          {snapshot.downloads.length > 0 ? (
+          {orderedDownloads.length > 0 ? (
             <ul className="materials-download-list">
-              {snapshot.downloads.map((download) => (
+              {orderedDownloads.map((download) => (
                 <li key={download.id} className="materials-download-row">
                   <div className="materials-download-copy">
                     <strong>{download.title}</strong>

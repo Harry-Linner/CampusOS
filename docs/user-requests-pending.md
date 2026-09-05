@@ -5,7 +5,7 @@
 
 ## 1. 【通知】背景颜色过浅，透明度调为完全不透明
 
-**当前状态（2026-09-03）：进行中，未验收。** 工作区已有主题 token `--notification-panel-bg`，且 `.notification-popover` 已消费该 token；改动尚未经过当前 Electron/CDP 截图验收、测试、提交或 CI，不得标记完成。
+**当前状态（2026-09-05）：已实现并完成本地验收。** `.notification-popover` 使用各主题下完全不透明的 `--notification-panel-bg`；浅色与深色主题均已通过 Electron/CDP 截图复核。
 
 - 现象：通知中心弹层背景色过浅/带透明度，观感不佳。
 - 目标：把通知弹层背景改为**完全不透明**。
@@ -14,9 +14,11 @@
   - 弹层样式为全局 CSS 类（`notification-popover`），需找到对应样式定义处调整背景/透明度。
 - 备注：改动属 UI 视觉类，须走 CDP 截图亲验（见 `docs/agents/visual-verification.md`）。
 
+**自查记录（2026-09-05）：** 浅色、深色截图分别位于 `.tmp/visual/download-notifications/notification-light.png` 与 `notification-dark.png`（Git ignored）；弹层边界、文字对比度、滚动区域和底层遮挡均正常。`pnpm typecheck`、`pnpm lint`、根目录 `pnpm test` 与 Electron E2E 已通过。
+
 ## 2. 【资料 - 下载队列】若干交互增强
 
-**当前状态（2026-09-03）：进行中，未验收。** 工作区已有未提交改动：向 renderer 传递 `createdAt`、按入队时间倒序、清除终态记录 IPC/UI、全部下载完成通知和本地 MP3 播放。仍缺针对性测试、真实下载完成链路、资料页视觉验收、提交和 CI。`build/download-complete.mp3` 目前没有仓内来源/许可证证据，不能作为可分发资产视为完成。
+**当前状态（2026-09-05）：已实现并完成本地验收。** 队列按入队时间倒序；“进行中”只统计 queued/syncing；自然结束时生成完成或失败数通知，并在桌面通知开关启用时播放自定义音效；“清空记录”会清空所有状态的任务，取消活动请求、删除 `.part`、保留最终文件，活动任务存在时先确认。人工清空或取消不会触发完成提示。
 
 - 现状：`plugins/official/materials/src/index.tsx` 下载队列以 `{n} 个进行中` 显示进行中数量（约 516-518 行）。
 - 需求点：
@@ -30,6 +32,14 @@
   - `packages/core/src/main/downloadIpc.ts`、`packages/core/src/main/sqliteDownloadQueuePersistence.ts`、`packages/core/src/main/databaseService.ts`（`DownloadQueueItem` / `StoredDownloadQueue`）—— 持久化与 IPC。
   - 桌面通知与提醒：`packages/core/src/main/notificationCenter.ts`、`packages/core/src/main/reminderScheduler.ts`（可复用通知链与系统通知音效）。
 - 备注：涉及正式数据链、IPC、持久化、通知与 UI，须完整自查并通过 CDP 亲验。
+
+### 自查记录（2026-09-05）
+
+- **入口与正式链路：** 资料插件通过 preload/IPC 调用 `DownloadEngine.clearAll()`；引擎等待取消完成后清空 SQLite 队列，并只删除临时文件。自然结束由主进程状态转换触发通知，再向主渲染进程发送一次提示音事件。
+- **用户可见行为：** 计数加大并提高对比度；队列按 `createdAt` 倒序；活动任务清空前显示原生确认；成功、失败、空队列均有明确反馈。
+- **错误边界：** 下载取消信号在取得响应后及流读取过程中再次检查；音频播放失败被隔离，不影响下载终态；CSP 只允许同源媒体。
+- **许可：** 音效为 Universfield 的 Pixabay “New Notification 057”，来源、许可、哈希与再分发边界记录在 `THIRD_PARTY_ASSETS.md`，不纳入项目 MIT 授权。
+- **验证证据：** 针对性 19 项测试通过；完整单测 621 项通过、2 项按设计跳过；生产/E2E 构建均包含哈希化 MP3；Electron E2E 7 项通过，其中真实本地 HTTP 下载验证了完成事件、清空队列和最终文件保留。资料页截图位于 `.tmp/visual/download-notifications/`（Git ignored）。
 
 ### 音效调研结论（2026-08-29，纯研究，未改代码）
 

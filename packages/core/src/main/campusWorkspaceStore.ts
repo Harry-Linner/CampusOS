@@ -210,7 +210,7 @@ const buildGeneratedRecord = async (
     downloads,
     summary: {
       ...mergedSnapshot.summary,
-      downloadsInFlight: downloads.filter((item) => item.status !== "ready")
+      downloadsInFlight: downloads.filter((item) => item.status === "queued" || item.status === "syncing")
         .length
     }
   };

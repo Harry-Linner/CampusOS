@@ -97,7 +97,7 @@ export const useCampusWorkspace = (): CampusWorkspaceState => {
                   summary: {
                     ...current.summary,
                     downloadsInFlight: downloads.filter(
-                      (item) => item.status !== "ready"
+                      (item) => item.status === "queued" || item.status === "syncing"
                     ).length
                   }
                 }

@@ -1,4 +1,4 @@
-﻿/* @vitest-environment jsdom */
+/* @vitest-environment jsdom */
 
 import { createElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -210,9 +210,11 @@ const installBridge = (
       pause: vi.fn(async () => false),
       resume: vi.fn(async () => false),
       cancel: vi.fn(async () => false),
+      clearAll: vi.fn(async () => 0),
       open: vi.fn(async () => undefined),
       reveal: vi.fn(async () => undefined),
-      subscribe: vi.fn(() => () => undefined)
+      subscribe: vi.fn(() => () => undefined),
+      subscribeToCompletionSound: vi.fn(() => () => undefined)
     },
     plugins: {
       load: vi.fn(async () => runtimeSnapshot),
