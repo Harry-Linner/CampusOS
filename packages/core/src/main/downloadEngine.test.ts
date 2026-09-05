@@ -359,6 +359,14 @@ describe("DownloadEngine", () => {
     const activeStarted = new Promise<void>((resolve) => {
       activeRequestStarted = resolve;
     });
+    let abortObserved!: () => void;
+    const activeAbortObserved = new Promise<void>((resolve) => {
+      abortObserved = resolve;
+    });
+    let releaseAbortCleanup!: () => void;
+    const abortCleanupReleased = new Promise<void>((resolve) => {
+      releaseAbortCleanup = resolve;
+    });
     const baseItem = (id: string, status: DownloadQueueItem["status"]): DownloadQueueItem => ({
       id,
       url: `https://example.com/${id}.bin`,
@@ -391,7 +399,12 @@ describe("DownloadEngine", () => {
         await new Promise<void>((_resolve, reject) => {
           signal.addEventListener(
             "abort",
-            () => reject(new DOMException("Aborted", "AbortError")),
+            () => {
+              abortObserved();
+              void abortCleanupReleased.then(() => {
+                reject(new DOMException("Aborted", "AbortError"));
+              });
+            },
             { once: true }
           );
         });
@@ -414,7 +427,17 @@ describe("DownloadEngine", () => {
     await mkdir(join(active.temporaryPath, ".."), { recursive: true });
     await writeFile(active.temporaryPath, "partial", "utf8");
 
-    await expect(engine.clearAll()).resolves.toBe(4);
+    const clearing = engine.clearAll();
+    await activeAbortObserved;
+    await expect(engine.enqueue({
+      url: "https://example.com/concurrent.bin",
+      title: "concurrent.bin",
+      courseName: "Systems",
+      sourceId: "academic-affairs",
+      semester: "2026-fall"
+    })).rejects.toThrow("下载队列正在清空");
+    releaseAbortCleanup();
+    await expect(clearing).resolves.toBe(4);
     expect(engine.allTasks).toEqual([]);
     expect(save).toHaveBeenLastCalledWith([]);
     await expect(readFile(active.temporaryPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });

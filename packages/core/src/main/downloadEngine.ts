@@ -107,6 +107,7 @@ export class DownloadEngine {
   private queuePersistence: DownloadQueuePersistence | null;
   private resolveResponse: DownloadResponseResolver;
   private persistChain: Promise<void> = Promise.resolve();
+  private clearAllOperation: Promise<number> | null = null;
 
   constructor(options: DownloadEngineOptions = {}) {
     if (!Number.isInteger(options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT) ||
@@ -166,6 +167,9 @@ export class DownloadEngine {
     sourceId: CampusSourceId;
     semester: string;
   }): Promise<DownloadQueueItem> {
+    if (this.clearAllOperation) {
+      throw new Error("下载队列正在清空，请稍后重试。");
+    }
     getHttpUrl(task.url);
     const fileName = safePathSegment(basename(task.title), "文件名");
     const semester = safePathSegment(task.semester, "学期");
@@ -290,7 +294,22 @@ export class DownloadEngine {
   }
 
   /** 清空整个下载队列。活动任务会先取消，最终文件保留，仅删除临时文件。 */
-  async clearAll(): Promise<number> {
+  clearAll(): Promise<number> {
+    if (this.clearAllOperation) return this.clearAllOperation;
+    const operation = Promise.resolve().then(() => this.performClearAll());
+    this.clearAllOperation = operation;
+    void operation.then(
+      () => {
+        if (this.clearAllOperation === operation) this.clearAllOperation = null;
+      },
+      () => {
+        if (this.clearAllOperation === operation) this.clearAllOperation = null;
+      }
+    );
+    return operation;
+  }
+
+  private async performClearAll(): Promise<number> {
     const items = [...this.items.values()];
     if (items.length === 0) return 0;
 

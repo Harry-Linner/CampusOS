@@ -167,7 +167,7 @@ export const registerDownloadHandlers = ({
       return toTask(engine, task.id);
     }
   );
-  for (const action of ["pause", "resume"] as const) {
+  for (const action of ["pause", "resume", "cancel"] as const) {
     ipcMain.handle(`campusos:downloads:${action}`, async (event, id: string) => {
       assertTrustedRenderer(event);
       const engine = await loadEngine();
@@ -175,11 +175,6 @@ export const registerDownloadHandlers = ({
       return updated;
     });
   }
-  ipcMain.handle("campusos:downloads:cancel", async (event, id: string) => {
-    assertTrustedRenderer(event);
-    const engine = await loadEngine();
-    return completionTracker.suppressDuring(() => engine.cancel(id));
-  });
   ipcMain.handle("campusos:downloads:clear-all", async (event) => {
     assertTrustedRenderer(event);
     const engine = await loadEngine();
