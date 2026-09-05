@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BrowserWindow } from "electron";
 
 // 基础/回退路径：无 proto/register/pointer 回调能力，WorkerW 嵌入不可用 → 回退 GW_HWNDNEXT。
-const setWindowPos = vi.fn(() => true);
+type SetWindowPosArgs = [number, number, number, number, number, number, number];
+const setWindowPos = vi.fn((...args: SetWindowPosArgs) => {
+  void args;
+  return true;
+});
 const setParent = vi.fn((_: number, parent: number) => {
   nativeState.parent = parent;
   return 1;
@@ -113,7 +117,8 @@ describe("pinWindowToDesktopBottom", () => {
 
   it("restores the top-level parent and styles before falling back after an attach failure", () => {
     nativeState.workerEnabled = true;
-    setWindowPos.mockImplementation((hwnd: number) => !(hwnd === 0x51a5c && nativeState.parent !== 0));
+    setWindowPos.mockImplementation((...args: SetWindowPosArgs) =>
+      !(args[0] === 0x51a5c && nativeState.parent !== 0));
     const win = createWindowStub();
     pinWindowToDesktopBottom(win);
 
