@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { createDatabaseService } from "./databaseService";
 
@@ -23,7 +24,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(9);
+      expect(database.schemaVersion).toBe(10);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -105,6 +106,58 @@ describe("database service", () => {
       ).toThrow("GPA 策略保存时间无效。");
     } finally {
       database.close();
+    }
+  });
+
+  it("removes the legacy planner schedule table when migrating an existing v9 database", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-database-v9-test-"));
+    temporaryDirectories.push(storageRoot);
+    const databasePath = join(storageRoot, "campusos.sqlite");
+    const legacyDatabase = new Database(databasePath);
+    legacyDatabase.exec(`
+      CREATE TABLE schema_migrations (
+        version INTEGER PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+      INSERT INTO schema_migrations (version, applied_at) VALUES
+        (1, '2026-01-01T00:00:00.000Z'),
+        (2, '2026-01-01T00:00:00.000Z'),
+        (3, '2026-01-01T00:00:00.000Z'),
+        (5, '2026-01-01T00:00:00.000Z'),
+        (6, '2026-01-01T00:00:00.000Z'),
+        (7, '2026-01-01T00:00:00.000Z'),
+        (8, '2026-01-01T00:00:00.000Z'),
+        (9, '2026-01-01T00:00:00.000Z');
+      CREATE TABLE planner_schedules (
+        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+        schedule_json TEXT NOT NULL,
+        saved_at TEXT NOT NULL
+      );
+      INSERT INTO planner_schedules (singleton, schedule_json, saved_at)
+      VALUES (1, '{}', '2026-01-01T00:00:00.000Z');
+    `);
+    legacyDatabase.close();
+
+    const database = createDatabaseService({ databasePath });
+    try {
+      expect(database.schemaVersion).toBe(10);
+    } finally {
+      database.close();
+    }
+
+    const migratedDatabase = new Database(databasePath, { readonly: true });
+    try {
+      const plannerTable = migratedDatabase
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+        .get("planner_schedules");
+      expect(plannerTable).toBeUndefined();
+      expect(
+        migratedDatabase
+          .prepare("SELECT 1 AS applied FROM schema_migrations WHERE version = 10")
+          .get()
+      ).toEqual({ applied: 1 });
+    } finally {
+      migratedDatabase.close();
     }
   });
 });

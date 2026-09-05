@@ -46,7 +46,7 @@
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
 - `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。资料连接器使用包含已结课课程的全历史课程范围，工作区按全部有效学期投影，并将逐课 activities 请求限制为最多 4 路并发；真实 `2025-2026 春夏` 只作为私有下载验收基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
 - 既有 QuickJS/WASM 与 utility process headless 隔离实现保留为安全研究和历史技术资产，不接入 `.campusmod` 生命周期；纯 headless、main 和 connector 包不再属于插件产品形态。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不扩大插件执行边界。
-- SQLite `DatabaseService` 已完成 v1/v2/v3 migration：工作区快照、官方 capability provenance、下载队列、日程任务与自动排程写入同一数据库，旧 JSON 仅作一次性导入；Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
+- SQLite `DatabaseService` 迁移链已推进至 v10：工作区快照、官方 capability provenance、下载队列与日程任务写入同一数据库，旧 JSON 仅作一次性导入；自动排程历史表由 migration 10 删除，migration 3 保留用于连续升级。Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
 - 桌面壳层已调整为固定左侧导航与右侧主内容滚动；周视图在桌面直接填充主内容宽度，窄屏才使用横向滚动。
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。

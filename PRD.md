@@ -16,7 +16,7 @@
 > 下列"插件模块边界（2026-08-03）""In scope for MVP"等历史段落为过去时记录；当前口径以此块为准，冲突处以本块优先。
 
 - 官方用户模块为**五个**：学业、日程、资料、AI 助手、**校园资讯（campus-feed）**。早报 daily-brief 已暂停（2026-08-25 决议），代码与 IPC 保留但未挂载、不在模块集合。
-- **自动排程已于 2026-08-22 决议删除**，不属于日程能力；`campusos:schedule:plan:*` 仅剩 preload 死桩与 `planner_schedules` 空表待代码清理，不再当作产品功能。
+- **自动排程已于 2026-08-22 决议删除**，不属于日程能力；preload 计划接口已移除，数据库 migration 10 删除历史 `planner_schedules` 表，不再保留可调用入口或运行时存储。
 - Core 数据连接器：本科教务、研究生教务、学在浙大、素拓、在线校历。校园资讯（抓取校内外信息源）由 Core 主进程承载，源码级源清单见 [校园资讯浙大源指南](docs/campus-feed/zju-sources-guide.md)。
 - 计算机学院院网、云峰学院院网、ETA 三全育人平台：**计划占位、从未接入真实连接器**，不属于 MVP 接入源（仅存在于 workspace 快照的 planned 占位行）。
 - 产品仍处于开发期、**未发布**；发布前门禁（多设备/研究生真实账号/全新 Windows/真实桌面通知/GitHub Release/CC98）见 [私有 Alpha 验收清单](docs/alpha-acceptance.md)。

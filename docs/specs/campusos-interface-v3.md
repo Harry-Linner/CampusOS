@@ -50,8 +50,8 @@ The grades view does not expose connector source-state badges. Major labels are 
 
 - Use a Monday-first, continuous 7 × 6 monthly grid with thin shared borders.
 - Provide exactly four views in one page: 月历, 周视图, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
-- 自动排程已于 2026-08-22 决议删除（见文末"决策同步"节）；"规划（plan）"类能力不再属于日程，`campusos:schedule:plan:*` 的 preload 死桩与 `planner_schedules` 空表待代码清理。
-- Provide additional internal tabs for 接下来、任务、规划 and 导出. Deadline tasks, fixed/repeating schedules and planner periods do not create separate first-level destinations.
+- 自动排程已于 2026-08-22 决议删除（见文末"决策同步"节）；"规划（plan）"类能力不再属于日程，preload 计划接口已移除，数据库 migration 10 删除历史 `planner_schedules` 表。
+- Keep task creation and editing, undated tasks, repeat rules, reminders, filters, and iCal/Markdown/image export inside the 日程 page; none creates a separate first-level destination.
 - 周视图 uses the available desktop content width directly and must not create a nested horizontal scroll container. At narrow widths, horizontal scrolling is allowed on the calendar page itself.
 - 月历 places courses, assignments, and exams directly inside the matching date cell.
 - 日程 is a linear, chronological list grouped by date for the visible month, rather than a secondary summary panel.
@@ -218,10 +218,11 @@ graduate-account, or Release-distribution acceptance.
 
 > 2026-08-16 之后的界面/产品决策此前只记录在各 spec 与 research 中，本节收口到 UX 基线文档；冲突处以本节为准。
 
-- **自动排程删除（2026-08-22）**：日程模块不再包含"自动排程/规划"；`campusos:schedule:plan:generate/load` 仅剩 preload 死桩、`planner_schedules` 为从未读写的空表，属待清理残留，不是产品能力。
+- **自动排程删除（2026-08-22）**：日程模块不再包含"自动排程/规划"；`campusos:schedule:plan:generate/load` preload 死桩已移除，数据库 migration 10 删除从未读写的历史 `planner_schedules` 表。migration 3 保留在历史迁移序列中，任务、日历和 iCal 链路不受影响。
 - **日程"全部课程"区块删除（2026-08-23）**：以学期分组课表与课程目录替代。
 - **设置页重构（2026-08-23）**：分栏设置（账号/通知/后台/数据/更新/关于/高级），诊断与连接器健康并入"高级"。
 - **早报 daily-brief 暂停（2026-08-25）**：移出官方模块名单，代码与 IPC 保留未删除、不挂载；恢复前不得按"第 5 模块"口径推进。
 - **校园资讯成为官方第五模块（2026-08）**：Core 主进程抓取信息源 + 插件视图 + AI 受控抽取转日程（spec 见 phase-f-feed-calendar-notices.md，决策/边界见 ADR-0004 与 docs/desk-calendar-decisions.md 无关的 campus-feed 记录）。
 - **桌历组件窗删除、保持独立设计（2026-09-03）**：B3 独立悬浮组件窗与 DeskToDo 桌历均为历史实现；当前桌历是 Electron `deskCalendarHost` 独立 BrowserWindow，需求决策见 [docs/desk-calendar-decisions.md](../desk-calendar-decisions.md)，实现缺口清单见 plan.md Current Development Workboard。
+- **自动排程遗留清理自查（2026-09-05）**：产品入口、共享 Schedule 接口与主进程均无计划能力；preload 无悬空 IPC，v9 数据库升级测试确认 migration 10 删除旧表并登记版本，正式手动任务持久化测试保持通过。
 - 相关旧规格（campusos-round2 / ideazjuermodapp / b3-float-widgets / desktodo-gap-closure）已在文档清理时删除，历史见 git。

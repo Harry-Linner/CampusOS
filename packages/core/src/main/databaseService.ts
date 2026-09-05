@@ -232,6 +232,9 @@ const migrate = (database: Database.Database): void => {
       saved_at TEXT NOT NULL
     );
   `);
+  applyMigration(10, `
+    DROP TABLE IF EXISTS planner_schedules;
+  `);
 };
 
 export const createDatabaseService = ({

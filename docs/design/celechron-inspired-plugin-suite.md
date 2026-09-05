@@ -152,7 +152,7 @@ Celechron 对照功能最初收敛为三个官方插件（下表为 Celechron �
 
 **偏离记录（用户明确需求，2026-08-22）：**
 
-1. **删除自动排程**。对照位置：Celechron `lib/model/scholar.dart`、`lib/utils/gpa_helper.dart` 之外，Celechron 并无自动排程；自动排程是 CampusOS 自研扩展（原 `scheduleDomain.generatePlannerSchedule` + `planner.schedule@1` + `schedule-plan-section`）。偏离原因：用户明确要求删除"自动排程"，日程回归"统一查看课程、考试、截止事项与个人安排"的定位。影响：排程 UI、域逻辑与 `planner.schedule@1` 声明一并移除；任务数据模型中的 `breakable`/`blocksPlanning` 字段保留用于数据兼容，UI 不再暴露。验证：typecheck/lint 零错误、479 tests 通过、实机 DOM 确认"自动排程"文案消失。（2026-09 文档清理注：实际代码中 `campusos:schedule:plan:generate/load` 的 preload 死桩与 `planner_schedules` 空表仍在，属待清理残留，不是已实现能力。）
+1. **删除自动排程**。对照位置：Celechron `lib/model/scholar.dart`、`lib/utils/gpa_helper.dart` 之外，Celechron 并无自动排程；自动排程是 CampusOS 自研扩展（原 `scheduleDomain.generatePlannerSchedule` + `planner.schedule@1` + `schedule-plan-section`）。偏离原因：用户明确要求删除"自动排程"，日程回归"统一查看课程、考试、截止事项与个人安排"的定位。影响：排程 UI、域逻辑与 `planner.schedule@1` 声明一并移除；任务数据模型中的 `breakable`/`blocksPlanning` 字段保留用于数据兼容，UI 不再暴露。验证：typecheck/lint 零错误、479 tests 通过、实机 DOM 确认"自动排程"文案消失。2026-09-05 继续移除 `campusos:schedule:plan:generate/load` preload 死桩，并由数据库 migration 10 删除历史空表；migration 3 保留以维持升级序列。
 2. **日程展示全部学期课程**。对照位置：Celechron `lib/model/scholar.dart:97-110` 只暴露当前学期；CampusOS 原 `deriveTimetableCalendarEvents` 只投影 `selectAcademicSemesterWindow` 选中的学期。偏离原因：用户明确要求"所有课程同时展示，能看到下学期的也能看到两年前的"。影响：日历事件投影改为投影所有有校历窗口的学期；无校历窗口的学期在"全部课程"按学期分组列表中可见。验证：`academicTimetableEvents.test.ts` 新增跨学期投影用例，479 tests 通过。
 
 ## 7. 数据与交互规则

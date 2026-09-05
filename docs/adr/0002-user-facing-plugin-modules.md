@@ -76,7 +76,7 @@ At startup, the host presents the previous successfully validated user-runtime s
 
 1. **官方用户模块集合更新为五个**：`academic`（学业）、`schedule`（日程）、`materials`（资料）、`ai-assistant`（AI 助手）与 `campus-feed`（校园资讯，2026-08 加入）。每个模块仍恰好贡献一个左侧栏一级入口。
 2. **daily-brief（早报）已暂停（2026-08-25 决议）**：代码与 IPC 保留但未挂载，不在官方列表、左侧栏或引导推荐中；恢复开发前必须先重新立项。
-3. **自动排程不属于日程能力（2026-08-22 决议删除）**：`campusos:schedule:plan:*` 的 preload 死桩与 `planner_schedules` 空表是待清理残留，不是已实现能力。
+3. **自动排程不属于日程能力（2026-08-22 决议删除）**：`campusos:schedule:plan:*` preload 死桩已移除，数据库 migration 10 删除历史 `planner_schedules` 表；migration 3 仅保留在迁移序列中，确保所有数据库版本按同一路径升级。
 4. 标准导航示例随模块集合更新为：`总览(Core) / 学业 / 日程 / 资料 / AI 助手 / 校园资讯 / 扩展(Core) / 设置(Core)`；禁用或阻塞的模块入口消失。
 5. 数据连接器边界不变：本科/研究生教务、学在浙大、素拓与在线校历仍为 Core 托管连接器；校园资讯抓取服务亦由 Core 主进程承载，其插件仅提供用户界面。
 

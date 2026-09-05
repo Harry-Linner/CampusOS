@@ -111,14 +111,6 @@ contextBridge.exposeInMainWorld("campusos", {
       includeCompleted?: boolean;
       timeSpentMinutes?: number;
     }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
-    generatePlan: (settings: {
-      workMinutes: number;
-      restMinutes: number;
-      availableStartHour: number;
-      availableEndHour: number;
-      horizonDays: number;
-    }) => ipcRenderer.invoke("campusos:schedule:plan:generate", settings),
-    loadPlan: () => ipcRenderer.invoke("campusos:schedule:plan:load"),
     exportIcal: (input: {
       academicYearStart: number;
       termLabel: string;
