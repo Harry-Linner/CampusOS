@@ -519,3 +519,11 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 - `.tmp/celechron-1.3.0/lib/http/ugrs_spider.dart` 表明本科课表并非只查当前与下一学年：它从学号推导入学年，抓取入学年至当前学年，并在毕业边界内探测下一学年；每学年顺序固定为秋、冬、春、夏。`2|夏` 即短学期；CampusOS 在学业课表中将其并入春夏学期并提供“只看短学期”，在资料模块中作为独立学期分组。
 - 资料历史范围是一次明确产品扩展：本地 ZJU Learning Assistant 对照只请求活跃课程，但用户要求所有过去学期，因此 CampusOS 课程分页包含已结课状态并取消工作区单学期白名单。其余业务 Session、分页、activities/uploads 解析、认证下载、缓存和失败边界保持不变；逐课 activities 最多 4 路并发，防止历史课程扩大后形成请求尖峰。
 - 2026-08-16 的真实账号脱敏验证通过完整课表请求结构、跨多个学在浙大学期、逐课资料目录、一份授权课件下载及实际字节校验，敏感字段输出为 0。该证据不替代多设备、全新 Windows 安装和真实系统托盘现场验收。
+
+## 2026-09-05 WorkerW 贴底实现复核
+
+本轮通过 GitHub CLI 重新检索并读取 Windows 桌面层公开实现。`NAME0x0/WebDesk`（MIT，检索时 7 stars，2026-09-03 更新）的 [`src/DesktopHost.cs`](https://github.com/NAME0x0/WebDesk/blob/main/src/DesktopHost.cs) 与 [`src/WallpaperSurface.cs`](https://github.com/NAME0x0/WebDesk/blob/main/src/WallpaperSurface.cs) 区分 Windows 11 raised-desktop 与传统顶层 WorkerW：raised 模式按图标/壁纸的明确 z-order 挂到 Progman，传统模式找不到安全 WorkerW 时不把 Progman 当作无条件回退。`dvalfrid/rigstats`（MIT，检索时 12 stars，2026-09-05 更新）的 [`src-egui/src/win32_wallpaper.rs`](https://github.com/dvalfrid/rigstats/blob/main/src-egui/src/win32_wallpaper.rs) 给出传统 WorkerW 的物理坐标换算，并明确用 `GetAncestor(GA_PARENT)` 复查保留 `WS_POPUP` 的挂载状态。两者均核验了仓库根 `LICENSE`。
+
+CampusOS 采用相同的系统层原则并在现有 Electron/koffi 边界内重写：先识别 Progman 子图标/壁纸层，再生成并枚举传统 WorkerW；raised 模式先切子窗口样式再挂到 Progman，传统模式保留 Electron popup 样式并用 `GA_PARENT` 复查；挂载前后校验物理坐标，不加入 `WS_EX_TRANSPARENT`；任何失败恢复顶层样式并回退既有 z-order 贴底。双显示器实测曾暴露遗留位置只剩 9 像素仍被当作“可见”，现已把恢复条件改为至少保留可操作宽高，并以真实 HWND、Win+D 和全虚拟桌面截图闭环。没有引入第三方依赖或复制源码。无 LICENSE 的 `pomodoro-flow` 与 GPL-3.0 的 TED 仅用于排除路线，不采用代码。
+
+同轮产品决策把本地事件重复规则定为每 N 天、每 N 周并选星期、每 N 月、每 N 年，结束条件为永不/日期/次数，编辑范围为仅本次/本次及未来/整个系列；每个 occurrence 保存独立状态。Celechron 1.3.0 只提供旧式滚动任务周期，没有稳定 occurrence 与三种系列编辑语义，因此这部分属于用户明确批准的新产品能力，不伪称为 Celechron 迁入。

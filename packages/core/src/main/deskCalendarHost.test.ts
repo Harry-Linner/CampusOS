@@ -5,6 +5,7 @@ import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared"
 
 const electronState = vi.hoisted(() => ({
   userData: "",
+  loginEnabled: false,
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   webContentsSend: vi.fn()
 }));
@@ -25,7 +26,8 @@ const pinWindow = vi.hoisted(() => vi.fn());
 vi.mock("electron", () => ({
   app: {
     isPackaged: false,
-    getPath: vi.fn((name: string) => (name === "userData" ? electronState.userData : electronState.userData))
+    getPath: vi.fn((name: string) => (name === "userData" ? electronState.userData : electronState.userData)),
+    getLoginItemSettings: vi.fn(() => ({ openAtLogin: electronState.loginEnabled }))
   },
   BrowserWindow: vi.fn(),
   ipcMain: {
@@ -50,6 +52,16 @@ vi.mock("./campusWorkspaceStore", () => ({
 }));
 vi.mock("./scheduleIpc", () => ({
   loadScheduleTasks: () => ({ tasks: tasksState.tasks, updatedAt: "2026-01-01T00:00:00.000Z" }),
+  loadSchedulePeriods: (range: { startAt: string; endAt: string }) => tasksState.tasks.filter((task) =>
+    Date.parse(task.endAt) > Date.parse(range.startAt) && Date.parse(task.startAt) < Date.parse(range.endAt)
+  ).map((task) => ({
+    id: `${task.id}:0-2026-09-03`, taskId: task.id, title: task.title,
+    description: task.description, location: task.location, startAt: task.startAt,
+    endAt: task.endAt, type: task.type, status: task.status,
+    blocksPlanning: task.blocksPlanning, occurrenceId: `${task.id}:0`, occurrenceKey: "0",
+    occurrenceIndex: 0, occurrenceStartAt: task.startAt, occurrenceEndAt: task.endAt,
+    seriesGroupId: task.id
+  })),
   saveScheduleTask: saveTask,
   mutateScheduleTask: mutateTask
 }));
@@ -64,6 +76,8 @@ vi.mock("./desktopPinning", () => ({
 }));
 
 import { registerDeskCalendarHostHandlers, resolveDeskCalendarPlacement } from "./deskCalendarHost";
+import { closeOfficialDatabaseService } from "./officialDatabaseService";
+import { resetOfficialCapabilityRepository } from "./officialCapabilityRepository";
 
 const invoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
   const handler = electronState.handlers.get(channel);
@@ -96,6 +110,7 @@ beforeEach(async () => {
   const dir = await mkdtemp(join(process.env.TEMP ?? process.cwd(), "campusos-desk-cal-"));
   tmpDirs.push(dir);
   electronState.userData = dir;
+  electronState.loginEnabled = false;
   electronState.handlers.clear();
   electronState.webContentsSend.mockReset();
   saveTask.mockReset();
@@ -131,6 +146,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  resetOfficialCapabilityRepository();
+  closeOfficialDatabaseService();
   await Promise.all(tmpDirs.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
@@ -172,7 +189,7 @@ describe("desk calendar host", () => {
     expect(data.items.find((i) => i.id === "deadline:d1")).toMatchObject({ kind: "assignment" });
     expect(data.items.find((i) => i.id === "deadline:d2")).toMatchObject({ kind: "exam", time: "09:00" });
     // 任务：上海时区时间，避免 UTC 8h 偏移
-    expect(data.items.find((i) => i.id === "task:t1")).toMatchObject({ kind: "task", time: "14:30", status: "running" });
+    expect(data.items.find((i) => i.id.startsWith("task:t1:"))).toMatchObject({ kind: "task", time: "14:30", status: "running" });
     // 节假日/补班
     expect(data.holidays).toContainEqual({ date: "2026-10-01", label: "国庆节", holiday: true });
     expect(data.holidays).toContainEqual({ date: "2026-10-10", label: "补班", holiday: false });
@@ -196,6 +213,36 @@ describe("desk calendar host", () => {
     expect(input.repeatEndsOn).toBe("2026-09-10");
     expect(input.reminderMode).toBe("lead");
     expect(input.reminderLeadMinutes).toBe(30);
+  });
+
+  it("keeps the first Shanghai morning inside a date-only range", async () => {
+    tasksState.tasks = [{
+      id: "early", title: "Early event", status: "running", description: "",
+      timeSpentMinutes: 0, timeNeededMinutes: 30,
+      startAt: "2026-09-03T00:30:00+08:00", endAt: "2026-09-03T01:00:00+08:00",
+      location: "", type: "fixed", repeatType: "norepeat", repeatPeriod: 1,
+      repeatEndsOn: "2026-09-03", blocksPlanning: true, breakable: false, fromId: null
+    }];
+    const data = await invoke<{ items: { id: string }[] }>("campusos:desk-calendar:data", {
+      startAt: "2026-09-03", endAt: "2026-09-04"
+    });
+    expect(data.items.some((item) => item.id === "task:early:0")).toBe(true);
+  });
+
+  it("saves every editable local field without inferring type from recurrence", async () => {
+    const result = await invoke<{ ok: boolean }>("campusos:desk-calendar:save-event", {
+      date: "2026-09-10", title: "One-off fixed event", type: "fixed",
+      startAt: "2026-09-10T09:00", endAt: "2026-09-10T10:00",
+      repeatType: "norepeat", timeSpentMinutes: 15, timeNeededMinutes: 90,
+      breakable: false, blocksPlanning: true, reminderMode: "custom",
+      reminderAt: "2026-09-10T08:20"
+    });
+    expect(result.ok).toBe(true);
+    expect(saveTask).toHaveBeenCalledWith(expect.objectContaining({
+      type: "fixed", repeatType: "norepeat", timeSpentMinutes: 15,
+      timeNeededMinutes: 90, breakable: false, blocksPlanning: true,
+      reminderMode: "custom", reminderAt: "2026-09-10T08:20"
+    }));
   });
 
   it("rejects an event with a missing title", async () => {
@@ -236,6 +283,27 @@ describe("desk calendar host", () => {
     expect(reloaded.opacity).toBe(0.6);
     expect(reloaded.showWeeks).toBe(false);
   });
+
+  it("keeps desk-calendar auto-start subordinate to CampusOS auto-start", async () => {
+    const blocked = await invoke<{ autoStart: boolean; campusAutoStartEnabled: boolean }>(
+      "campusos:desk-calendar:settings:save",
+      { autoStart: true }
+    );
+    expect(blocked).toMatchObject({ autoStart: false, campusAutoStartEnabled: false });
+
+    electronState.loginEnabled = true;
+    const enabled = await invoke<{ autoStart: boolean; campusAutoStartEnabled: boolean }>(
+      "campusos:desk-calendar:settings:save",
+      { autoStart: true }
+    );
+    expect(enabled).toMatchObject({ autoStart: true, campusAutoStartEnabled: true });
+
+    electronState.loginEnabled = false;
+    const disabledAgain = await invoke<{ autoStart: boolean; campusAutoStartEnabled: boolean }>(
+      "campusos:desk-calendar:settings:load"
+    );
+    expect(disabledAgain).toMatchObject({ autoStart: false, campusAutoStartEnabled: false });
+  });
 });
 
 describe("resolveDeskCalendarPlacement", () => {
@@ -251,6 +319,13 @@ describe("resolveDeskCalendarPlacement", () => {
     const result = resolveDeskCalendarPlacement({ x: -2, y: -7841, width: 1282, height: 756 }, oneDisplay, primary);
     expect(result.useDefault).toBe(true);
     expect(result).toMatchObject({ width: 940, height: 700 });
+    expect(result.x).toBe(primary.x + Math.round((primary.width - 940) / 2));
+    expect(result.y).toBe(primary.y + Math.round((primary.height - 700) / 2));
+  });
+
+  it("does not accept a geometry with only a thin sliver left on-screen", () => {
+    const result = resolveDeskCalendarPlacement({ x: 225, y: -925, width: 1254, height: 934 }, oneDisplay, primary);
+    expect(result).toMatchObject({ width: 940, height: 700, useDefault: true });
     expect(result.x).toBe(primary.x + Math.round((primary.width - 940) / 2));
     expect(result.y).toBe(primary.y + Math.round((primary.height - 700) / 2));
   });

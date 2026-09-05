@@ -13,3 +13,8 @@ export const getOfficialDatabaseService = (): DatabaseService => {
   });
   return databaseService;
 };
+
+export const closeOfficialDatabaseService = (): void => {
+  databaseService?.close();
+  databaseService = null;
+};

@@ -24,7 +24,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(11);
+      expect(database.schemaVersion).toBe(12);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -79,6 +79,11 @@ describe("database service", () => {
       expect(database.loadLocalTasks()).toEqual({
         tasks: [{ id: "task-a", status: "running" }],
         savedAt: "2026-07-20T08:03:00.000Z"
+      });
+      database.saveDesktopCalendarState("settings", { opacity: 0.8 }, "2026-07-20T08:04:00.000Z");
+      expect(database.loadDesktopCalendarState("settings")).toEqual({
+        value: { opacity: 0.8 },
+        savedAt: "2026-07-20T08:04:00.000Z"
       });
       database.saveAcademicGpaStrategy(
         "account-a",
@@ -143,7 +148,7 @@ describe("database service", () => {
 
     const database = createDatabaseService({ databasePath });
     try {
-      expect(database.schemaVersion).toBe(11);
+      expect(database.schemaVersion).toBe(12);
     } finally {
       database.close();
     }

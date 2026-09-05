@@ -202,7 +202,7 @@ graduate-account, or Release-distribution acceptance.
 - 主程序更新只检查并展示版本信息，不自动下载；用户选择【现在更新】后才下载、校验和安装。用户选择【稍后】不下载、不重复打扰，直到出现新版本。下载中允许取消，失败保持当前版本并提供重试。
 - 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存，并按版本持久化【稍后】选择。
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
-- 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+- 桌面日历不支持拖拽直接改时间；所有事件可双击进入编辑。本地事件可改全部字段，课程、考试和上游作业只保存本地备注与提醒。
 
 ## 2026-08-16 实现状态同步
 
@@ -210,7 +210,7 @@ graduate-account, or Release-distribution acceptance.
 - 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
 - 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
 - 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
-- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
+- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复事件使用稳定实例，支持每 N 天、每 N 周并选星期、每 N 月、每 N 年，以及永不/日期/次数结束和三种编辑范围。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 自建任务的单项提醒已接入正式调度；插件后台热更新已接入可信 HTTPS 清单、按插件批准、签名校验和原子替换。
 
@@ -223,6 +223,6 @@ graduate-account, or Release-distribution acceptance.
 - **设置页重构（2026-08-23）**：分栏设置（账号/通知/后台/数据/更新/关于/高级），诊断与连接器健康并入"高级"。
 - **早报 daily-brief 暂停（2026-08-25）**：移出官方模块名单，代码与 IPC 保留未删除、不挂载；恢复前不得按"第 5 模块"口径推进。
 - **校园资讯成为官方第五模块（2026-08）**：Core 主进程抓取信息源 + 插件视图 + AI 受控抽取转日程（spec 见 phase-f-feed-calendar-notices.md，决策/边界见 ADR-0004 与 docs/desk-calendar-decisions.md 无关的 campus-feed 记录）。
-- **桌历组件窗删除、保持独立设计（2026-09-03）**：B3 独立悬浮组件窗与 DeskToDo 桌历均为历史实现；当前桌历是 Electron `deskCalendarHost` 独立 BrowserWindow，需求决策见 [docs/desk-calendar-decisions.md](../desk-calendar-decisions.md)，实现缺口清单见 plan.md Current Development Workboard。
+- **桌历组件窗删除、保持独立设计（2026-09-05）**：B3 独立悬浮组件窗与 DeskToDo 桌历均为历史实现；当前桌历是 Electron `deskCalendarHost` 独立 BrowserWindow，需求决策见 [docs/desk-calendar-decisions.md](../desk-calendar-decisions.md)，实现与验收见 [桌历与重复事件 spec](desk-calendar-and-recurrence.md)。
 - **自动排程遗留清理自查（2026-09-05）**：产品入口、共享 Schedule 接口与主进程均无计划能力；preload 无悬空 IPC，v9 数据库升级测试确认 migration 10 删除旧表并登记版本，正式手动任务持久化测试保持通过。
 - 相关旧规格（campusos-round2 / ideazjuermodapp / b3-float-widgets / desktodo-gap-closure）已在文档清理时删除，历史见 git。

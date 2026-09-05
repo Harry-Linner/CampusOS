@@ -13,3 +13,7 @@ export const getOfficialCapabilityRepository = (): CapabilityRepository => {
 
   return repository;
 };
+
+export const resetOfficialCapabilityRepository = (): void => {
+  repository = null;
+};

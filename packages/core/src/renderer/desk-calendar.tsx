@@ -7,6 +7,10 @@ import "./styles.css";
 
 // ===== 日期工具（照搬自 ScheduleView，本地独立窗口用）=====
 type CalKind = "course" | "exam" | "deadline" | "task";
+type RepeatType = "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
+type RepeatEndMode = "never" | "date" | "count";
+type TaskType = "deadline" | "fixed";
+type ReminderMode = "global" | "none" | "at-time" | "lead" | "custom";
 interface ScheduleEvent {
   id: string;
   title: string;
@@ -17,6 +21,22 @@ interface ScheduleEvent {
   note?: string;
   taskId?: string;
   status?: string;
+  origin: "local" | "upstream";
+  occurrenceKey?: string;
+  repeatType?: RepeatType;
+  repeatPeriod?: number;
+  repeatEndsOn?: string;
+  repeatEndMode?: RepeatEndMode;
+  repeatCount?: number | null;
+  repeatWeekdays?: number[];
+  reminderLeadMinutes?: number | null;
+  reminderMode?: ReminderMode;
+  reminderAt?: string | null;
+  taskType?: TaskType;
+  timeSpentMinutes?: number;
+  timeNeededMinutes?: number;
+  breakable?: boolean;
+  blocksPlanning?: boolean;
 }
 type ViewMode = "month" | "week" | "day";
 
@@ -29,6 +49,25 @@ interface RawItem {
   note?: string;
   location?: string;
   status?: string;
+  origin: "local" | "upstream";
+  startAt: string;
+  endAt: string;
+  taskId?: string;
+  occurrenceKey?: string;
+  repeatType?: RepeatType;
+  repeatPeriod?: number;
+  repeatEndsOn?: string;
+  repeatEndMode?: RepeatEndMode;
+  repeatCount?: number | null;
+  repeatWeekdays?: number[];
+  reminderLeadMinutes?: number | null;
+  reminderMode?: ReminderMode;
+  reminderAt?: string | null;
+  taskType?: TaskType;
+  timeSpentMinutes?: number;
+  timeNeededMinutes?: number;
+  breakable?: boolean;
+  blocksPlanning?: boolean;
 }
 interface DeskCalendarSettings {
   showWeeks: boolean;
@@ -42,6 +81,7 @@ interface DeskCalendarSettings {
   opacity: number;
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
+  campusAutoStartEnabled: boolean;
   alwaysOnTop: boolean;
   locked: boolean;
 }
@@ -54,12 +94,11 @@ interface CalData {
   theme?: "light" | "dark" | "high-contrast";
   currentWeek?: number | null;
 }
-type RepeatType = "once" | "daily-range" | "weekly" | "specific-dates";
 
 declare global {
   interface Window {
     deskCalendar?: {
-      getCalendarData: () => Promise<CalData>;
+      getCalendarData: (range?: { startAt: string; endAt: string }) => Promise<CalData>;
       subscribe: (cb: (d: CalData) => void) => () => void;
       setTransparency: (v: number) => void;
       moveWindow: (dx: number, dy: number) => void;
@@ -69,17 +108,33 @@ declare global {
       saveSettings: (patch: Partial<DeskCalendarSettings>) => Promise<DeskCalendarSettings>;
       subscribeSettings: (cb: (s: DeskCalendarSettings) => void) => () => void;
       onOpenSettings: (cb: () => void) => () => void;
-      completeTask: (id: string, completed: boolean) => Promise<{ ok: boolean; error?: string }>;
-      createEvent: (input: {
+      completeTask: (id: string, completed: boolean, occurrenceKey?: string) => Promise<{ ok: boolean; error?: string }>;
+      saveEvent: (input: {
+        id?: string;
+        origin?: "local" | "upstream";
+        taskId?: string;
+        occurrenceKey?: string;
+        editScope?: "single" | "future" | "series";
         date: string;
         title: string;
-        priority?: string;
-        repeatType?: string;
+        repeatType?: RepeatType;
+        repeatPeriod?: number;
+        repeatEndsOn?: string;
+        repeatEndMode?: RepeatEndMode;
+        repeatCount?: number | null;
+        repeatWeekdays?: number[];
         startAt?: string;
         endAt?: string;
         location?: string;
         note?: string;
         reminderLeadMinutes?: number;
+        reminderMode?: ReminderMode;
+        reminderAt?: string | null;
+        type?: TaskType;
+        timeSpentMinutes?: number;
+        timeNeededMinutes?: number;
+        breakable?: boolean;
+        blocksPlanning?: boolean;
       }) => Promise<{ ok: boolean; error?: string }>;
     };
   }
@@ -126,12 +181,15 @@ const lunarOf = (y: number, m: number, d: number): { day: string; jieqi: string;
     ji: lunar.getDayJi()
   };
 };
-// 自然周 = 该日期在"其所在月份"的第几周（周一起始；月初所在的周为第 1 周）。
-// 校历周(已导入)优先，否则回退月内周。
-const monthWeekNumber = (value: Date, refMonth: Date): number => {
-  const p = getShanghaiDateParts(refMonth);
-  const firstMonday = startOfWeek(fromShanghaiParts(Number(p.year), Number(p.month), 1));
-  return 1 + Math.round((startOfWeek(value).getTime() - firstMonday.getTime()) / (7 * 86400000));
+const naturalWeekNumber = (value: Date): number => {
+  const p = getShanghaiDateParts(value);
+  const target = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day)));
+  const weekday = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - weekday + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const firstWeekday = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstWeekday + 3);
+  return 1 + Math.round((target.getTime() - firstThursday.getTime()) / (7 * 86400000));
 };
 const getShanghaiDayNumber = (value: Date): number => Number(getShanghaiDateParts(value).day);
 const weekdayLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -173,33 +231,64 @@ const groupEventsByDay = (events: ScheduleEvent[], range: Range): Map<string, Sc
 };
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
-  { value: "once", label: "单次" },
-  { value: "daily-range", label: "范围每天" },
-  { value: "weekly", label: "范围内每周几" },
-  { value: "specific-dates", label: "指定多日" }
+  { value: "norepeat", label: "不重复" },
+  { value: "days", label: "每 N 天" },
+  { value: "weeks", label: "每 N 周" },
+  { value: "month", label: "每月" },
+  { value: "year", label: "每年" }
 ];
 const REMIND_UNITS = ["分钟", "小时", "天"] as const;
 
 interface TaskForm {
   id?: string;
+  origin: "local" | "upstream";
+  taskId?: string;
+  occurrenceKey?: string;
+  editScope: "single" | "future" | "series";
   title: string;
   repeatType: RepeatType;
+  repeatPeriod: number;
+  repeatEndMode: RepeatEndMode;
+  repeatEndsOn: string;
+  repeatCount: number;
+  repeatWeekdays: number[];
   startAt: string;
   endAt: string;
   location: string;
   note: string;
+  type: TaskType;
+  timeSpentMinutes: number;
+  timeNeededMinutes: number;
+  breakable: boolean;
+  blocksPlanning: boolean;
+  reminderMode: ReminderMode;
+  reminderAt: string;
   remindEnabled: boolean;
   remindValue: number;
   remindUnit: string;
 }
 
 const emptyForm = (date: string): TaskForm => ({
+  origin: "local",
+  editScope: "series",
   title: "",
-  repeatType: "once",
+  repeatType: "norepeat",
+  repeatPeriod: 1,
+  repeatEndMode: "never",
+  repeatEndsOn: date,
+  repeatCount: 10,
+  repeatWeekdays: [1],
   startAt: `${date}T09:00`,
   endAt: `${date}T10:00`,
   location: "",
   note: "",
+  type: "deadline",
+  timeSpentMinutes: 0,
+  timeNeededMinutes: 60,
+  breakable: true,
+  blocksPlanning: true,
+  reminderMode: "global",
+  reminderAt: `${date}T09:00`,
   remindEnabled: false,
   remindValue: 30,
   remindUnit: "分钟"
@@ -217,6 +306,7 @@ const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
   opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
   autoStart: false,
+  campusAutoStartEnabled: false,
   alwaysOnTop: false,
   locked: false
 };
@@ -257,42 +347,48 @@ export default function DeskCalendar(): JSX.Element {
     void window.deskCalendar?.saveSettings(patch).then(applySettings);
   };
 
-  const load = useCallback(async (): Promise<void> => {
+  const loadData = useCallback(async (range: Range): Promise<void> => {
     const bridge = window.deskCalendar;
     if (!bridge) return;
-    const [d, s] = await Promise.all([bridge.getCalendarData(), bridge.getSettings()]);
+    const d = await bridge.getCalendarData({
+      startAt: dayKey(range.start),
+      endAt: dayKey(range.end)
+    });
     setData(d);
-    applySettings(s);
     document.documentElement.setAttribute("data-theme", d.theme ?? "light");
     if (d.today) {
       const t = d.today;
-      setCursor({ y: Number(t.slice(0, 4)), m: Number(t.slice(5, 7)), d: Number(t.slice(8, 10)) });
-      setSelected(d.today);
+      setCursor((current) => current ?? { y: Number(t.slice(0, 4)), m: Number(t.slice(5, 7)), d: Number(t.slice(8, 10)) });
+      setSelected((current) => current ?? d.today);
     }
-  }, [applySettings]);
+  }, []);
   useEffect(() => {
-    void load();
-    const unsub = window.deskCalendar?.subscribe(() => { void load(); });
+    void window.deskCalendar?.getSettings().then(applySettings);
     const unsubSettings = window.deskCalendar?.subscribeSettings(applySettings);
     const unsubOpen = window.deskCalendar?.onOpenSettings(() => setShowSettings(true));
-    return () => { unsub?.(); unsubSettings?.(); unsubOpen?.(); };
-  }, [load, applySettings]);
+    return () => { unsubSettings?.(); unsubOpen?.(); };
+  }, [applySettings]);
 
   const events: ScheduleEvent[] = useMemo(
     () =>
       data.items.map((item) => {
         const kind: CalKind = item.kind === "assignment" ? "deadline" : item.kind;
-        const start = fromShanghaiParts(
-          Number(item.date.slice(0, 4)), Number(item.date.slice(5, 7)), Number(item.date.slice(8, 10)),
-          item.time ? Number(item.time.slice(0, 2)) : 0, item.time ? Number(item.time.slice(3, 5)) : 0
-        );
-        const end = new Date(start.getTime() + 60 * 60 * 1000);
-        return { id: item.id, title: item.title, kind, startAt: start.toISOString(), endAt: end.toISOString(), taskId: item.kind === "task" ? item.id.replace(/^task:/, "") : undefined, location: item.location, note: item.note, status: item.status };
+        return {
+          id: item.id, title: item.title, kind, startAt: item.startAt, endAt: item.endAt,
+          taskId: item.taskId, location: item.location, note: item.note, status: item.status,
+          origin: item.origin, occurrenceKey: item.occurrenceKey, repeatType: item.repeatType,
+          repeatPeriod: item.repeatPeriod, repeatEndsOn: item.repeatEndsOn,
+          repeatEndMode: item.repeatEndMode, repeatCount: item.repeatCount,
+          repeatWeekdays: item.repeatWeekdays, reminderLeadMinutes: item.reminderLeadMinutes,
+          reminderMode: item.reminderMode, reminderAt: item.reminderAt, taskType: item.taskType,
+          timeSpentMinutes: item.timeSpentMinutes, timeNeededMinutes: item.timeNeededMinutes,
+          breakable: item.breakable, blocksPlanning: item.blocksPlanning
+        };
       }),
     [data.items]
   );
 
-  const selDate = cursor ? fromShanghaiParts(cursor.y, cursor.m, cursor.d) : new Date();
+  const selDate = useMemo(() => cursor ? fromShanghaiParts(cursor.y, cursor.m, cursor.d) : new Date(), [cursor]);
   const monthDays = useMemo(() => buildMonthDays(selDate), [selDate]);
   const eventRange: Range = useMemo(() => {
     if (viewMode === "month") {
@@ -307,6 +403,11 @@ export default function DeskCalendar(): JSX.Element {
     const s = startOfDay(selDate);
     return { start: s, end: addDays(s, 1) };
   }, [selDate, viewMode]);
+  useEffect(() => {
+    void loadData(eventRange);
+    const unsub = window.deskCalendar?.subscribe(() => { void loadData(eventRange); });
+    return () => { unsub?.(); };
+  }, [eventRange, loadData]);
   const eventsByDay = useMemo(() => groupEventsByDay(events, eventRange), [events, eventRange]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selDate), i)), [selDate]);
   const holidayMap = useMemo(() => {
@@ -314,8 +415,8 @@ export default function DeskCalendar(): JSX.Element {
     for (const h of data.holidays ?? []) m.set(h.date, { label: h.label, holiday: h.holiday });
     return m;
   }, [data.holidays]);
-  // 周次：有校历周（已导入）用校历周，否则回退月内自然周（该月第几周）。
-  const weekNumberFor = (day: Date): number => data.weeks?.[dayKey(day)] ?? monthWeekNumber(day, selDate);
+  // 周次：有校历周用校历周，否则回退周一开始的自然周。
+  const weekNumberFor = (day: Date): number => data.weeks?.[dayKey(day)] ?? naturalWeekNumber(day);
   // 月视图 42 天的农历/节气/节日/宜忌（供显示项开关），一次算好。
   const lunarMap = useMemo(() => {
     const m = new Map<string, { day: string; jieqi: string; festivals: string[]; yi: string[]; ji: string[] }>();
@@ -363,7 +464,35 @@ export default function DeskCalendar(): JSX.Element {
   // 双击事件条 → 编辑
   const onDoubleEvent = (event: ScheduleEvent): void => {
     const dk = dayKey(new Date(event.startAt));
-    setForm({ ...emptyForm(dk), id: event.id, title: event.title, location: event.location ?? "", note: event.note ?? "", startAt: toDateInput(new Date(event.startAt)) + "T" + getShanghaiDateParts(new Date(event.startAt)).hour + ":" + getShanghaiDateParts(new Date(event.startAt)).minute, endAt: toDateInput(new Date(event.endAt)) + "T" + getShanghaiDateParts(new Date(event.endAt)).hour + ":" + getShanghaiDateParts(new Date(event.endAt)).minute });
+    const weekday = getShanghaiWeekday(new Date(event.startAt));
+    setForm({
+      ...emptyForm(dk),
+      id: event.id,
+      origin: event.origin,
+      taskId: event.taskId,
+      occurrenceKey: event.occurrenceKey,
+      editScope: event.repeatType && event.repeatType !== "norepeat" ? "single" : "series",
+      title: event.title,
+      location: event.location ?? "",
+      note: event.note ?? "",
+      startAt: toDateInput(new Date(event.startAt)) + "T" + getShanghaiDateParts(new Date(event.startAt)).hour + ":" + getShanghaiDateParts(new Date(event.startAt)).minute,
+      endAt: toDateInput(new Date(event.endAt)) + "T" + getShanghaiDateParts(new Date(event.endAt)).hour + ":" + getShanghaiDateParts(new Date(event.endAt)).minute,
+      repeatType: event.repeatType ?? "norepeat",
+      repeatPeriod: event.repeatPeriod ?? 1,
+      repeatEndMode: event.repeatEndMode ?? "date",
+      repeatEndsOn: event.repeatEndsOn ?? dk,
+      repeatCount: event.repeatCount ?? 10,
+      repeatWeekdays: event.repeatWeekdays?.length ? event.repeatWeekdays : [weekday],
+      type: event.taskType ?? "deadline",
+      timeSpentMinutes: event.timeSpentMinutes ?? 0,
+      timeNeededMinutes: event.timeNeededMinutes ?? 60,
+      breakable: event.breakable ?? true,
+      blocksPlanning: event.blocksPlanning ?? true,
+      reminderMode: event.reminderMode ?? (event.reminderLeadMinutes != null ? "lead" : "none"),
+      reminderAt: event.reminderAt ? `${toDateInput(new Date(event.reminderAt))}T${getShanghaiDateParts(new Date(event.reminderAt)).hour}:${getShanghaiDateParts(new Date(event.reminderAt)).minute}` : "",
+      remindEnabled: event.reminderLeadMinutes !== null && event.reminderLeadMinutes !== undefined,
+      remindValue: event.reminderLeadMinutes ?? 30
+    });
   };
   // 单击事件条 → 信息卡片，显示节次/时间/教师/地点
   const onInfoClick = (event: ScheduleEvent): void => setInfoEvent(event);
@@ -389,33 +518,52 @@ export default function DeskCalendar(): JSX.Element {
   const saveEvent = async (): Promise<void> => {
     if (!form) return;
     if (!form.title.trim()) return;
-    await window.deskCalendar?.createEvent({
+    await window.deskCalendar?.saveEvent({
+      id: form.id,
+      origin: form.origin,
+      taskId: form.taskId,
+      occurrenceKey: form.occurrenceKey,
+      editScope: form.editScope,
       date: form.startAt.slice(0, 10),
       title: form.title.trim(),
       repeatType: form.repeatType,
-      startAt: form.repeatType === "once" ? form.startAt : undefined,
-      endAt: form.repeatType === "once" ? form.endAt : undefined,
+      repeatPeriod: form.repeatPeriod,
+      repeatEndMode: form.repeatEndMode,
+      repeatEndsOn: form.repeatEndsOn,
+      repeatCount: form.repeatEndMode === "count" ? form.repeatCount : null,
+      repeatWeekdays: form.repeatType === "weeks" ? form.repeatWeekdays : [],
+      startAt: form.startAt,
+      endAt: form.endAt,
       location: form.location,
       note: form.note,
-      reminderLeadMinutes: form.remindEnabled ? (form.remindUnit === "小时" ? form.remindValue * 60 : form.remindUnit === "天" ? form.remindValue * 1440 : form.remindValue) : undefined
+      type: form.type,
+      timeSpentMinutes: form.timeSpentMinutes,
+      timeNeededMinutes: form.timeNeededMinutes,
+      breakable: form.breakable,
+      blocksPlanning: form.blocksPlanning,
+      reminderMode: form.origin === "upstream" ? (form.remindEnabled ? "lead" : "none") : form.reminderMode,
+      reminderLeadMinutes: form.origin === "upstream"
+        ? (form.remindEnabled ? (form.remindUnit === "小时" ? form.remindValue * 60 : form.remindUnit === "天" ? form.remindValue * 1440 : form.remindValue) : undefined)
+        : form.reminderMode === "lead" ? (form.remindUnit === "小时" ? form.remindValue * 60 : form.remindUnit === "天" ? form.remindValue * 1440 : form.remindValue) : undefined,
+      reminderAt: form.origin === "local" && form.reminderMode === "custom" ? form.reminderAt || null : null
     });
     setForm(null);
-    void load();
+    void loadData(eventRange);
   };
 
   // 标记完成 / 恢复未完成：任务类事件通过后端 mutate（status=completed | restore）。
   const completeTask = async (event: ScheduleEvent): Promise<void> => {
     if (!event.taskId) return;
     const completed = event.status !== "completed";
-    const res = await window.deskCalendar?.completeTask(event.taskId, completed);
+    const res = await window.deskCalendar?.completeTask(event.taskId, completed, event.occurrenceKey);
     if (res?.ok) {
       setInfoEvent(null);
-      void load();
+      void loadData(eventRange);
     }
   };
 
   const monthLabel = cursor ? `${cursor.y}年${cursor.m}月` : "";
-  const weekLabel = cursor ? `${cursor.y}年${cursor.m}月 第${monthWeekNumber(fromShanghaiParts(cursor.y, cursor.m, cursor.d), fromShanghaiParts(cursor.y, cursor.m, 1))}周` : "";
+  const weekLabel = cursor ? `${cursor.y}年${cursor.m}月 第${weekNumberFor(fromShanghaiParts(cursor.y, cursor.m, cursor.d))}周` : "";
   const dayLabel = cursor ? `${cursor.y}年${cursor.m}月${cursor.d}日` : "";
   const headerLabel = viewMode === "week" ? weekLabel : viewMode === "day" ? dayLabel : monthLabel;
 
@@ -554,19 +702,39 @@ export default function DeskCalendar(): JSX.Element {
         <div className="dk-form-backdrop" onClick={() => setForm(null)}>
           <div className="dk-form-card" onClick={(e) => e.stopPropagation()}>
             <h3>{form.id ? "编辑事件" : "新增事件"}</h3>
-            <label>名称<input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
-            <label>重复
+            {form.origin === "upstream" ? <p className="dk-form-hint">课程、考试和抓取内容的名称、时间、地点由数据源维护；这里可保存个人备注和提醒。</p> : null}
+            <label>名称<input type="text" disabled={form.origin === "upstream"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            {form.origin === "local" ? <>
+              <label>事件类型<select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as TaskType })}><option value="deadline">截止事项</option><option value="fixed">固定日程</option></select></label>
+              <div className="dk-form-row">
+                <label>预计用时（分钟）<input type="number" min={1} value={form.timeNeededMinutes} onChange={(e) => setForm({ ...form, timeNeededMinutes: Math.max(1, Number(e.target.value)) })} /></label>
+                <label>已投入（分钟）<input type="number" min={0} value={form.timeSpentMinutes} onChange={(e) => setForm({ ...form, timeSpentMinutes: Math.max(0, Number(e.target.value)) })} /></label>
+              </div>
+              <div className="dk-form-options">
+                <label><input type="checkbox" checked={form.breakable} onChange={(e) => setForm({ ...form, breakable: e.target.checked })} /> 可拆分安排</label>
+                <label><input type="checkbox" checked={form.blocksPlanning} onChange={(e) => setForm({ ...form, blocksPlanning: e.target.checked })} /> 占用规划时间</label>
+              </div>
+            </> : null}
+            {form.origin === "local" ? <label>重复
               <select value={form.repeatType} onChange={(e) => setForm({ ...form, repeatType: e.target.value as RepeatType })}>
                 {REPEAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </label>
+            </label> : null}
+            {form.origin === "local" && form.repeatType !== "norepeat" ? <>
+              <label>间隔<input type="number" min={1} value={form.repeatPeriod} onChange={(e) => setForm({ ...form, repeatPeriod: Math.max(1, Number(e.target.value)) })} /></label>
+              {form.repeatType === "weeks" ? <fieldset className="dk-weekday-picker"><legend>重复星期</legend>{[1, 2, 3, 4, 5, 6, 0].map((day, index) => <label key={day}><input type="checkbox" checked={form.repeatWeekdays.includes(day)} onChange={(e) => setForm({ ...form, repeatWeekdays: e.target.checked ? [...new Set([...form.repeatWeekdays, day])] : form.repeatWeekdays.filter((item) => item !== day) })} />{weekdayLabels[index]}</label>)}</fieldset> : null}
+              <label>结束<select value={form.repeatEndMode} onChange={(e) => setForm({ ...form, repeatEndMode: e.target.value as RepeatEndMode })}><option value="never">永不</option><option value="date">指定日期</option><option value="count">指定次数</option></select></label>
+              {form.repeatEndMode === "date" ? <label>结束日期<input type="date" value={form.repeatEndsOn} onChange={(e) => setForm({ ...form, repeatEndsOn: e.target.value })} /></label> : null}
+              {form.repeatEndMode === "count" ? <label>次数<input type="number" min={1} value={form.repeatCount} onChange={(e) => setForm({ ...form, repeatCount: Math.max(1, Number(e.target.value)) })} /></label> : null}
+              {form.id ? <label>编辑范围<select value={form.editScope} onChange={(e) => setForm({ ...form, editScope: e.target.value as TaskForm["editScope"] })}><option value="single">仅本次</option><option value="future">本次及未来</option><option value="series">整个系列</option></select></label> : null}
+            </> : null}
             <div className="dk-form-row">
-              <label>开始<input type="datetime-local" value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} /></label>
-              <label>结束<input type="datetime-local" value={form.endAt} onChange={(e) => setForm({ ...form, endAt: e.target.value })} /></label>
+              <label>开始<input type="datetime-local" disabled={form.origin === "upstream"} value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} /></label>
+              <label>结束<input type="datetime-local" disabled={form.origin === "upstream"} value={form.endAt} onChange={(e) => setForm({ ...form, endAt: e.target.value })} /></label>
             </div>
-            <label>地点<input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></label>
+            <label>地点<input type="text" disabled={form.origin === "upstream"} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></label>
             <label>备注<textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
-            <div className="dk-form-remind">
+            {form.origin === "upstream" ? <div className="dk-form-remind">
               <label className="dk-remind-toggle"><input type="checkbox" checked={form.remindEnabled} onChange={(e) => setForm({ ...form, remindEnabled: e.target.checked })} /> 提醒</label>
               <div className="dk-form-row">
                 <label>提前<input type="number" value={form.remindValue} onChange={(e) => setForm({ ...form, remindValue: Number(e.target.value), remindEnabled: true })} /></label>
@@ -574,7 +742,14 @@ export default function DeskCalendar(): JSX.Element {
                   {REMIND_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
-            </div>
+            </div> : <div className="dk-form-remind">
+              <label>提醒方式<select value={form.reminderMode} onChange={(e) => setForm({ ...form, reminderMode: e.target.value as ReminderMode })}><option value="global">跟随全局</option><option value="none">不提醒</option><option value="at-time">事件开始时</option><option value="lead">提前一段时间</option><option value="custom">自定义时间</option></select></label>
+              {form.reminderMode === "lead" ? <div className="dk-form-row">
+                <label>提前<input type="number" min={0} value={form.remindValue} onChange={(e) => setForm({ ...form, remindValue: Math.max(0, Number(e.target.value)) })} /></label>
+                <select aria-label="提醒单位" value={form.remindUnit} onChange={(e) => setForm({ ...form, remindUnit: e.target.value })}>{REMIND_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
+              </div> : null}
+              {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" value={form.reminderAt} onChange={(e) => setForm({ ...form, reminderAt: e.target.value })} /></label> : null}
+            </div>}
             <div className="dk-form-actions">
               <button type="button" onClick={() => setForm(null)}>取消</button>
               <button type="button" className="dk-primary" onClick={() => void saveEvent()}>保存</button>
@@ -613,7 +788,8 @@ export default function DeskCalendar(): JSX.Element {
             </section>
             <section className="dk-settings-section">
               <h4>通用</h4>
-              <label className="dk-settings-row">开机自启<input type="checkbox" checked={settings.autoStart} onChange={(e) => patchSetting({ autoStart: e.target.checked })} /></label>
+              <label className="dk-settings-row">随 CampusOS 开机恢复<input type="checkbox" disabled={!settings.campusAutoStartEnabled} checked={settings.autoStart} onChange={(e) => patchSetting({ autoStart: e.target.checked })} /></label>
+              {!settings.campusAutoStartEnabled ? <p className="dk-form-hint">请先在 CampusOS 设置中开启“开机启动”。</p> : null}
               <label className="dk-settings-row">置顶<input type="checkbox" checked={settings.alwaysOnTop} onChange={(e) => patchSetting({ alwaysOnTop: e.target.checked })} /></label>
               <label className="dk-settings-row">锁定位置/大小（图钉）<input type="checkbox" checked={settings.locked} onChange={(e) => patchSetting({ locked: e.target.checked })} /></label>
             </section>

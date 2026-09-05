@@ -203,6 +203,8 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 
 ## 5. 桌面日历与主界面日程设计风格差异过大 —— 调研可复用开源桌面日历
 
+**状态（2026-09-05）：已完成范围决策与实现，不再待办。** 当前边界和验收统一见 [桌历功能决策](desk-calendar-decisions.md) 与 [桌历与重复事件 spec](specs/desk-calendar-and-recurrence.md)。下文保留为历史调研过程，不能覆盖定稿。
+
 **当前架构校正（2026-09-03）：** 下方 2026-08-29 的 PyQt/DeskToDo 描述是当时的研究背景，不是当前运行代码。当前桌历由 `packages/core/src/main/deskCalendarHost.ts` 创建 Electron `BrowserWindow` 并加载 `packages/core/src/renderer/desk-calendar.tsx`；`desktop-calendar/` 仅为 DeskToDo 对照实现。调研结论中“复用自家日程设计语言”的方向仍有效，但当前任务是评估/改造现有 Electron 桌历，不是继续维护 Python 子进程或其 feed 桥。
 
 - 2026-08-29 勘察时的现状：CampusOS 主界面日程（主窗口内 `ScheduleView`）与“桥接的 DeskToDo 桌面日历”（`desktop-calendar/`，PyQt/Qt 单窗三栏：月历 + 待办侧栏 + 组件区）**设计风格差别过大**。
@@ -271,6 +273,8 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 
 ## 5附｜桌面日历「该怎么做 / 有什么功能 / 怎么实现」调研结论（2026-09-03 定稿）
 
+> **2026-09-05 状态：已实现。** Electron 桌历、SQLite 状态、WorkerW 主路径、主/桌历统一编辑与重复规则均已落地；以下问题和实现建议是定稿前的历史材料。
+
 > 依据三个真实样本：**① `D:\xdiarys-green`**（DesktopCal，成熟的商用 Windows 桌面日历安装目录，含 `desktopcal.exe`/sqlite/lua 脚本/农历/皮肤）；**② `.tmp/DeskToDo`**（现役 CampusOS 桌历来源，Python/PyQt）；**③ 外部检索**（联想应用商店"小智桌面日历"、优效日历、WallCal、Google/Outlook/Todoist 等）。目标：定出 CampusOS 桌面日历的**功能清单 + 实现路径**，并在视觉/功能上与主界面日程完全一致。
 
 ### 一、成熟桌面日历应有/常见的功能（样本归纳）
@@ -311,11 +315,11 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 - 星期头 `schedule-weekday` mono 小字 + 边框；更多按钮 `schedule-more-button` 下划线。
 - 全局：米白纸底 `--paper`、低饱和、直角/极小圆角（6/10px）、等宽数字 tabular-nums。
 
-### 四、确认的问题（开工前需用户拍板）
+### 四、已确认的问题（2026-09-05）
 
-1. **桌历窗口定位**：默认显示**当前月**并高亮 today，还是**自动定位到"有课的那个月"**？（当前秋冬学期若 snapshot 暂无课程，默认月会显得"没内容"）
-2. **是否隐藏滚动条 / 网格一屏放下**：窗口高 736 是否够 6 行格子（112×6=672 + 头部 ≈ 740），要不要微调窗口高去边。
-3. **功能范围**：桌面日历窗口是**只做月历总览 + 当日事件**，还是要**继承 DeskToDo 的小组件**（时钟/天气/倒计时/进度条）、及其周/日视图切换？—— 决定窗口要不要做大、要不要多页。
+1. 默认显示当前日期所在月份并高亮今天，用户可切换月、周、日视图。
+2. 网格随窗口自适应，整体不滚动；事件过多时在日期格内部滚动。
+3. 当前范围为课程、考试、作业和本地任务的月/周/日总览与编辑，不迁入天气、通用倒计时和进度条组件。
 
 ## 5附｜桌面日历「技术实现」深度调研（2026-09-03）
 
@@ -331,9 +335,9 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 |---|---|---|
 | ❌ `electron-bottom-most`（npm，MIT） | 封装 `SetWindowPos(hWnd, HWND_BOTTOM, ...)` | **用 `HWND_BOTTOM` 会沉到桌面层之下、被壁纸盖住**（CampusOS `desktopPinning.ts` 注释已实测踩坑） |
 | ❌ `GetDesktopWindow()` 枚举取 `GW_HWNDLAST` | 找"最底窗口"作锚点 | 对根桌面窗口恒为 0，找不到 |
-| ✅ **CampusOS `desktopPinning.ts`（现成，推荐）** | 以 **`Progman`**（桌面壁纸/图标宿主）为基准，`SetWindowPos` 把窗口插到 `Progman` 上方邻窗（`GW_HWNDNEXT`） | 正确 —"壁纸之上、普通窗口之下"；已含 Win+D 自愈守护 |
+| ✅ **CampusOS `desktopPinning.ts`** | 首选安全 WorkerW 挂载，失败时以 `Progman` 邻窗作 z-order 回退 | WorkerW 获得图标下/壁纸上的目标层级；回退保证窗口仍可用 |
 
-**结论**：**不要引入 `electron-bottom-most`**（用 HWND_BOTTOM 会错）；**复用 CampusOS 现成的 `pinWindowToDesktopBottom(window)`**（koffi 调 user32 `SetWindowPos`，锚 `Progman` + `GW_HWNDNEXT`，仅 Windows，失败静默降级）。这已踩完坑、是权威做法。
+**结论（已更新）**：不引入 `electron-bottom-most`。`pinWindowToDesktopBottom(window)` 以 WorkerW 为主路径，挂载或坐标校验失败时再用 `Progman` + `GW_HWNDNEXT` 回退；依据见 `research.md` 的 2026-09-05 WorkerW 复核。
 
 ### B. 透明无边框工具窗（OverlayWindow 标配）
 

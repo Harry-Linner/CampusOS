@@ -110,7 +110,13 @@ contextBridge.exposeInMainWorld("campusos", {
       scope?: "single" | "future" | "series";
       includeCompleted?: boolean;
       timeSpentMinutes?: number;
+      occurrenceKey?: string;
     }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
+    loadPersonalizations: () => ipcRenderer.invoke("campusos:schedule:personalizations:load"),
+    savePersonalization: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) =>
+      ipcRenderer.invoke("campusos:schedule:personalization:save", eventId, input),
+    loadCalendarData: (input: { today: string; startAt: string; endAt: string }) =>
+      ipcRenderer.invoke("campusos:schedule:calendar-data:load", input),
     exportIcal: (input: {
       academicYearStart: number;
       termLabel: string;

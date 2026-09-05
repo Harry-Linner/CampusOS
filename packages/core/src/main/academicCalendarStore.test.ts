@@ -20,6 +20,7 @@ vi.mock("electron", () => ({
 }));
 
 import { registerAcademicCalendarHandlers } from "./academicCalendarStore";
+import { closeOfficialDatabaseService } from "./officialDatabaseService";
 
 const temporaryDirectories: string[] = [];
 
@@ -28,6 +29,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  closeOfficialDatabaseService();
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>
       rm(directory, { recursive: true, force: true })

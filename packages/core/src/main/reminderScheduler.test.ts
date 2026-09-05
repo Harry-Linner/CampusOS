@@ -5,6 +5,9 @@ const notificationState = vi.hoisted(() => ({
   supported: true,
   add: vi.fn(async () => undefined)
 }));
+const personalizationState = vi.hoisted(() => ({
+  records: {} as Record<string, { note: string; reminderLeadMinutes: number | null; updatedAt: string }>
+}));
 
 vi.mock("electron", () => ({
   Notification: {
@@ -16,6 +19,9 @@ vi.mock("electron", () => ({
 
 vi.mock("./notificationCenter", () => ({
   addNotification: notificationState.add
+}));
+vi.mock("./deskCalendarStateStore", () => ({
+  loadCalendarEventPersonalizations: () => personalizationState.records
 }));
 
 import {
@@ -86,6 +92,7 @@ describe("reminder scheduler", () => {
     vi.useFakeTimers();
     notificationState.supported = true;
     notificationState.add.mockClear();
+    personalizationState.records = {};
     scheduleWorkspaceReminders(snapshot([]), {
       enabled: false,
       leadMinutes: [15],
@@ -152,6 +159,36 @@ describe("reminder scheduler", () => {
       title: "数据结构",
       body: "课程将在 15 分钟后开始，地点：教室 A",
       source: "schedule"
+    }));
+  });
+
+  it("schedules a personalized reminder for a fallback upstream course", async () => {
+    personalizationState.records = {
+      "course:course-1": { note: "", reminderLeadMinutes: 15, updatedAt: now.toISOString() }
+    };
+    const courseStart = new Date(now.getTime() + 16 * 60_000).toISOString();
+    const state = scheduleWorkspaceReminders({
+      ...snapshot([]),
+      courses: [{
+        id: "course-1",
+        title: "Fallback course",
+        sourceId: "academic-affairs",
+        startAt: courseStart,
+        endAt: new Date(now.getTime() + 76 * 60_000).toISOString(),
+        location: "Room A"
+      }]
+    }, {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+
+    expect(state.scheduledCount).toBe(1);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "course",
+      title: "Fallback course"
     }));
   });
 

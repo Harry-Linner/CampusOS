@@ -4,6 +4,7 @@ import type {
   CalendarExportInput,
   LocalTaskInput,
   LocalTaskMutation,
+  LocalTaskOccurrenceOverride,
   LocalTaskRecord,
   LocalTaskRepeatType,
   LocalTaskStatus,
@@ -26,6 +27,12 @@ export interface TaskPeriod {
   type: LocalTaskType;
   status: LocalTaskStatus;
   blocksPlanning: boolean;
+  occurrenceId: string;
+  occurrenceKey: string;
+  occurrenceIndex: number;
+  occurrenceStartAt: string;
+  occurrenceEndAt: string;
+  seriesGroupId: string;
 }
 
 export interface TaskRefreshResult {
@@ -48,9 +55,6 @@ const parseDate = (value: string, field: string): Date => {
   }
   return new Date(timestamp);
 };
-
-const toIso = (value: Date | number): string =>
-  new Date(value).toISOString();
 
 const getShanghaiDateParts = (value: Date): Record<string, string> => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -98,79 +102,6 @@ const daysInMonth = (year: number, month: number): number =>
 const addDays = (value: Date, days: number): Date =>
   new Date(value.getTime() + days * DAY_MS);
 
-const addNextPeriod = (
-  start: Date,
-  end: Date,
-  repeatType: LocalTaskRepeatType,
-  repeatPeriod: number,
-  repeatWeekdays: number[] = []
-): { start: Date; end: Date } => {
-  if (repeatType === "days" || repeatType === "weeks") {
-    const delta = Math.max(1, repeatPeriod) * (repeatType === "weeks" ? 7 : 1) * DAY_MS;
-    return { start: new Date(start.getTime() + delta), end: new Date(end.getTime() + delta) };
-  }
-
-  if (repeatType === "weekdays") {
-    const allowed = (repeatWeekdays.length > 0 ? repeatWeekdays : [1, 2, 3, 4, 5]).sort((left, right) => left - right);
-    const parts = getShanghaiDateParts(start);
-    const currentDay = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
-    const nextOffset = allowed.map((weekday) => (weekday - currentDay + 7) % 7 || 7).sort((left, right) => left - right)[0] ?? 7;
-    const nextStart = new Date(start.getTime() + nextOffset * DAY_MS);
-    const delta = nextStart.getTime() - start.getTime();
-    return { start: nextStart, end: new Date(end.getTime() + delta) };
-  }
-
-  if (repeatType === "month") {
-    const parts = getShanghaiDateParts(start);
-    let year = Number(parts.year);
-    let month = Number(parts.month) + 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
-    }
-    const day = Number(parts.day);
-    while (daysInMonth(year, month) < day) {
-      month += 1;
-      if (month > 12) {
-        month = 1;
-        year += 1;
-      }
-    }
-    const nextStart = fromShanghaiParts(
-      year,
-      month,
-      day,
-      Number(parts.hour),
-      Number(parts.minute),
-      Number(parts.second),
-      start.getUTCMilliseconds()
-    );
-    const delta = nextStart.getTime() - start.getTime();
-    return { start: nextStart, end: new Date(end.getTime() + delta) };
-  }
-
-  if (repeatType === "year") {
-    const parts = getShanghaiDateParts(start);
-    let year = Number(parts.year) + 1;
-    const month = Number(parts.month);
-    const day = Number(parts.day);
-    while (daysInMonth(year, month) < day) year += 1;
-    const nextStart = fromShanghaiParts(
-      year,
-      month,
-      day,
-      Number(parts.hour),
-      Number(parts.minute),
-      Number(parts.second),
-      start.getUTCMilliseconds()
-    );
-    const delta = nextStart.getTime() - start.getTime();
-    return { start: nextStart, end: new Date(end.getTime() + delta) };
-  }
-
-  return { start, end };
-};
-
 const normalizeStatus = (value: unknown): LocalTaskStatus => {
   const statuses: LocalTaskStatus[] = [
     "running",
@@ -211,8 +142,39 @@ export const normalizeTaskRecord = (
     Math.max(0, Math.round(finiteNumber(value.timeSpentMinutes, 0)))
   );
 
+  const repeatEndsOn = typeof value.repeatEndsOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.repeatEndsOn)
+    ? value.repeatEndsOn
+    : dateOnlyIso(value.endAt, "重复结束日期");
+  const repeatEndMode = value.repeatEndMode === "never" || value.repeatEndMode === "count"
+    ? value.repeatEndMode
+    : "date";
+  const occurrenceOverrides = value.occurrenceOverrides && typeof value.occurrenceOverrides === "object"
+    ? Object.fromEntries(Object.entries(value.occurrenceOverrides).flatMap(([key, override]) => {
+      if (!/^\d+$/.test(key) || !override || typeof override !== "object") return [];
+      const candidate = override as LocalTaskOccurrenceOverride;
+      return [[key, {
+        ...(candidate.status === "running" || candidate.status === "suspended" || candidate.status === "completed" || candidate.status === "deleted" ? { status: candidate.status } : {}),
+        ...(Number.isFinite(candidate.timeSpentMinutes) ? { timeSpentMinutes: Math.max(0, Math.round(candidate.timeSpentMinutes ?? 0)) } : {}),
+        ...(typeof candidate.title === "string" ? { title: candidate.title } : {}),
+        ...(typeof candidate.description === "string" ? { description: candidate.description } : {}),
+        ...(typeof candidate.location === "string" ? { location: candidate.location } : {}),
+        ...(typeof candidate.startAt === "string" && Number.isFinite(Date.parse(candidate.startAt)) ? { startAt: new Date(candidate.startAt).toISOString() } : {}),
+        ...(typeof candidate.endAt === "string" && Number.isFinite(Date.parse(candidate.endAt)) ? { endAt: new Date(candidate.endAt).toISOString() } : {}),
+        ...(candidate.reminderMode ? { reminderMode: candidate.reminderMode } : {}),
+        ...(candidate.reminderLeadMinutes === null || Number.isFinite(candidate.reminderLeadMinutes) ? { reminderLeadMinutes: candidate.reminderLeadMinutes ?? null } : {}),
+        ...(candidate.reminderAt === null
+          ? { reminderAt: null }
+          : typeof candidate.reminderAt === "string" && Number.isFinite(Date.parse(candidate.reminderAt))
+            ? { reminderAt: new Date(candidate.reminderAt).toISOString() }
+            : {}),
+        ...(typeof candidate.deletedAt === "string" && Number.isFinite(Date.parse(candidate.deletedAt)) ? { deletedAt: candidate.deletedAt } : {})
+      } satisfies LocalTaskOccurrenceOverride]];
+    }))
+    : {};
+
+  const normalizedId = typeof value.id === "string" && value.id.length > 0 ? value.id : getIdFactory(options)();
   return {
-    id: typeof value.id === "string" && value.id.length > 0 ? value.id : getIdFactory(options)(),
+    id: normalizedId,
     status: normalizeStatus(value.status),
     description: typeof value.description === "string" ? value.description : "",
     timeSpentMinutes: spent,
@@ -225,8 +187,12 @@ export const normalizeTaskRecord = (
     type: normalizeType(value.type),
     repeatType: normalizeRepeatType(value.repeatType),
     repeatPeriod: Math.max(1, Math.round(finiteNumber(value.repeatPeriod, 1))),
-    repeatEndsOn: dateOnlyIso(value.repeatEndsOn, "重复结束日期"),
+    repeatEndsOn,
     repeatWeekdays: Array.isArray(value.repeatWeekdays) ? value.repeatWeekdays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : [],
+    repeatEndMode,
+    repeatCount: repeatEndMode === "count" ? Math.max(1, Math.round(finiteNumber(value.repeatCount, 1))) : null,
+    seriesGroupId: typeof value.seriesGroupId === "string" && value.seriesGroupId ? value.seriesGroupId : normalizedId,
+    occurrenceOverrides,
     blocksPlanning: value.blocksPlanning !== false,
     reminderMode: value.reminderMode === "none" || value.reminderMode === "at-time" || value.reminderMode === "lead" || value.reminderMode === "custom"
       ? value.reminderMode
@@ -293,6 +259,45 @@ export const applyTaskMutation = (
     return retained;
   }
 
+  if (mutation.occurrenceKey !== undefined && target.type === "fixed" && target.repeatType !== "norepeat") {
+    if (scope === "series" && mutation.status === "deleted") {
+      return tasks.map((task) => task.seriesGroupId === (target.seriesGroupId ?? target.id)
+        ? { ...task, status: "deleted", deletedAt: new Date().toISOString() }
+        : task);
+    }
+    if (scope === "future" && mutation.status === "deleted") {
+      const occurrence = getTaskOccurrenceBounds(target, mutation.occurrenceKey);
+      if (!occurrence) throw new Error("任务实例不存在。");
+      const previous = addDays(startOfDay(new Date(occurrence.startAt)), -1);
+      const parts = getShanghaiDateParts(previous);
+      return tasks.map((task) => task.id === target.id ? {
+        ...task,
+        repeatEndMode: "date" as const,
+        repeatEndsOn: `${parts.year}-${parts.month}-${parts.day}`
+      } : task);
+    }
+    return tasks.map((task) => {
+      if (task.id !== target.id) return task;
+      const prior = task.occurrenceOverrides?.[mutation.occurrenceKey ?? ""] ?? {};
+      const nextOverride: LocalTaskOccurrenceOverride = { ...prior };
+      if (mutation.action === "restore") {
+        nextOverride.status = "running";
+        nextOverride.deletedAt = null;
+      } else if (mutation.status) {
+        nextOverride.status = mutation.status;
+        nextOverride.deletedAt = mutation.status === "deleted" ? new Date().toISOString() : null;
+      }
+      if (mutation.timeSpentMinutes !== undefined) {
+        nextOverride.timeSpentMinutes = Math.min(task.timeNeededMinutes, Math.max(0, Math.round(mutation.timeSpentMinutes)));
+      }
+      if (nextOverride.status === "completed") nextOverride.timeSpentMinutes = task.timeNeededMinutes;
+      return {
+        ...task,
+        occurrenceOverrides: { ...(task.occurrenceOverrides ?? {}), [mutation.occurrenceKey ?? ""]: nextOverride }
+      };
+    });
+  }
+
   return tasks.map((task) => {
     const isTarget = task.id === mutation.id;
     const isSeriesMember = matchesSeries(task);
@@ -332,9 +337,6 @@ export const refreshLocalTasks = (
   const current = source
     .map((task) => normalizeTaskRecord(task, { ...options, idFactory }))
     .filter((task) => task.status !== "deleted" || !task.deletedAt || Date.parse(task.deletedAt) >= cutoff);
-  const existingFixedIds = new Set<string>();
-  const historical: LocalTaskRecord[] = [];
-
   for (const task of current) {
     if (task.status === "deleted") continue;
     if (task.type === "deadline") {
@@ -346,53 +348,12 @@ export const refreshLocalTasks = (
       continue;
     }
 
-    if (task.type !== "fixed") continue;
-    existingFixedIds.add(task.id);
-    const repeatEnd = dateOnly(parseDate(task.repeatEndsOn, "重复结束日期"));
-    let start = parseDate(task.startAt, "任务开始时间");
-    let end = parseDate(task.endAt, "任务结束时间");
-    const customReminderOffsetMs = task.reminderMode === "custom" && task.reminderAt
-      ? Date.parse(task.reminderAt) - start.getTime()
-      : null;
-    task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
-
-    let guard = 0;
-    while (end.getTime() < now.getTime() && task.status !== "outdated") {
-      const legacy: LocalTaskRecord = {
-        ...task,
-        id: idFactory(),
-        status: "outdated",
-        type: "fixedlegacy",
-        title: `${task.title}（过去日程）`,
-        repeatType: "norepeat",
-        repeatPeriod: 1,
-        repeatEndsOn: toIso(dateOnly(end)).slice(0, 10),
-        startAt: start.toISOString(),
-        endAt: end.toISOString(),
-        fromId: task.id,
-        deletedAt: null
-      };
-      historical.push(legacy);
-      if (task.repeatType === "norepeat") {
-        task.status = "outdated";
-        break;
-      }
-      const next = addNextPeriod(start, end, task.repeatType, task.repeatPeriod, task.repeatWeekdays ?? []);
-      start = next.start;
-      end = next.end;
-      task.startAt = start.toISOString();
-      task.endAt = end.toISOString();
-      if (customReminderOffsetMs !== null) {
-        task.reminderAt = new Date(start.getTime() + customReminderOffsetMs).toISOString();
-      }
-      task.status = dateOnly(start).getTime() > repeatEnd.getTime() ? "outdated" : "running";
-      if (++guard > 20_000) throw new Error("重复任务实例数量超过安全上限。");
+    if (task.type === "fixed" && task.status !== "suspended") {
+      task.status = "running";
     }
   }
 
   const result = current
-    .concat(historical)
-    .filter((task) => task.type !== "fixedlegacy" || existingFixedIds.has(task.fromId ?? ""))
     .sort((left, right) =>
       Date.parse(left.endAt) - Date.parse(right.endAt) || left.id.localeCompare(right.id)
     );
@@ -419,49 +380,170 @@ const buildTaskInstances = (
   const result: TaskPeriod[] = [];
   const start = parseDate(task.startAt, "任务开始时间");
   const end = parseDate(task.endAt, "任务结束时间");
-  const addInstance = (instanceStart: Date, instanceEnd: Date, suffix: string): void => {
-    if (instanceEnd.getTime() <= rangeStart.getTime() || instanceStart.getTime() >= rangeEnd.getTime()) return;
+  const addInstance = (instanceStart: Date, instanceEnd: Date, occurrenceIndex: number): void => {
+    const occurrenceKey = String(occurrenceIndex);
+    const occurrenceId = `${task.id}:${occurrenceKey}`;
+    const override = task.occurrenceOverrides?.[occurrenceKey];
+    const resolvedStart = override?.startAt ? parseDate(override.startAt, "实例开始时间") : instanceStart;
+    const resolvedEnd = override?.endAt ? parseDate(override.endAt, "实例结束时间") : instanceEnd;
+    if (resolvedEnd <= resolvedStart) return;
+    if (override?.status === "deleted") return;
+    if (resolvedEnd.getTime() <= rangeStart.getTime() || resolvedStart.getTime() >= rangeEnd.getTime()) return;
     for (
-      let cursor = startOfDay(instanceStart);
-      cursor.getTime() < instanceEnd.getTime();
+      let cursor = startOfDay(resolvedStart);
+      cursor.getTime() < resolvedEnd.getTime();
       cursor = addDays(cursor, 1)
     ) {
-      const chopped = periodForDay(instanceStart, instanceEnd, cursor);
+      const chopped = periodForDay(resolvedStart, resolvedEnd, cursor);
       if (!chopped) continue;
       result.push({
-        id: `${task.id}${suffix}-${cursor.toISOString().slice(0, 10)}`,
+        id: `${occurrenceId}-${cursor.toISOString().slice(0, 10)}`,
         taskId: task.id,
-        title: task.title,
-        description: task.description,
-        location: task.location,
+        title: override?.title ?? task.title,
+        description: override?.description ?? task.description,
+        location: override?.location ?? task.location,
         startAt: chopped.start.toISOString(),
         endAt: chopped.end.toISOString(),
         type: task.type,
-        status: task.status,
-        blocksPlanning: task.blocksPlanning
+        status: override?.status ?? (task.type === "fixed" && resolvedEnd.getTime() < Date.now() ? "outdated" : task.status),
+        blocksPlanning: task.blocksPlanning,
+        occurrenceId,
+        occurrenceKey,
+        occurrenceIndex,
+        occurrenceStartAt: resolvedStart.toISOString(),
+        occurrenceEndAt: resolvedEnd.toISOString(),
+        seriesGroupId: task.seriesGroupId ?? task.id
       });
     }
   };
 
   if (task.type === "deadline") {
-    addInstance(start, end, "");
+    addInstance(start, end, 0);
     return result;
   }
 
-  let instanceStart = start;
-  let instanceEnd = end;
-  const repeatEnd = dateOnly(parseDate(task.repeatEndsOn, "重复结束日期"));
-  let guard = 0;
-  while (instanceStart.getTime() <= rangeEnd.getTime() && dateOnly(instanceStart).getTime() <= repeatEnd.getTime()) {
-    addInstance(instanceStart, instanceEnd, `-${instanceStart.toISOString()}`);
-    if (task.repeatType === "norepeat") break;
-    const next = addNextPeriod(instanceStart, instanceEnd, task.repeatType, task.repeatPeriod, task.repeatWeekdays ?? []);
-    instanceStart = next.start;
-    instanceEnd = next.end;
-    if (++guard > 20_000) break;
+  const duration = end.getTime() - start.getTime();
+  const endMode = task.repeatType === "norepeat" ? "count" : (task.repeatEndMode ?? "date");
+  const maxCount = task.repeatType === "norepeat" ? 1 : endMode === "count" ? Math.max(1, task.repeatCount ?? 1) : Number.POSITIVE_INFINITY;
+  const endDate = endMode === "date" ? dateOnly(parseDate(task.repeatEndsOn, "重复结束日期")) : null;
+  const accepts = (candidate: Date, index: number): boolean => index < maxCount && (!endDate || dateOnly(candidate).getTime() <= endDate.getTime());
+  let occurrenceIndex = 0;
+  const emit = (candidate: Date): boolean => {
+    if (!accepts(candidate, occurrenceIndex)) return false;
+    addInstance(candidate, new Date(candidate.getTime() + duration), occurrenceIndex);
+    occurrenceIndex += 1;
+    return candidate.getTime() <= rangeEnd.getTime();
+  };
+
+  if (task.repeatType === "weeks" || task.repeatType === "weekdays") {
+    const anchorParts = getShanghaiDateParts(start);
+    const anchorWeekday = new Date(Date.UTC(Number(anchorParts.year), Number(anchorParts.month) - 1, Number(anchorParts.day))).getUTCDay();
+    const weekdays = [...new Set(task.repeatWeekdays?.length ? task.repeatWeekdays : task.repeatType === "weekdays" ? [1, 2, 3, 4, 5] : [anchorWeekday])].sort((a, b) => a - b);
+    const mondayOffset = anchorWeekday === 0 ? -6 : 1 - anchorWeekday;
+    const weekAnchor = addDays(start, mondayOffset);
+    for (let week = 0, guard = 0; guard < 20_000; week += Math.max(1, task.repeatPeriod), guard += 1) {
+      let continued = false;
+      for (const weekday of weekdays) {
+        const offset = weekday === 0 ? 6 : weekday - 1;
+        const candidate = addDays(weekAnchor, week * 7 + offset);
+        if (candidate < start) continue;
+        if (!accepts(candidate, occurrenceIndex)) return result;
+        continued = emit(candidate) || continued;
+      }
+      if (!continued && addDays(weekAnchor, week * 7).getTime() > rangeEnd.getTime()) break;
+    }
+    return result;
+  }
+
+  for (let cycle = 0, guard = 0; guard < 20_000; cycle += 1, guard += 1) {
+    let candidate = start;
+    if (cycle > 0 && task.repeatType === "days") candidate = addDays(start, cycle * Math.max(1, task.repeatPeriod));
+    else if (cycle > 0 && task.repeatType === "month") {
+      const parts = getShanghaiDateParts(start);
+      const totalMonth = Number(parts.month) - 1 + cycle * Math.max(1, task.repeatPeriod);
+      const year = Number(parts.year) + Math.floor(totalMonth / 12);
+      const month = totalMonth % 12 + 1;
+      candidate = fromShanghaiParts(year, month, Math.min(Number(parts.day), daysInMonth(year, month)), Number(parts.hour), Number(parts.minute), Number(parts.second), start.getUTCMilliseconds());
+    } else if (cycle > 0 && task.repeatType === "year") {
+      const parts = getShanghaiDateParts(start);
+      const year = Number(parts.year) + cycle * Math.max(1, task.repeatPeriod);
+      const month = Number(parts.month);
+      candidate = fromShanghaiParts(year, month, Math.min(Number(parts.day), daysInMonth(year, month)), Number(parts.hour), Number(parts.minute), Number(parts.second), start.getUTCMilliseconds());
+    }
+    if (!accepts(candidate, occurrenceIndex)) break;
+    emit(candidate);
+    if (candidate.getTime() > rangeEnd.getTime() || task.repeatType === "norepeat") break;
   }
   return result;
 };
+
+/** Resolve an occurrence by its stable series index without depending on the active view range. */
+export function getTaskOccurrenceBounds(
+  task: LocalTaskRecord,
+  occurrenceKey: string
+): { startAt: string; endAt: string } | null {
+  if (!/^\d+$/.test(occurrenceKey)) return null;
+  const targetIndex = Number(occurrenceKey);
+  if (!Number.isSafeInteger(targetIndex) || targetIndex < 0 || targetIndex >= 20_000) return null;
+  const start = parseDate(task.startAt, "任务开始时间");
+  const end = parseDate(task.endAt, "任务结束时间");
+  const duration = end.getTime() - start.getTime();
+  const endMode = task.repeatType === "norepeat" ? "count" : (task.repeatEndMode ?? "date");
+  const maxCount = task.repeatType === "norepeat" ? 1 : endMode === "count" ? Math.max(1, task.repeatCount ?? 1) : Number.POSITIVE_INFINITY;
+  const endDate = endMode === "date" ? dateOnly(parseDate(task.repeatEndsOn, "重复结束日期")) : null;
+  let index = 0;
+  const inspect = (candidate: Date): { found?: { startAt: string; endAt: string }; stop: boolean } => {
+    if (index >= maxCount || (endDate && dateOnly(candidate).getTime() > endDate.getTime())) return { stop: true };
+    if (index === targetIndex) {
+      return {
+        found: { startAt: candidate.toISOString(), endAt: new Date(candidate.getTime() + duration).toISOString() },
+        stop: true
+      };
+    }
+    index += 1;
+    return { stop: false };
+  };
+
+  if (task.repeatType === "weeks" || task.repeatType === "weekdays") {
+    const anchorParts = getShanghaiDateParts(start);
+    const anchorWeekday = new Date(Date.UTC(Number(anchorParts.year), Number(anchorParts.month) - 1, Number(anchorParts.day))).getUTCDay();
+    const weekdays = [...new Set(task.repeatWeekdays?.length ? task.repeatWeekdays : task.repeatType === "weekdays" ? [1, 2, 3, 4, 5] : [anchorWeekday])].sort((left, right) => left - right);
+    const mondayOffset = anchorWeekday === 0 ? -6 : 1 - anchorWeekday;
+    const weekAnchor = addDays(start, mondayOffset);
+    for (let week = 0, guard = 0; guard < 20_000; week += Math.max(1, task.repeatPeriod), guard += 1) {
+      for (const weekday of weekdays) {
+        const offset = weekday === 0 ? 6 : weekday - 1;
+        const candidate = addDays(weekAnchor, week * 7 + offset);
+        if (candidate < start) continue;
+        const result = inspect(candidate);
+        if (result.found) return result.found;
+        if (result.stop) return null;
+      }
+    }
+    return null;
+  }
+
+  for (let cycle = 0; cycle < 20_000; cycle += 1) {
+    let candidate = start;
+    if (cycle > 0 && task.repeatType === "days") candidate = addDays(start, cycle * Math.max(1, task.repeatPeriod));
+    else if (cycle > 0 && task.repeatType === "month") {
+      const parts = getShanghaiDateParts(start);
+      const totalMonth = Number(parts.month) - 1 + cycle * Math.max(1, task.repeatPeriod);
+      const year = Number(parts.year) + Math.floor(totalMonth / 12);
+      const month = totalMonth % 12 + 1;
+      candidate = fromShanghaiParts(year, month, Math.min(Number(parts.day), daysInMonth(year, month)), Number(parts.hour), Number(parts.minute), Number(parts.second), start.getUTCMilliseconds());
+    } else if (cycle > 0 && task.repeatType === "year") {
+      const parts = getShanghaiDateParts(start);
+      const year = Number(parts.year) + cycle * Math.max(1, task.repeatPeriod);
+      const month = Number(parts.month);
+      candidate = fromShanghaiParts(year, month, Math.min(Number(parts.day), daysInMonth(year, month)), Number(parts.hour), Number(parts.minute), Number(parts.second), start.getUTCMilliseconds());
+    }
+    const result = inspect(candidate);
+    if (result.found) return result.found;
+    if (result.stop || task.repeatType === "norepeat") return null;
+  }
+  return null;
+}
 
 export const getTaskCalendarPeriods = (
   tasks: LocalTaskRecord[],

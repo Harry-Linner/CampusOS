@@ -195,7 +195,7 @@ describe("ScheduleView", () => {
     }));
     const taskButtons = await screen.findAllByRole("button", { name: "Read notes" });
     fireEvent.click(taskButtons[0]);
-    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    fireEvent.click(await screen.findByRole("button", { name: "完成" }));
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "task-1", status: "completed" }));
   });
 
@@ -210,9 +210,135 @@ describe("ScheduleView", () => {
 
     const taskButtons = await screen.findAllByRole("button", { name: "Read notes" });
     fireEvent.click(taskButtons[0]);
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(await screen.findByRole("dialog")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(screen.getByRole("heading", { name: "编辑任务" })).toBeTruthy();
+  });
+
+  it("treats a real double-click sequence as direct edit instead of opening details", async () => {
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule: createSchedule()
+    }));
+
+    const task = (await screen.findAllByRole("button", { name: "Read notes" }))[0];
+    fireEvent.click(task, { detail: 1 });
+    fireEvent.click(task, { detail: 2 });
+    fireEvent.doubleClick(task, { detail: 2 });
+
+    expect(screen.getByRole("heading", { name: "编辑任务" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "编辑" })).toBeNull();
+  });
+
+  it("limits upstream event editing to personal notes and reminders", async () => {
+    const schedule = createSchedule([]);
+    schedule.loadPersonalizations = vi.fn(async () => ({}));
+    schedule.savePersonalization = vi.fn(async (eventId, input) => ({
+      eventId,
+      note: input.note,
+      reminderLeadMinutes: input.reminderLeadMinutes,
+      updatedAt: now.toISOString()
+    }));
+    const upstreamSnapshot: CampusWorkspaceSnapshot = {
+      ...snapshot,
+      courses: [{
+        id: "course-readonly",
+        title: "Read-only course",
+        sourceId: "academic-affairs",
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        location: "Room 2"
+      }]
+    };
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot: upstreamSnapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule
+    }));
+
+    const course = (await screen.findAllByRole("button", { name: "Read-only course" }))[0];
+    fireEvent.click(course, { detail: 1 });
+    fireEvent.click(course, { detail: 2 });
+    fireEvent.doubleClick(course, { detail: 2 });
+
+    expect(screen.getByRole("heading", { name: "个性化“Read-only course”" })).toBeTruthy();
+    expect(screen.queryByLabelText("标题")).toBeNull();
+    fireEvent.change(screen.getByLabelText("个人备注"), { target: { value: "Bring notes" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(schedule.savePersonalization).toHaveBeenCalledWith(
+      "course:course-readonly",
+      { note: "Bring notes", reminderLeadMinutes: null }
+    ));
+  });
+
+  it("edits the full occurrence when a multi-day event is opened from its later day", async () => {
+    const todayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+    }).format(new Date());
+    const midnight = new Date(`${todayKey}T00:00:00+08:00`);
+    const fullStart = new Date(midnight.getTime() - 60 * 60 * 1000);
+    const fullEnd = new Date(midnight.getTime() + 2 * 60 * 60 * 1000);
+    const overnight: LocalTaskRecord = {
+      ...record,
+      id: "overnight",
+      title: "Overnight task",
+      type: "fixed",
+      repeatType: "days",
+      repeatEndMode: "never",
+      occurrenceOverrides: {
+        "0": {
+          title: "Overnight override",
+          description: "Instance note",
+          location: "Instance room",
+          timeSpentMinutes: 25,
+          reminderMode: "none",
+          reminderAt: null
+        }
+      },
+      startAt: fullStart.toISOString(),
+      endAt: fullEnd.toISOString()
+    };
+    const schedule = createSchedule([overnight]);
+    schedule.loadPeriods = vi.fn(async () => ([
+      {
+        id: "overnight:0-day-1", taskId: "overnight", title: "Overnight override",
+        description: "Instance note", location: "Instance room", startAt: fullStart.toISOString(), endAt: midnight.toISOString(),
+        type: "fixed", status: "running", blocksPlanning: true,
+        occurrenceId: "overnight:0", occurrenceKey: "0", occurrenceIndex: 0,
+        occurrenceStartAt: fullStart.toISOString(), occurrenceEndAt: fullEnd.toISOString(), seriesGroupId: "overnight"
+      },
+      {
+        id: "overnight:0-day-2", taskId: "overnight", title: "Overnight override",
+        description: "Instance note", location: "Instance room", startAt: midnight.toISOString(), endAt: fullEnd.toISOString(),
+        type: "fixed", status: "running", blocksPlanning: true,
+        occurrenceId: "overnight:0", occurrenceKey: "0", occurrenceIndex: 0,
+        occurrenceStartAt: fullStart.toISOString(), occurrenceEndAt: fullEnd.toISOString(), seriesGroupId: "overnight"
+      }
+    ] as LocalTaskPeriod[]));
+    render(createElement(ScheduleView, {
+      loading: false,
+      snapshot,
+      capabilities: { read: vi.fn(async () => []) },
+      onRefresh: vi.fn(async () => undefined),
+      schedule
+    }));
+
+    const laterDay = (await screen.findAllByRole("button", { name: "Overnight override" }))[1];
+    fireEvent.click(laterDay, { detail: 1 });
+    fireEvent.click(laterDay, { detail: 2 });
+    fireEvent.doubleClick(laterDay, { detail: 2 });
+    const editedStart = (screen.getByLabelText("开始") as HTMLInputElement).value;
+    expect(new Date(`${editedStart}:00+08:00`).toISOString()).toBe(fullStart.toISOString());
+    expect((screen.getByLabelText("标题") as HTMLInputElement).value).toBe("Overnight override");
+    expect((screen.getByLabelText("说明") as HTMLTextAreaElement).value).toBe("Instance note");
+    expect((screen.getByLabelText("地点") as HTMLInputElement).value).toBe("Instance room");
+    expect((screen.getByLabelText("已用分钟") as HTMLInputElement).value).toBe("25");
+    expect((screen.getByLabelText("单项提醒") as HTMLSelectElement).value).toBe("none");
   });
 
   it("deletes a repeating fixed task from the calendar with series scope", async () => {
@@ -236,12 +362,12 @@ describe("ScheduleView", () => {
 
     expect((await screen.findAllByText("Weekly review")).length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole("button", { name: "Weekly review" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    fireEvent.click(await screen.findByRole("button", { name: "删除" }));
     fireEvent.click(screen.getByRole("button", { name: "整个系列" }));
     await waitFor(() => expect(schedule.mutateTask).toHaveBeenCalledWith({ id: "fixed-1", status: "deleted", scope: "series", includeCompleted: false }));
   });
 
-  it("only exposes a repeat interval for Celechron's day-based recurrence", async () => {
+  it("exposes an interval for daily and monthly recurrence", async () => {
     render(createElement(ScheduleView, {
       loading: false,
       snapshot,
@@ -263,7 +389,7 @@ describe("ScheduleView", () => {
     fireEvent.change(screen.getByLabelText("重复"), {
       target: { value: "month" }
     });
-    expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(2);
+    expect(form?.querySelectorAll('input[type="number"]')).toHaveLength(3);
   });
 
   it("keeps a monthly repeating task visible on the calendar with month recurrence", async () => {
@@ -286,7 +412,7 @@ describe("ScheduleView", () => {
 
     await screen.findAllByText("Monthly review");
     fireEvent.click(screen.getAllByRole("button", { name: "Monthly review" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect((screen.getByLabelText("重复") as HTMLSelectElement).value).toBe("month");
   });
 });

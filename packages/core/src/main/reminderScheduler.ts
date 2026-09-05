@@ -6,6 +6,8 @@ import type {
 } from "../shared/reminderBridge";
 import { createDefaultReminderSchedulerState } from "../shared/reminderBridge";
 import { addNotification } from "./notificationCenter";
+import { getTaskCalendarPeriods } from "./scheduleDomain";
+import { loadCalendarEventPersonalizations } from "./deskCalendarStateStore";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const STARTUP_CATCH_UP_MS = 24 * 60 * 60 * 1000;
@@ -115,20 +117,32 @@ export const getReminderSchedulerState = (): ReminderSchedulerState =>
 
 export const buildLocalTaskReminders = (
   tasks: LocalTaskRecord[],
-  globalLeadMinutes: number[]
-): ScheduledReminder[] => tasks.flatMap((task) => {
-  if (task.status === "completed" || task.status === "deleted" || task.status === "outdated" || task.status === "overdue") return [];
-  const eventStartAt = task.type === "deadline" ? task.endAt : task.startAt;
+  globalLeadMinutes: number[],
+  now = new Date()
+): ScheduledReminder[] => {
+  const maxLead = Math.max(0, ...globalLeadMinutes, ...tasks.map((task) => task.reminderLeadMinutes ?? 0));
+  const rangeStart = new Date(now.getTime() - STARTUP_CATCH_UP_MS - maxLead * 60_000);
+  const rangeEnd = new Date(now.getTime() + MAX_TIMEOUT_MS + maxLead * 60_000);
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  return getTaskCalendarPeriods(tasks, rangeStart, rangeEnd).flatMap((period) => {
+  const task = byId.get(period.taskId);
+  if (!task || period.status === "completed" || period.status === "deleted" || period.status === "outdated" || period.status === "overdue") return [];
+  const override = period.occurrenceKey === undefined ? undefined : task.occurrenceOverrides?.[period.occurrenceKey];
+  const eventStartAt = task.type === "deadline" ? (period.occurrenceEndAt ?? period.endAt) : (period.occurrenceStartAt ?? period.startAt);
   const eventStartMs = Date.parse(eventStartAt);
   if (!Number.isFinite(eventStartMs)) return [];
-  const mode = task.reminderMode ?? "global";
+  const mode = override?.reminderMode ?? task.reminderMode ?? "global";
   if (mode === "none") return [];
+  const customReminderAt = override?.reminderAt ?? (task.reminderAt
+    ? new Date(eventStartMs + Date.parse(task.reminderAt) - Date.parse(task.type === "deadline" ? task.endAt : task.startAt)).toISOString()
+    : "");
+  const lead = override?.reminderLeadMinutes ?? task.reminderLeadMinutes;
   const entries = mode === "custom"
-    ? [{ fireAt: task.reminderAt ?? "", leadMinutes: Math.max(0, Math.round((eventStartMs - Date.parse(task.reminderAt ?? "")) / 60_000)) }]
+    ? [{ fireAt: customReminderAt, leadMinutes: Math.max(0, Math.round((eventStartMs - Date.parse(customReminderAt)) / 60_000)) }]
     : mode === "at-time"
       ? [{ fireAt: eventStartAt, leadMinutes: 0 }]
       : mode === "lead"
-        ? [{ fireAt: new Date(eventStartMs - Math.max(0, task.reminderLeadMinutes ?? 0) * 60_000).toISOString(), leadMinutes: Math.max(0, task.reminderLeadMinutes ?? 0) }]
+        ? [{ fireAt: new Date(eventStartMs - Math.max(0, lead ?? 0) * 60_000).toISOString(), leadMinutes: Math.max(0, lead ?? 0) }]
         : globalLeadMinutes.map((leadMinutes) => ({
           fireAt: new Date(eventStartMs - leadMinutes * 60_000).toISOString(),
           leadMinutes
@@ -136,15 +150,16 @@ export const buildLocalTaskReminders = (
   return entries
     .filter((entry) => Number.isFinite(Date.parse(entry.fireAt)))
     .map((entry) => ({
-      id: `local-task:${task.id}:${entry.fireAt}`,
-      title: task.title,
+      id: `local-task:${period.occurrenceId ?? `${task.id}:0`}:${entry.fireAt}`,
+      title: period.title,
       kind: "task" as const,
       fireAt: entry.fireAt,
       eventStartAt,
       leadMinutes: entry.leadMinutes,
-      location: task.location || undefined
+      location: period.location || undefined
     }));
-});
+  });
+};
 
 export const scheduleWorkspaceReminders = (
   snapshot: CampusWorkspaceSnapshot | null,
@@ -167,9 +182,57 @@ export const scheduleWorkspaceReminders = (
     });
   }
 
+  let personalizations: ReturnType<typeof loadCalendarEventPersonalizations> = {};
+  try { personalizations = loadCalendarEventPersonalizations(); } catch { /* Database unavailable in isolated schedulers. */ }
+  const canonicalEventIds = new Set(snapshot?.calendarEvents?.map((event) => event.id) ?? []);
+  const personalizedEvents: Array<{
+    eventId: string;
+    title: string;
+    kind: "course" | "deadline" | "task";
+    eventStartAt: string;
+    location?: string;
+  }> = [
+    ...(snapshot?.calendarEvents ?? []).map((event) => ({
+      eventId: `calendar:${event.id}`,
+      title: event.title,
+      kind: event.kind === "course" ? "course" as const : event.kind === "task" ? "task" as const : "deadline" as const,
+      eventStartAt: event.startAt,
+      location: event.location ?? undefined
+    })),
+    ...(snapshot?.courses ?? []).filter((course) => !canonicalEventIds.has(course.id)).map((course) => ({
+      eventId: `course:${course.id}`,
+      title: course.title,
+      kind: "course" as const,
+      eventStartAt: course.startAt,
+      location: course.location
+    })),
+    ...(snapshot?.deadlines ?? []).filter((deadline) => !canonicalEventIds.has(deadline.id)).map((deadline) => ({
+      eventId: `deadline:${deadline.id}`,
+      title: deadline.title,
+      kind: "deadline" as const,
+      eventStartAt: deadline.dueAt
+    }))
+  ];
+  const personalizedReminders: ScheduledReminder[] = personalizedEvents.flatMap((event) => {
+    const leadMinutes = personalizations[event.eventId]?.reminderLeadMinutes;
+    if (leadMinutes === null || leadMinutes === undefined) return [];
+    const eventStartAt = event.eventStartAt;
+    const startMs = Date.parse(eventStartAt);
+    if (!Number.isFinite(startMs)) return [];
+    return [{
+      id: `personalized:${event.eventId}:${eventStartAt}:${leadMinutes}`,
+      title: event.title,
+      kind: event.kind,
+      fireAt: new Date(startMs - leadMinutes * 60_000).toISOString(),
+      eventStartAt,
+      leadMinutes,
+      location: event.location ?? undefined
+    }];
+  });
   const sortedReminders: ScheduledReminder[] = [
     ...(snapshot?.reminders ?? []),
-    ...buildLocalTaskReminders(localTasks, settings.leadMinutes)
+    ...personalizedReminders,
+    ...buildLocalTaskReminders(localTasks, settings.leadMinutes, now)
   ].sort(
     (left, right) =>
       new Date(left.fireAt).getTime() - new Date(right.fireAt).getTime()

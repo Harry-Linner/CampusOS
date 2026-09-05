@@ -868,6 +868,13 @@ input:focus-visible {
   font-weight: 650;
 }
 
+.schedule-week-badge {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
 .package-signature.is-unsigned {
   border-color: #d8b46a;
   background: #fff7df;
@@ -4309,6 +4316,12 @@ input:focus-visible {
   min-height: 62px;
   resize: vertical;
 }
+.schedule-weekday-picker { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); }
+.schedule-weekday-picker legend { padding: 0 4px; font-size: 0.72rem; color: var(--ink-faint); }
+.schedule-task-form .schedule-weekday-picker label { width: auto; flex-direction: row; align-items: center; gap: 4px; }
+.schedule-task-form .schedule-weekday-picker input { width: 15px; min-height: 15px; }
+.schedule-personalization-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; color: var(--ink-soft); }
+.schedule-personalization-field textarea, .schedule-personalization-field select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); padding: 8px; }
 
 .schedule-form-grid {
   display: grid;
@@ -5382,10 +5395,15 @@ input:focus-visible {
   background: rgba(0,0,0,0.22); cursor: pointer;
 }
 .dk-form-card {
-  width: 340px; background: var(--paper); border: 1px solid var(--line-strong);
+  width: 380px; max-height: 86vh; overflow-y: auto; background: var(--paper); border: 1px solid var(--line-strong);
   border-radius: 10px; box-shadow: var(--shadow-elevated); padding: 16px; cursor: default;
   display: flex; flex-direction: column; gap: 8px;
 }
+.dk-form-hint { margin: 0; font-size: 11px; line-height: 1.5; color: var(--ink-faint); }
+.dk-weekday-picker { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.dk-weekday-picker legend { padding: 0 4px; font-size: 11px; color: var(--ink-faint); }
+.dk-form-card .dk-weekday-picker label { flex-direction: row; align-items: center; }
+.dk-form-card input:disabled, .dk-form-card select:disabled { opacity: 0.62; cursor: not-allowed; }
 .dk-form-card h3 { margin: 0 0 4px; font-size: 15px; color: var(--ink); }
 .dk-form-card label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); }
 .dk-form-card input[type="text"], .dk-form-card input[type="datetime-local"], .dk-form-card input[type="number"], .dk-form-card select, .dk-form-card textarea {
@@ -5394,6 +5412,8 @@ input:focus-visible {
 .dk-form-card .dk-form-row { display: flex; gap: 8px; align-items: flex-end; }
 .dk-form-card .dk-form-row label { flex: 1; }
 .dk-form-row input[type="number"] { width: 54px; }
+.dk-form-options { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.dk-form-card .dk-form-options label { flex-direction: row; align-items: center; gap: 6px; }
 /* 信息卡片按钮（完成/关闭） */
 .dk-info-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
 .dk-info-actions button { margin-top: 0; flex: none; border: 0; background: var(--paper-deep); color: var(--ink); border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer; }

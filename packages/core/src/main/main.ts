@@ -51,8 +51,11 @@ import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { registerAcademicCalendarHandlers } from "./academicCalendarStore";
 import {
   registerDeskCalendarHostHandlers,
-  killDeskCalendar
+  killDeskCalendar,
+  restoreDeskCalendarOnCampusStart
 } from "./deskCalendarHost";
+import { closeOfficialDatabaseService } from "./officialDatabaseService";
+import { resetOfficialCapabilityRepository } from "./officialCapabilityRepository";
 import {
   attachMainWindowLifecycle,
   createCampusTray,
@@ -260,6 +263,7 @@ const startCampusApp = (): void => {
     registerAnalyticsHandlers();
     await createMainWindow();
     await createCampusTray();
+    await restoreDeskCalendarOnCampusStart();
     // The updater is intentionally started after the first window exists so
     // packaged startup status is visible through the normal renderer event.
     void checkForUpdates();
@@ -289,4 +293,6 @@ app.on("before-quit", () => {
   markCampusAppQuitting();
   killDeskCalendar();
   workspaceRefreshScheduler.stop();
+  resetOfficialCapabilityRepository();
+  closeOfficialDatabaseService();
 });

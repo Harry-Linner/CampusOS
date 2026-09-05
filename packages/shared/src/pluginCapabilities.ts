@@ -438,6 +438,22 @@ export type LocalTaskStatus =
   | "outdated";
 export type LocalTaskRepeatType = "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
 export type LocalTaskReminderMode = "global" | "none" | "at-time" | "lead" | "custom";
+export type LocalTaskRepeatEndMode = "never" | "date" | "count";
+export type LocalTaskEditScope = "single" | "future" | "series";
+
+export interface LocalTaskOccurrenceOverride {
+  status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
+  timeSpentMinutes?: number;
+  title?: string;
+  description?: string;
+  startAt?: string;
+  endAt?: string;
+  location?: string;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
+  deletedAt?: string | null;
+}
 
 export interface LocalTaskRecord {
   id: string;
@@ -455,6 +471,10 @@ export interface LocalTaskRecord {
   repeatPeriod: number;
   repeatEndsOn: string;
   repeatWeekdays?: number[];
+  repeatEndMode?: LocalTaskRepeatEndMode;
+  repeatCount?: number | null;
+  seriesGroupId?: string;
+  occurrenceOverrides?: Record<string, LocalTaskOccurrenceOverride>;
   blocksPlanning: boolean;
   reminderMode?: LocalTaskReminderMode;
   reminderLeadMinutes?: number | null;
@@ -488,6 +508,11 @@ export interface LocalTaskInput {
   repeatPeriod: number;
   repeatEndsOn: string;
   repeatWeekdays?: number[];
+  repeatEndMode?: LocalTaskRepeatEndMode;
+  repeatCount?: number | null;
+  editScope?: LocalTaskEditScope;
+  occurrenceKey?: string;
+  seriesGroupId?: string;
   blocksPlanning: boolean;
   reminderMode?: LocalTaskReminderMode;
   reminderLeadMinutes?: number | null;
@@ -501,6 +526,7 @@ export interface LocalTaskMutation {
   status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
   action?: "restore" | "purge";
   scope?: "single" | "future" | "series";
+  occurrenceKey?: string;
   includeCompleted?: boolean;
   timeSpentMinutes?: number;
 }
@@ -525,6 +551,24 @@ export interface LocalTaskPeriod {
   type: LocalTaskType;
   status: LocalTaskStatus;
   blocksPlanning: boolean;
+  occurrenceId?: string;
+  occurrenceKey?: string;
+  occurrenceIndex?: number;
+  occurrenceStartAt?: string;
+  occurrenceEndAt?: string;
+  seriesGroupId?: string;
+}
+
+export interface CalendarEventPersonalization {
+  note: string;
+  reminderLeadMinutes: number | null;
+  updatedAt: string;
+}
+
+export interface UnifiedCalendarData {
+  holidays: { date: string; label: string; holiday: boolean }[];
+  weeks: Record<string, number>;
+  currentWeek: number | null;
 }
 
 export interface CalendarExportInput {

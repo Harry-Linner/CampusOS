@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  CalendarEventPersonalization,
   LocalTaskInput,
   LocalTaskPeriod,
   LocalTaskRecord,
@@ -29,6 +30,8 @@ type ScheduleEvent = {
   note?: string;
   taskId?: string;
   status?: LocalTaskRecord["status"];
+  origin?: "local" | "upstream";
+  occurrenceKey?: string;
 };
 
 interface TaskFormState {
@@ -46,6 +49,10 @@ interface TaskFormState {
   repeatPeriod: number;
   repeatEndsOn: string;
   repeatWeekdays?: number[];
+  repeatEndMode: "never" | "date" | "count";
+  repeatCount: number;
+  occurrenceKey?: string;
+  editScope: "single" | "future" | "series";
   blocksPlanning: boolean;
   reminderMode: "global" | "none" | "at-time" | "lead" | "custom";
   reminderLeadMinutes: number;
@@ -196,6 +203,10 @@ const defaultTaskForm = (date = new Date()): TaskFormState => {
     repeatType: "norepeat",
     repeatPeriod: 1,
     repeatEndsOn: toDateInput(end),
+    repeatEndMode: "never",
+    repeatCount: 10,
+    repeatWeekdays: [getShanghaiWeekday(start)],
+    editScope: "series",
     blocksPlanning: true,
     reminderMode: "global",
     reminderLeadMinutes: 15,
@@ -203,40 +214,64 @@ const defaultTaskForm = (date = new Date()): TaskFormState => {
   };
 };
 
-const taskToForm = (task: LocalTaskRecord): TaskFormState => ({
-  id: task.id,
-  title: task.title,
-  description: task.description,
-  timeSpentMinutes: task.timeSpentMinutes,
-  timeNeededMinutes: task.timeNeededMinutes,
-  startAt: toDateTimeInput(new Date(task.startAt)),
-  endAt: toDateTimeInput(new Date(task.endAt)),
-  location: task.location,
-  breakable: task.breakable,
-  type: task.type === "fixedlegacy" ? "fixed" : task.type,
-  repeatType: task.repeatType,
-  repeatPeriod: task.repeatPeriod,
-  repeatEndsOn: task.repeatEndsOn,
-  blocksPlanning: task.blocksPlanning,
-  reminderMode: task.reminderMode ?? "global",
-  reminderLeadMinutes: task.reminderLeadMinutes ?? 15,
-  reminderAt: task.reminderAt ? toDateTimeInput(new Date(task.reminderAt)) : toDateTimeInput(new Date(task.endAt))
-});
+const taskToForm = (task: LocalTaskRecord, event?: ScheduleEvent): TaskFormState => {
+  const override = event?.occurrenceKey ? task.occurrenceOverrides?.[event.occurrenceKey] : undefined;
+  const reminderAt = override && Object.prototype.hasOwnProperty.call(override, "reminderAt")
+    ? override.reminderAt
+    : task.reminderAt;
+  return {
+    id: task.id,
+    title: event?.title ?? override?.title ?? task.title,
+    description: override?.description ?? task.description,
+    timeSpentMinutes: override?.timeSpentMinutes ?? task.timeSpentMinutes,
+    timeNeededMinutes: task.timeNeededMinutes,
+    startAt: toDateTimeInput(new Date(event?.startAt ?? override?.startAt ?? task.startAt)),
+    endAt: toDateTimeInput(new Date(event?.endAt ?? override?.endAt ?? task.endAt)),
+    location: event?.location ?? override?.location ?? task.location,
+    breakable: task.breakable,
+    type: task.type === "fixedlegacy" ? "fixed" : task.type,
+    repeatType: task.repeatType,
+    repeatPeriod: task.repeatPeriod,
+    repeatEndsOn: task.repeatEndsOn,
+    repeatEndMode: task.repeatEndMode ?? "date",
+    repeatCount: task.repeatCount ?? 10,
+    occurrenceKey: event?.occurrenceKey,
+    editScope: event?.occurrenceKey && task.repeatType !== "norepeat" ? "single" : "series",
+    blocksPlanning: task.blocksPlanning,
+    reminderMode: override?.reminderMode ?? task.reminderMode ?? "global",
+    reminderLeadMinutes: override?.reminderLeadMinutes ?? task.reminderLeadMinutes ?? 15,
+    reminderAt: reminderAt ? toDateTimeInput(new Date(reminderAt)) : ""
+  };
+};
+
+const taskEventsFromPeriods = (periods: LocalTaskPeriod[]): ScheduleEvent[] => {
+  const occurrences = new Map<string, ScheduleEvent>();
+  for (const period of periods) {
+    const occurrenceId = period.occurrenceId ?? period.id;
+    if (occurrences.has(occurrenceId)) continue;
+    occurrences.set(occurrenceId, {
+      id: `task:${occurrenceId}`,
+      taskId: period.taskId,
+      kind: "task",
+      title: period.title,
+      startAt: period.occurrenceStartAt ?? period.startAt,
+      endAt: period.occurrenceEndAt ?? period.endAt,
+      location: period.location,
+      status: period.status,
+      origin: "local",
+      occurrenceKey: period.occurrenceKey
+    });
+  }
+  return [...occurrences.values()];
+};
 
 const buildEvents = (
   snapshot: PluginComponentProps["snapshot"],
-  periods: LocalTaskPeriod[]
+  periods: LocalTaskPeriod[],
+  personalizations: Record<string, CalendarEventPersonalization>
 ): ScheduleEvent[] => {
-  if (!snapshot) return periods.map((period) => ({
-    id: `task:${period.id}`,
-    taskId: period.taskId,
-    kind: "task",
-    title: period.title,
-    startAt: period.startAt,
-    endAt: period.endAt,
-    location: period.location,
-    status: period.status
-  }));
+  const localEvents = taskEventsFromPeriods(periods);
+  if (!snapshot) return localEvents;
   const canonicalEventIds = new Set(
     snapshot.calendarEvents?.map((event) => event.id) ?? []
   );
@@ -248,7 +283,8 @@ const buildEvents = (
       startAt: event.startAt,
       endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
       location: event.location ?? undefined,
-      note: event.note ?? undefined
+      note: personalizations[`calendar:${event.id}`]?.note || event.note || undefined,
+      origin: "upstream" as const
     })),
     ...snapshot.courses
       .filter((course) => !canonicalEventIds.has(course.id))
@@ -259,7 +295,8 @@ const buildEvents = (
         startAt: course.startAt,
         endAt: course.endAt,
         location: course.location,
-        note: course.note
+        note: personalizations[`course:${course.id}`]?.note || course.note,
+        origin: "upstream" as const
       })),
     ...snapshot.deadlines
       .filter((deadline) => !canonicalEventIds.has(deadline.id))
@@ -269,21 +306,13 @@ const buildEvents = (
         title: deadline.title,
         startAt: new Date(new Date(deadline.dueAt).getTime() - 60 * 60 * 1000).toISOString(),
         endAt: deadline.dueAt,
-        note: deadline.note
+        note: personalizations[`deadline:${deadline.id}`]?.note || deadline.note,
+        origin: "upstream" as const
       }))
   ];
   return [
     ...projectedCalendarEvents,
-    ...periods.map((period) => ({
-      id: `task:${period.id}`,
-      taskId: period.taskId,
-      kind: "task" as const,
-      title: period.title,
-      startAt: period.startAt,
-      endAt: period.endAt,
-      location: period.location,
-      status: period.status
-    }))
+    ...localEvents
   ].sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
 };
 
@@ -364,12 +393,16 @@ export const ScheduleView = ({
   const [tasks, setTasks] = useState<LocalTaskRecord[]>([]);
   const [taskUpdatedAt, setTaskUpdatedAt] = useState<string | null>(null);
   const [periods, setPeriods] = useState<LocalTaskPeriod[]>([]);
+  const [personalizations, setPersonalizations] = useState<Record<string, CalendarEventPersonalization>>({});
+  const [calendarWeeks, setCalendarWeeks] = useState<Record<string, number>>({});
   const [form, setForm] = useState<TaskFormState | null>(null);
+  const [personalizationForm, setPersonalizationForm] = useState<{ event: ScheduleEvent; note: string; reminderLeadMinutes: number | null } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
+  const [pendingDeleteOccurrenceKey, setPendingDeleteOccurrenceKey] = useState<string | undefined>();
   const [deleteCompletedHistory, setDeleteCompletedHistory] = useState(false);
   const [moreDay, setMoreDay] = useState<string | null>(null);
   const [miniOpen, setMiniOpen] = useState(false);
@@ -506,8 +539,10 @@ export const ScheduleView = ({
   useEffect(() => {
     void loadTasks();
     if (!schedule) return undefined;
+    void schedule.loadPersonalizations?.().then(setPersonalizations).catch(() => undefined);
     return schedule.subscribe(() => {
       void loadTasks();
+      void schedule.loadPersonalizations?.().then(setPersonalizations).catch(() => undefined);
     });
   }, [loadTasks, schedule]);
 
@@ -521,6 +556,21 @@ export const ScheduleView = ({
       end: new Date(Math.max(range.end.getTime(), nextEnd.getTime()))
     };
   }, [range]);
+
+  useEffect(() => {
+    if (!schedule?.loadCalendarData) return undefined;
+    let active = true;
+    void schedule.loadCalendarData({
+      today: dayKey(new Date()),
+      startAt: dayKey(range.start),
+      endAt: dayKey(range.end)
+    }).then((result) => {
+      if (active) setCalendarWeeks(result.weeks);
+    }).catch(() => {
+      if (active) setCalendarWeeks({});
+    });
+    return () => { active = false; };
+  }, [range, schedule]);
 
   useEffect(() => {
     if (!schedule) return undefined;
@@ -538,8 +588,8 @@ export const ScheduleView = ({
   }, [periodsRange.end, periodsRange.start, schedule, taskUpdatedAt]);
 
   const events = useMemo(
-    () => buildEvents(snapshot, periods).filter((event) => !hiddenKinds.has(event.kind)),
-    [hiddenKinds, periods, snapshot]
+    () => buildEvents(snapshot, periods, personalizations).filter((event) => !hiddenKinds.has(event.kind)),
+    [hiddenKinds, periods, personalizations, snapshot]
   );
   const eventsByDay = useMemo(() => groupEventsByDay(events, range), [events, range]);
   const monthDays = useMemo(() => buildMonthDays(selectedDate), [selectedDate]);
@@ -575,6 +625,57 @@ export const ScheduleView = ({
 
   const selectEvent = (event: ScheduleEvent): void => {
     setSelectedEvent(event);
+  };
+
+  const eventClickTimer = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (eventClickTimer.current !== null) window.clearTimeout(eventClickTimer.current);
+  }, []);
+
+  const queueEventDetails = (event: ScheduleEvent, before?: () => void): void => {
+    if (eventClickTimer.current !== null) window.clearTimeout(eventClickTimer.current);
+    eventClickTimer.current = window.setTimeout(() => {
+      before?.();
+      selectEvent(event);
+      eventClickTimer.current = null;
+    }, 220);
+  };
+
+  const openEventEditor = (event: ScheduleEvent, before?: () => void): void => {
+    if (eventClickTimer.current !== null) {
+      window.clearTimeout(eventClickTimer.current);
+      eventClickTimer.current = null;
+    }
+    before?.();
+    editEvent(event);
+  };
+
+  const editEvent = (event: ScheduleEvent): void => {
+    if (event.origin === "local" && event.taskId) {
+      const task = tasks.find((candidate) => candidate.id === event.taskId);
+      if (task && task.type !== "fixedlegacy") setForm(taskToForm(task, event));
+      return;
+    }
+    const saved = personalizations[event.id];
+    setPersonalizationForm({ event, note: saved?.note ?? event.note ?? "", reminderLeadMinutes: saved?.reminderLeadMinutes ?? null });
+  };
+
+  const savePersonalization = async (): Promise<void> => {
+    if (!schedule?.savePersonalization || !personalizationForm) return;
+    setBusy(true);
+    try {
+      const saved = await schedule.savePersonalization(personalizationForm.event.id, {
+        note: personalizationForm.note,
+        reminderLeadMinutes: personalizationForm.reminderLeadMinutes
+      });
+      setPersonalizations((current) => ({ ...current, [personalizationForm.event.id]: saved }));
+      setPersonalizationForm(null);
+      setNotice("个性化内容已保存");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "个性化内容保存失败。");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const isTaskEditable = (event: ScheduleEvent): boolean =>
@@ -650,6 +751,10 @@ export const ScheduleView = ({
         repeatPeriod: original.repeatPeriod,
         repeatEndsOn: original.repeatEndsOn,
         repeatWeekdays: original.repeatWeekdays ?? [],
+        repeatEndMode: original.repeatEndMode,
+        repeatCount: original.repeatCount,
+        editScope: state.event.occurrenceKey ? "single" : "series",
+        occurrenceKey: state.event.occurrenceKey,
         blocksPlanning: original.blocksPlanning,
         reminderMode: original.reminderMode,
         reminderLeadMinutes: original.reminderLeadMinutes,
@@ -710,6 +815,10 @@ export const ScheduleView = ({
         repeatPeriod: form.repeatPeriod,
         repeatEndsOn: form.repeatEndsOn,
         repeatWeekdays: form.repeatWeekdays ?? [],
+        repeatEndMode: form.repeatEndMode,
+        repeatCount: form.repeatEndMode === "count" ? form.repeatCount : null,
+        editScope: form.editScope,
+        occurrenceKey: form.occurrenceKey,
         blocksPlanning: form.blocksPlanning,
         reminderMode: form.reminderMode,
         reminderLeadMinutes: form.reminderMode === "lead" ? form.reminderLeadMinutes : null,
@@ -730,13 +839,13 @@ export const ScheduleView = ({
   const mutate = async (
     task: LocalTaskRecord,
     status: "running" | "suspended" | "completed" | "deleted",
-    options: { scope?: "single" | "future" | "series"; includeCompleted?: boolean } = {}
+    options: { scope?: "single" | "future" | "series"; includeCompleted?: boolean; occurrenceKey?: string } = {}
   ): Promise<void> => {
     if (!schedule) return;
     setBusy(true);
     setError(null);
     try {
-      const data = await schedule.mutateTask({ id: task.id, status, ...(options.scope ? { scope: options.scope } : {}), ...(options.includeCompleted !== undefined ? { includeCompleted: options.includeCompleted } : {}) });
+      const data = await schedule.mutateTask({ id: task.id, status, ...(options.scope ? { scope: options.scope } : {}), ...(options.includeCompleted !== undefined ? { includeCompleted: options.includeCompleted } : {}), ...(options.occurrenceKey !== undefined ? { occurrenceKey: options.occurrenceKey } : {}) });
       setTasks(data.tasks);
       setTaskUpdatedAt(data.updatedAt);
       if (form?.id === task.id) setForm(null);
@@ -748,21 +857,23 @@ export const ScheduleView = ({
     }
   };
 
-  const deleteTask = async (task: LocalTaskRecord): Promise<void> => {
+  const deleteTask = async (task: LocalTaskRecord, occurrenceKey?: string): Promise<void> => {
     if ((task.type === "fixed" && task.repeatType !== "norepeat") || task.status === "completed") {
       setSelectedEvent(null);
       setPendingDelete(task);
+      setPendingDeleteOccurrenceKey(occurrenceKey);
       setDeleteCompletedHistory(false);
       return;
     }
-    await mutate(task, "deleted");
+    await mutate(task, "deleted", { occurrenceKey });
   };
 
   const confirmTaskDelete = async (scope: "single" | "future" | "series"): Promise<void> => {
     if (!pendingDelete) return;
     const task = pendingDelete;
     setPendingDelete(null);
-    await mutate(task, "deleted", { scope, includeCompleted: deleteCompletedHistory });
+    await mutate(task, "deleted", { scope, includeCompleted: deleteCompletedHistory, occurrenceKey: pendingDeleteOccurrenceKey });
+    setPendingDeleteOccurrenceKey(undefined);
   };
 
   const exportIcal = async (): Promise<void> => {
@@ -859,6 +970,7 @@ export const ScheduleView = ({
     : viewMode === "week"
       ? formatWeek(selectedDate)
       : formatMonth(selectedDate);
+  const selectedWeek = calendarWeeks[dayKey(selectedDate)];
 
   return (
     <section className="page-shell schedule-page" ref={schedulePageRef}>
@@ -924,6 +1036,7 @@ export const ScheduleView = ({
             <div className="calendar-controls" aria-label="日历导航">
               <button className="icon-button" type="button" aria-label="上一个周期" onClick={() => movePeriod(-1)}><AppIcon name="chevron-left" size={18} /></button>
               <strong>{periodLabel}</strong>
+              {selectedWeek ? <span className="schedule-week-badge">第 {selectedWeek} 周</span> : null}
               <button className="icon-button" type="button" aria-label="下一个周期" onClick={() => movePeriod(1)}><AppIcon name="chevron-right" size={18} /></button>
               <Button variant="ghost" type="button" onClick={() => setSelectedDate(new Date())}>今天</Button>
               <div className="schedule-mini-wrap">
@@ -1086,8 +1199,8 @@ export const ScheduleView = ({
                     {makeupDays.find((makeup) => makeup.date === dayKeyValue) ? <span className="schedule-makeup-label">补{weekdayLabels[(makeupDays.find((makeup) => makeup.date === dayKeyValue)!.weekday + 6) % 7]}</span> : null}
                     <div className="schedule-event-list">
                       {eventStyle === "bar"
-                        ? items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}>{event.title}</button>)
-                        : items.slice(0, 8).map((event) => <span className={`schedule-dot schedule-dot-${event.kind}`} key={event.id} role="img" aria-label={event.title} title={event.title} onClick={(click) => { click.stopPropagation(); selectEvent(event); }} />)}
+                        ? items.slice(0, 5).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); queueEventDetails(event); }} onDoubleClick={(click) => { click.stopPropagation(); openEventEditor(event); }}>{event.title}</button>)
+                        : items.slice(0, 8).map((event) => <span className={`schedule-dot schedule-dot-${event.kind}`} key={event.id} role="img" aria-label={event.title} title={event.title} onClick={(click) => { click.stopPropagation(); queueEventDetails(event); }} onDoubleClick={(click) => { click.stopPropagation(); openEventEditor(event); }} />)}
                       {items.length > (eventStyle === "bar" ? 5 : 8) ? <button className="schedule-more-button" type="button" onClick={(click) => { click.stopPropagation(); setMoreDay(dayKeyValue); }}>+{items.length - (eventStyle === "bar" ? 5 : 8)} 项</button> : null}
                     </div>
                   </section>
@@ -1109,7 +1222,7 @@ export const ScheduleView = ({
                   setForm({ ...defaultTaskForm(day), startAt: toDateTimeInput(start), endAt: toDateTimeInput(end) });
                 }}>
                   <header><span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span><strong>{getShanghaiDayNumber(day)}</strong></header>
-                  <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); selectEvent(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
+                  <div className="schedule-event-list">{(eventsByDay.get(dayKey(day)) ?? []).map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={(click) => { click.stopPropagation(); queueEventDetails(event); }} onDoubleClick={(click) => { click.stopPropagation(); openEventEditor(event); }}><strong>{event.title}</strong><small>{formatEventMeta(event)}</small></button>)}</div>
                 </section>
               ))}
             </div>
@@ -1120,7 +1233,7 @@ export const ScheduleView = ({
               {Array.from(eventsByDay.entries()).filter(([key]) => monthKey(key) === monthKey(selectedDate)).map(([key, items]) => (
                 <section className="schedule-agenda-day" key={key}>
                   <header><strong>{Number(key.slice(8, 10))}</strong><span>{weekdayLabels[(getShanghaiWeekday(dateFromDayKey(key)) + 6) % 7]}</span></header>
-                  <div className="schedule-event-list">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => selectEvent(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}{event.location ? ` · ${event.location}` : ""}</small></button>)}</div>
+                  <div className="schedule-event-list">{items.map((event) => <button className={eventClassName(event)} type="button" key={event.id} onClick={() => queueEventDetails(event)} onDoubleClick={() => openEventEditor(event)}><strong>{event.title}</strong><small>{formatEventMeta(event)}{event.location ? ` · ${event.location}` : ""}</small></button>)}</div>
                 </section>
               ))}
               {eventsByDay.size === 0 ? <div className="quiet-empty-state">本月没有安排</div> : null}
@@ -1181,7 +1294,8 @@ export const ScheduleView = ({
                       type="button"
                       key={event.id}
                       aria-label={isContinuation ? `${event.title}（延续）` : event.title}
-                      onClick={(click) => { click.stopPropagation(); selectEvent(event); }}
+                      onClick={(click) => { click.stopPropagation(); queueEventDetails(event); }}
+                      onDoubleClick={(click) => { click.stopPropagation(); openEventEditor(event); }}
                       onPointerDown={editable ? beginDayDrag(event, "move") : undefined}
                       onPointerMove={editable ? moveDayDrag : undefined}
                       onPointerUp={editable ? () => void endDayDrag() : undefined}
@@ -1206,11 +1320,11 @@ export const ScheduleView = ({
               {selectedEvent.location || selectedEvent.note ? <p className="text-sm leading-6">{selectedEvent.location || selectedEvent.note}</p> : null}
               {selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? (
                 <div className="settings-actions">
-                  <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask))}>编辑</Button>
-                  {selectedTask.type === "deadline" && selectedTask.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed")}>完成</Button> : null}
-                  <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask)}>删除</Button>
+                  <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask, selectedEvent))}>编辑</Button>
+                  {selectedEvent.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed", { occurrenceKey: selectedEvent.occurrenceKey })}>完成</Button> : null}
+                  <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask, selectedEvent.occurrenceKey)}>删除</Button>
                 </div>
-              ) : <p className="text-xs leading-5 text-muted-foreground">课程、考试和上游作业为只读；需要修改自建任务时请在 CampusOS 主窗口操作。</p>}
+              ) : <div className="settings-actions"><Button variant="outline" type="button" onClick={() => editEvent(selectedEvent)}>编辑个人备注与提醒</Button></div>}
             </div>
           </DialogContent>
         </Dialog>
@@ -1224,12 +1338,24 @@ export const ScheduleView = ({
             </DialogHeader>
             <div className="schedule-more-day-list">
               {(eventsByDay.get(moreDay) ?? []).map((event) => (
-                <button className={eventClassName(event)} type="button" key={event.id} onClick={() => { setMoreDay(null); selectEvent(event); }}>
+                <button className={eventClassName(event)} type="button" key={event.id} onClick={() => queueEventDetails(event, () => setMoreDay(null))} onDoubleClick={() => openEventEditor(event, () => setMoreDay(null))}>
                   <strong>{event.title}</strong>
                   <small>{formatEventMeta(event)}{event.location ? ` · ${event.location}` : ""}</small>
                 </button>
               ))}
             </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {personalizationForm ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setPersonalizationForm(null); }}>
+          <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
+            <DialogHeader><DialogTitle>个性化“{personalizationForm.event.title}”</DialogTitle></DialogHeader>
+            <p className="text-xs leading-5 text-muted-foreground">名称、时间和地点由学校数据源维护，不会被本地修改。</p>
+            <label className="schedule-personalization-field">个人备注<textarea value={personalizationForm.note} onChange={(event) => setPersonalizationForm({ ...personalizationForm, note: event.target.value })} /></label>
+            <label className="schedule-personalization-field">提醒<select value={personalizationForm.reminderLeadMinutes ?? "none"} onChange={(event) => setPersonalizationForm({ ...personalizationForm, reminderLeadMinutes: event.target.value === "none" ? null : Number(event.target.value) })}><option value="none">不额外提醒</option><option value="0">准时</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label>
+            <div className="settings-actions"><Button type="button" disabled={busy} onClick={() => void savePersonalization()}>保存</Button></div>
           </DialogContent>
         </Dialog>
       ) : null}
@@ -1250,9 +1376,13 @@ export const ScheduleView = ({
               <label>单项提醒<select value={form.reminderMode === "lead" ? `lead:${form.reminderLeadMinutes}` : form.reminderMode} onChange={(event) => { const value = event.target.value; if (value.startsWith("lead:")) setForm({ ...form, reminderMode: "lead", reminderLeadMinutes: Number(value.slice(5)) }); else setForm({ ...form, reminderMode: value as TaskFormState["reminderMode"] }); }}><option value="global">使用全局提前量</option><option value="none">不提醒</option><option value="at-time">开始/截止时</option><option value="lead:5">提前 5 分钟</option><option value="lead:15">提前 15 分钟</option><option value="lead:30">提前 30 分钟</option><option value="lead:60">提前 1 小时</option><option value="lead:1440">提前 1 天</option><option value="custom">自定义时间</option></select></label>
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" required value={form.reminderAt} onChange={(event) => setForm({ ...form, reminderAt: event.target.value })} /></label> : null}
               {form.type === "fixed" ? <>
-                <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每隔几天</option><option value="weeks">每隔几周</option><option value="weekdays">每周工作日</option><option value="month">每月</option><option value="year">每年</option></select></label>
-                {form.repeatType === "days" || form.repeatType === "weeks" ? <label>周期<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Number(event.target.value) })} /></label> : null}
-                {form.repeatType !== "norepeat" ? <label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label> : null}
+                <label>重复<select value={form.repeatType} onChange={(event) => setForm({ ...form, repeatType: event.target.value as TaskFormState["repeatType"] })}><option value="norepeat">不重复</option><option value="days">每 N 天</option><option value="weeks">每 N 周</option><option value="month">每月</option><option value="year">每年</option></select></label>
+                {form.repeatType !== "norepeat" ? <label>间隔<input type="number" min="1" value={form.repeatPeriod} onChange={(event) => setForm({ ...form, repeatPeriod: Math.max(1, Number(event.target.value)) })} /></label> : null}
+                {form.repeatType === "weeks" ? <fieldset className="schedule-weekday-picker"><legend>重复星期</legend>{[1, 2, 3, 4, 5, 6, 0].map((weekday, index) => <label key={weekday}><input type="checkbox" checked={(form.repeatWeekdays ?? []).includes(weekday)} onChange={(event) => setForm({ ...form, repeatWeekdays: event.target.checked ? [...new Set([...(form.repeatWeekdays ?? []), weekday])] : (form.repeatWeekdays ?? []).filter((candidate) => candidate !== weekday) })} />{weekdayLabels[index]}</label>)}</fieldset> : null}
+                {form.repeatType !== "norepeat" ? <label>结束<select value={form.repeatEndMode} onChange={(event) => setForm({ ...form, repeatEndMode: event.target.value as TaskFormState["repeatEndMode"] })}><option value="never">永不</option><option value="date">指定日期</option><option value="count">指定次数</option></select></label> : null}
+                {form.repeatType !== "norepeat" && form.repeatEndMode === "date" ? <label>重复结束<input type="date" required value={form.repeatEndsOn} onChange={(event) => setForm({ ...form, repeatEndsOn: event.target.value })} /></label> : null}
+                {form.repeatType !== "norepeat" && form.repeatEndMode === "count" ? <label>重复次数<input type="number" min="1" value={form.repeatCount} onChange={(event) => setForm({ ...form, repeatCount: Math.max(1, Number(event.target.value)) })} /></label> : null}
+                {form.id && form.repeatType !== "norepeat" ? <label>编辑范围<select value={form.editScope} onChange={(event) => setForm({ ...form, editScope: event.target.value as TaskFormState["editScope"] })}><option value="single">仅本次</option><option value="future">本次及未来</option><option value="series">整个系列</option></select></label> : null}
               </> : null}
               <div className="settings-actions"><Button type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</Button></div>
             </form>

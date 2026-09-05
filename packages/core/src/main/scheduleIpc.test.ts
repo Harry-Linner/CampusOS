@@ -183,6 +183,9 @@ describe("schedule IPC", () => {
       "campusos:schedule:periods:load",
       "campusos:schedule:task:save",
       "campusos:schedule:task:mutate",
+      "campusos:schedule:personalizations:load",
+      "campusos:schedule:personalization:save",
+      "campusos:schedule:calendar-data:load",
       "campusos:schedule:ical:export"
     ]);
 
@@ -246,5 +249,93 @@ describe("schedule IPC", () => {
 
     const removed = await invoke<LocalTasksData>("campusos:schedule:task:mutate", { id: restored.tasks[0].id, action: "purge" });
     expect(removed.tasks).toEqual([]);
+  });
+
+  it("persists one-occurrence and future-segment edits for a recurring event", async () => {
+    const start = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const recurring: LocalTaskInput = {
+      title: "Daily review",
+      description: "",
+      timeSpentMinutes: 0,
+      timeNeededMinutes: 60,
+      startAt: start.toISOString(),
+      endAt: end.toISOString(),
+      location: "Library",
+      breakable: true,
+      type: "fixed",
+      repeatType: "days",
+      repeatPeriod: 1,
+      repeatEndsOn: start.toISOString().slice(0, 10),
+      repeatEndMode: "never",
+      repeatCount: null,
+      repeatWeekdays: [],
+      blocksPlanning: false,
+      reminderMode: "custom",
+      reminderAt: new Date(start.getTime() - 60 * 60 * 1000).toISOString()
+    };
+    const created = await invoke<LocalTasksData>("campusos:schedule:task:save", recurring);
+    const taskId = created.tasks[0].id;
+
+    const secondStart = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    const secondEnd = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+    const single = await invoke<LocalTasksData>("campusos:schedule:task:save", {
+      ...recurring,
+      id: taskId,
+      occurrenceKey: "1",
+      editScope: "single",
+      title: "Private second review",
+      timeSpentMinutes: 20,
+      reminderMode: "none",
+      reminderAt: null,
+      startAt: secondStart.toISOString(),
+      endAt: secondEnd.toISOString()
+    });
+    expect(single.tasks[0].occurrenceOverrides?.["1"]).toMatchObject({
+      title: "Private second review",
+      timeSpentMinutes: 20,
+      reminderMode: "none",
+      reminderAt: null
+    });
+
+    // Move the edited occurrence forward: the old segment must still end before
+    // occurrence #2's original slot, not before its newly edited date.
+    const thirdStart = new Date(start.getTime() + 10 * 24 * 60 * 60 * 1000);
+    const thirdEnd = new Date(end.getTime() + 10 * 24 * 60 * 60 * 1000);
+    const future = await invoke<LocalTasksData>("campusos:schedule:task:save", {
+      ...recurring,
+      id: taskId,
+      occurrenceKey: "2",
+      editScope: "future",
+      title: "Review from now on",
+      startAt: thirdStart.toISOString(),
+      endAt: thirdEnd.toISOString()
+    });
+    expect(future.tasks).toHaveLength(2);
+    expect(new Set(future.tasks.map((item) => item.seriesGroupId))).toEqual(new Set([taskId]));
+    const originalCutoffParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(new Date(start.getTime() + 24 * 60 * 60 * 1000));
+    const originalCutoff = Object.fromEntries(originalCutoffParts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    expect(future.tasks.find((item) => item.id === taskId)).toMatchObject({
+      repeatEndMode: "date",
+      repeatEndsOn: `${originalCutoff.year}-${originalCutoff.month}-${originalCutoff.day}`
+    });
+    expect(future.tasks.find((item) => item.id !== taskId)).toMatchObject({
+      title: "Review from now on",
+      repeatEndMode: "never",
+      startAt: thirdStart.toISOString()
+    });
+  });
+
+  it("stores upstream event notes and reminder overrides in SQLite", async () => {
+    await invoke("campusos:schedule:personalization:save", "course:event-1", {
+      note: "Bring printed notes",
+      reminderLeadMinutes: 45
+    });
+    const loaded = await invoke<Record<string, { note: string; reminderLeadMinutes: number | null }>>(
+      "campusos:schedule:personalizations:load"
+    );
+    expect(loaded["course:event-1"]).toMatchObject({ note: "Bring printed notes", reminderLeadMinutes: 45 });
   });
 });

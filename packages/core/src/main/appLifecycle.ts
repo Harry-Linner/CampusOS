@@ -22,7 +22,8 @@ import {
   launchDeskCalendar,
   closeDeskCalendar,
   isDeskCalendarRunning,
-  openDeskCalendarSettings
+  openDeskCalendarSettings,
+  enforceDeskCalendarAutoStartDependency
 } from "./deskCalendarHost";
 
 const SETTINGS_FILE = "app-lifecycle.json";
@@ -86,6 +87,7 @@ const persistSettings = async (patch: AppLifecycleSettingsPatch): Promise<AppLif
       openAtLogin: next.launchAtLogin,
       args: next.launchAtLogin ? ["--hidden"] : []
     });
+    if (!next.launchAtLogin) enforceDeskCalendarAutoStartDependency(false);
   }
   return { ...next };
 };

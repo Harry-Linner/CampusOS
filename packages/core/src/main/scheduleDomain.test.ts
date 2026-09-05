@@ -2,6 +2,7 @@ import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared"
 import { describe, expect, it } from "vitest";
 import type { CalendarEventRecord } from "@campusos/shared";
 import {
+  applyTaskMutation,
   createIcalContent,
   createTaskRecord,
   getTaskCalendarPeriods,
@@ -74,7 +75,7 @@ const calendarEvent = (
 });
 
 describe("schedule domain", () => {
-  it("matches Celechron status refresh and rolls fixed instances into history", () => {
+  it("keeps the recurring series anchor stable while refreshing derived statuses", () => {
     let id = 0;
     const refreshed = refreshLocalTasks(
       [
@@ -102,13 +103,13 @@ describe("schedule domain", () => {
 
     expect(refreshed.tasks.find((item) => item.id === "done")?.status).toBe("completed");
     expect(refreshed.tasks.find((item) => item.id === "overdue")?.status).toBe("overdue");
-    expect(refreshed.tasks.filter((item) => item.type === "fixedlegacy")).toHaveLength(3);
+    expect(refreshed.tasks.filter((item) => item.type === "fixedlegacy")).toHaveLength(0);
     expect(refreshed.tasks.find((item) => item.id === "weekly")?.startAt).toBe(
-      "2026-08-04T01:00:00.000Z"
+      "2026-08-01T01:00:00.000Z"
     );
   });
 
-  it("skips invalid monthly dates exactly as Celechron does", () => {
+  it("clamps monthly dates to month end and restores the anchor day later", () => {
     const record = createTaskRecord(
       {
         title: "Monthly",
@@ -134,8 +135,46 @@ describe("schedule domain", () => {
     );
     expect(periods.map((item) => item.startAt.slice(0, 10))).toEqual([
       "2026-01-31",
-      "2026-03-31"
+      "2026-02-28",
+      "2026-03-31",
+      "2026-04-30"
     ]);
+  });
+
+  it("supports every-N-weeks weekdays, count limits, and independent occurrence state", () => {
+    const record = createTaskRecord({
+      title: "Seminar", description: "", timeSpentMinutes: 0, timeNeededMinutes: 60,
+      startAt: "2026-09-07T09:00:00+08:00", endAt: "2026-09-07T10:00:00+08:00",
+      location: "", breakable: false, type: "fixed", repeatType: "weeks", repeatPeriod: 2,
+      repeatWeekdays: [1, 3], repeatEndsOn: "2027-01-01", repeatEndMode: "count",
+      repeatCount: 4, blocksPlanning: true
+    }, { idFactory: () => "series" });
+    const completed = applyTaskMutation([record], { id: "series", occurrenceKey: "1", status: "completed" });
+    const periods = getTaskCalendarPeriods(completed, new Date("2026-09-01T00:00:00+08:00"), new Date("2026-10-01T00:00:00+08:00"));
+    expect(periods.map((item) => [item.startAt.slice(0, 10), item.status, item.occurrenceId])).toEqual([
+      ["2026-09-07", "running", "series:0"],
+      ["2026-09-09", "completed", "series:1"],
+      ["2026-09-21", "running", "series:2"],
+      ["2026-09-23", "running", "series:3"]
+    ]);
+  });
+
+  it("can truncate an endless series from a later occurrence", () => {
+    const record = createTaskRecord({
+      title: "Weekly", description: "", timeSpentMinutes: 0, timeNeededMinutes: 60,
+      startAt: "2026-09-07T09:00:00+08:00", endAt: "2026-09-07T10:00:00+08:00",
+      location: "", breakable: false, type: "fixed", repeatType: "weeks", repeatPeriod: 1,
+      repeatWeekdays: [1], repeatEndsOn: "2026-09-07", repeatEndMode: "never",
+      repeatCount: null, blocksPlanning: true
+    }, { idFactory: () => "endless" });
+
+    const [truncated] = applyTaskMutation([record], {
+      id: "endless",
+      occurrenceKey: "10",
+      scope: "future",
+      status: "deleted"
+    });
+    expect(truncated).toMatchObject({ repeatEndMode: "date", repeatEndsOn: "2026-11-15" });
   });
 
   it("chops multi-day tasks into day periods", () => {

@@ -29,6 +29,11 @@ export interface StoredLocalTasks {
   savedAt: string;
 }
 
+export interface StoredDesktopCalendarState {
+  value: unknown;
+  savedAt: string;
+}
+
 export interface StoredAcademicGpaStrategy {
   strategy: LegacyAcademicGpaStrategy;
   savedAt: string;
@@ -68,6 +73,9 @@ export interface DatabaseService {
   loadDownloadQueue: () => StoredDownloadQueue | null;
   saveLocalTasks: (tasks: unknown, savedAt: string) => void;
   loadLocalTasks: () => StoredLocalTasks | null;
+  saveDesktopCalendarState: (key: string, value: unknown, savedAt: string) => void;
+  loadDesktopCalendarState: (key: string) => StoredDesktopCalendarState | null;
+  deleteDesktopCalendarState: (key: string) => void;
   saveAcademicGpaStrategy: (
     accountId: string,
     strategy: LegacyAcademicGpaStrategy,
@@ -243,6 +251,13 @@ const migrate = (database: Database.Database): void => {
       last_success_at TEXT NOT NULL
     );
   `);
+  applyMigration(12, `
+    CREATE TABLE desktop_calendar_state (
+      state_key TEXT PRIMARY KEY,
+      value_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
+  `);
 };
 
 export const createDatabaseService = ({
@@ -370,6 +385,26 @@ export const createDatabaseService = ({
         "SELECT tasks_json, saved_at FROM local_task_sets WHERE singleton = 1"
       ).get() as { tasks_json: string; saved_at: string } | undefined;
       return row ? { tasks: JSON.parse(row.tasks_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    saveDesktopCalendarState: (key, value, savedAt) => {
+      if (!key.trim()) throw new Error("桌历状态键不能为空。");
+      if (!Number.isFinite(Date.parse(savedAt))) throw new Error("桌历状态保存时间无效。");
+      database.prepare(`
+        INSERT INTO desktop_calendar_state (state_key, value_json, saved_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(state_key) DO UPDATE SET
+          value_json = excluded.value_json,
+          saved_at = excluded.saved_at
+      `).run(key, JSON.stringify(value), savedAt);
+    },
+    loadDesktopCalendarState: (key) => {
+      const row = database.prepare(`
+        SELECT value_json, saved_at FROM desktop_calendar_state WHERE state_key = ?
+      `).get(key) as { value_json: string; saved_at: string } | undefined;
+      return row ? { value: JSON.parse(row.value_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    deleteDesktopCalendarState: (key) => {
+      database.prepare("DELETE FROM desktop_calendar_state WHERE state_key = ?").run(key);
     },
     saveAcademicGpaStrategy: (accountId, strategy, savedAt) => {
       if (!accountId.trim()) throw new Error("GPA 策略账户不能为空。");

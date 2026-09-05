@@ -46,7 +46,7 @@
 - `.campusmod` 已实现原生文件选择、ZIP/manifest/entrypoint 严格校验、权限审查、10 分钟一次性确认、防换包摘要、原子安装升级、崩溃恢复、逐文件完整性扫描、动态注册和卸载。Electron 已升级至 43.1.1，preload 改为 CJS，主 renderer 开启 Chromium OS sandbox 与严格 CSP；唯一 namespaced activity view + `storage:local` + 无 capability/后台贡献的 profile 可通过独立 `campusmod://` origin iframe 激活，其他包强制停用。
 - `zju-learning` 已实现专用业务 Session、固定 `/api/todos`、学期、全部课程分页和逐课 activities/uploads 操作，发布 `learning.assignments@1` 与 `learning.materials@1`。主进程启动后立即刷新，完成后按 ZJU Learning Assistant 的 60–120 秒随机间隔继续；作业与资料分支独立降级，任一课程失败不会发布残缺资料快照。资料连接器使用包含已结课课程的全历史课程范围，工作区按全部有效学期投影，并将逐课 activities 请求限制为最多 4 路并发；真实 `2025-2026 春夏` 只作为私有下载验收基线。DDL 更新/移除会替换旧事件；上海自然日早于今天的 DDL 不再投影为待办或提醒。课件下载固定使用 reference → preview、5 次指数退避和一次受控重认证，本地缺失或大小不符时重新入队。
 - 既有 QuickJS/WASM 与 utility process headless 隔离实现保留为安全研究和历史技术资产，不接入 `.campusmod` 生命周期；纯 headless、main 和 connector 包不再属于插件产品形态。`.campusmod` 已实现 Ed25519 规范载荷签名验证、安装状态持久化和 UI 展示；签名不建立信任目录，也不扩大插件执行边界。
-- SQLite `DatabaseService` 迁移链已推进至 v11：工作区快照、官方 capability provenance、下载队列、日程任务与校园资讯刷新基线写入同一数据库，旧 JSON 仅作一次性导入；自动排程历史表由 migration 10 删除，migration 3 保留用于连续升级。Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
+- SQLite `DatabaseService` 迁移链已推进至 v12：工作区快照、官方 capability provenance、下载队列、日程任务、校园资讯刷新基线以及桌历设置/位置/可见状态/校历覆盖/事件个性化写入同一数据库，旧 JSON 仅作一次性导入；自动排程历史表由 migration 10 删除，migration 3 保留用于连续升级。Electron 依赖通过 `rebuild:electron` 重新编译 native binding。
 - 5 步首次引导向导已完成：欢迎→连接 ZJU 认证→同步数据→推荐扩展→进入工作台，首次启动自动展示。
 - 桌面壳层已调整为固定左侧导航与右侧主内容滚动；周视图在桌面直接填充主内容宽度，窄屏才使用横向滚动。
 - - 重试策略：`withRetry` 支持分类（retryable/fatal）、指数退避与 jitter；已集成到刷新协调器各 connector。
@@ -60,22 +60,22 @@
 
 ---
 
-## Current Development Workboard (2026-09-03)
+## Current Development Workboard (2026-09-05)
 
 **阶段：** 仍处于开发期。当前目标是完成正式代码链、测试和受影响界面的亲眼验收；私有 Alpha 现场、发布和外部分发不构成本阶段的完成条件。
 
 ### 当前应完成
 
-- [ ] **收尾下载队列工作区改动。** 当前未提交改动已开始传递既有 `createdAt` 入队时间、按其倒序展示、清除终态记录、全部下载完成通知和提示音。仍需补齐针对性测试、完整 `typecheck`/`lint`/`test`/E2E、资料页 CDP 操作与截图验收。`build/download-complete.mp3` 尚无可复核的来源和许可证记录，不能随安装包提交或分发，除非先补齐该证据或换成有明确再分发许可的素材。
+- [x] **收尾下载队列与通知/资讯改动。** 下载保留独立的临时提醒，不进入通知中心；通知中心使用 `unread/read/handled/expired`、保留最近 500 条并优先保护未读；校园资讯以可预览、可定位的轻量引用进入通知中心。提示音素材已记录来源和许可边界。
 - [ ] **完成本轮 UI 验收债。** 通知中心不透明改动与下载队列改动必须按 `docs/agents/visual-verification.md` 走真实 Electron/CDP 链路并查看截图。连接器健康、能力审计、导出、子 Tab 和学业问答各 spec 已记录代码/测试完成，但仍缺当前代码的桌面截图证据；应逐项补录，而不是以旧的测试或历史截图替代。
-- [ ] **重新确认桌面日历的当前契约。** 当前运行实现是 `deskCalendarHost.ts` 创建的 Electron `BrowserWindow`，不是 `desktop-calendar/` 的 PyQt 进程。历史 DeskToDo/B3 记录不能证明当前实现具备组件独立悬浮窗或与主日程一致的视觉。以主日程为设计基线，明确桌历最终范围后，再实现并走多窗口 CDP/OS 层验收。
+- [x] **完成桌历、重复事件和校历契约。** 当前 Electron 桌历已接入 SQLite 状态、稳定 occurrence、三种系列编辑范围、上游事件本地备注/提醒、统一校历服务、从属开机恢复和 WorkerW 主路径；范围与自查见 `docs/specs/desk-calendar-and-recurrence.md`。
 - [ ] **完成子 Tab 的真实动态分块验证。** Phase E 已完成视图按需挂载，但官方重依赖的 `React.lazy`/动态 import 分块及构建产物检查仍未完成。
 
 ### 已立项但须先确认范围
 
-- [ ] AI 助手“课程日程记事本”：课程/上游日程目前只读；需要先确定可写注释的数据模型、提醒语义和冲突边界。
+- [x] 课程日程记事本的数据边界：上游正式字段只读，本机只保存备注和提醒覆盖；主日历与桌历共用 SQLite 个性化存储，不改写抓取数据。
 - [ ] AI 桌宠：已有技术调研和自建透明 Electron 窗口建议，但尚未立项实现；拖放目标、权限、数据最小化和模式切换必须先形成独立 spec。
-- [ ] 桌历与主日程视觉统一：已有调研结论，尚未完成范围决策和实现验收。
+- [x] 桌历与主日程交互统一：月/周/日视图、事件类型色、双击编辑、重复规则和上游只读边界一致；视觉与行为证据记录在桌历 spec。
 
 ### 明确不属于当前开发完成条件
 
@@ -637,8 +637,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
   `desk-calendar.html`，深色半透明圆角面板。
 - [x] 月/周/日三视图：复用工作区正式快照（calendarEvents + courses + deadlines）
   投影每日事件，悬浮窗内可切换视图、前后导航、回到今天；关闭即停用。
-- [x] 日程模块头部新增“桌面日历”控制：开启/关闭悬浮窗 + 选择月/周/日视图，
-  设置持久化到 `preferences/desk-calendar.json`；工作区刷新后向悬浮窗推送最新快照。
+- [x] 日程模块头部新增“桌面日历”控制：开启/关闭悬浮窗 + 选择月/周/日视图；设置、位置、可见状态和校历覆盖持久化到 SQLite，工作区刷新后向悬浮窗推送最新快照。
 - [x] 悬浮窗数据经受信 IPC（`campusos:desk-calendar:*`）读取，主窗口与悬浮窗
   分离 preload，符合现有受信 renderer 边界。
 - [x] 覆盖：主进程窗口/IPC/持久化测试、renderer 悬浮窗组件测试、ScheduleView 控制测试。
@@ -646,8 +645,8 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 ### Calendar detail and reminder closure (2026-08-16)
 
 - [x] 开发期直接将任务逾期状态从 `failed` 改为 `overdue`，不保留兼容别名或历史迁移。
-- [x] 主日历与桌面日历的课程、考试、作业、任务均可打开详情；桌面日历保持只读并引导回主窗口修改。
-- [x] 课程、考试和上游作业保持只读；自建任务支持编辑、完成和删除。
+- [x] 主日历与桌面日历的课程、考试、作业、任务均可打开详情并双击编辑；桌历可直接完成本地事件编辑。
+- [x] 课程、考试和上游作业的正式字段保持只读，可保存本机备注和提醒；自建任务支持完整编辑、完成和删除。
 - [x] 自建任务支持覆盖全局提前量的单项提醒，包括不提醒、开始/截止时、预设提前量和自定义时间。
 - [x] 短学期在学业课表中归入春夏学期并提供“只看短学期”筛选；资料模块将短学期拆成独立学期分组。
 
@@ -661,6 +660,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - [x] 托盘提供打开 CampusOS、桌面日历开关及月/周/日视图和明确退出；日程插件禁用时移除桌面日历控制，不提供全局立即同步。
 - [x] 标题栏关闭与 `Alt+F4` 走同一询问路径；托盘退出、更新重启和系统关机使用 quitting guard 绕过询问。
 - [x] 登录项启动时后台运行并恢复已启用能力；手动启动显示主窗口。
+- [x] 桌历开机恢复严格从属于 CampusOS 全局开机自启；全局关闭时桌历开关强制关闭且不可开启。
 - [x] 覆盖首次/重复询问、一次性选择、持久默认、设置重置、插件禁用和所有退出路径的 Electron 测试。
 
 ## 2026-08-16 决策同步：CampusOS 生命周期、任务回收站与更新
@@ -673,7 +673,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - 主程序更新只检查并展示版本信息，不自动下载；用户选择【现在更新】后才下载、校验和安装。用户选择【稍后】不下载、不重复打扰，直到出现新版本。下载中允许取消，失败保持当前版本并提供重试。
 - 更新提示展示当前版本、新版本和最多 5 条重点更新内容，可展开完整日志；更新不删除任务、通知、窗口布局、桌面日历状态等持久化缓存。
 - 插件后台热更新必须由用户按插件批准；仅可信签名且权限/能力/schema 未变化的更新可热更新，其他更新需重新确认并在必要时重启；下载隔离、校验失败回滚。
-- 桌面日历不支持拖拽直接改时间；复杂编辑回到 CampusOS 主窗口，课程、考试和上游作业保持只读。
+- 桌面日历不支持拖拽直接改时间；所有事件可双击进入编辑，本地事件可改全部字段，上游事件只保存本地备注与提醒。
 
 ## 2026-08-16 实现状态同步
 
@@ -681,7 +681,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 - 首次引导已加入后台启动与桌面通知偏好，设置页可持续修改；通知中心保存 30 天并支持已读、已处理和清理过期通知。
 - 本地备份支持手动导出、预览、合并或替换恢复；备份为明文 JSON，明确不包含凭据、Cookie、Session、Token、AI Key 或下载文件本体。
 - 回收站保留软删除时间，超过 30 天自动清理；重复任务按系列分组，删除时可选当前实例、当前及未来或整个系列，并可决定是否包含已完成历史。
-- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每天、每 N 天、每 N 周、工作日、每月和每年。
+- 恢复过期实例必须经过用户确认；只恢复任务实例，不恢复已过期提醒，也不补发提醒。重复规则支持每 N 天、每 N 周并选星期、每 N 月、每 N 年，提供永不/日期/次数结束和仅本次/本次及未来/整个系列编辑。
 - 主程序更新保持手动下载和安装：退出应用不会自动安装已下载版本；插件包沿用签名校验、隔离安装和失败回滚边界。
 - 插件后台热更新已完成：可信 HTTPS 更新清单、版本发现、用户按插件批准、摘要/签名校验、原子替换、权限变化重新确认和 API 变化拒绝均已接入；默认清单位于 `plugins/updates.json`。
 

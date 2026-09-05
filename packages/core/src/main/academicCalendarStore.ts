@@ -1,27 +1,42 @@
 import { app, ipcMain } from "electron";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import type {
   AcademicCalendarSettings,
   AcademicCalendarSettingsInput
 } from "@campusos/shared";
 import { normalizeAcademicCalendarSettings } from "@campusos/shared";
+import { getOfficialDatabaseService } from "./officialDatabaseService";
 
 const ACADEMIC_CALENDAR_FILE = "academic-calendar.json";
 
 const getAcademicCalendarPath = (): string =>
   join(app.getPath("userData"), "settings", ACADEMIC_CALENDAR_FILE);
 
-const ensureSettingsDir = async (storagePath: string): Promise<void> => {
-  await mkdir(dirname(storagePath), { recursive: true });
-};
+const STATE_KEY = "academic-calendar-settings";
 
 const readStored = async (): Promise<AcademicCalendarSettings> => {
   const storagePath = getAcademicCalendarPath();
+  const database = getOfficialDatabaseService();
+  const stored = database.loadDesktopCalendarState(STATE_KEY);
+  if (stored) {
+    return normalizeAcademicCalendarSettings({
+      ...(stored.value as Partial<AcademicCalendarSettingsInput>),
+      savedAt: stored.savedAt
+    }, database.databasePath);
+  }
   try {
     const raw = await readFile(storagePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<AcademicCalendarSettingsInput>;
-    return normalizeAcademicCalendarSettings(parsed, storagePath);
+    const migrated = normalizeAcademicCalendarSettings(parsed, database.databasePath);
+    const savedAt = typeof parsed.savedAt === "string" && Number.isFinite(Date.parse(parsed.savedAt))
+      ? parsed.savedAt
+      : new Date().toISOString();
+    database.saveDesktopCalendarState(STATE_KEY, {
+      statutoryHolidays: migrated.statutoryHolidays,
+      makeupDays: migrated.makeupDays
+    }, savedAt);
+    return { ...migrated, savedAt };
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -29,7 +44,7 @@ const readStored = async (): Promise<AcademicCalendarSettings> => {
       "code" in error &&
       error.code === "ENOENT"
     ) {
-      return normalizeAcademicCalendarSettings({}, storagePath);
+      return normalizeAcademicCalendarSettings({}, database.databasePath);
     }
     throw error;
   }
@@ -41,19 +56,21 @@ export const loadAcademicCalendarSettings = async (): Promise<AcademicCalendarSe
 export const saveAcademicCalendarSettings = async (
   input: AcademicCalendarSettingsInput
 ): Promise<AcademicCalendarSettings> => {
-  const storagePath = getAcademicCalendarPath();
-  const next = normalizeAcademicCalendarSettings(input, storagePath);
+  const database = getOfficialDatabaseService();
+  const next = normalizeAcademicCalendarSettings(input, database.databasePath);
   const payload = {
     statutoryHolidays: next.statutoryHolidays,
     makeupDays: next.makeupDays,
     savedAt: new Date().toISOString()
   };
-  await ensureSettingsDir(storagePath);
-  await writeFile(storagePath, JSON.stringify(payload, null, 2), "utf8");
+  database.saveDesktopCalendarState(STATE_KEY, {
+    statutoryHolidays: payload.statutoryHolidays,
+    makeupDays: payload.makeupDays
+  }, payload.savedAt);
   return {
     ...next,
     savedAt: payload.savedAt,
-    storagePath
+    storagePath: database.databasePath
   };
 };
 

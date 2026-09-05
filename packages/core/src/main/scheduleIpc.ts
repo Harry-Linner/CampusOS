@@ -17,11 +17,14 @@ import {
   rescheduleCampusWorkspaceReminders
 } from "./campusWorkspaceStore";
 import { readReminderSettingsRecord } from "./reminderSettingsStore";
+import { loadCalendarEventPersonalizations, saveCalendarEventPersonalization } from "./deskCalendarStateStore";
+import { loadUnifiedCalendarData } from "./calendarDataService";
 import {
   applyTaskMutation,
   createIcalContent,
   createTaskRecord,
   getTaskCalendarPeriods,
+  getTaskOccurrenceBounds,
   normalizeTaskRecord,
   refreshLocalTasks
 } from "./scheduleDomain";
@@ -35,6 +38,15 @@ const notifyScheduleChanged = (): void => {
 };
 
 const nowIso = (): string => new Date().toISOString();
+
+const previousShanghaiDate = (iso: string): string => {
+  const date = new Date(Date.parse(iso) - 24 * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(date);
+  const record = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${record.year}-${record.month}-${record.day}`;
+};
 
 const readStoredTasks = (): LocalTaskRecord[] => {
   const stored = getOfficialDatabaseService().loadLocalTasks();
@@ -96,16 +108,58 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
     if (existing.type === "fixedlegacy") {
       throw new Error("历史日程只读，不能编辑。");
     }
-    source.splice(existingIndex, 1, {
-      ...next,
-      status: existing.status,
-      timeSpentMinutes: Math.min(existing.timeSpentMinutes, next.timeNeededMinutes)
-    });
-    source.splice(
-      0,
-      source.length,
-      ...source.filter((task) => task.type !== "fixedlegacy" || task.fromId !== next.id)
-    );
+    const scope = input.editScope ?? "series";
+    const occurrenceKey = input.occurrenceKey;
+    const recurringOccurrence = existing.type === "fixed" && existing.repeatType !== "norepeat" && occurrenceKey !== undefined;
+    if (recurringOccurrence && scope === "single") {
+      source.splice(existingIndex, 1, {
+        ...existing,
+        occurrenceOverrides: {
+          ...(existing.occurrenceOverrides ?? {}),
+          [occurrenceKey]: {
+            ...(existing.occurrenceOverrides?.[occurrenceKey] ?? {}),
+            title: next.title,
+            description: next.description,
+            startAt: next.startAt,
+            endAt: next.endAt,
+            location: next.location,
+            timeSpentMinutes: next.timeSpentMinutes,
+            reminderMode: next.reminderMode,
+            reminderLeadMinutes: next.reminderLeadMinutes,
+            reminderAt: next.reminderAt
+          }
+        }
+      });
+    } else if (recurringOccurrence && scope === "future") {
+      const originalOccurrence = getTaskOccurrenceBounds(existing, occurrenceKey);
+      if (!originalOccurrence) throw new Error("任务实例不存在。");
+      source.splice(existingIndex, 1, {
+        ...existing,
+        repeatEndMode: "date",
+        repeatEndsOn: previousShanghaiDate(originalOccurrence.startAt)
+      });
+      const segment = createTaskRecord({
+        ...input,
+        id: undefined,
+        occurrenceKey: undefined,
+        editScope: undefined,
+        seriesGroupId: existing.seriesGroupId ?? existing.id
+      });
+      source.push(segment);
+    } else {
+      source.splice(existingIndex, 1, {
+        ...next,
+        seriesGroupId: existing.seriesGroupId ?? existing.id,
+        occurrenceOverrides: existing.occurrenceOverrides ?? {},
+        status: existing.status,
+        timeSpentMinutes: Math.min(existing.timeSpentMinutes, next.timeNeededMinutes)
+      });
+      source.splice(
+        0,
+        source.length,
+        ...source.filter((task) => task.type !== "fixedlegacy" || task.fromId !== next.id)
+      );
+    }
   } else {
     source.push(next);
   }
@@ -179,6 +233,22 @@ export const registerScheduleHandlers = (): void => {
   ipcMain.handle("campusos:schedule:task:mutate", async (event, input: LocalTaskMutation) => {
     assertTrustedRenderer(event);
     return mutateScheduleTask(input);
+  });
+  ipcMain.handle("campusos:schedule:personalizations:load", async (event) => {
+    assertTrustedRenderer(event);
+    return loadCalendarEventPersonalizations();
+  });
+  ipcMain.handle("campusos:schedule:personalization:save", async (event, eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) => {
+    assertTrustedRenderer(event);
+    const result = saveCalendarEventPersonalization(eventId, input ?? {});
+    notifyScheduleChanged();
+    await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());
+    return result;
+  });
+  ipcMain.handle("campusos:schedule:calendar-data:load", async (event, input: { today: string; startAt: string; endAt: string }) => {
+    assertTrustedRenderer(event);
+    if (!input || typeof input.today !== "string") throw new Error("日历范围无效。");
+    return loadUnifiedCalendarData(input.today, input);
   });
   ipcMain.handle("campusos:schedule:ical:export", async (event, input: CalendarExportInput) => {
     assertTrustedRenderer(event);

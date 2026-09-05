@@ -1,11 +1,16 @@
-import { mkdir as mkdirAsync, writeFile as writeFileAsync } from "node:fs/promises";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, type Rectangle } from "electron";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
-import { loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
+import { loadSchedulePeriods, loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
-import { loadAcademicCalendarSettings } from "./academicCalendarStore";
+import { loadUnifiedCalendarData } from "./calendarDataService";
+import {
+  DESK_CALENDAR_STATE_KEYS,
+  loadCalendarEventPersonalizations,
+  loadDesktopState,
+  saveCalendarEventPersonalization,
+  saveDesktopState
+} from "./deskCalendarStateStore";
 
 /** 桌面日历窗口对外暴露的数据（渲染层 CalData）。 */
 interface DeskCalendarData {
@@ -27,8 +32,27 @@ interface DeskCalendarData {
     color?: string;
     note?: string;
     location?: string;
-    status?: string;
-  }[];
+      status?: string;
+      origin: "local" | "upstream";
+      startAt: string;
+      endAt: string;
+      taskId?: string;
+      occurrenceKey?: string;
+      repeatType?: string;
+      repeatPeriod?: number;
+      repeatEndsOn?: string;
+      repeatEndMode?: "never" | "date" | "count";
+      repeatCount?: number | null;
+      repeatWeekdays?: number[];
+      reminderMode?: "global" | "none" | "at-time" | "lead" | "custom";
+      reminderLeadMinutes?: number | null;
+      reminderAt?: string | null;
+      taskType?: "deadline" | "fixed";
+      timeSpentMinutes?: number;
+      timeNeededMinutes?: number;
+      breakable?: boolean;
+      blocksPlanning?: boolean;
+    }[];
 }
 
 let deskCalendarWindow: BrowserWindow | null = null;
@@ -36,7 +60,7 @@ let deskCalendarVisible = false;
 let deskCalendarTransparency = 0.98;
 let dragStartBounds: Electron.Rectangle | null = null;
 
-/** 桌历设置（设置面板内容，持久化到 settings/desk-calendar-settings.json）。 */
+/** 桌历设置（设置面板内容，持久化到 SQLite desktop_calendar_state）。 */
 export interface DeskCalendarSettings {
   showWeeks: boolean;
   showHolidays: boolean;
@@ -49,11 +73,11 @@ export interface DeskCalendarSettings {
   opacity: number;
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
+  campusAutoStartEnabled: boolean;
   alwaysOnTop: boolean;
   locked: boolean;
 }
 
-const SETTINGS_FILE = "desk-calendar-settings.json";
 const DEFAULT_SETTINGS: DeskCalendarSettings = {
   showWeeks: true,
   showHolidays: true,
@@ -66,17 +90,27 @@ const DEFAULT_SETTINGS: DeskCalendarSettings = {
   opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
   autoStart: false,
+  campusAutoStartEnabled: false,
   alwaysOnTop: false,
   locked: false
 };
-const getSettingsPath = (): string => join(app.getPath("userData"), "settings", SETTINGS_FILE);
+const isCampusAutoStartEnabled = (): boolean => {
+  try { return app.getLoginItemSettings().openAtLogin; } catch { return false; }
+};
 const loadDeskCalendarSettings = (): DeskCalendarSettings => {
-  try {
-    const parsed = JSON.parse(readFileSync(getSettingsPath(), "utf8")) as Partial<DeskCalendarSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed, colors: { ...DEFAULT_SETTINGS.colors, ...(parsed.colors ?? {}) } };
-  } catch {
-    return { ...DEFAULT_SETTINGS };
-  }
+  const parsed = loadDesktopState<Partial<DeskCalendarSettings>>(
+    DESK_CALENDAR_STATE_KEYS.settings,
+    {},
+    "desk-calendar-settings.json"
+  );
+  const campusAutoStartEnabled = isCampusAutoStartEnabled();
+  return {
+    ...DEFAULT_SETTINGS,
+    ...parsed,
+    autoStart: campusAutoStartEnabled && parsed.autoStart === true,
+    campusAutoStartEnabled,
+    colors: { ...DEFAULT_SETTINGS.colors, ...(parsed.colors ?? {}) }
+  };
 };
 const saveDeskCalendarSettings = (patch: Partial<DeskCalendarSettings>): DeskCalendarSettings => {
   const current = loadDeskCalendarSettings();
@@ -85,22 +119,11 @@ const saveDeskCalendarSettings = (patch: Partial<DeskCalendarSettings>): DeskCal
     ...patch,
     colors: { ...current.colors, ...(patch.colors ?? {}) }
   };
-  try {
-    mkdirSync(dirname(getSettingsPath()), { recursive: true });
-    writeFileSync(getSettingsPath(), JSON.stringify(next, null, 2), "utf8");
-  } catch {
-    // 写失败静默。
-  }
+  next.campusAutoStartEnabled = isCampusAutoStartEnabled();
+  if (!next.campusAutoStartEnabled) next.autoStart = false;
+  saveDesktopState(DESK_CALENDAR_STATE_KEYS.settings, next);
   return next;
 };
-const applyDeskCalendarAutoStart = (enable: boolean): void => {
-  try { app.setLoginItemSettings({ openAtLogin: enable }); } catch { /* 某些环境不支持，忽略。 */ }
-};
-
-// 桌历窗口几何记忆（简化：单份 json；阶段2可按显示器签名记忆）。
-const GEOMETRY_FILE = "desk-calendar-geometry.json";
-const getGeometryPath = (): string =>
-  join(app.getPath("userData"), "settings", GEOMETRY_FILE);
 
 interface SavedDeskCalendarGeometry {
   x: number;
@@ -109,17 +132,36 @@ interface SavedDeskCalendarGeometry {
   height: number;
 }
 
+const hasMeaningfulVisibleArea = (geometry: SavedDeskCalendarGeometry, area: Rectangle): boolean => {
+  const visibleWidth = Math.max(0, Math.min(geometry.x + geometry.width, area.x + area.width) - Math.max(geometry.x, area.x));
+  const visibleHeight = Math.max(0, Math.min(geometry.y + geometry.height, area.y + area.height) - Math.max(geometry.y, area.y));
+  return visibleWidth >= Math.min(160, geometry.width / 2) &&
+    visibleHeight >= Math.min(120, geometry.height / 2);
+};
+
+const displaySignature = (): string => screen.getAllDisplays()
+  .map((display) => `${display.workArea.x},${display.workArea.y},${display.workArea.width},${display.workArea.height}:${display.scaleFactor ?? 1}`)
+  .sort()
+  .join("|");
+
 const getSavedDeskCalendarGeometry = (): SavedDeskCalendarGeometry | null => {
-  try {
-    const parsed = JSON.parse(readFileSync(getGeometryPath(), "utf8")) as Partial<SavedDeskCalendarGeometry>;
-    if (
-      typeof parsed.x === "number" && typeof parsed.y === "number" &&
-      typeof parsed.width === "number" && typeof parsed.height === "number"
-    ) {
-      return { x: parsed.x, y: parsed.y, width: parsed.width, height: parsed.height };
-    }
-  } catch {
-    // 无存档/不可读 -> 用默认
+  const geometries = loadDesktopState<Record<string, Partial<SavedDeskCalendarGeometry>>>(
+    DESK_CALENDAR_STATE_KEYS.geometries,
+    {}
+  );
+  const parsed = geometries[displaySignature()];
+  if (parsed && typeof parsed.x === "number" && typeof parsed.y === "number" &&
+      typeof parsed.width === "number" && typeof parsed.height === "number") {
+    return { x: parsed.x, y: parsed.y, width: parsed.width, height: parsed.height };
+  }
+  // One-time import of the old single-layout JSON.
+  const legacy = loadDesktopState<Partial<SavedDeskCalendarGeometry>>(
+    "desk-calendar-legacy-geometry",
+    {},
+    "desk-calendar-geometry.json"
+  );
+  if (typeof legacy.x === "number" && typeof legacy.y === "number" && typeof legacy.width === "number" && typeof legacy.height === "number") {
+    return { x: legacy.x, y: legacy.y, width: legacy.width, height: legacy.height };
   }
   return null;
 };
@@ -129,14 +171,16 @@ const saveDeskCalendarGeometry = (window: BrowserWindow): void => {
     const bounds = window.getBounds();
     // 防 WorkerW 子窗口 getBounds 异常(巨负坐标/超屏尺寸)：仅当与某显示器可见区有交集才保存，
     // 避免把异常值覆盖进有效记忆(否则恢复时窗口会跑到屏幕外)。
-    const onScreen = screen.getAllDisplays().some((display) => {
-      const area = display.workArea;
-      return Math.max(bounds.x, area.x) < Math.min(bounds.x + bounds.width, area.x + area.width) &&
-        Math.max(bounds.y, area.y) < Math.min(bounds.y + bounds.height, area.y + area.height);
-    });
+    const onScreen = screen.getAllDisplays().some((display) => hasMeaningfulVisibleArea(bounds, display.workArea));
     if (!onScreen) return;
-    mkdirSync(dirname(getGeometryPath()), { recursive: true });
-    writeFileSync(getGeometryPath(), JSON.stringify(bounds, null, 2), "utf8");
+    const geometries = loadDesktopState<Record<string, SavedDeskCalendarGeometry>>(
+      DESK_CALENDAR_STATE_KEYS.geometries,
+      {}
+    );
+    saveDesktopState(DESK_CALENDAR_STATE_KEYS.geometries, {
+      ...geometries,
+      [displaySignature()]: bounds
+    });
   } catch {
     // 保存失败静默，不影响窗口。
   }
@@ -150,11 +194,7 @@ export const resolveDeskCalendarPlacement = (
   primaryWorkArea: Rectangle
 ): { width: number; height: number; x: number; y: number; useDefault: boolean } => {
   const savedVisible = savedGeometry
-    ? displays.some((display) => {
-      const area = display.workArea;
-      return Math.max(savedGeometry.x, area.x) < Math.min(savedGeometry.x + savedGeometry.width, area.x + area.width) &&
-        Math.max(savedGeometry.y, area.y) < Math.min(savedGeometry.y + savedGeometry.height, area.y + area.height);
-    })
+    ? displays.some((display) => hasMeaningfulVisibleArea(savedGeometry, display.workArea))
     : false;
   const useDefault = !savedGeometry || !savedVisible;
   const width = useDefault ? 940 : savedGeometry.width;
@@ -164,21 +204,11 @@ export const resolveDeskCalendarPlacement = (
   return { width, height, x, y, useDefault };
 };
 
-const getVisibilityPath = (): string =>
-  join(app.getPath("userData"), "desk-calendar-visible.json");
-
 const writeVisibilityFlag = async (visible: boolean): Promise<void> => {
   deskCalendarVisible = visible;
-  const path = getVisibilityPath();
-  await mkdirAsync(dirname(path), { recursive: true });
-  await writeFileAsync(path, JSON.stringify({ visible }), "utf8");
+  saveDesktopState(DESK_CALENDAR_STATE_KEYS.visibility, { visible });
 };
 
-const dateOf = (iso: string): string => iso.slice(0, 10);
-const timeOf = (iso: string): string | undefined => {
-  const m = /T(\d{2}):(\d{2})/.exec(iso);
-  return m ? `${m[1]}:${m[2]}` : undefined;
-};
 const toIso = (value: unknown): string | null =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) ? value : null;
 
@@ -194,22 +224,34 @@ const shanghaiTimeOf = (iso: string): string | undefined => {
   return h !== undefined && m !== undefined ? `${h}:${m}` : undefined;
 };
 
-const buildDeskCalendarData = async (): Promise<DeskCalendarData> => {
+const shanghaiDateOf = (iso: string): string => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date(iso));
+  const record = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return `${record.year}-${record.month}-${record.day}`;
+};
+
+const parseDeskRangeBoundary = (value: unknown): Date | null => {
+  if (typeof value !== "string") return null;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00+08:00` : value;
+  const timestamp = Date.parse(normalized);
+  return Number.isFinite(timestamp) ? new Date(timestamp) : null;
+};
+
+const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string }): Promise<DeskCalendarData> => {
   const record = await hydrateCampusWorkspace();
   const snapshot = record.snapshot;
   const items: DeskCalendarData["items"] = [];
-
-  // 法定节假日/补班（来自 academic-calendar 设置），供月历格子标注。
-  let holidays: DeskCalendarData["holidays"] = [];
-  try {
-    const cal = await loadAcademicCalendarSettings();
-    holidays = [
-      ...(cal.statutoryHolidays ?? []).map((h) => ({ date: h.date, label: h.label, holiday: true })),
-      ...(cal.makeupDays ?? []).map((m) => ({ date: m.date, label: `补班`, holiday: false }))
-    ];
-  } catch {
-    holidays = [];
-  }
+  const now = new Date();
+  const today = shanghaiDateOf(now.toISOString());
+  const rangeStart = parseDeskRangeBoundary(range?.startAt) ?? new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+  const rangeEnd = parseDeskRangeBoundary(range?.endAt) ?? new Date(now.getTime() + 400 * 24 * 60 * 60 * 1000);
+  const calendarData = await loadUnifiedCalendarData(today, {
+    startAt: shanghaiDateOf(rangeStart.toISOString()),
+    endAt: shanghaiDateOf(rangeEnd.toISOString())
+  }).catch(() => ({ holidays: [], weeks: {}, currentWeek: null }));
+  const personalizations = loadCalendarEventPersonalizations();
 
   // 主题跟随主界面（原生主题）。CampusOS 主界面由 renderer 切换，这里用 nativeTheme 近似，
   // 保证桌历窗口与主界面所选主题（light/dark/high-contrast）一致。
@@ -219,56 +261,123 @@ const buildDeskCalendarData = async (): Promise<DeskCalendarData> => {
       ? "dark"
       : "light";
 
+  const canonicalEventIds = new Set(snapshot.calendarEvents?.map((event) => event.id) ?? []);
+  for (const event of snapshot.calendarEvents ?? []) {
+    const start = toIso(event.startAt);
+    if (!start) continue;
+    const end = toIso(event.endAt ?? "") ?? new Date(Date.parse(start) + 60 * 60 * 1000).toISOString();
+    if (Date.parse(end) <= rangeStart.getTime() || Date.parse(start) >= rangeEnd.getTime()) continue;
+    const id = `calendar:${event.id}`;
+    items.push({
+      id,
+      title: event.title,
+      date: shanghaiDateOf(start),
+      kind: event.kind === "task" ? "task" : event.kind,
+      time: shanghaiTimeOf(start),
+      note: personalizations[id]?.note || event.note || undefined,
+      location: event.location ?? undefined,
+      origin: "upstream",
+      startAt: start,
+      endAt: end,
+      reminderLeadMinutes: personalizations[id]?.reminderLeadMinutes ?? null
+    });
+  }
+
   for (const course of snapshot.courses ?? []) {
+    if (canonicalEventIds.has(course.id)) continue;
     const start = toIso(course.startAt);
     if (!start) continue;
+    const end = toIso(course.endAt) ?? new Date(Date.parse(start) + 60 * 60 * 1000).toISOString();
+    if (Date.parse(end) <= rangeStart.getTime() || Date.parse(start) >= rangeEnd.getTime()) continue;
+    const id = `course:${course.id}`;
     items.push({
-      id: `course:${course.id}`,
+      id,
       title: course.title,
-      date: dateOf(start),
+      date: shanghaiDateOf(start),
       kind: "course",
-      time: timeOf(start) ?? undefined,
+      time: shanghaiTimeOf(start),
       color: "var(--accent)",
-      note: course.note ?? undefined,
-      location: course.location ?? undefined
+      note: personalizations[id]?.note || course.note || undefined,
+      location: course.location ?? undefined,
+      origin: "upstream",
+      startAt: start,
+      endAt: end,
+      reminderLeadMinutes: personalizations[id]?.reminderLeadMinutes ?? null
     });
   }
 
   for (const deadline of snapshot.deadlines ?? []) {
+    if (canonicalEventIds.has(deadline.id)) continue;
     const due = toIso(deadline.dueAt);
     if (!due) continue;
+    const start = deadline.kind === "exam"
+      ? due
+      : new Date(Date.parse(due) - 60 * 60 * 1000).toISOString();
+    const end = deadline.kind === "exam"
+      ? new Date(Date.parse(due) + 60 * 60 * 1000).toISOString()
+      : due;
+    if (Date.parse(due) <= rangeStart.getTime() || Date.parse(start) >= rangeEnd.getTime()) continue;
+    const id = `deadline:${deadline.id}`;
     items.push({
-      id: `deadline:${deadline.id}`,
+      id,
       title: deadline.title,
-      date: dateOf(due),
+      date: shanghaiDateOf(due),
       kind: deadline.kind === "exam" ? "exam" : "assignment",
-      time: timeOf(due) ?? undefined,
+      time: shanghaiTimeOf(start),
       color: deadline.kind === "exam" ? "#c0392b" : "#a56d22",
-      note: deadline.note ?? undefined
+      note: personalizations[id]?.note || deadline.note || undefined,
+      origin: "upstream",
+      startAt: start,
+      endAt: end,
+      reminderLeadMinutes: personalizations[id]?.reminderLeadMinutes ?? null
     });
   }
 
-  for (const task of loadScheduleTasks().tasks) {
-    if (task.status === "deleted") continue;
-    const start = toIso(task.startAt);
-    if (!start) continue;
+  const tasks = loadScheduleTasks().tasks;
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const seenOccurrences = new Set<string>();
+  for (const period of loadSchedulePeriods({ startAt: rangeStart.toISOString(), endAt: rangeEnd.toISOString() })) {
+    const task = taskById.get(period.taskId);
+    if (!task) continue;
+    const occurrenceId = period.occurrenceId ?? period.id;
+    if (seenOccurrences.has(occurrenceId)) continue;
+    seenOccurrences.add(occurrenceId);
+    const occurrenceStartAt = period.occurrenceStartAt ?? period.startAt;
+    const occurrenceEndAt = period.occurrenceEndAt ?? period.endAt;
+    const override = task.occurrenceOverrides?.[period.occurrenceKey ?? "0"];
     items.push({
-      id: `task:${task.id}`,
-      title: task.title,
-      date: dateOf(start),
+      id: `task:${occurrenceId}`,
+      title: period.title,
+      date: shanghaiDateOf(occurrenceStartAt),
       kind: "task",
-      time: shanghaiTimeOf(start) ?? undefined,
+      time: shanghaiTimeOf(occurrenceStartAt),
       color: "#356b57",
-      status: task.status
+      note: period.description || undefined,
+      location: period.location || undefined,
+      status: period.status,
+      origin: "local",
+      startAt: occurrenceStartAt,
+      endAt: occurrenceEndAt,
+      taskId: task.id,
+      occurrenceKey: period.occurrenceKey,
+      repeatType: task.repeatType,
+      repeatPeriod: task.repeatPeriod,
+      repeatEndsOn: task.repeatEndsOn,
+      repeatEndMode: task.repeatEndMode,
+      repeatCount: task.repeatCount,
+      repeatWeekdays: task.repeatWeekdays,
+      reminderMode: override?.reminderMode ?? task.reminderMode,
+      reminderLeadMinutes: override?.reminderLeadMinutes ?? task.reminderLeadMinutes,
+      reminderAt: override && Object.prototype.hasOwnProperty.call(override, "reminderAt") ? override.reminderAt : task.reminderAt,
+      taskType: task.type === "fixedlegacy" ? "fixed" : task.type,
+      timeSpentMinutes: override?.timeSpentMinutes ?? task.timeSpentMinutes,
+      timeNeededMinutes: task.timeNeededMinutes,
+      breakable: task.breakable,
+      blocksPlanning: task.blocksPlanning
     });
   }
 
-  // 校历周次（解析好的 json，这里用占位：由校历 provider 提供，暂空）
-  const weeks: DeskCalendarData["weeks"] = {};
-  const currentWeek: number | null = null;
-  const today = new Date().toISOString().slice(0, 10);
-
-  return { today, holidays, theme, items, weeks, currentWeek };
+  return { today, theme, items, ...calendarData };
 };
 
 const sendDataToWindow = async (): Promise<void> => {
@@ -295,6 +404,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   const winWidth = placement.width;
   const winHeight = placement.height;
 
+  const settings = loadDeskCalendarSettings();
   const win = new BrowserWindow({
     width: winWidth,
     height: winHeight,
@@ -302,7 +412,7 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
     y: by,
     transparent: true,
     frame: false,
-    resizable: true,
+    resizable: !settings.locked,
     hasShadow: false,
     skipTaskbar: true,
     show: false,
@@ -315,7 +425,10 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   });
   // 贴底：壁纸之上、其它窗口之下（含 Win+D 自愈守护）。千万不用 setAlwaysOnTop。
   win.setMenu(null);
-  win.setOpacity(deskCalendarTransparency);
+  deskCalendarTransparency = settings.opacity;
+  win.setOpacity(settings.opacity);
+  win.setAlwaysOnTop(settings.alwaysOnTop);
+  win.setMovable(!settings.locked);
   pinWindowToDesktopBottom(win);
 
   // 几何记忆：移动/缩放/关闭时保存，下次按记忆恢复。
@@ -403,7 +516,27 @@ export const killDeskCalendar = (): void => {
   deskCalendarWindow = null;
 };
 
-export const isDeskCalendarRunning = (): boolean => deskCalendarVisible;
+export const isDeskCalendarRunning = (): boolean =>
+  deskCalendarVisible && deskCalendarWindow !== null && !deskCalendarWindow.isDestroyed();
+
+export const enforceDeskCalendarAutoStartDependency = (campusAutoStartEnabled: boolean): void => {
+  const current = loadDesktopState<Partial<DeskCalendarSettings>>(
+    DESK_CALENDAR_STATE_KEYS.settings,
+    {},
+    "desk-calendar-settings.json"
+  );
+  if (!campusAutoStartEnabled && current.autoStart === true) {
+    saveDesktopState(DESK_CALENDAR_STATE_KEYS.settings, { ...current, autoStart: false });
+  }
+  if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
+    deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", loadDeskCalendarSettings());
+  }
+};
+
+export const restoreDeskCalendarOnCampusStart = async (): Promise<void> => {
+  const settings = loadDeskCalendarSettings();
+  if (settings.campusAutoStartEnabled && settings.autoStart) await launchDeskCalendar();
+};
 
 export const registerDeskCalendarHostHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:process:start", async () => {
@@ -417,11 +550,10 @@ export const registerDeskCalendarHostHandlers = (): void => {
   ipcMain.handle("campusos:desk-calendar:process:status", async () => ({
     running: isDeskCalendarRunning()
   }));
-  ipcMain.handle("campusos:desk-calendar:data", async () => buildDeskCalendarData());
+  ipcMain.handle("campusos:desk-calendar:data", async (_event, range) => buildDeskCalendarData((range ?? {}) as { startAt?: string; endAt?: string }));
   ipcMain.handle("campusos:desk-calendar:settings:load", async () => loadDeskCalendarSettings());
   ipcMain.handle("campusos:desk-calendar:settings:save", async (_event, patch) => {
     const next = saveDeskCalendarSettings((patch ?? {}) as Partial<DeskCalendarSettings>);
-    applyDeskCalendarAutoStart(next.autoStart);
     deskCalendarTransparency = next.opacity;
     applyTransparency();
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
@@ -432,19 +564,26 @@ export const registerDeskCalendarHostHandlers = (): void => {
     }
     return next;
   });
-  ipcMain.handle("campusos:desk-calendar:complete-task", async (_event, id, completed) => {
+  ipcMain.handle("campusos:desk-calendar:complete-task", async (_event, id, completed, occurrenceKey) => {
     if (typeof id !== "string" || !id) return { ok: false, error: "任务不存在。" };
     try {
       // completed=true -> 置为 completed；false -> restore（按类型回退为 running/overdue/running）。
-      await mutateScheduleTask(completed ? { id, status: "completed" } : { id, action: "restore" });
+      await mutateScheduleTask(completed
+        ? { id, status: "completed", ...(typeof occurrenceKey === "string" ? { occurrenceKey } : {}) }
+        : { id, action: "restore", ...(typeof occurrenceKey === "string" ? { occurrenceKey } : {}) });
       await sendDataToWindow();
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "操作失败。" };
     }
   });
-  ipcMain.handle("campusos:desk-calendar:create-event", async (_event, input) => {
-    const { date, title, startAt, endAt, location, note, reminderLeadMinutes } = (input ?? {}) as {
+  ipcMain.handle("campusos:desk-calendar:save-event", async (_event, input) => {
+    const { id, origin, taskId, occurrenceKey, editScope, date, title, startAt, endAt, location, note, reminderMode, reminderLeadMinutes, reminderAt, type, timeSpentMinutes, timeNeededMinutes, breakable, blocksPlanning, repeatType, repeatPeriod, repeatEndsOn, repeatEndMode, repeatCount, repeatWeekdays } = (input ?? {}) as {
+      id?: string;
+      origin?: "local" | "upstream";
+      taskId?: string;
+      occurrenceKey?: string;
+      editScope?: "single" | "future" | "series";
       date: string;
       title: string;
       startAt?: string;
@@ -452,7 +591,26 @@ export const registerDeskCalendarHostHandlers = (): void => {
       location?: string;
       note?: string;
       reminderLeadMinutes?: number;
+      reminderMode?: "global" | "none" | "at-time" | "lead" | "custom";
+      reminderAt?: string | null;
+      type?: "deadline" | "fixed";
+      timeSpentMinutes?: number;
+      timeNeededMinutes?: number;
+      breakable?: boolean;
+      blocksPlanning?: boolean;
+      repeatType?: "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
+      repeatPeriod?: number;
+      repeatEndsOn?: string;
+      repeatEndMode?: "never" | "date" | "count";
+      repeatCount?: number | null;
+      repeatWeekdays?: number[];
     };
+    if (origin === "upstream") {
+      if (!id) return { ok: false, error: "事件不存在。" };
+      saveCalendarEventPersonalization(id, { note, reminderLeadMinutes: reminderLeadMinutes ?? null });
+      await sendDataToWindow();
+      return { ok: true };
+    }
     if (!date || !title) return { ok: false, error: "日期和名称不能为空。" };
     // 默认只在当日新增（用户双击某天时）；重复类型仅在显式选择时使用。
     // repeatEndsOn 必须是有效日期（scheduleDomain 校验不接受空串），用当天；
@@ -460,21 +618,47 @@ export const registerDeskCalendarHostHandlers = (): void => {
     const dayStart = `${date}T00:00:00+08:00`;
     const dayEnd = `${date}T23:59:59+08:00`;
     await saveScheduleTask({
+      ...(taskId ? { id: taskId } : {}),
       title,
       description: note ?? "",
       startAt: startAt ?? dayStart,
       endAt: endAt ?? dayEnd,
       location: location ?? "",
-      type: "deadline",
-      repeatType: "norepeat",
-      repeatPeriod: 1,
-      repeatEndsOn: date,
-      breakable: true,
-      blocksPlanning: false,
-      timeSpentMinutes: 0,
-      timeNeededMinutes: 0,
-      reminderMode: reminderLeadMinutes != null ? "lead" : "none",
-      reminderLeadMinutes: reminderLeadMinutes ?? null,
+      type: type ?? "deadline",
+      repeatType: repeatType ?? "norepeat",
+      repeatPeriod: Math.max(1, repeatPeriod ?? 1),
+      repeatEndsOn: repeatEndsOn ?? date,
+      repeatEndMode: repeatEndMode ?? (repeatType === "norepeat" || !repeatType ? "date" : "never"),
+      repeatCount: repeatEndMode === "count" ? Math.max(1, repeatCount ?? 1) : null,
+      repeatWeekdays: repeatWeekdays ?? [],
+      editScope,
+      occurrenceKey,
+      breakable: breakable ?? true,
+      blocksPlanning: blocksPlanning ?? true,
+      timeSpentMinutes: Math.max(0, timeSpentMinutes ?? 0),
+      timeNeededMinutes: Math.max(1, timeNeededMinutes ?? 60),
+      reminderMode: reminderMode ?? (reminderLeadMinutes != null ? "lead" : "none"),
+      reminderLeadMinutes: reminderMode === "lead" || (!reminderMode && reminderLeadMinutes != null) ? reminderLeadMinutes ?? 15 : null,
+      reminderAt: reminderMode === "custom" ? reminderAt ?? null : null
+    });
+    await sendDataToWindow();
+    return { ok: true };
+  });
+  // Compatibility for older renderer bundles during an application update.
+  ipcMain.handle("campusos:desk-calendar:create-event", async (_event, input) => {
+    const handlerInput = (input ?? {}) as Record<string, unknown>;
+    const { date, title } = handlerInput;
+    if (typeof date !== "string" || typeof title !== "string" || !date || !title) return { ok: false, error: "日期和名称不能为空。" };
+    await saveScheduleTask({
+      title, description: typeof handlerInput.note === "string" ? handlerInput.note : "",
+      startAt: typeof handlerInput.startAt === "string" ? handlerInput.startAt : `${date}T00:00:00+08:00`,
+      endAt: typeof handlerInput.endAt === "string" ? handlerInput.endAt : `${date}T23:59:59+08:00`,
+      location: typeof handlerInput.location === "string" ? handlerInput.location : "",
+      type: "deadline", repeatType: "norepeat", repeatPeriod: 1, repeatEndsOn: date,
+      repeatEndMode: "date", repeatCount: null, repeatWeekdays: [], breakable: true,
+      blocksPlanning: false, timeSpentMinutes: 0, timeNeededMinutes: 1,
+      reminderMode: Number.isFinite(handlerInput.reminderLeadMinutes) ? "lead" : "none",
+      reminderLeadMinutes: Number.isFinite(handlerInput.reminderLeadMinutes) ? Number(handlerInput.reminderLeadMinutes) : null,
       reminderAt: null
     });
     await sendDataToWindow();
