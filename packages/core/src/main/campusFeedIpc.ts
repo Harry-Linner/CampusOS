@@ -48,6 +48,14 @@ export const registerCampusFeedHandlers = (service: CampusFeedService): void => 
     return service.updateSource(input.id, input.patch);
   });
 
+  ipcMain.handle("campusos:campus-feed:notification-settings-save", async (event, input: { keywords: string[] }) => {
+    assertTrustedRenderer(event);
+    if (typeof input !== "object" || input === null || !Array.isArray(input.keywords)) {
+      throw new Error("通知关键词设置无效。");
+    }
+    return service.saveNotificationSettings(input);
+  });
+
   ipcMain.handle("campusos:campus-feed:remove-source", async (event, sourceId: string) => {
     assertTrustedRenderer(event);
     if (typeof sourceId !== "string" || !sourceId) {

@@ -16,6 +16,31 @@ afterEach(async () => {
 });
 
 describe("database service", () => {
+  it("treats a summary-only feed edit as a visible update", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-feed-summary-test-"));
+    temporaryDirectories.push(storageRoot);
+    const database = createDatabaseService({ databasePath: join(storageRoot, "campusos.sqlite") });
+    try {
+      const item = {
+        id: "item-1",
+        sourceId: "source-1",
+        url: "https://example.test/item-1",
+        title: "标题",
+        summary: "旧摘要",
+        publishedAt: "2026-09-01T00:00:00.000Z",
+        contentHash: "same-detail-hash",
+        fetchedAt: "2026-09-01T00:00:00.000Z",
+        state: "new"
+      };
+      expect(database.upsertCampusFeedItem(item)).toBe(true);
+      database.markCampusFeedItemsRead([item.id]);
+      expect(database.upsertCampusFeedItem({ ...item, summary: "新摘要", fetchedAt: "2026-09-01T01:00:00.000Z" })).toBe(true);
+      expect(database.findCampusFeedItem(item.id)).toMatchObject({ summary: "新摘要", state: "new" });
+    } finally {
+      database.close();
+    }
+  });
+
   it("migrates a SQLite database and persists workspace and account-isolated capability records", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-database-test-"));
     temporaryDirectories.push(storageRoot);
@@ -24,7 +49,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(13);
+      expect(database.schemaVersion).toBe(14);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -98,6 +123,11 @@ describe("database service", () => {
       expect(database.loadCampusFeedRefreshState("xgb-pingjiang")).toBeNull();
       database.saveCampusFeedRefreshState("xgb-pingjiang", "2026-07-20T08:06:00.000Z");
       expect(database.loadCampusFeedRefreshState("xgb-pingjiang")).toBe("2026-07-20T08:06:00.000Z");
+      database.saveCampusFeedNotificationSettings({ keywords: ["讲座"] }, "2026-07-20T08:07:00.000Z");
+      expect(database.loadCampusFeedNotificationSettings()).toEqual({
+        settings: { keywords: ["讲座"] },
+        savedAt: "2026-07-20T08:07:00.000Z"
+      });
 
       expect(() =>
         database.saveAcademicGpaStrategy("", "first", "2026-07-20T08:05:00.000Z")
@@ -148,7 +178,7 @@ describe("database service", () => {
 
     const database = createDatabaseService({ databasePath });
     try {
-      expect(database.schemaVersion).toBe(13);
+      expect(database.schemaVersion).toBe(14);
     } finally {
       database.close();
     }

@@ -210,22 +210,26 @@ const startCampusApp = (): void => {
     registerCampusFeedHandlers(createCampusFeedService({
       database: getOfficialDatabaseService(),
       notify: async (input) => {
+        const sourceNames = [...new Set(input.items.map((item) => item.sourceName))];
         for (const [index, item] of input.items.entries()) {
           await addNotification({
-            id: `campus-feed:${item.id}:${item.contentHash}`,
+            id: `campus-feed:${item.id}`,
             kind: "feed",
             title: item.title,
             body: item.summary ?? "暂无摘要，可前往校园资讯查看详情。",
             actionTarget: { viewId: "campus-feed", entityId: item.id },
             source: "campus-feed",
-            sourceId: input.sourceId,
-            sourceLabel: input.sourceName,
+            sourceId: item.sourceId,
+            sourceLabel: item.sourceName,
             groupId: input.batchId,
             entityId: item.id,
             publishedAt: item.publishedAt,
             showDesktop: index === 0,
-            desktopTitle: input.sourceName,
-            desktopBody: `新增 ${input.items.length} 条校园资讯`
+            desktopTitle: sourceNames.length === 1 ? sourceNames[0] : "校园资讯",
+            desktopBody: `新增 ${input.items.length} 条校园资讯`,
+            desktopActionTarget: index === 0
+              ? { viewId: "campus-feed", entityIds: input.items.map((entry) => entry.id) }
+              : undefined
           });
         }
       },

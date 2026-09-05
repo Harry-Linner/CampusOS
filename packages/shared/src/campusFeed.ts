@@ -58,6 +58,13 @@ export interface FeedSourceDescriptor {
   /** Fetch interval in minutes (default 60). */
   intervalMinutes: number;
   enabled: boolean;
+  /** Whether new matching items from this source enter the notification system. */
+  notificationEnabled?: boolean;
+}
+
+export interface CampusFeedNotificationSettings {
+  /** Global OR-matched terms applied to title and summary. Empty means no filtering. */
+  keywords: string[];
 }
 
 /** A normalized notice item. */
@@ -80,6 +87,7 @@ export interface FeedItemRecord {
 export interface CampusFeedSnapshot {
   sources: FeedSourceDescriptor[];
   items: FeedItemRecord[];
+  notificationSettings: CampusFeedNotificationSettings;
   /** sourceId -> ISO timestamp of the last successful fetch. */
   lastRefresh: Record<string, string>;
 }
@@ -89,6 +97,7 @@ export interface CampusFeedBridge {
   refreshSource: (sourceId: string) => Promise<FeedItemRecord[]>;
   refreshAll: () => Promise<void>;
   updateSource: (id: string, patch: Partial<FeedSourceDescriptor>) => Promise<FeedSourceDescriptor>;
+  saveNotificationSettings: (input: CampusFeedNotificationSettings) => Promise<CampusFeedNotificationSettings>;
   removeSource: (id: string) => Promise<void>;
   markRead: (ids: string[]) => Promise<void>;
   openExternal: (url: string) => Promise<void>;

@@ -5,6 +5,7 @@ export type NotificationSource = "system" | "schedule" | "campus-feed" | "academ
 export interface NotificationActionTarget {
   viewId: string;
   entityId?: string;
+  entityIds?: string[];
 }
 
 export interface NotificationRecord {

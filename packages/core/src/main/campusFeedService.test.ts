@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeedItemRecord, LocalTaskInput } from "@campusos/shared";
-import { createCampusFeedService, type CampusFeedService } from "./campusFeedService";
+import { createCampusFeedService, type CampusFeedNotifyInput, type CampusFeedService } from "./campusFeedService";
 import {
   MVP_CAMPUS_FEED_SOURCES,
   feedSourceRequestFingerprint
@@ -65,7 +65,7 @@ describe("campusFeedService", () => {
     const fetchFn = createFetch({
       "http://www.xgb.zju.edu.cn/53395/list.htm": XGB_HTML
     });
-    const notify = vi.fn(async () => undefined);
+    const notify = vi.fn(async (input: CampusFeedNotifyInput) => { void input; });
     service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
 
     const first = await service.refreshSource("xgb-pingjiang");
@@ -145,20 +145,82 @@ describe("campusFeedService", () => {
     const snapshot = await service.getSnapshot();
     expect(snapshot.sources.find((source) => source.id === "xgb-pingjiang")).toBeUndefined();
     expect(snapshot.items).toHaveLength(0);
+    expect(database.loadCampusFeedRefreshState("xgb-pingjiang")).toBeNull();
   });
 
-  it("refreshAll fetches every enabled source and tolerates failures", async () => {
+  it("refreshAll keeps successful results and reports partial failures", async () => {
     const fetchFn = createFetch({
       "http://www.xgb.zju.edu.cn/53395/list.htm": XGB_HTML,
       "https://ugrs.zju.edu.cn/dwjlfwpt/42976/list.htm": UG_HTML
     });
     service = createCampusFeedService({ database, fetchFn, startScheduler: false });
     await service.updateSource("zjutw-tzgg", { enabled: false });
-    await service.refreshAll();
+    await expect(service.refreshAll()).rejects.toThrow(/信息源刷新失败/);
     const snapshot = await service.getSnapshot();
     expect(snapshot.items).toHaveLength(3);
     // ckc has no mock page -> 404, tolerated
     expect(snapshot.lastRefresh["ckc-zxtz"]).toBeUndefined();
+  });
+
+  it("persists normalized global notification keywords", async () => {
+    service = createCampusFeedService({ database, startScheduler: false });
+    await expect(service.saveNotificationSettings({ keywords: [" Scholarship ", "scholarship", "讲座", ""] }))
+      .resolves.toEqual({ keywords: ["Scholarship", "讲座"] });
+
+    const restored = createCampusFeedService({ database, startScheduler: false });
+    expect((await restored.getSnapshot()).notificationSettings).toEqual({ keywords: ["Scholarship", "讲座"] });
+  });
+
+  it("filters notifications by title or summary and honors each source notification switch", async () => {
+    const listUrl = "http://www.xgb.zju.edu.cn/53395/list.htm";
+    const matching = XGB_HTML.replace("关于评选2024-2025学年", "SCHOLARSHIP 关于评选2024-2025学年");
+    const matchingAgain = matching.replace("SCHOLARSHIP 关于评选2024-2025学年", "Scholarship 更新 关于评选2024-2025学年");
+    let listCalls = 0;
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) !== listUrl) return new Response("not found", { status: 404 });
+      listCalls += 1;
+      return new Response(listCalls === 1 ? XGB_HTML : listCalls === 2 ? matching : matchingAgain, { status: 200 });
+    }) as unknown as typeof fetch;
+    const notify = vi.fn(async (input: CampusFeedNotifyInput) => { void input; });
+    service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
+
+    await service.refreshSource("xgb-pingjiang");
+    await service.saveNotificationSettings({ keywords: ["scholarship"] });
+    expect(notify).not.toHaveBeenCalled();
+    await service.refreshSource("xgb-pingjiang");
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0].items).toHaveLength(1);
+
+    await service.updateSource("xgb-pingjiang", { notificationEnabled: false });
+    await service.refreshSource("xgb-pingjiang");
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("emits one combined notification batch when refresh-all finds items in several sources", async () => {
+    const xgbUrl = "http://www.xgb.zju.edu.cn/53395/list.htm";
+    const ugrsUrl = "https://ugrs.zju.edu.cn/dwjlfwpt/42976/list.htm";
+    let changed = false;
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === xgbUrl) return new Response(changed ? XGB_HTML.replace("关于评选2024-2025学年", "【更新】关于评选2024-2025学年") : XGB_HTML, { status: 200 });
+      if (url === ugrsUrl) return new Response(changed ? UG_HTML.replace("第四课堂修读方式", "【更新】第四课堂修读方式") : UG_HTML, { status: 200 });
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+    const notify = vi.fn(async (input: CampusFeedNotifyInput) => { void input; });
+    service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
+    const snapshot = await service.getSnapshot();
+    await Promise.all(snapshot.sources
+      .filter((source) => source.id !== "xgb-pingjiang" && source.id !== "ugrs-dwjl" && source.enabled)
+      .map((source) => service.updateSource(source.id, { enabled: false })));
+
+    await service.refreshAll();
+    expect(notify).not.toHaveBeenCalled();
+    changed = true;
+    await service.refreshAll();
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0][0].batchId).toContain("campus-feed:all:");
+    expect(notify.mock.calls[0][0].items).toHaveLength(2);
+    expect(new Set(notify.mock.calls[0][0].items.map((item) => item.sourceId))).toEqual(new Set(["xgb-pingjiang", "ugrs-dwjl"]));
   });
 
   it("propagates a fetch failure and schedules a retry without corrupting state", async () => {
@@ -262,7 +324,7 @@ describe("campusFeedService", () => {
         }
         return new Response("not found", { status: 404 });
       }) as unknown as typeof fetch;
-      const notify = vi.fn(async () => undefined);
+      const notify = vi.fn(async (input: CampusFeedNotifyInput) => { void input; });
       service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
       await service.refreshSource("xgb-pingjiang");
       await service.markRead((await service.getSnapshot()).items.map((item) => item.id));
@@ -276,10 +338,12 @@ describe("campusFeedService", () => {
       expect(snapshot.items.filter((item) => item.title.includes("已更新"))[0].state).toBe("new");
       expect(notify).toHaveBeenCalledTimes(1);
       expect(notify).toHaveBeenCalledWith(expect.objectContaining({
-        sourceId: "xgb-pingjiang",
-        sourceName: "学工门户 · 评奖评优",
         batchId: expect.stringContaining("campus-feed:xgb-pingjiang:"),
-        items: [expect.objectContaining({ title: expect.stringContaining("已更新") })]
+        items: [expect.objectContaining({
+          sourceId: "xgb-pingjiang",
+          sourceName: "学工门户 · 评奖评优",
+          title: expect.stringContaining("已更新")
+        })]
       }));
     });
 

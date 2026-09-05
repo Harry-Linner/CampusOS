@@ -33,6 +33,7 @@ import type { CampusFeedService } from "./campusFeedService";
 const snapshot = {
   sources: [],
   items: [],
+  notificationSettings: { keywords: [] },
   lastRefresh: {}
 };
 
@@ -41,6 +42,7 @@ const service = {
   refreshSource: vi.fn(async () => []),
   refreshAll: vi.fn(async () => undefined),
   updateSource: vi.fn(async (_id: string, patch: unknown) => ({ id: "s1", ...(patch as Record<string, unknown>) })),
+  saveNotificationSettings: vi.fn(async (input: unknown) => input),
   removeSource: vi.fn(async () => undefined),
   markRead: vi.fn(async () => undefined),
   openExternal: vi.fn(async () => "https://xgb.zju.edu.cn/a"),
@@ -67,7 +69,7 @@ const invoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
 };
 
 describe("campusFeedIpc", () => {
-  it("registers exactly the twelve formal channels", () => {
+  it("registers the formal channels", () => {
     process.env.ELECTRON_RENDERER_URL = "http://localhost:5173/";
     registerCampusFeedHandlers(service);
     expect([...electronState.handlers.keys()]).toEqual([
@@ -75,6 +77,7 @@ describe("campusFeedIpc", () => {
       "campusos:campus-feed:refresh-source",
       "campusos:campus-feed:refresh-all",
       "campusos:campus-feed:update-source",
+      "campusos:campus-feed:notification-settings-save",
       "campusos:campus-feed:remove-source",
       "campusos:campus-feed:mark-read",
       "campusos:campus-feed:open-external",
@@ -94,6 +97,8 @@ describe("campusFeedIpc", () => {
     expect(service.refreshAll).toHaveBeenCalledTimes(1);
     await invoke("campusos:campus-feed:mark-read", ["a", "b"]);
     expect(service.markRead).toHaveBeenCalledWith(["a", "b"]);
+    await invoke("campusos:campus-feed:notification-settings-save", { keywords: ["奖学金"] });
+    expect(service.saveNotificationSettings).toHaveBeenCalledWith({ keywords: ["奖学金"] });
   });
 
   it("opens a validated external URL through the shell", async () => {
@@ -121,5 +126,7 @@ describe("campusFeedIpc", () => {
       .rejects.toThrow(/订阅源更新参数无效/);
     await expect(invoke("campusos:campus-feed:mark-read", "not-an-array"))
       .rejects.toThrow(/已读条目参数无效/);
+    await expect(invoke("campusos:campus-feed:notification-settings-save", { keywords: "nope" }))
+      .rejects.toThrow(/通知关键词设置无效/);
   });
 });

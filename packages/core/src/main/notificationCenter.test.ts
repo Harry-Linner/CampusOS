@@ -153,15 +153,24 @@ describe("Notification IPC", () => {
       title: "校园资讯",
       body: "一条新资讯",
       source: "campus-feed",
-      actionTarget: { viewId: "campus-feed", entityId: "feed-1" }
+      actionTarget: { viewId: "campus-feed", entityId: "feed-1" },
+      desktopActionTarget: { viewId: "campus-feed", entityIds: ["feed-1", "feed-2"] }
     });
     expect(added.state).toBe("unread");
     expect(electronState.notifications).toHaveLength(1);
 
     electronState.notifications[0].handlers.get("click")?.();
-    expect(electronState.navigate).toHaveBeenCalledWith({ viewId: "campus-feed", entityId: "feed-1" });
+    expect(electronState.navigate).toHaveBeenCalledWith({ viewId: "campus-feed", entityIds: ["feed-1", "feed-2"] });
     await vi.waitFor(async () => {
       expect((await readNotificationRecords()).find((entry) => entry.id === added.id)?.state).toBe("read");
     });
+  });
+
+  it("updates one stable feed notification record when its visible content changes", async () => {
+    await addNotification({ id: "campus-feed:item-1", kind: "feed", title: "旧标题", body: "旧摘要", showDesktop: false });
+    await addNotification({ id: "campus-feed:item-1", kind: "feed", title: "新标题", body: "新摘要", showDesktop: false });
+    const records = await readNotificationRecords();
+    expect(records.filter((entry) => entry.id === "campus-feed:item-1")).toHaveLength(1);
+    expect(records.find((entry) => entry.id === "campus-feed:item-1")).toMatchObject({ title: "新标题", body: "新摘要", state: "unread" });
   });
 });

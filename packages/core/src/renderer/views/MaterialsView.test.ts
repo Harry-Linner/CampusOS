@@ -86,6 +86,21 @@ const snapshot: CampusWorkspaceSnapshot = {
 };
 
 describe("MaterialsView", () => {
+  it("allows retrying a failed initial read and renders the recovered workspace", async () => {
+    const onRefresh = vi.fn().mockRejectedValueOnce(new Error("读取失败，请检查连接。"));
+    const props = { capabilities: {} as PluginCapabilityClient, loading: false, onRefresh, snapshot: null };
+    const view = render(createElement(MaterialsView, props));
+    fireEvent.click(screen.getByRole("button", { name: "重试读取" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("读取失败"));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    onRefresh.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByRole("button", { name: "重试读取" }));
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(2));
+    view.rerender(createElement(MaterialsView, { ...props, snapshot }));
+    expect(screen.getByRole("button", { name: "课程资料" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("keeps the summer short term separate from spring-summer materials", () => {
     render(createElement(MaterialsView, {
       capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,

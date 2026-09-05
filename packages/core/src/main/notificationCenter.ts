@@ -24,6 +24,7 @@ export interface AddNotificationInput {
   title: string;
   body: string;
   actionTarget?: string | NotificationActionTarget | null;
+  desktopActionTarget?: string | NotificationActionTarget | null;
   source?: NotificationSource;
   sourceId?: string | null;
   sourceLabel?: string | null;
@@ -61,6 +62,9 @@ const normalizeTarget = (value: unknown): string | NotificationActionTarget | nu
     viewId: candidate.viewId.trim().slice(0, 80),
     ...(typeof candidate.entityId === "string" && candidate.entityId.trim()
       ? { entityId: candidate.entityId.trim().slice(0, 240) }
+      : {}),
+    ...(Array.isArray(candidate.entityIds)
+      ? { entityIds: [...new Set(candidate.entityIds.filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim())).map((entry) => entry.trim().slice(0, 240)))].slice(0, 50) }
       : {})
   };
 };
@@ -241,7 +245,7 @@ export const addNotification = async (input: AddNotificationInput): Promise<Noti
   records = [record, ...(records ?? []).filter((entry) => entry.id !== id)];
   persist(records);
   if (input.showDesktop !== false) {
-    const target = targetToNavigation(record.actionTarget);
+    const target = targetToNavigation(input.desktopActionTarget ?? record.actionTarget);
     const lifecycle = await getAppLifecycleSettings();
     if (lifecycle.notificationEnabled && Notification.isSupported()) {
       const notification = new Notification({ title: input.desktopTitle ?? record.title, body: input.desktopBody ?? record.body });

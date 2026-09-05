@@ -177,6 +177,8 @@ contextBridge.exposeInMainWorld("campusos", {
     refreshAll: () => ipcRenderer.invoke("campusos:campus-feed:refresh-all"),
     updateSource: (id: string, patch: Record<string, unknown>) =>
       ipcRenderer.invoke("campusos:campus-feed:update-source", { id, patch }),
+    saveNotificationSettings: (input: { keywords: string[] }) =>
+      ipcRenderer.invoke("campusos:campus-feed:notification-settings-save", input),
     removeSource: (id: string) => ipcRenderer.invoke("campusos:campus-feed:remove-source", id),
     markRead: (ids: string[]) => ipcRenderer.invoke("campusos:campus-feed:mark-read", ids),
     openExternal: (url: string) => ipcRenderer.invoke("campusos:campus-feed:open-external", url),

@@ -13,6 +13,7 @@ import type {
   CampusFeedAiTestResult,
   CampusFeedScheduleCandidate,
   CampusFeedScheduleImportResult,
+  CampusFeedNotificationSettings,
   CampusFeedSnapshot,
   FeedItemRecord,
   FeedSourceDescriptor,
@@ -48,10 +49,11 @@ const BACKOFF_BASE_MS = 5 * 60 * 1000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 export interface CampusFeedNotifyInput {
-  sourceId: string;
-  sourceName: string;
   batchId: string;
-  items: Array<Pick<FeedItemRecord, "id" | "title" | "summary" | "publishedAt" | "contentHash">>;
+  items: Array<Pick<FeedItemRecord, "id" | "title" | "summary" | "publishedAt" | "contentHash"> & {
+    sourceId: string;
+    sourceName: string;
+  }>;
 }
 
 export interface CampusFeedServiceDependencies {
@@ -85,6 +87,7 @@ export interface CampusFeedService {
     id: string,
     patch: Partial<FeedSourceDescriptor>
   ) => Promise<FeedSourceDescriptor>;
+  saveNotificationSettings: (input: CampusFeedNotificationSettings) => Promise<CampusFeedNotificationSettings>;
   removeSource: (id: string) => Promise<void>;
   markRead: (ids: string[]) => Promise<void>;
   openExternal: (url: string) => Promise<string>;
@@ -107,8 +110,41 @@ const isDescriptor = (value: unknown): value is FeedSourceDescriptor => {
     (candidate.category === "college" || candidate.category === "general") &&
     Array.isArray(candidate.tags) &&
     typeof candidate.intervalMinutes === "number" &&
-    typeof candidate.enabled === "boolean"
+    typeof candidate.enabled === "boolean" &&
+    (candidate.notificationEnabled === undefined || typeof candidate.notificationEnabled === "boolean")
   );
+};
+
+const normalizeSource = (source: FeedSourceDescriptor): FeedSourceDescriptor => ({
+  ...source,
+  notificationEnabled: source.notificationEnabled !== false
+});
+
+const normalizeNotificationSettings = (value: unknown): CampusFeedNotificationSettings => {
+  if (typeof value !== "object" || value === null || !Array.isArray((value as { keywords?: unknown }).keywords)) {
+    return { keywords: [] };
+  }
+  const keywords: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of (value as { keywords: unknown[] }).keywords) {
+    if (typeof entry !== "string") continue;
+    const keyword = entry.trim().slice(0, 40);
+    const key = keyword.toLocaleLowerCase("en-US");
+    if (!keyword || seen.has(key)) continue;
+    seen.add(key);
+    keywords.push(keyword);
+    if (keywords.length >= 30) break;
+  }
+  return { keywords };
+};
+
+const matchesNotificationKeywords = (
+  item: Pick<FeedItemRecord, "title" | "summary">,
+  settings: CampusFeedNotificationSettings
+): boolean => {
+  if (settings.keywords.length === 0) return true;
+  const searchable = `${item.title}\n${item.summary ?? ""}`.toLocaleLowerCase("en-US");
+  return settings.keywords.some((keyword) => searchable.includes(keyword.toLocaleLowerCase("en-US")));
 };
 
 const normalizeInterval = (value: number): number => {
@@ -252,6 +288,7 @@ export const createCampusFeedService = ({
   const inFlight = new Set<string>();
   const failures = new Map<string, number>();
   const lastRefresh: Record<string, string> = {};
+  let notificationSettings: CampusFeedNotificationSettings = { keywords: [] };
   let hydrated = false;
   let hydration: Promise<void> | null = null;
 
@@ -268,7 +305,7 @@ export const createCampusFeedService = ({
         const stored = database.listCampusFeedSources();
         const savedAt = now().toISOString();
         if (stored.length === 0) {
-          sources = MVP_CAMPUS_FEED_SOURCES.map((source) => ({ ...source }));
+          sources = MVP_CAMPUS_FEED_SOURCES.map(normalizeSource);
           for (const source of sources) {
             database.saveCampusFeedSource(source.id, source, savedAt);
           }
@@ -282,15 +319,19 @@ export const createCampusFeedService = ({
           sources = stored
             .map((entry) => entry.config)
             .filter(isDescriptor)
-            .map((source) => ({ ...source }));
+            .map(normalizeSource);
           // 老安装补种缺失的默认源（保留用户已做的启停/间隔设置）。
           for (const source of MVP_CAMPUS_FEED_SOURCES) {
             if (!known.has(source.id)) {
-              sources.push({ ...source });
-              database.saveCampusFeedSource(source.id, source, savedAt);
+              const normalized = normalizeSource(source);
+              sources.push(normalized);
+              database.saveCampusFeedSource(source.id, normalized, savedAt);
             }
           }
         }
+        notificationSettings = normalizeNotificationSettings(
+          database.loadCampusFeedNotificationSettings()?.settings ?? { keywords: [] }
+        );
         hydrated = true;
       })();
     }
@@ -311,6 +352,7 @@ export const createCampusFeedService = ({
     const snapshot: CampusFeedSnapshot = {
       sources: sources.map((source) => ({ ...source })),
       items: buildItems(),
+      notificationSettings: { keywords: [...notificationSettings.keywords] },
       lastRefresh: { ...lastRefresh }
     };
     for (const listener of listeners) listener(snapshot);
@@ -324,7 +366,10 @@ export const createCampusFeedService = ({
     }
   };
 
-  const refreshSource = async (sourceId: string): Promise<FeedItemRecord[]> => {
+  const refreshSourceInternal = async (sourceId: string, notifyImmediately: boolean): Promise<{
+    items: FeedItemRecord[];
+    notificationItems: CampusFeedNotifyInput["items"];
+  }> => {
     await hydrate();
     const source = sources.find((candidate) => candidate.id === sourceId);
     if (!source) throw new Error("订阅源不存在。");
@@ -334,10 +379,16 @@ export const createCampusFeedService = ({
     inFlight.add(sourceId);
     const startedAt = performance.now();
     try {
-      const items = await performRefresh(source, startedAt);
+      const outcome = await performRefresh(source, startedAt);
       scheduleNext(source);
       broadcast();
-      return items;
+      if (notifyImmediately && outcome.notificationItems.length > 0 && notify) {
+        void notify({
+          batchId: `campus-feed:${source.id}:${now().toISOString()}`,
+          items: outcome.notificationItems
+        });
+      }
+      return outcome;
     } catch (cause) {
       failures.set(sourceId, (failures.get(sourceId) ?? 0) + 1);
       scheduleRetry(source);
@@ -356,6 +407,9 @@ export const createCampusFeedService = ({
       inFlight.delete(sourceId);
     }
   };
+
+  const refreshSource = async (sourceId: string): Promise<FeedItemRecord[]> =>
+    (await refreshSourceInternal(sourceId, true)).items;
 
   const schedule = (source: FeedSourceDescriptor, delayMs: number): void => {
     clearTimer(source.id);
@@ -386,7 +440,7 @@ export const createCampusFeedService = ({
   const performRefresh = async (
     source: FeedSourceDescriptor,
     startedAt: number
-  ): Promise<FeedItemRecord[]> => {
+  ): Promise<{ items: FeedItemRecord[]; notificationItems: CampusFeedNotifyInput["items"] }> => {
     const hadBaseline = database.loadCampusFeedRefreshState(source.id) !== null;
     const outcome = await fetchSourceList(source, { fetchFn, now });
     const items = outcome.items;
@@ -406,21 +460,21 @@ export const createCampusFeedService = ({
       durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
       requestFingerprint: outcome.requestFingerprint
     });
-    if (hadBaseline && fresh.length > 0 && notify) {
-      void notify({
-        sourceId: source.id,
-        sourceName: source.name,
-        batchId: `campus-feed:${source.id}:${refreshedAt}`,
-        items: fresh.map(({ id, title, summary, publishedAt, contentHash }) => ({
+    const notifiable = source.notificationEnabled === false
+      ? []
+      : fresh.filter((item) => matchesNotificationKeywords(item, notificationSettings));
+    const notificationItems = hadBaseline
+      ? notifiable.map(({ id, title, summary, publishedAt, contentHash }) => ({
           id,
           title,
           summary,
           publishedAt,
-          contentHash
+          contentHash,
+          sourceId: source.id,
+          sourceName: source.name
         }))
-      });
-    }
-    return items;
+      : [];
+    return { items, notificationItems };
   };
 
   const startInitialFetch = (): void => {
@@ -440,6 +494,7 @@ export const createCampusFeedService = ({
       return {
         sources: sources.map((source) => ({ ...source })),
         items: buildItems(),
+        notificationSettings: { keywords: [...notificationSettings.keywords] },
         lastRefresh: { ...lastRefresh }
       };
     },
@@ -449,12 +504,16 @@ export const createCampusFeedService = ({
     refreshAll: async () => {
       await hydrate();
       const enabled = sources.filter((source) => source.enabled);
-      await Promise.allSettled(
-        enabled.map((source) =>
-          refreshSource(source.id).catch(() => undefined)
-        )
-      );
+      const results = await Promise.allSettled(enabled.map((source) => refreshSourceInternal(source.id, false)));
       broadcast();
+      const notificationItems = results.flatMap((result) => result.status === "fulfilled" ? result.value.notificationItems : []);
+      if (notificationItems.length > 0 && notify) {
+        void notify({ batchId: `campus-feed:all:${now().toISOString()}`, items: notificationItems });
+      }
+      const failed = results.flatMap((result, index) => result.status === "rejected" ? [enabled[index].name] : []);
+      if (failed.length > 0) {
+        throw new Error(`${failed.length} 个信息源刷新失败：${failed.join("、")}`);
+      }
     },
 
     updateSource: async (id, patch) => {
@@ -465,6 +524,10 @@ export const createCampusFeedService = ({
       if (patch.enabled !== undefined) {
         if (typeof patch.enabled !== "boolean") throw new Error("订阅状态无效。");
         next.enabled = patch.enabled;
+      }
+      if (patch.notificationEnabled !== undefined) {
+        if (typeof patch.notificationEnabled !== "boolean") throw new Error("通知状态无效。");
+        next.notificationEnabled = patch.notificationEnabled;
       }
       if (patch.intervalMinutes !== undefined) {
         if (typeof patch.intervalMinutes !== "number") throw new Error("刷新间隔无效。");
@@ -484,6 +547,17 @@ export const createCampusFeedService = ({
       if (next.enabled) scheduleNext(next);
       broadcast();
       return { ...next };
+    },
+
+    saveNotificationSettings: async (input) => {
+      await hydrate();
+      if (typeof input !== "object" || input === null || !Array.isArray(input.keywords)) {
+        throw new Error("通知关键词设置无效。");
+      }
+      notificationSettings = normalizeNotificationSettings(input);
+      database.saveCampusFeedNotificationSettings(notificationSettings, now().toISOString());
+      broadcast();
+      return { keywords: [...notificationSettings.keywords] };
     },
 
     removeSource: async (id) => {

@@ -237,7 +237,7 @@ describe("notification SQLite persistence regressions", () => {
   });
 
   it("has a real SQLite migration and keeps the public record fields available", async () => {
-    expect(persistenceState.current?.schemaVersion).toBe(13);
+    expect(persistenceState.current?.schemaVersion).toBe(14);
     const record = makeRecord("api-shape");
     persistenceState.current?.saveNotifications([record], true);
     expect(persistenceState.current?.loadNotifications()).toEqual([record]);
@@ -253,7 +253,7 @@ describe("notification SQLite persistence regressions", () => {
     legacyDatabase.close();
 
     persistenceState.current = createDatabaseService({ databasePath });
-    expect(persistenceState.current.schemaVersion).toBe(13);
+    expect(persistenceState.current.schemaVersion).toBe(14);
     const record = makeRecord("migrated");
     persistenceState.current.saveNotifications([record], true);
     expect(persistenceState.current.loadNotifications()).toEqual([record]);

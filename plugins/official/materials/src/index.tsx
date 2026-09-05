@@ -304,14 +304,24 @@ export const Component = ({
   };
 
   if (!snapshot) {
+    const reading = loading || busyId === "reload";
     return (
       <section className="page-shell materials-page">
         <header className="page-heading">
           <div>
             <h1>资料</h1>
-            <p>{loading ? "正在读取课程资料与下载队列" : "资料暂时不可用"}</p>
+            <p role="status">{reading ? "正在读取课程资料与下载队列" : "资料暂时不可用"}</p>
           </div>
         </header>
+        {!reading ? <div className="quiet-empty-state">
+          <p>请重试读取课程资料与下载队列。</p>
+          <Button onClick={() => {
+            setBusyId("reload");
+            setActionError(null);
+            void onRefresh().catch((error) => setActionError(error instanceof Error ? error.message : "资料读取失败，请稍后重试。")).finally(() => setBusyId(null));
+          }}>重试读取</Button>
+        </div> : null}
+        {actionError ? <p className="error-copy" role="alert">{actionError}</p> : null}
       </section>
     );
   }

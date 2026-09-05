@@ -112,6 +112,8 @@ export interface DatabaseService {
   saveCampusFeedRefreshState: (sourceId: string, lastSuccessAt: string) => void;
   saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
   loadCampusFeedAiSettings: () => { settings: unknown; savedAt: string } | null;
+  saveCampusFeedNotificationSettings: (settings: unknown, savedAt: string) => void;
+  loadCampusFeedNotificationSettings: () => { settings: unknown; savedAt: string } | null;
   loadNotifications: () => NotificationRecord[];
   saveNotifications: (records: readonly NotificationRecord[], markLegacyImported?: boolean) => void;
   hasImportedLegacyNotifications: () => boolean;
@@ -273,6 +275,13 @@ const migrate = (database: Database.Database): void => {
       legacy_imported INTEGER NOT NULL DEFAULT 0 CHECK (legacy_imported IN (0, 1))
     );
     INSERT INTO notification_storage_meta (singleton, legacy_imported) VALUES (1, 0);
+  `);
+  applyMigration(14, `
+    CREATE TABLE campus_feed_notification_settings (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      settings_json TEXT NOT NULL,
+      saved_at TEXT NOT NULL
+    );
   `);
 };
 
@@ -625,8 +634,11 @@ export const createDatabaseService = ({
       `).run(id, JSON.stringify(config), savedAt);
     },
     deleteCampusFeedSource: (id) => {
-      database.prepare("DELETE FROM campus_feed_sources WHERE id = ?").run(id);
-      database.prepare("DELETE FROM campus_feed_items WHERE source_id = ?").run(id);
+      database.transaction(() => {
+        database.prepare("DELETE FROM campus_feed_sources WHERE id = ?").run(id);
+        database.prepare("DELETE FROM campus_feed_items WHERE source_id = ?").run(id);
+        database.prepare("DELETE FROM campus_feed_refresh_state WHERE source_id = ?").run(id);
+      })();
     },
     upsertCampusFeedItem: (item) => {
       const candidate = item as {
@@ -646,11 +658,10 @@ export const createDatabaseService = ({
         throw new Error("校园资讯条目抓取时间无效。");
       }
       const existing = database.prepare(
-        "SELECT content_hash FROM campus_feed_items WHERE id = ?"
-      ).get(candidate.id) as { content_hash: string } | undefined;
-      // Truly new insert, or an upstream edit (contentHash changed) — both should be
-      // surfaced as "fresh" and reset the item to unread.
-      const isNewOrChanged = !existing || existing.content_hash !== candidate.contentHash;
+        "SELECT title, summary FROM campus_feed_items WHERE id = ?"
+      ).get(candidate.id) as { title: string; summary: string | null } | undefined;
+      // User-visible edits are defined by the fields used for notification matching.
+      const isNewOrChanged = !existing || existing.title !== candidate.title || existing.summary !== candidate.summary;
       database.prepare(`
         INSERT INTO campus_feed_items (
           id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
@@ -662,7 +673,10 @@ export const createDatabaseService = ({
           published_at = excluded.published_at,
           content_hash = excluded.content_hash,
           fetched_at = excluded.fetched_at,
-          state = CASE WHEN campus_feed_items.content_hash != excluded.content_hash THEN 'new' ELSE campus_feed_items.state END
+          state = CASE
+            WHEN campus_feed_items.title != excluded.title OR campus_feed_items.summary IS NOT excluded.summary THEN 'new'
+            ELSE campus_feed_items.state
+          END
       `).run(
         candidate.id,
         candidate.sourceId,
@@ -810,6 +824,26 @@ export const createDatabaseService = ({
     loadCampusFeedAiSettings: () => {
       const row = database.prepare(
         "SELECT settings_json, saved_at FROM campus_feed_ai_settings WHERE singleton = 1"
+      ).get() as { settings_json: string; saved_at: string } | undefined;
+      return row
+        ? { settings: JSON.parse(row.settings_json) as unknown, savedAt: row.saved_at }
+        : null;
+    },
+    saveCampusFeedNotificationSettings: (settings, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯通知设置保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_notification_settings (singleton, settings_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          settings_json = excluded.settings_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(settings), savedAt);
+    },
+    loadCampusFeedNotificationSettings: () => {
+      const row = database.prepare(
+        "SELECT settings_json, saved_at FROM campus_feed_notification_settings WHERE singleton = 1"
       ).get() as { settings_json: string; saved_at: string } | undefined;
       return row
         ? { settings: JSON.parse(row.settings_json) as unknown, savedAt: row.saved_at }
