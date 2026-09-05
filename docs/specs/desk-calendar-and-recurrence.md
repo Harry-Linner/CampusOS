@@ -1,6 +1,6 @@
 # 桌历与重复事件收口 Spec
 
-状态：已实现并完成本地验证（2026-09-05）；远端验证以本次提交对应的 GitHub Actions 为准
+状态：2026-09-05 桌历原生交互修复；重复事件与通知仍有已确认缺陷，见 [审查记录](../audits/2026-09-05-desktop-and-schedule.md)。远端验证以本次提交对应的 GitHub Actions 为准。
 
 ## 目标与边界
 
@@ -32,12 +32,12 @@
 
 用户放假/补班覆盖 > 官方校历开课日与学季边界 > 内置农历/节日展示 > 周一开始的自然周回退。桌历由 `calendarDataService` 读取该结果；主日历沿用相同正式校历 capability 和自然周回退语义。
 
-### WorkerW 贴底
+### 可交互桌面贴底
 
-- Windows 11 raised-desktop 布局中，桌历挂到 `Progman` 并排在 `SHELLDLL_DefView` 后、壁纸 `WorkerW` 前；传统布局发送 `WM_SPAWN_WORKERW` 后挂到承载图标窗口之后的顶层 `WorkerW`。
-- 挂载前后校验物理坐标，避免混合 DPI 或多显示器导致窗口跳出屏幕。
-- 不使用 `WS_EX_TRANSPARENT`；WorkerW 不可用或校验失败时恢复顶层样式并走 z-order 回退。
-- 窗口获得焦点或被系统隐藏后重新校正层级；用户开启置顶时尊重置顶选择。
+- 桌历始终位于桌面之上、普通应用之下，不提供置顶选项；旧 `alwaysOnTop` 偏好在读取与保存时移除，其他设置保留。
+- 保持 Electron 独立顶层窗口、原生样式和 DPI 行为，不挂入 WorkerW，不改变 Explorer 子窗口层级。
+- 识别实际包含 `SHELLDLL_DefView` 的顶层宿主（可能是 WorkerW 或 Progman），使用上方邻窗 `GW_HWNDPREV` 作为插入依据；避免误入 topmost 分组。
+- 显示/获得焦点后校正层级；每 500ms 检查原生可见性和位置层级，已就位则不重排。第一次显示前不自愈弹窗，销毁后移除守护和所属 IPC 监听器。
 - 恢复位置必须在某个显示器上保留可操作的可见宽高；只剩几像素的遗留位置按离屏处理并回到主屏默认位置。
 
 ## 自查记录
@@ -46,10 +46,11 @@
 |---|---|---|
 | 代码入口 | `scheduleIpc.ts`、`deskCalendarHost.ts`、两个 renderer | 已实现 |
 | 正式数据/IPC/持久化 | schedule IPC + SQLite migration 12 + personalization IPC | 已实现 |
-| 用户可见行为 | CDP 查看主界面四视图、桌历三视图、本地/上游编辑表单、重复规则和从属开关；截图位于 Git ignored 的 `.tmp/visual/desk-calendar-recurrence/` | 通过 |
-| 错误边界 | 无效输入、遗留导入、WorkerW 回退、父开关联动 | 已实现并有针对性测试 |
-| 自动化验证 | `pnpm typecheck`、`pnpm lint`；root test 644 passed / 2 skipped；Electron e2e 7 passed | 通过 |
-| 系统桌面层 | 双显示器下核对真实 HWND 的 `GA_PARENT=WorkerW`、物理矩形与 Win+D 后全虚拟桌面截图 | 通过 |
+| 用户可见行为 | 原生鼠标切周视图、双击上游事件、键盘编辑备注、点击保存；正式接口确认写入；独立 E2E fixture | 通过；重复事件边界见审查待修复项 |
+| 错误边界 | 预加载路径、旧置顶设置清理、IPC 生命周期、桌面宿主缺失、topmost 锚点保护 | 有针对性测试；不代表全部重复输入已合法化 |
+| 自动化验证 | `pnpm typecheck`、`pnpm lint`；root test 649 passed / 2 skipped；Electron e2e 8 passed | 通过 |
+| 系统桌面层 | 旧版按钮命中 SysListView32；修复后周/日/今天命中 Chromium 子窗口且根 HWND 为桌历。E2E 核验普通应用在上、非 topmost、Win32 SW_HIDE 恢复 | 默认贴底通过；本轮尚未覆盖 Wallpaper Engine 运行与 Win+D 手动实机 |
+| 关闭重开与设置 | 重开后正式接口仍返回原生键盘写入的测试备注；`.tmp/desktop-final-settings.png` 与 `.tmp/desktop-final-settings-bottom.png` 已亲眼查看，无置顶控件 | 通过；截图只含隔离 fixture |
 | 远端验证 | 当前提交对应 GitHub Actions；run id 随提交生成，不预写到源码 | 提交后执行 |
 
 ## 外部实现依据
@@ -58,4 +59,4 @@
 
 - [NAME0x0/WebDesk `DesktopHost.cs`](https://github.com/NAME0x0/WebDesk/blob/main/src/DesktopHost.cs) 与 [`WallpaperSurface.cs`](https://github.com/NAME0x0/WebDesk/blob/main/src/WallpaperSurface.cs)：MIT，7 stars，覆盖 Windows 11 raised-desktop 与传统 WorkerW 布局；raised 模式按明确 z-order 挂到 Progman，传统模式找不到安全 WorkerW 时不拿 Progman 充当回退。
 - [dvalfrid/rigstats `win32_wallpaper.rs`](https://github.com/dvalfrid/rigstats/blob/main/src-egui/src/win32_wallpaper.rs)：MIT，12 stars，覆盖 WorkerW 查找顺序、物理坐标换算与重新挂载检查。
-- 两个项目的许可证均由仓库根 `LICENSE` 文件核验。CampusOS 只复用公开算法思路并按现有 Electron/koffi 边界重写，没有复制第三方源码。
+- 两个项目的许可证均由仓库根 `LICENSE` 文件核验。它们的壁纸挂载不能作为交互成功依据；当前实现不再采用挂载路线，没有复制第三方源码。原生层方向以 [Microsoft GetWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow)、[SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos) 和本机输入复现为依据。

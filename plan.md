@@ -68,7 +68,7 @@
 
 - [x] **收尾下载队列与通知/资讯改动。** 下载保留独立的临时提醒，不进入通知中心；通知中心使用 `unread/read/handled/expired`、保留最近 500 条并优先保护未读；校园资讯以可预览、可定位的轻量引用进入通知中心。提示音素材已记录来源和许可边界。
 - [ ] **完成本轮 UI 验收债。** 通知中心不透明改动与下载队列改动必须按 `docs/agents/visual-verification.md` 走真实 Electron/CDP 链路并查看截图。连接器健康、能力审计、导出、子 Tab 和学业问答各 spec 已记录代码/测试完成，但仍缺当前代码的桌面截图证据；应逐项补录，而不是以旧的测试或历史截图替代。
-- [x] **完成桌历、重复事件和校历契约。** 当前 Electron 桌历已接入 SQLite 状态、稳定 occurrence、三种系列编辑范围、上游事件本地备注/提醒、统一校历服务、从属开机恢复和 WorkerW 主路径；范围与自查见 `docs/specs/desk-calendar-and-recurrence.md`。
+- [ ] **完成桌历、重复事件和校历契约。** 桌历 SQLite 状态、上游个性化、统一校历与从属恢复已有实现；原生交互修复改为独立窗口贴底并移除置顶。重复事件完成状态、历史保护、系列编辑等仍未收口，见 `docs/audits/2026-09-05-desktop-and-schedule.md`；本轮验收见 `docs/specs/desk-calendar-and-recurrence.md`。
 - [ ] **完成子 Tab 的真实动态分块验证。** Phase E 已完成视图按需挂载，但官方重依赖的 `React.lazy`/动态 import 分块及构建产物检查仍未完成。
 
 ### 已立项但须先确认范围
@@ -633,7 +633,7 @@ This MVP entry supersedes earlier three-module wording in this historical plan; 
 ### Desk calendar floating window (2026-08-16)
 
 - [x] 借鉴 DeskToDo（`https://github.com/ShawnXu01/DeskToDo`，MIT）的桌面悬浮形态：
-  独立无边框、半透明、置顶、跳过任务栏的 `BrowserWindow`，加载独立 renderer 入口
+  独立无边框、半透明、贴底、跳过任务栏的 `BrowserWindow`（2026-09-05 明确不提供置顶），加载独立 renderer 入口
   `desk-calendar.html`，深色半透明圆角面板。
 - [x] 月/周/日三视图：复用工作区正式快照（calendarEvents + courses + deadlines）
   投影每日事件，悬浮窗内可切换视图、前后导航、回到今天；关闭即停用。

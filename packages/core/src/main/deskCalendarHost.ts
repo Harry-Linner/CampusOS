@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, type Rectangle } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, type IpcMainEvent, type Rectangle } from "electron";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadSchedulePeriods, loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
@@ -74,7 +74,6 @@ export interface DeskCalendarSettings {
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
   campusAutoStartEnabled: boolean;
-  alwaysOnTop: boolean;
   locked: boolean;
 }
 
@@ -91,18 +90,23 @@ const DEFAULT_SETTINGS: DeskCalendarSettings = {
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
   autoStart: false,
   campusAutoStartEnabled: false,
-  alwaysOnTop: false,
   locked: false
 };
 const isCampusAutoStartEnabled = (): boolean => {
   try { return app.getLoginItemSettings().openAtLogin; } catch { return false; }
 };
 const loadDeskCalendarSettings = (): DeskCalendarSettings => {
-  const parsed = loadDesktopState<Partial<DeskCalendarSettings>>(
+  const parsed = loadDesktopState<Partial<DeskCalendarSettings> & { alwaysOnTop?: unknown }>(
     DESK_CALENDAR_STATE_KEYS.settings,
     {},
     "desk-calendar-settings.json"
   );
+  // The calendar always stays below ordinary applications. Retire the old
+  // opt-in topmost setting without losing the user's other saved preferences.
+  if ("alwaysOnTop" in parsed) {
+    delete parsed.alwaysOnTop;
+    saveDesktopState(DESK_CALENDAR_STATE_KEYS.settings, parsed);
+  }
   const campusAutoStartEnabled = isCampusAutoStartEnabled();
   return {
     ...DEFAULT_SETTINGS,
@@ -114,11 +118,12 @@ const loadDeskCalendarSettings = (): DeskCalendarSettings => {
 };
 const saveDeskCalendarSettings = (patch: Partial<DeskCalendarSettings>): DeskCalendarSettings => {
   const current = loadDeskCalendarSettings();
-  const next: DeskCalendarSettings = {
+  const next: DeskCalendarSettings & { alwaysOnTop?: unknown } = {
     ...current,
     ...patch,
     colors: { ...current.colors, ...(patch.colors ?? {}) }
   };
+  delete next.alwaysOnTop;
   next.campusAutoStartEnabled = isCampusAutoStartEnabled();
   if (!next.campusAutoStartEnabled) next.autoStart = false;
   saveDesktopState(DESK_CALENDAR_STATE_KEYS.settings, next);
@@ -417,17 +422,16 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
     skipTaskbar: true,
     show: false,
     webPreferences: {
-      preload: join(app.getAppPath(), "out/preload/deskCalendar.cjs"),
+      preload: join(__dirname, "../preload/deskCalendar.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
     }
   });
-  // 贴底：壁纸之上、其它窗口之下（含 Win+D 自愈守护）。千万不用 setAlwaysOnTop。
+  // 保持可交互的桌面层级：桌面之上、普通应用之下，不提供置顶模式。
   win.setMenu(null);
   deskCalendarTransparency = settings.opacity;
   win.setOpacity(settings.opacity);
-  win.setAlwaysOnTop(settings.alwaysOnTop);
   win.setMovable(!settings.locked);
   pinWindowToDesktopBottom(win);
 
@@ -441,28 +445,41 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   win.on("close", persistGeometry);
 
   // 拖动：缓存起点 + 总位移，锁死宽高（避免 Windows 缩放下 DIP↔像素取整累积放大）。
-  ipcMain.on("campusos:desk-calendar:drag-move", (_event, payload) => {
+  const fromThisWindow = (event: IpcMainEvent): boolean => !win.isDestroyed() && event.sender === win.webContents;
+  const onDragMove = (event: IpcMainEvent, payload: unknown): void => {
     const { dx, dy } = (payload ?? {}) as { dx?: number; dy?: number };
-    if (!win || win.isDestroyed()) return;
+    if (!fromThisWindow(event) || loadDeskCalendarSettings().locked) return;
+    if (typeof dx !== "number" || typeof dy !== "number" || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
     if (!dragStartBounds) dragStartBounds = win.getBounds();
     win.setBounds({
-      x: dragStartBounds.x + Math.round(dx ?? 0),
-      y: dragStartBounds.y + Math.round(dy ?? 0),
+      x: dragStartBounds.x + Math.round(dx),
+      y: dragStartBounds.y + Math.round(dy),
       width: dragStartBounds.width,
       height: dragStartBounds.height
     });
-  });
-  ipcMain.on("campusos:desk-calendar:drag-end", () => {
-    dragStartBounds = null;
-  });
-  ipcMain.on("campusos:desk-calendar:transparency", (_event, value) => {
-    if (typeof value === "number" && value >= 0.3 && value <= 1) {
+  };
+  const onDragEnd = (event: IpcMainEvent): void => {
+    if (fromThisWindow(event)) dragStartBounds = null;
+  };
+  const onTransparency = (event: IpcMainEvent, value: unknown): void => {
+    if (fromThisWindow(event) && typeof value === "number" && value >= 0.3 && value <= 1) {
       deskCalendarTransparency = value;
       applyTransparency();
     }
-  });
-  ipcMain.on("campusos:desk-calendar:close", () => {
-    if (win && !win.isDestroyed()) win.close();
+  };
+  const onClose = (event: IpcMainEvent): void => {
+    if (fromThisWindow(event)) void closeDeskCalendar();
+  };
+  ipcMain.on("campusos:desk-calendar:drag-move", onDragMove);
+  ipcMain.on("campusos:desk-calendar:drag-end", onDragEnd);
+  ipcMain.on("campusos:desk-calendar:transparency", onTransparency);
+  ipcMain.on("campusos:desk-calendar:close", onClose);
+  win.once("closed", () => {
+    dragStartBounds = null;
+    ipcMain.removeListener("campusos:desk-calendar:drag-move", onDragMove);
+    ipcMain.removeListener("campusos:desk-calendar:drag-end", onDragEnd);
+    ipcMain.removeListener("campusos:desk-calendar:transparency", onTransparency);
+    ipcMain.removeListener("campusos:desk-calendar:close", onClose);
   });
 
   return win;
@@ -557,7 +574,6 @@ export const registerDeskCalendarHostHandlers = (): void => {
     deskCalendarTransparency = next.opacity;
     applyTransparency();
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
-      deskCalendarWindow.setAlwaysOnTop(next.alwaysOnTop);
       deskCalendarWindow.setResizable(!next.locked);
       deskCalendarWindow.setMovable(!next.locked);
       deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", next);

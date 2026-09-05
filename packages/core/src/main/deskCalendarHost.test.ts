@@ -78,6 +78,7 @@ vi.mock("./desktopPinning", () => ({
 import { registerDeskCalendarHostHandlers, resolveDeskCalendarPlacement } from "./deskCalendarHost";
 import { closeOfficialDatabaseService } from "./officialDatabaseService";
 import { resetOfficialCapabilityRepository } from "./officialCapabilityRepository";
+import { DESK_CALENDAR_STATE_KEYS, loadDesktopState, saveDesktopState } from "./deskCalendarStateStore";
 
 const invoke = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
   const handler = electronState.handlers.get(channel);
@@ -152,6 +153,17 @@ afterEach(async () => {
 });
 
 describe("desk calendar host", () => {
+  it("retires legacy topmost settings while preserving the other SQLite preferences", async () => {
+    saveDesktopState(DESK_CALENDAR_STATE_KEYS.settings, { alwaysOnTop: true, opacity: 0.75, locked: true });
+    const loaded = await invoke<Record<string, unknown>>("campusos:desk-calendar:settings:load");
+    expect(loaded).not.toHaveProperty("alwaysOnTop");
+    expect(loaded).toMatchObject({ opacity: 0.75, locked: true });
+    expect(loadDesktopState(DESK_CALENDAR_STATE_KEYS.settings, {})).not.toHaveProperty("alwaysOnTop");
+    const saved = await invoke<Record<string, unknown>>("campusos:desk-calendar:settings:save", { alwaysOnTop: true, showLunar: true });
+    expect(saved).not.toHaveProperty("alwaysOnTop");
+    expect(saved).toMatchObject({ opacity: 0.75, showLunar: true, locked: true });
+  });
+
   it("builds data from workspace + schedule tasks + academic calendar", async () => {
     tasksState.tasks = [{
       id: "t1",

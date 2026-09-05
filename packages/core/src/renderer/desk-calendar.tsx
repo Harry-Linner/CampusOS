@@ -82,7 +82,6 @@ interface DeskCalendarSettings {
   colors: { calendar: string; cell: string; todayBorder: string; lunar: string; holiday: string };
   autoStart: boolean;
   campusAutoStartEnabled: boolean;
-  alwaysOnTop: boolean;
   locked: boolean;
 }
 
@@ -307,7 +306,6 @@ const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
   autoStart: false,
   campusAutoStartEnabled: false,
-  alwaysOnTop: false,
   locked: false
 };
 
@@ -790,7 +788,6 @@ export default function DeskCalendar(): JSX.Element {
               <h4>通用</h4>
               <label className="dk-settings-row">随 CampusOS 开机恢复<input type="checkbox" disabled={!settings.campusAutoStartEnabled} checked={settings.autoStart} onChange={(e) => patchSetting({ autoStart: e.target.checked })} /></label>
               {!settings.campusAutoStartEnabled ? <p className="dk-form-hint">请先在 CampusOS 设置中开启“开机启动”。</p> : null}
-              <label className="dk-settings-row">置顶<input type="checkbox" checked={settings.alwaysOnTop} onChange={(e) => patchSetting({ alwaysOnTop: e.target.checked })} /></label>
               <label className="dk-settings-row">锁定位置/大小（图钉）<input type="checkbox" checked={settings.locked} onChange={(e) => patchSetting({ locked: e.target.checked })} /></label>
             </section>
             <div className="dk-form-actions"><button type="button" onClick={() => setShowSettings(false)}>关闭</button></div>

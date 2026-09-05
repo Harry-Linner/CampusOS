@@ -273,7 +273,7 @@ ipcMain.on('drag-move', (_e, dx, dy) => { win.setBounds({ x: dragStart.x+dx, y: 
 
 ## 5附｜桌面日历「该怎么做 / 有什么功能 / 怎么实现」调研结论（2026-09-03 定稿）
 
-> **2026-09-05 状态：已实现。** Electron 桌历、SQLite 状态、WorkerW 主路径、主/桌历统一编辑与重复规则均已落地；以下问题和实现建议是定稿前的历史材料。
+> **2026-09-05 复核：尚未全部收口。** 桌历交互已改为独立窗口贴底，移除 WorkerW 挂载与置顶选项；重复事件与通知仍有已验证缺陷，见 [审查记录](audits/2026-09-05-desktop-and-schedule.md)。以下问题和代码建议属于历史材料，尤其不能沿用其中的置顶与壁纸挂载方案。
 
 > 依据三个真实样本：**① `D:\xdiarys-green`**（DesktopCal，成熟的商用 Windows 桌面日历安装目录，含 `desktopcal.exe`/sqlite/lua 脚本/农历/皮肤）；**② `.tmp/DeskToDo`**（现役 CampusOS 桌历来源，Python/PyQt）；**③ 外部检索**（联想应用商店"小智桌面日历"、优效日历、WallCal、Google/Outlook/Todoist 等）。目标：定出 CampusOS 桌面日历的**功能清单 + 实现路径**，并在视觉/功能上与主界面日程完全一致。
 

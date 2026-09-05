@@ -12,9 +12,9 @@
 
 ## 1. 标准方案：CDP 逐窗口截图与操作（已验证 ✅）
 
-Electron 是 Chromium。应用以调试端口启动后，**每个 BrowserWindow 都是独立的 CDP target**，可以独立截图、独立注入真实输入、独立读 DOM——不受遮挡、多显示器、OS 无障碍树限制影响，且能穿透插件 iframe（输入走 CDP Input 域，是真实 DOM 事件）。
+Electron 是 Chromium。应用以调试端口启动后，每个 BrowserWindow 都是独立的 CDP target，可以独立截图、注入页面事件、读取 DOM。CDP 绕过 Windows 的遮挡与命中判定；它验证的是页面交互，不证明用户的鼠标能到达窗口。
 
-调研结论（2026-08-28 广泛搜索）：这是业界标准做法。GUI agent 研究界（OSWorld、Windows Agent Arena、UI-TARS-desktop）普遍用 OS 全屏截图，恰恰处理不了遮挡/overlay/副屏；对 Electron 应用，应用内 CDP 严格优于 OS 层方案。现成可复用工具：`microsoft/playwright-mcp --cdp-endpoint`、`amafjarkasi/electron-mcp-server` 等；本仓库选择自带轻量脚本（见下），零新依赖（playwright 已是 e2e 依赖）。
+页面检查使用现有 Playwright/CDP 脚本；窗口层级、透明度、真实鼠标和键盘另外检查。2026-09-05 已复现“CDP 能点但鼠标被桌面图标层截获”，因此不再把 CDP 结论当作系统输入验收。
 
 ### 启动带 CDP 的 dev
 
@@ -46,7 +46,7 @@ node scripts/visual.mjs eval "desk-calendar" "<js 表达式>"      # 读状态/�
 2. **better-sqlite3 双重构建**：`CAMPUSOS_DEV_CDP_PORT=... pnpm dev` 启动会把 better-sqlite3 重编为 Electron 版；随后直接跑 `pnpm --filter @campusos/core test` 会报 `NODE_MODULE_VERSION` 不匹配。跑单测用仓库根 `pnpm test`（会先重编 Node 版）。反过来：**dev/Electron 进程开着时不要跑重编**（`EBUSY/EPERM` 锁文件失败）——先停 dev、`taskkill /F /IM electron.exe`，跑完测试再重启 dev。
 3. **透明窗口截图丢 alpha**：CDP 截图会把桌面日历的毛玻璃透明底合成到不透明底色上，看不到"透出壁纸"的真实效果。验收主题/透明度时，需补一张 OS 级全屏截图做对照（显示"最小化所有窗口"后桌面上的真实层叠效果）。
 4. **陈旧帧**：隐藏/遮挡窗口有 backgroundThrottling。如截图内容明显滞后，先对目标窗口做一次交互（click/eval）再截，或在 overlay 的 webPreferences 里加 `backgroundThrottling: false`（尚未加，暂无需要）。
-5. **OS 无障碍路线的局限（备忘）**：computer-use 的 AXPress 对 Core 渲染的侧栏有效，但对插件 iframe 内的按钮无效（按压被接受但界面无反应）。当前桌历也应走 CDP；仅在验证透明贴底层叠效果时补 OS 截图。
+5. **OS 无障碍路线的局限**：AXPress 被接受不表示页面有响应。原生鼠标检查用坐标点击，并在稳定后从 DOM/正式数据链确认结果。截图可能早于渲染更新，应重新观察，不能把瞬时旧帧当成操作失败。
 
 ### 纯浏览器直开 renderer 的结论
 
@@ -79,7 +79,7 @@ node scripts/visual.mjs eval "desk-calendar" "<js 表达式>"      # 读状态/�
 
 1. 代码改完 → `pnpm typecheck` + `pnpm lint` + 根目录 `pnpm test`（顺序：先停 dev，测完重启 dev）。
 2. `CAMPUSOS_DEV_CDP_PORT=9223 pnpm dev` 重启 → 按§2 走受影响链路，逐链路截图并亲自查看判断。
-3. 涉及透明度/主题层叠效果的，补 OS 级截图对照。
+3. 涉及透明度/主题层叠的补 OS 截图；涉及窗口层级、焦点、拖动、点击的必须补原生命中与输入检查（§8）。
 4. 验收结论写进对应 spec 的自查记录（引用截图文件路径，截图存 `.tmp/visual/`，不入库）。
 5. e2e（`pnpm --filter @campusos/core test:e2e`，需先停 dev）+ commit + push + `gh run watch` CI 绿。
 
@@ -107,10 +107,19 @@ DeskToDo（PyQt6，`.tmp/DeskToDo`，`python -m venv .venv && .venv/Scripts/pip 
 
 ## 6. 桌面日历贴底（Win32）的四个实测坑（2026-08-28，desktopPinning.ts）
 
-1. **锚点方向**：SetWindowPos 语义是"插到 hWndInsertAfter 之后（更靠底）"。要落在"桌面之上、其余窗口之下"，insertAfter 必须取 **Progman 的 GW_HWNDNEXT(=2)**（上方邻窗）。取 HWND_BOTTOM 会沉到桌面层之下被壁纸盖住；取 GW_HWNDPREV(=3，下方邻窗) 同样沉底。常量速记：HWNDFIRST=0、HWNDLAST=1、HWNDNEXT=2、HWNDPREV=3、OWNER=4（把 4 当 PREV 用会查成 owner，得到误导性的"下方无窗口"）。
+1. **锚点方向（2026-09-05 更正）**：SetWindowPos 把窗口放在 insertAfter 下方。`GW_HWNDNEXT=2` 是下方邻窗，`GW_HWNDPREV=3` 才是上方邻窗。当前代码找到实际包含 `SHELLDLL_DefView` 的顶层宿主，使用它的上方邻窗作为依据；已紧贴宿主上方则不重排。原文对 NEXT/PREV 的解释相反，禁止沿用。依据：[GetWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow)。
 2. **不能从 GetDesktopWindow() 枚举**：对根桌面窗口取 GW_HWNDLAST 恒返回 0（实测）。锚点基准用 `FindWindowW("Progman")`。
 3. **不能用 WM_WINDOWPOSCHANGING 钩子**：钩子上下文里调 koffi（含字符串编组的 FindWindowW）会段错误（0xC0000005，实测把 electron-vite dev 整个打挂）；且 Electron hookWindowMessage 传入的 lParam Buffer 是指针值的拷贝，改写它无法影响真实 WINDOWPOS。压底时机只用"创建后 + focus"。
 4. **Win+D 自愈守护**：Explorer"显示桌面"直接 SW_HIDE，Electron 的 isVisible() 感知不到（仍返回 true），showInactive() 会因此空转——守护必须查 Win32 IsWindowVisible，并先 hide() 强制两侧状态对齐再 showInactive()。skipTaskbar+工具窗被隐藏后没有任何系统恢复入口，无守护=窗口永久消失。
+
+## 8. 原生输入门禁（2026-09-05）
+
+- 桌历始终贴底，不提供置顶设置。保留原生顶层窗口，不挂到 WorkerW 壁纸层；后者在按钮仍可见时也会被 Explorer 图标层截获输入。
+- 使用独立 userData 和 E2E fixture，截图前确认没有私有业务数据或其他应用盖在目标区域；透明背景测试也要防止透出私有窗口。需要清理桌面遮挡时先与正在使用电脑的用户协调。
+- 带 CDP 启动后，在 `packages/core` 运行 `node scripts/verify-desktop-input.mjs`。它按物理像素检查“周/日/今天”按钮的 `WindowFromPoint` 与真实根 HWND，不改变焦点或窗口层级。退出 0 表示命中桌历，1 表示桌面拦截/结构错误，2 表示被普通应用遮住；遮挡不应被当作贴底失败。
+- 主屏桌面可见时，用原生坐标点击切换视图、双击事件、键盘编辑和保存；同时通过正式 IPC 数据确认结果。仅 UIA Invoke/CDP 点击不算原生鼠标验收。
+- 另测普通应用遮挡桌历、关闭再开、系统隐藏恢复、多屏位置与 Wallpaper Engine 开/关。无法执行的场景逐项注明，不能沿用前任结论。
+- `e2e/desktop-calendar.e2e.ts` 验证真实父窗口、非 topmost、主应用在桌历上方、直接 Win32 SW_HIDE 后恢复、预加载桥及重复开关的监听器清理。SW_HIDE 测试不能冒充对所有 Windows 版本的 Win+D 实机验证。
 
 ## 7. 桌面日历窗口状态与设置的文件名碰撞（已修复）
 

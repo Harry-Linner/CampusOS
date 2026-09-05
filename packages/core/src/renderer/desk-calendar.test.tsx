@@ -14,7 +14,7 @@ const baseSettings = {
   showWeeks: true, showHolidays: true, showLunar: false, showFestival: false, showJieqi: false, showJiyi: false,
   glass: false, bgColor: "", opacity: 0.98,
   colors: { calendar: "", cell: "", todayBorder: "", lunar: "", holiday: "" },
-  autoStart: false, campusAutoStartEnabled: false, alwaysOnTop: false, locked: false
+  autoStart: false, campusAutoStartEnabled: false, locked: false
 };
 const getSettings = vi.fn(async () => ({ ...baseSettings, colors: { ...baseSettings.colors } }));
 const saveSettings = vi.fn(async (patch: Record<string, unknown>) => ({
@@ -154,7 +154,7 @@ describe("desk calendar", () => {
     for (const label of [/日历文字/, /单元格背景/, /今天边框/, /农历文字/, /节假日文字/]) fireEvent.change(screen.getByLabelText(label), { target: { value: "#ff0000" } });
     // 通用
     expect(screen.getByLabelText(/随 CampusOS 开机恢复/)).toHaveProperty("disabled", true);
-    fireEvent.click(screen.getByLabelText(/置顶/));
+    expect(screen.queryByLabelText(/置顶/)).toBeNull();
     fireEvent.click(screen.getByLabelText(/图钉/));
     fireEvent.click(screen.getByText("关闭"));
     await waitFor(() => expect(saveSettings).toHaveBeenCalled());
