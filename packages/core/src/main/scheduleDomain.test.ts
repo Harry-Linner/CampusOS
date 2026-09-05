@@ -174,7 +174,11 @@ describe("schedule domain", () => {
       scope: "future",
       status: "deleted"
     });
-    expect(truncated).toMatchObject({ repeatEndMode: "date", repeatEndsOn: "2026-11-15" });
+    const periods = getTaskCalendarPeriods([truncated], new Date("2026-09-01T00:00:00+08:00"), new Date("2026-12-01T00:00:00+08:00"));
+    expect(periods).toHaveLength(10);
+    expect(periods.at(-1)?.startAt).toBe("2026-11-09T01:00:00.000Z");
+    const restored = applyTaskMutation([truncated], { id: "endless", scope: "series", action: "restore" });
+    expect(getTaskCalendarPeriods(restored, new Date("2026-11-16T00:00:00+08:00"), new Date("2026-11-17T00:00:00+08:00"))).toHaveLength(1);
   });
 
   it("chops multi-day tasks into day periods", () => {

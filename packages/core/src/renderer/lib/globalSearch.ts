@@ -114,7 +114,22 @@ export const buildGlobalSearchIndex = (
   // Self-created tasks (local task store) — not part of the workspace snapshot, but
   // searchable so the user can locate their own schedule entries.
   const taskIndex = tasks
-    .filter((task) => !task.deletedAt && task.status !== "deleted")
+    .filter((task) => {
+      if (task.deletedAt || task.status === "deleted") return false;
+      const ranges = task.occurrenceDeletions ?? [];
+      const start = task.seriesOccurrenceOffset ?? 0;
+      const end = task.seriesEndBefore ?? (task.repeatEndMode === "count" ? start + (task.repeatCount ?? 1) : Infinity);
+      const completed = Object.entries(task.occurrenceOverrides ?? {}).some(([key, override]) =>
+        override.status === "completed" && Number(key) >= start && Number(key) < end &&
+        !ranges.some((range) => range.includeCompleted && Number(key) >= range.from && Number(key) < (range.to ?? Infinity)));
+      if (completed) return true;
+      let coveredUntil = start;
+      for (const range of [...ranges].sort((a, b) => a.from - b.from)) {
+        if (range.from > coveredUntil) break;
+        coveredUntil = Math.max(coveredUntil, range.to ?? Infinity);
+      }
+      return coveredUntil < end;
+    })
     .map<GlobalSearchResult>((task) => ({
       id: `task:${task.id}`,
       kind: "item",

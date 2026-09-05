@@ -318,6 +318,11 @@ export default function DeskCalendar(): JSX.Element {
   const [, setSelected] = useState<string | null>(null);
   const [infoEvent, setInfoEvent] = useState<ScheduleEvent | null>(null);
   const [form, setForm] = useState<TaskForm | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const saveErrorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (!form) setSaveError(null); }, [form]);
+  useEffect(() => { if (saveError) saveErrorRef.current?.focus(); }, [saveError]);
   const [glass, setGlass] = useState(false);
 
   const applySettings = useCallback((s: DeskCalendarSettings): void => {
@@ -514,9 +519,12 @@ export default function DeskCalendar(): JSX.Element {
   }, []);
 
   const saveEvent = async (): Promise<void> => {
-    if (!form) return;
-    if (!form.title.trim()) return;
-    await window.deskCalendar?.saveEvent({
+    if (!form || saving) return;
+    if (!form.title.trim()) { setSaveError("名称不能为空。"); return; }
+    setSaveError(null);
+    setSaving(true);
+    try {
+    const result = await window.deskCalendar?.saveEvent({
       id: form.id,
       origin: form.origin,
       taskId: form.taskId,
@@ -545,8 +553,14 @@ export default function DeskCalendar(): JSX.Element {
         : form.reminderMode === "lead" ? (form.remindUnit === "小时" ? form.remindValue * 60 : form.remindUnit === "天" ? form.remindValue * 1440 : form.remindValue) : undefined,
       reminderAt: form.origin === "local" && form.reminderMode === "custom" ? form.reminderAt || null : null
     });
+    if (!result?.ok) throw new Error(result?.error ?? "日程服务不可用，请重新打开桌历。");
     setForm(null);
     void loadData(eventRange);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "日程保存失败。");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 标记完成 / 恢复未完成：任务类事件通过后端 mutate（status=completed | restore）。
@@ -749,9 +763,10 @@ export default function DeskCalendar(): JSX.Element {
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" value={form.reminderAt} onChange={(e) => setForm({ ...form, reminderAt: e.target.value })} /></label> : null}
             </div>}
             <div className="dk-form-actions">
-              <button type="button" onClick={() => setForm(null)}>取消</button>
-              <button type="button" className="dk-primary" onClick={() => void saveEvent()}>保存</button>
+              <button type="button" disabled={saving} onClick={() => setForm(null)}>取消</button>
+              <button type="button" className="dk-primary" disabled={saving} onClick={() => void saveEvent()}>{saving ? "保存中…" : "保存"}</button>
             </div>
+            {saveError ? <p role="alert" tabIndex={-1} ref={saveErrorRef}>{saveError}</p> : null}
           </div>
         </div>
       ) : null}

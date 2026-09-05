@@ -531,3 +531,5 @@ prompt injection, duplicate prevention, and deterministic update/cancel.
 补充阅读了 rigstats 提交 `35bca2556123936be8665bce319871bcab4ec0c3` 的 [`win32_behind.rs`](https://github.com/dvalfrid/rigstats/blob/35bca2556123936be8665bce319871bcab4ec0c3/src-egui/src/win32_behind.rs)：普通交互窗口与壁纸宿主是两条路径，定期压底且不应每帧制造重绘。CampusOS 使用已就位即跳过的检查；该来源没有验证普通窗口的 Win+D 自愈，不能把其壁纸宿主结论移用于交互日历。本轮实际输入与持久化验收及其他待修复问题见 [审查记录](docs/audits/2026-09-05-desktop-and-schedule.md)。
 
 同轮产品决策把本地事件重复规则定为每 N 天、每 N 周并选星期、每 N 月、每 N 年，结束条件为永不/日期/次数，编辑范围为仅本次/本次及未来/整个系列；每个 occurrence 保存独立状态。Celechron 1.3.0 只提供旧式滚动任务周期，没有稳定 occurrence 与三种系列编辑语义，因此这部分属于用户明确批准的新产品能力，不伪称为 Celechron 迁入。
+
+2026-09-06 追加修复：固定事件刷新保留完成状态；分段用全局实例序号与删除范围维持稳定身份、历史保护和恢复边界；日期校验对照 Celechron `task_edit_page.dart:41-63`。通知迁入 SQLite v13，读改写在同步事务阶段完成，系统 toast 等待发生在提交之后，备份中的任务与通知共同回滚。主日历真实操作额外发现普通双击误走拖动保存，已改为只有时间发生变化且未取消时保存；拖动使用实例提醒并保持相对时间。两个编辑表单均验证错误可见与草稿保留，未改桌历始终贴底的边界。

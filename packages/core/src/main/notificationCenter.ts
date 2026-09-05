@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, Notification } from "electron";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import type {
@@ -11,12 +11,11 @@ import type {
 } from "../shared/notificationBridge";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { getAppLifecycleSettings, navigateCampusMainWindow } from "./appLifecycle";
+import { getOfficialDatabaseService } from "./officialDatabaseService";
 
 const FILE = "notifications.json";
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_RECORDS = 500;
-let records: NotificationRecord[] | null = null;
-let loadedFilePath: string | null = null;
 export const NOTIFICATIONS_CHANGED_CHANNEL = "campusos:notifications:changed";
 
 export interface AddNotificationInput {
@@ -108,9 +107,10 @@ const newestFirst = (left: NotificationRecord, right: NotificationRecord): numbe
 
 const prune = (source: readonly NotificationRecord[] | null): NotificationRecord[] => {
   const now = Date.now();
-  const normalized = (source ?? [])
+  const normalized = [...new Map((source ?? [])
     .map(normalizeRecord)
     .filter((entry): entry is NotificationRecord => entry !== null)
+    .map((entry) => [entry.id, entry] as const)).values()]
     .map((entry) =>
       (entry.state === "read" || entry.state === "handled") && Date.parse(entry.expiresAt) <= now
         ? { ...entry, state: "expired" as const }
@@ -124,24 +124,30 @@ const prune = (source: readonly NotificationRecord[] | null): NotificationRecord
       if (entry.state === state && kept.length < MAX_RECORDS) kept.push(entry);
     }
   }
-  records = kept.sort(newestFirst);
-  return records.slice();
+  return kept.sort(newestFirst);
 };
 
-const load = async (): Promise<NotificationRecord[]> => {
-  const currentFilePath = filePath();
-  if (records && loadedFilePath === currentFilePath) return prune(records);
-  try {
-    const parsed = JSON.parse(await readFile(currentFilePath, "utf8")) as unknown;
-    records = Array.isArray(parsed)
-      ? parsed.map(normalizeRecord).filter((entry): entry is NotificationRecord => entry !== null)
-      : [];
-  } catch (error) {
-    if (!isMissing(error)) void error;
-    records = [];
+// No await between load and save: each operation commits before yielding to
+// another producer or app shutdown. SQLite is authoritative, including emptiness.
+const load = (): NotificationRecord[] => {
+  const database = getOfficialDatabaseService();
+  let records = database.loadNotifications();
+  if (!database.hasImportedLegacyNotifications()) {
+    let legacy: NotificationRecord[] = [];
+    try {
+      const text = readFileSync(filePath(), "utf8");
+      const parsed: unknown = text.trim() ? JSON.parse(text) : [];
+      if (!Array.isArray(parsed)) throw new Error("invalid notification list");
+      legacy = parsed.map(normalizeRecord).filter((entry): entry is NotificationRecord => entry !== null);
+    } catch (error) {
+      if (!isMissing(error)) throw new Error("旧通知记录无法读取，原文件和 SQLite 数据已保留。请修复旧通知文件后重试。");
+    }
+    records = prune([...legacy, ...records]);
+    database.saveNotifications(records, true);
   }
-  loadedFilePath = currentFilePath;
-  return prune(records);
+  const retained = prune(records);
+  if (JSON.stringify(retained) !== JSON.stringify(records)) database.saveNotifications(retained);
+  return retained;
 };
 
 const broadcast = (): void => {
@@ -150,14 +156,11 @@ const broadcast = (): void => {
   }
 };
 
-const persist = async (): Promise<NotificationRecord[]> => {
-  prune(records);
-  await mkdir(join(app.getPath("userData"), "notifications"), { recursive: true });
-  const currentFilePath = filePath();
-  await writeFile(currentFilePath, JSON.stringify(records ?? [], null, 2), "utf8");
-  loadedFilePath = currentFilePath;
+const persist = (records: readonly NotificationRecord[]): NotificationRecord[] => {
+  const retained = prune(records);
+  getOfficialDatabaseService().saveNotifications(retained);
   broadcast();
-  return (records ?? []).slice();
+  return retained;
 };
 
 const targetToNavigation = (
@@ -176,44 +179,44 @@ export const showTransientNotification = async (input: TransientNotificationInpu
   notification.show();
 };
 
-export const readNotificationRecords = (): Promise<NotificationRecord[]> => load();
+export const readNotificationRecords = async (): Promise<NotificationRecord[]> => load();
 
 export const markNotificationsReadByTarget = async (actionTarget: string): Promise<void> => {
-  await load();
+  let records = load();
   records = (records ?? []).map((entry) => {
     const target = targetToNavigation(entry.actionTarget);
     return target?.viewId === actionTarget && entry.state === "unread"
       ? { ...entry, state: "read" }
       : entry;
   });
-  await persist();
+  persist(records);
 };
 
 export const markNotificationsHandledByEntities = async (
   source: NotificationSource,
   entityIds: readonly string[]
 ): Promise<void> => {
-  await load();
+  let records = load();
   const ids = new Set(entityIds);
   records = (records ?? []).map((entry) =>
     entry.source === source && entry.entityId && ids.has(entry.entityId) && entry.state !== "expired"
       ? { ...entry, state: "handled" }
       : entry
   );
-  await persist();
+  persist(records);
 };
 
-export const restoreNotificationRecords = async (incoming: NotificationRecord[], mode: "merge" | "replace"): Promise<NotificationRecord[]> => {
-  await load();
+export const restoreNotificationRecords = (incoming: NotificationRecord[], mode: "merge" | "replace"): NotificationRecord[] => {
+  let records = load();
   const normalized = incoming.map(normalizeRecord).filter((entry): entry is NotificationRecord => entry !== null);
   records = mode === "replace"
     ? normalized
     : [...normalized, ...(records ?? []).filter((current) => !normalized.some((item) => item.id === current.id))];
-  return persist();
+  return persist(records);
 };
 
 export const addNotification = async (input: AddNotificationInput): Promise<NotificationRecord> => {
-  await load();
+  let records = load();
   const now = new Date();
   const id = input.id?.slice(0, 320) || randomUUID();
   const existing = (records ?? []).find((entry) => entry.id === id);
@@ -236,7 +239,7 @@ export const addNotification = async (input: AddNotificationInput): Promise<Noti
   if (!record) throw new Error("通知内容无效。");
   if (existing && existing.title === record.title && existing.body === record.body) return existing;
   records = [record, ...(records ?? []).filter((entry) => entry.id !== id)];
-  await persist();
+  persist(records);
   if (input.showDesktop !== false) {
     const target = targetToNavigation(record.actionTarget);
     const lifecycle = await getAppLifecycleSettings();
@@ -253,20 +256,20 @@ export const addNotification = async (input: AddNotificationInput): Promise<Noti
 };
 
 const mutate = async (id: string, state: "read" | "unread" | "handled"): Promise<NotificationRecord[]> => {
-  await load();
+  let records = load();
   records = (records ?? []).map((entry) =>
     entry.id === id
       ? { ...entry, state, ...(state === "unread" ? { expiresAt: new Date(Date.now() + RETENTION_MS).toISOString() } : {}) }
       : entry
   );
-  return persist();
+  return persist(records);
 };
 
 const mutateMany = async (ids: readonly string[], state: "read" | "unread" | "handled"): Promise<NotificationRecord[]> => {
-  await load();
+  let records = load();
   const idSet = new Set(ids);
   records = (records ?? []).map((entry) => idSet.has(entry.id) ? { ...entry, state } : entry);
-  return persist();
+  return persist(records);
 };
 
 export const registerNotificationHandlers = (): void => {
@@ -276,9 +279,9 @@ export const registerNotificationHandlers = (): void => {
   ipcMain.handle("campusos:notifications:handled", async (event, id: string) => { assertTrustedRenderer(event); return mutate(id, "handled"); });
   ipcMain.handle("campusos:notifications:read-all", async (event) => {
     assertTrustedRenderer(event);
-    await load();
+    let records = load();
     records = (records ?? []).map((entry) => entry.state === "unread" ? { ...entry, state: "read" } : entry);
-    return persist();
+    return persist(records);
   });
   ipcMain.handle("campusos:notifications:batch", async (event, input: { ids: string[]; state: "read" | "unread" | "handled" }) => {
     assertTrustedRenderer(event);
@@ -287,11 +290,11 @@ export const registerNotificationHandlers = (): void => {
     }
     return mutateMany(input.ids.slice(0, MAX_RECORDS), input.state);
   });
-  ipcMain.handle("campusos:notifications:clear-expired", async (event) => { assertTrustedRenderer(event); await load(); return persist(); });
+  ipcMain.handle("campusos:notifications:clear-expired", async (event) => { assertTrustedRenderer(event); const records = load(); return persist(records); });
   ipcMain.handle("campusos:notifications:clear-all", async (event) => {
     assertTrustedRenderer(event);
-    await load();
+    let records = load();
     records = (records ?? []).map((entry) => entry.state === "expired" ? entry : { ...entry, state: "handled" });
-    return persist();
+    return persist(records);
   });
 };

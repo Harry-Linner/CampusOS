@@ -43,8 +43,10 @@ export const registerBackupHandlers = (): void => {
     const incomingTasks = Array.isArray((payload.tasks as { tasks?: unknown[] }).tasks) ? (payload.tasks as { tasks: unknown[] }).tasks : [];
     const currentTasks = (database.loadLocalTasks()?.tasks ?? []) as unknown[];
     const tasks = mode === "replace" ? incomingTasks : [...currentTasks, ...incomingTasks.filter((candidate: unknown) => !currentTasks.some((current: unknown) => typeof candidate === "object" && candidate !== null && typeof current === "object" && current !== null && "id" in candidate && "id" in current && candidate.id === current.id))];
-    database.saveLocalTasks(tasks, new Date().toISOString());
-    await restoreNotificationRecords(payload.notifications as NotificationRecord[], mode);
+    database.transaction(() => {
+      database.saveLocalTasks(tasks, new Date().toISOString());
+      restoreNotificationRecords(payload.notifications as NotificationRecord[], mode);
+    });
     await addNotification({ kind: "system", title: "备份已恢复", body: mode === "replace" ? "本地任务已按备份替换。" : "本地任务已与备份合并。", showDesktop: false });
     return preview(selectedImportPath, payload);
   });

@@ -24,7 +24,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(12);
+      expect(database.schemaVersion).toBe(13);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -148,7 +148,7 @@ describe("database service", () => {
 
     const database = createDatabaseService({ databasePath });
     try {
-      expect(database.schemaVersion).toBe(12);
+      expect(database.schemaVersion).toBe(13);
     } finally {
       database.close();
     }

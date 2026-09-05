@@ -9,7 +9,7 @@ afterEach(cleanup);
 const getData = vi.fn();
 const subscribe = vi.fn(() => () => undefined);
 const completeTask = vi.fn(async () => ({ ok: true }));
-const saveEvent = vi.fn(async () => ({ ok: true }));
+const saveEvent = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; error?: string }>>(async () => ({ ok: true }));
 const baseSettings = {
   showWeeks: true, showHolidays: true, showLunar: false, showFestival: false, showJieqi: false, showJiyi: false,
   glass: false, bgColor: "", opacity: 0.98,
@@ -104,6 +104,17 @@ describe("desk calendar", () => {
     fireEvent.change(name, { target: { value: "新任务" } });
     fireEvent.click(screen.getByText("保存"));
     await waitFor(() => expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "新任务" })));
+  });
+
+  it("keeps the draft open and shows the backend validation failure", async () => {
+    saveEvent.mockResolvedValueOnce({ ok: false, error: "重复结束日期不能早于开始日期。" });
+    render(<DeskCalendar />);
+    await screen.findByText("任务A");
+    fireEvent.doubleClick(screen.getByText("任务A"));
+    await screen.findByText("编辑事件");
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("重复结束日期");
+    expect((screen.getByLabelText("名称") as HTMLInputElement).value).toBe("任务A");
   });
 
   it("double-clicking an event opens the edit form (onDoubleEvent)", async () => {

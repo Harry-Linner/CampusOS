@@ -1,4 +1,5 @@
 import { Notification } from "electron";
+import { resolveLocalTaskReminderAt } from "@campusos/shared";
 import type { CampusReminder, CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 import type {
   ReminderSchedulerState,
@@ -8,6 +9,7 @@ import { createDefaultReminderSchedulerState } from "../shared/reminderBridge";
 import { addNotification } from "./notificationCenter";
 import { getTaskCalendarPeriods } from "./scheduleDomain";
 import { loadCalendarEventPersonalizations } from "./deskCalendarStateStore";
+import { buildReminderQueue } from "../shared/campusWorkspace";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const STARTUP_CATCH_UP_MS = 24 * 60 * 60 * 1000;
@@ -130,12 +132,14 @@ export const buildLocalTaskReminders = (
   const override = period.occurrenceKey === undefined ? undefined : task.occurrenceOverrides?.[period.occurrenceKey];
   const eventStartAt = task.type === "deadline" ? (period.occurrenceEndAt ?? period.endAt) : (period.occurrenceStartAt ?? period.startAt);
   const eventStartMs = Date.parse(eventStartAt);
-  if (!Number.isFinite(eventStartMs)) return [];
+  if (!Number.isFinite(eventStartMs) || eventStartMs < now.getTime()) return [];
   const mode = override?.reminderMode ?? task.reminderMode ?? "global";
   if (mode === "none") return [];
-  const customReminderAt = override?.reminderAt ?? (task.reminderAt
-    ? new Date(eventStartMs + Date.parse(task.reminderAt) - Date.parse(task.type === "deadline" ? task.endAt : task.startAt)).toISOString()
-    : "");
+  const customReminderAt = resolveLocalTaskReminderAt(task, {
+    occurrenceKey: period.occurrenceKey,
+    startAt: period.occurrenceStartAt ?? period.startAt,
+    endAt: period.occurrenceEndAt ?? period.endAt
+  }) ?? "";
   const lead = override?.reminderLeadMinutes ?? task.reminderLeadMinutes;
   const entries = mode === "custom"
     ? [{ fireAt: customReminderAt, leadMinutes: Math.max(0, Math.round((eventStartMs - Date.parse(customReminderAt)) / 60_000)) }]
@@ -229,17 +233,27 @@ export const scheduleWorkspaceReminders = (
       location: event.location ?? undefined
     }];
   });
-  const sortedReminders: ScheduledReminder[] = [
+  const overriddenIds = new Set(personalizedEvents.filter((event) => personalizations[event.eventId]?.reminderLeadMinutes != null)
+    .map((event) => event.eventId.slice(event.eventId.indexOf(":") + 1)));
+  const catchUp = buildReminderQueue(
+    (snapshot?.courses ?? []).filter((course) => !overriddenIds.has(course.id)),
+    (snapshot?.deadlines ?? []).filter((deadline) => !overriddenIds.has(deadline.id)),
+    settings.leadMinutes,
+    new Date(now.getTime() - STARTUP_CATCH_UP_MS).toISOString()
+  ).filter((reminder) => Date.parse(reminder.fireAt) <= now.getTime() && Date.parse(reminder.eventStartAt) >= now.getTime());
+  const sortedReminders: ScheduledReminder[] = [...new Map([
     ...(snapshot?.reminders ?? []),
+    ...catchUp,
     ...personalizedReminders,
     ...buildLocalTaskReminders(localTasks, settings.leadMinutes, now)
-  ].sort(
+  ].map((reminder) => [reminder.id, reminder])).values()].sort(
     (left, right) =>
       new Date(left.fireAt).getTime() - new Date(right.fireAt).getTime()
   );
   const nowMs = now.getTime();
 
   for (const reminder of sortedReminders) {
+    if (Date.parse(reminder.eventStartAt) < nowMs) continue;
     const fireAtMs = Date.parse(reminder.fireAt);
     if (Number.isFinite(fireAtMs) && fireAtMs <= nowMs && nowMs - fireAtMs <= STARTUP_CATCH_UP_MS) {
       void emitReminderNotification(reminder);

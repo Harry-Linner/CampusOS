@@ -1,6 +1,6 @@
 # 桌历与重复事件收口 Spec
 
-状态：2026-09-05 桌历原生交互修复；重复事件与通知仍有已确认缺陷，见 [审查记录](../audits/2026-09-05-desktop-and-schedule.md)。远端验证以本次提交对应的 GitHub Actions 为准。
+状态：2026-09-06 已修复桌历交互及审查确认的重复事件、提醒和通知持久化回归，见 [审查记录](../audits/2026-09-05-desktop-and-schedule.md)。Wallpaper Engine 运行与手动 Win+D 的系统实机门禁尚未补齐；远端验证以本次提交对应的 GitHub Actions 为准。
 
 ## 目标与边界
 
@@ -19,12 +19,17 @@
 - 结束条件：永不、指定日期、指定次数。
 - 编辑范围：仅本次、本次及未来、整个系列。
 - occurrence 以系列内稳定序号作为 key；实例覆盖包含状态、标题、说明、起止时间、地点与提醒。
+- 分段保存全局序号偏移和排他终点，occurrence ID 为系列 ID + 全局序号。未来编辑替换该边界之后的旧分段；未改变次数限制时沿用原系列剩余次数。旧分段按原起点和截止范围一次归一化，迁移已有实例覆盖键。
+- 整个系列编辑以最早根起点加选中实例的时间差计算，不把晚实例日期作为新根。变更的公共文字字段覆盖该范围，其他单次例外与完成状态保留。
+- 软删除以实例范围记录，界面默认保护已完成历史；恢复移除相应范围但保留原状态，永久删除不能恢复。整组含历史删除满 30 天后清理；被保护的已完成历史仍可见。
+- 自定义提醒在系列层保存相对时间，在单次覆盖中保存绝对时间；主日历、桌历和调度器共用换算。无效重复日期拒绝保存；桌历保留草稿并显示错误。桌历输入明确使用上海时区。
 - 月末不存在目标日时收敛到该月最后一天。历史 `weekdays` 记录继续读取，但 UI 不再新建该类型。
 
 ### 数据与生命周期
 
 - `desktop_calendar_state` 保存桌历设置、显示器签名位置、可见状态、人工校历覆盖和上游事件个性化。
 - 旧 JSON 只在 SQLite 无对应记录时导入一次；后续读写以 SQLite 为准。
+- migration 13 将通知记录及旧文件导入标记写入同一 SQLite。通知读改写同步完成，之后才等待系统 toast；退出时不存在尚未提交的通知写入队列。坏旧文件不覆盖数据库，备份恢复中的任务和通知共同提交或回滚。
 - 桌历开机恢复从属于 CampusOS 的 `launchAtLogin`。全局关闭时桌历恢复值归零，界面控件禁用。
 - 应用因登录项以隐藏模式启动时，只在父开关和桌历恢复开关都开启时恢复窗口。
 
@@ -45,15 +50,18 @@
 | 检查面 | 证据 | 状态 |
 |---|---|---|
 | 代码入口 | `scheduleIpc.ts`、`deskCalendarHost.ts`、两个 renderer | 已实现 |
-| 正式数据/IPC/持久化 | schedule IPC + SQLite migration 12 + personalization IPC | 已实现 |
-| 用户可见行为 | 原生鼠标切周视图、双击上游事件、键盘编辑备注、点击保存；正式接口确认写入；独立 E2E fixture | 通过；重复事件边界见审查待修复项 |
-| 错误边界 | 预加载路径、旧置顶设置清理、IPC 生命周期、桌面宿主缺失、topmost 锚点保护 | 有针对性测试；不代表全部重复输入已合法化 |
-| 自动化验证 | `pnpm typecheck`、`pnpm lint`；root test 649 passed / 2 skipped；Electron e2e 8 passed | 通过 |
+| 正式数据/IPC/持久化 | schedule IPC + SQLite migrations 12/13 + personalization IPC；通知、备份事务和重启回归 | 已实现 |
+| 用户可见行为 | 上轮原生鼠标与键盘链路；本轮 Electron 中编辑第五次提醒、无效日期草稿保留、重启后实例与通知状态一致 | 新增 `schedule-recovery.e2e.ts`；独立 userData 与 fixture |
+| 错误边界 | 重复日期、未知实例、连续分段、历史保护、通知并发、旧 JSON 损坏、事务失败、显式上海时区 | 有针对性回归 |
+| 自动化验证 | root `pnpm test`: 677 passed / 2 skipped；`pnpm typecheck`、`pnpm lint`；Electron e2e 9 passed | 本地通过；当前提交 CI 单独核验 |
+| 主日历交互与表单 | 开发窗口亲测双击不写库、第五次系列改名保留根日期、真实拖动半小时同步移动实例提醒；主日历与桌历错误截图已亲眼复核 | 通过；主表单在视口内滚动，错误保留在弹窗内 |
 | 系统桌面层 | 旧版按钮命中 SysListView32；修复后周/日/今天命中 Chromium 子窗口且根 HWND 为桌历。E2E 核验普通应用在上、非 topmost、Win32 SW_HIDE 恢复 | 默认贴底通过；本轮尚未覆盖 Wallpaper Engine 运行与 Win+D 手动实机 |
 | 关闭重开与设置 | 重开后正式接口仍返回原生键盘写入的测试备注；`.tmp/desktop-final-settings.png` 与 `.tmp/desktop-final-settings-bottom.png` 已亲眼查看，无置顶控件 | 通过；截图只含隔离 fixture |
 | 远端验证 | 当前提交对应 GitHub Actions；run id 随提交生成，不预写到源码 | 提交后执行 |
 
 ## 外部实现依据
+
+重复日期校验对照本地 Celechron `lib/page/task/task_edit_page.dart:41-63`；刷新生命周期对照 `lib/model/task.dart:249-263`。用户已批准的稳定 occurrence、分段编辑与独立完成历史超出了 Celechron 滚动单记录模型，因此保留这些扩展，用正式 SQLite 回归验证，未以滚动刷新重置用户的完成状态。
 
 检索日期：2026-09-05。
 

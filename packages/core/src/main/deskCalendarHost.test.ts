@@ -253,7 +253,8 @@ describe("desk calendar host", () => {
     expect(saveTask).toHaveBeenCalledWith(expect.objectContaining({
       type: "fixed", repeatType: "norepeat", timeSpentMinutes: 15,
       timeNeededMinutes: 90, breakable: false, blocksPlanning: true,
-      reminderMode: "custom", reminderAt: "2026-09-10T08:20"
+      reminderMode: "custom", reminderAt: "2026-09-10T08:20+08:00",
+      startAt: "2026-09-10T09:00+08:00", endAt: "2026-09-10T10:00+08:00"
     }));
   });
 

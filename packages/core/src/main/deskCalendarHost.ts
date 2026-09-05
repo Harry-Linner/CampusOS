@@ -1,4 +1,9 @@
 import { join } from "node:path";
+import { resolveLocalTaskReminderAt } from "@campusos/shared";
+
+// datetime-local controls describe the calendar's Shanghai clock, regardless
+// of the operating system's timezone. Already-qualified ISO timestamps survive.
+const calendarInputTime = (value: string): string => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value) ? `${value}+08:00` : value;
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, type IpcMainEvent, type Rectangle } from "electron";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadSchedulePeriods, loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
@@ -373,7 +378,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       repeatWeekdays: task.repeatWeekdays,
       reminderMode: override?.reminderMode ?? task.reminderMode,
       reminderLeadMinutes: override?.reminderLeadMinutes ?? task.reminderLeadMinutes,
-      reminderAt: override && Object.prototype.hasOwnProperty.call(override, "reminderAt") ? override.reminderAt : task.reminderAt,
+      reminderAt: resolveLocalTaskReminderAt(task, { occurrenceKey: period.occurrenceKey, startAt: occurrenceStartAt, endAt: occurrenceEndAt }),
       taskType: task.type === "fixedlegacy" ? "fixed" : task.type,
       timeSpentMinutes: override?.timeSpentMinutes ?? task.timeSpentMinutes,
       timeNeededMinutes: task.timeNeededMinutes,
@@ -594,6 +599,7 @@ export const registerDeskCalendarHostHandlers = (): void => {
     }
   });
   ipcMain.handle("campusos:desk-calendar:save-event", async (_event, input) => {
+    try {
     const { id, origin, taskId, occurrenceKey, editScope, date, title, startAt, endAt, location, note, reminderMode, reminderLeadMinutes, reminderAt, type, timeSpentMinutes, timeNeededMinutes, breakable, blocksPlanning, repeatType, repeatPeriod, repeatEndsOn, repeatEndMode, repeatCount, repeatWeekdays } = (input ?? {}) as {
       id?: string;
       origin?: "local" | "upstream";
@@ -637,8 +643,8 @@ export const registerDeskCalendarHostHandlers = (): void => {
       ...(taskId ? { id: taskId } : {}),
       title,
       description: note ?? "",
-      startAt: startAt ?? dayStart,
-      endAt: endAt ?? dayEnd,
+      startAt: calendarInputTime(startAt ?? dayStart),
+      endAt: calendarInputTime(endAt ?? dayEnd),
       location: location ?? "",
       type: type ?? "deadline",
       repeatType: repeatType ?? "norepeat",
@@ -655,10 +661,13 @@ export const registerDeskCalendarHostHandlers = (): void => {
       timeNeededMinutes: Math.max(1, timeNeededMinutes ?? 60),
       reminderMode: reminderMode ?? (reminderLeadMinutes != null ? "lead" : "none"),
       reminderLeadMinutes: reminderMode === "lead" || (!reminderMode && reminderLeadMinutes != null) ? reminderLeadMinutes ?? 15 : null,
-      reminderAt: reminderMode === "custom" ? reminderAt ?? null : null
+      reminderAt: reminderMode === "custom" && reminderAt ? calendarInputTime(reminderAt) : null
     });
     await sendDataToWindow();
     return { ok: true };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : "日程保存失败。" };
+    }
   });
   // Compatibility for older renderer bundles during an application update.
   ipcMain.handle("campusos:desk-calendar:create-event", async (_event, input) => {

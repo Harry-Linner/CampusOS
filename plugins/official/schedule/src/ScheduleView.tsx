@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { resolveLocalTaskReminderAt } from "@campusos/shared";
 import type {
   CalendarEventPersonalization,
   LocalTaskInput,
@@ -216,9 +217,7 @@ const defaultTaskForm = (date = new Date()): TaskFormState => {
 
 const taskToForm = (task: LocalTaskRecord, event?: ScheduleEvent): TaskFormState => {
   const override = event?.occurrenceKey ? task.occurrenceOverrides?.[event.occurrenceKey] : undefined;
-  const reminderAt = override && Object.prototype.hasOwnProperty.call(override, "reminderAt")
-    ? override.reminderAt
-    : task.reminderAt;
+  const reminderAt = resolveLocalTaskReminderAt(task, event ?? task);
   return {
     id: task.id,
     title: event?.title ?? override?.title ?? task.title,
@@ -400,6 +399,8 @@ export const ScheduleView = ({
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (error) formErrorRef.current?.focus(); }, [error]);
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LocalTaskRecord | null>(null);
   const [pendingDeleteOccurrenceKey, setPendingDeleteOccurrenceKey] = useState<string | undefined>();
@@ -424,7 +425,6 @@ export const ScheduleView = ({
     }
   });
   const [dragEvent, setDragEvent] = useState<ScheduleEvent | null>(null);
-  const [dragPreview, setDragPreview] = useState<{ startAt: string; endAt: string } | null>(null);
   const [conflictEvents, setConflictEvents] = useState<Set<string>>(new Set());
   const [makeupDays, setMakeupDays] = useState<ReadonlyArray<{ date: string; weekday: number; source: "builtin" | "manual" }>>([]);
   const [statutoryHolidays, setStatutoryHolidays] = useState<ReadonlyArray<{ date: string; label: string }>>([]);
@@ -682,16 +682,16 @@ export const ScheduleView = ({
     event.taskId !== undefined && event.kind === "task";
 
   // 日视图拖拽：按像素偏移换算分钟（1 小时 = 52px 基准，实际按容器高度换算）。
-  const dayDragState = useRef<{ event: ScheduleEvent; originStart: number; originEnd: number; startY: number; startHeight: number; mode: "move" | "resize-end" } | null>(null);
+  const dayDragState = useRef<{ event: ScheduleEvent; originStart: number; originEnd: number; startY: number; mode: "move" | "resize-end"; preview: { startAt: string; endAt: string } } | null>(null);
 
   const beginDayDrag = (event: ScheduleEvent, mode: "move" | "resize-end") => (pointer: React.PointerEvent<HTMLElement>): void => {
-    if (!isTaskEditable(event)) return;
+    if (!isTaskEditable(event) || busy || pointer.button !== 0) return;
+    pointer.stopPropagation();
     pointer.preventDefault();
     const originStart = Date.parse(event.startAt);
     const originEnd = Date.parse(event.endAt);
-    dayDragState.current = { event, originStart, originEnd, startY: pointer.clientY, startHeight: originEnd - originStart, mode };
+    dayDragState.current = { event, originStart, originEnd, startY: pointer.clientY, mode, preview: { startAt: event.startAt, endAt: event.endAt } };
     setDragEvent(event);
-    setDragPreview({ startAt: event.startAt, endAt: event.endAt });
     (pointer.currentTarget as HTMLElement).setPointerCapture(pointer.pointerId);
   };
 
@@ -702,12 +702,10 @@ export const ScheduleView = ({
     if (!container) return;
     const hoursPerPx = 24 / Math.max(1, container.getBoundingClientRect().height);
     const deltaMinutes = Math.round((pointer.clientY - state.startY) * hoursPerPx * 60 / timeStepMinutes) * timeStepMinutes;
-    const newStart = state.originStart + deltaMinutes * 60_000;
-    const newEnd = state.mode === "move" ? newStart + state.startHeight : newStart + (pointer.clientY - state.startY) * hoursPerPx * 60_000;
-    const snappedEnd = newEnd - ((newEnd - newStart) % (timeStepMinutes * 60_000));
-    const clampedEnd = Math.max(newStart + timeStepMinutes * 60_000, snappedEnd);
+    const newStart = state.mode === "move" ? state.originStart + deltaMinutes * 60_000 : state.originStart;
+    const clampedEnd = Math.max(newStart + timeStepMinutes * 60_000, state.originEnd + deltaMinutes * 60_000);
     const preview = { startAt: new Date(newStart).toISOString(), endAt: new Date(clampedEnd).toISOString() };
-    setDragPreview(preview);
+    state.preview = preview;
     // 冲突检测：与其它自建任务重叠（排除自身）。
     const conflicts = new Set<string>();
     for (const candidate of events) {
@@ -719,32 +717,33 @@ export const ScheduleView = ({
     setConflictEvents(conflicts);
   };
 
-  const endDayDrag = async (): Promise<void> => {
+  const endDayDrag = async (cancelled = false): Promise<void> => {
     const state = dayDragState.current;
-    if (!state || !dragPreview || !schedule || !state.event.taskId) {
+    if (!state || !schedule || !state.event.taskId) {
       dayDragState.current = null;
       setDragEvent(null);
-      setDragPreview(null);
       setConflictEvents(new Set());
       return;
     }
     const original = tasks.find((task) => task.id === state.event.taskId);
-    const next = { ...dragPreview };
+    const next = state.preview;
     dayDragState.current = null;
     setDragEvent(null);
-    setDragPreview(null);
     setConflictEvents(new Set());
-    if (!original) return;
+    if (!original || cancelled || (Date.parse(next.startAt) === state.originStart && Date.parse(next.endAt) === state.originEnd)) return;
+    const override = original.occurrenceOverrides?.[state.event.occurrenceKey ?? "0"];
+    const reminderAt = resolveLocalTaskReminderAt(original, state.event);
+    const reminderShift = original.type === "deadline" ? Date.parse(next.endAt) - state.originEnd : Date.parse(next.startAt) - state.originStart;
     try {
       await schedule.saveTask({
         id: original.id,
-        title: original.title,
-        description: original.description,
-        timeSpentMinutes: original.timeSpentMinutes,
-        timeNeededMinutes: Math.max(timeStepMinutes, Math.round((Date.parse(next.endAt) - Date.parse(next.startAt)) / 60_000)),
+        title: state.event.title,
+        description: override?.description ?? original.description,
+        timeSpentMinutes: override?.timeSpentMinutes ?? original.timeSpentMinutes,
+        timeNeededMinutes: original.timeNeededMinutes,
         startAt: next.startAt,
         endAt: next.endAt,
-        location: original.location,
+        location: state.event.location ?? original.location,
         breakable: original.breakable,
         type: original.type === "fixedlegacy" ? "fixed" : original.type,
         repeatType: original.repeatType,
@@ -756,9 +755,9 @@ export const ScheduleView = ({
         editScope: state.event.occurrenceKey ? "single" : "series",
         occurrenceKey: state.event.occurrenceKey,
         blocksPlanning: original.blocksPlanning,
-        reminderMode: original.reminderMode,
-        reminderLeadMinutes: original.reminderLeadMinutes,
-        reminderAt: original.reminderAt
+        reminderMode: override?.reminderMode ?? original.reminderMode,
+        reminderLeadMinutes: override?.reminderLeadMinutes ?? original.reminderLeadMinutes,
+        reminderAt: reminderAt ? new Date(Date.parse(reminderAt) + reminderShift).toISOString() : null
       });
       setNotice("任务时间已更新");
     } catch (cause) {
@@ -830,7 +829,7 @@ export const ScheduleView = ({
       setForm(null);
       setNotice("任务已保存");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "任务保存失败。");
+      setError(cause instanceof Error ? cause.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, "") : "任务保存失败。");
     } finally {
       setBusy(false);
     }
@@ -1002,7 +1001,7 @@ export const ScheduleView = ({
         </div>
       </header>
 
-      {error ? <div className="workspace-error-banner" role="alert">{error}</div> : null}
+      {error && !form ? <div className="workspace-error-banner" role="alert">{error}</div> : null}
       {notice ? <div className="schedule-notice" role="status">{notice}</div> : null}
       {pendingDelete ? (
         <section className="schedule-delete-decision" role="dialog" aria-modal="true" aria-label="删除任务">
@@ -1299,7 +1298,7 @@ export const ScheduleView = ({
                       onPointerDown={editable ? beginDayDrag(event, "move") : undefined}
                       onPointerMove={editable ? moveDayDrag : undefined}
                       onPointerUp={editable ? () => void endDayDrag() : undefined}
-                      onPointerCancel={editable ? () => void endDayDrag() : undefined}
+                      onPointerCancel={editable ? () => void endDayDrag(true) : undefined}
                     >{isContinuation ? null : <strong>{event.title}</strong>}<small>{isContinuation ? "" : formatEventMeta(event)}</small>{editable ? <span className="schedule-resize-handle" onPointerDown={beginDayDrag(event, "resize-end")} aria-hidden="true" /> : null}</button>;
                   })}</div></section>;
                 });
@@ -1362,7 +1361,7 @@ export const ScheduleView = ({
 
       {form ? (
         <Dialog open onOpenChange={(open) => { if (!open) setForm(null); }}>
-          <DialogContent aria-describedby={undefined} className="sm:max-w-xl">
+          <DialogContent aria-describedby={undefined} className="sm:max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{form.id ? "编辑任务" : "新建任务"}</DialogTitle>
             </DialogHeader>
@@ -1385,6 +1384,7 @@ export const ScheduleView = ({
                 {form.id && form.repeatType !== "norepeat" ? <label>编辑范围<select value={form.editScope} onChange={(event) => setForm({ ...form, editScope: event.target.value as TaskFormState["editScope"] })}><option value="single">仅本次</option><option value="future">本次及未来</option><option value="series">整个系列</option></select></label> : null}
               </> : null}
               <div className="settings-actions"><Button type="submit" disabled={busy}>{busy ? "保存中" : "保存任务"}</Button></div>
+              {error ? <div className="workspace-error-banner" role="alert" tabIndex={-1} ref={formErrorRef}>{error}</div> : null}
             </form>
           </DialogContent>
         </Dialog>

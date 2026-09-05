@@ -455,6 +455,15 @@ export interface LocalTaskOccurrenceOverride {
   deletedAt?: string | null;
 }
 
+/** Inclusive start, exclusive end; null end covers an unbounded recurrence. */
+export interface LocalTaskOccurrenceDeletion {
+  from: number;
+  to: number | null;
+  includeCompleted: boolean;
+  deletedAt: string;
+  permanent?: boolean;
+}
+
 export interface LocalTaskRecord {
   id: string;
   status: LocalTaskStatus;
@@ -474,6 +483,9 @@ export interface LocalTaskRecord {
   repeatEndMode?: LocalTaskRepeatEndMode;
   repeatCount?: number | null;
   seriesGroupId?: string;
+  seriesOccurrenceOffset?: number;
+  seriesEndBefore?: number;
+  occurrenceDeletions?: LocalTaskOccurrenceDeletion[];
   occurrenceOverrides?: Record<string, LocalTaskOccurrenceOverride>;
   blocksPlanning: boolean;
   reminderMode?: LocalTaskReminderMode;

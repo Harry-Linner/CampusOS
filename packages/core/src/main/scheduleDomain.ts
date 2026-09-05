@@ -192,6 +192,12 @@ export const normalizeTaskRecord = (
     repeatEndMode,
     repeatCount: repeatEndMode === "count" ? Math.max(1, Math.round(finiteNumber(value.repeatCount, 1))) : null,
     seriesGroupId: typeof value.seriesGroupId === "string" && value.seriesGroupId ? value.seriesGroupId : normalizedId,
+    ...(Number.isSafeInteger(value.seriesOccurrenceOffset) && (value.seriesOccurrenceOffset ?? -1) >= 0 ? { seriesOccurrenceOffset: value.seriesOccurrenceOffset } : {}),
+    ...(Number.isSafeInteger(value.seriesEndBefore) && (value.seriesEndBefore ?? -1) >= 0 ? { seriesEndBefore: value.seriesEndBefore } : {}),
+    occurrenceDeletions: (Array.isArray(value.occurrenceDeletions) ? value.occurrenceDeletions : []).filter((range) =>
+      range && Number.isSafeInteger(range.from) && range.from >= 0 &&
+      (range.to === null || (Number.isSafeInteger(range.to) && range.to > range.from)) &&
+      Number.isFinite(Date.parse(range.deletedAt))),
     occurrenceOverrides,
     blocksPlanning: value.blocksPlanning !== false,
     reminderMode: value.reminderMode === "none" || value.reminderMode === "at-time" || value.reminderMode === "lead" || value.reminderMode === "custom"
@@ -235,6 +241,14 @@ export const createTaskRecord = (
   if (record.type === "fixedlegacy") {
     throw new Error("不能新建过去日程。");
   }
+  // Celechron lib/page/task/task_edit_page.dart:41-63 rejects an empty repeat
+  // range. Validate commands here, not stored segments truncated by a split.
+  if (record.type === "fixed" && record.repeatType !== "norepeat" && record.repeatEndMode === "date") {
+    const date = new Date(`${record.repeatEndsOn}T00:00:00+08:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.repeatEndsOn) || !Number.isFinite(date.getTime()) || dateOnlyIso(date.toISOString(), "重复结束日期") !== record.repeatEndsOn || record.repeatEndsOn < dateOnlyIso(record.startAt, "开始日期")) {
+      throw new Error("重复结束日期不能早于开始日期，且必须是有效日期。");
+    }
+  }
   return record;
 };
 
@@ -247,55 +261,59 @@ export const applyTaskMutation = (
   const seriesId = target.type === "fixedlegacy" ? target.fromId : target.id;
   const scope = mutation.scope ?? "single";
   const matchesSeries = (task: LocalTaskRecord): boolean =>
-    task.id === mutation.id || (seriesId !== null && (task.id === seriesId || task.fromId === seriesId));
+    task.id === mutation.id || (task.seriesGroupId ?? task.id) === (target.seriesGroupId ?? target.id) ||
+    (seriesId !== null && (task.id === seriesId || task.fromId === seriesId));
+
+  if (target.type === "fixed" && target.repeatType !== "norepeat") {
+    const key = mutation.occurrenceKey ?? String(target.seriesOccurrenceOffset ?? 0);
+    const index = Number(key);
+    if (scope !== "series" && !getTaskOccurrenceBounds(target, key)) throw new Error("任务实例不存在。");
+    if (mutation.status === "deleted" || mutation.action) {
+      const from = scope === "series" ? 0 : index;
+      const to = scope === "single" ? index + 1 : Infinity;
+      const includeCompleted = mutation.includeCompleted !== false;
+      return tasks.flatMap((task) => {
+        if (!matchesSeries(task)) return [task];
+        if (mutation.action === "purge" && scope === "series" && includeCompleted) return [];
+        const ranges = task.occurrenceDeletions ?? [];
+        // Keep original override statuses underneath range tombstones, so restore
+        // does not turn completed history into running tasks. Infinite series are
+        // deleted without materializing an infinite list of instances.
+        const occurrenceDeletions = mutation.action === "restore"
+          ? ranges.flatMap((range) => {
+            const end = range.to ?? Infinity;
+            if (range.permanent || range.from >= to || end <= from) return [range];
+            return [
+              ...(range.from < from ? [{ ...range, to: from }] : []),
+              ...(end > to ? [{ ...range, from: to }] : [])
+            ];
+          })
+          : [...ranges, { from, to: Number.isFinite(to) ? to : null, includeCompleted, deletedAt: new Date().toISOString(), permanent: mutation.action === "purge" }];
+        const restored = mutation.action === "restore";
+        return [{ ...task, occurrenceDeletions,
+          ...(restored && task.status === "deleted" ? { status: "running" as const, deletedAt: null } : {})
+        }];
+      });
+    }
+    return tasks.map((task) => {
+      if (task.id !== target.id) return task;
+      const prior = task.occurrenceOverrides?.[key] ?? {};
+      const nextOverride: LocalTaskOccurrenceOverride = { ...prior };
+      if (mutation.status) nextOverride.status = mutation.status;
+      if (mutation.timeSpentMinutes !== undefined) nextOverride.timeSpentMinutes = Math.min(task.timeNeededMinutes, Math.max(0, Math.round(mutation.timeSpentMinutes)));
+      if (nextOverride.status === "completed") nextOverride.timeSpentMinutes = task.timeNeededMinutes;
+      return { ...task, occurrenceOverrides: { ...task.occurrenceOverrides, [key]: nextOverride } };
+    });
+  }
 
   if (mutation.action === "purge") {
     const retained = tasks.filter((task) => {
       if (!matchesSeries(task)) return true;
-      if (scope === "series") return mutation.includeCompleted !== false || task.status !== "completed";
+      if (scope === "series") return mutation.includeCompleted === false && task.status === "completed";
       return task.id !== mutation.id;
     });
     if (retained.length === tasks.length) throw new Error("任务不存在。");
     return retained;
-  }
-
-  if (mutation.occurrenceKey !== undefined && target.type === "fixed" && target.repeatType !== "norepeat") {
-    if (scope === "series" && mutation.status === "deleted") {
-      return tasks.map((task) => task.seriesGroupId === (target.seriesGroupId ?? target.id)
-        ? { ...task, status: "deleted", deletedAt: new Date().toISOString() }
-        : task);
-    }
-    if (scope === "future" && mutation.status === "deleted") {
-      const occurrence = getTaskOccurrenceBounds(target, mutation.occurrenceKey);
-      if (!occurrence) throw new Error("任务实例不存在。");
-      const previous = addDays(startOfDay(new Date(occurrence.startAt)), -1);
-      const parts = getShanghaiDateParts(previous);
-      return tasks.map((task) => task.id === target.id ? {
-        ...task,
-        repeatEndMode: "date" as const,
-        repeatEndsOn: `${parts.year}-${parts.month}-${parts.day}`
-      } : task);
-    }
-    return tasks.map((task) => {
-      if (task.id !== target.id) return task;
-      const prior = task.occurrenceOverrides?.[mutation.occurrenceKey ?? ""] ?? {};
-      const nextOverride: LocalTaskOccurrenceOverride = { ...prior };
-      if (mutation.action === "restore") {
-        nextOverride.status = "running";
-        nextOverride.deletedAt = null;
-      } else if (mutation.status) {
-        nextOverride.status = mutation.status;
-        nextOverride.deletedAt = mutation.status === "deleted" ? new Date().toISOString() : null;
-      }
-      if (mutation.timeSpentMinutes !== undefined) {
-        nextOverride.timeSpentMinutes = Math.min(task.timeNeededMinutes, Math.max(0, Math.round(mutation.timeSpentMinutes)));
-      }
-      if (nextOverride.status === "completed") nextOverride.timeSpentMinutes = task.timeNeededMinutes;
-      return {
-        ...task,
-        occurrenceOverrides: { ...(task.occurrenceOverrides ?? {}), [mutation.occurrenceKey ?? ""]: nextOverride }
-      };
-    });
   }
 
   return tasks.map((task) => {
@@ -327,6 +345,38 @@ export const applyTaskMutation = (
 const taskChanged = (left: LocalTaskRecord[], right: LocalTaskRecord[]): boolean =>
   JSON.stringify(left) !== JSON.stringify(right);
 
+export const normalizeTaskSeries = (source: LocalTaskRecord[]): LocalTaskRecord[] => {
+  const tasks = source.map((task) => normalizeTaskRecord(task));
+  const groups = new Map<string, LocalTaskRecord[]>();
+  for (const task of tasks) {
+    const group = task.seriesGroupId ?? task.id;
+    groups.set(group, [...(groups.get(group) ?? []), task]);
+  }
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.seriesOccurrenceOffset !== undefined && b.seriesOccurrenceOffset !== undefined
+      ? a.seriesOccurrenceOffset - b.seriesOccurrenceOffset
+      : a.id === a.seriesGroupId ? -1 : b.id === b.seriesGroupId ? 1 : Date.parse(a.startAt) - Date.parse(b.startAt));
+    let previous: LocalTaskRecord | undefined;
+    for (const task of group) {
+      if (task.seriesOccurrenceOffset === undefined) {
+        let offset = 0;
+        if (previous) {
+          const until = previous.repeatEndMode === "date"
+            ? addDays(new Date(`${previous.repeatEndsOn}T00:00:00+08:00`), 1)
+            : new Date(task.startAt);
+          const periods = buildTaskInstances({ ...previous, status: "running", occurrenceOverrides: {}, occurrenceDeletions: [] }, new Date(previous.startAt), until);
+          offset = (previous.seriesOccurrenceOffset ?? 0) + new Set(periods.map((period) => period.occurrenceKey)).size;
+        }
+        task.seriesOccurrenceOffset = offset;
+        if (offset) task.occurrenceOverrides = Object.fromEntries(Object.entries(task.occurrenceOverrides ?? {}).map(([key, override]) => [String(Number(key) + offset), override]));
+      }
+      if (previous && previous.seriesEndBefore === undefined) previous.seriesEndBefore = task.seriesOccurrenceOffset;
+      previous = task;
+    }
+  }
+  return tasks;
+};
+
 export const refreshLocalTasks = (
   source: LocalTaskRecord[],
   now = new Date(),
@@ -334,10 +384,12 @@ export const refreshLocalTasks = (
 ): TaskRefreshResult => {
   const idFactory = getIdFactory(options);
   const cutoff = now.getTime() - 30 * DAY_MS;
-  const current = source
-    .map((task) => normalizeTaskRecord(task, { ...options, idFactory }))
-    .filter((task) => task.status !== "deleted" || !task.deletedAt || Date.parse(task.deletedAt) >= cutoff);
+  const current = normalizeTaskSeries(source.map((task) => normalizeTaskRecord(task, { ...options, idFactory })))
+    .filter((task) => (task.status !== "deleted" || !task.deletedAt || Date.parse(task.deletedAt) >= cutoff) &&
+      !task.occurrenceDeletions?.some((range) => range.includeCompleted && Date.parse(range.deletedAt) < cutoff &&
+        range.from <= (task.seriesOccurrenceOffset ?? 0) && (range.to ?? Infinity) >= (task.seriesEndBefore ?? Infinity)));
   for (const task of current) {
+    task.occurrenceDeletions = task.occurrenceDeletions?.map((range) => Date.parse(range.deletedAt) < cutoff ? { ...range, permanent: true } : range);
     if (task.status === "deleted") continue;
     if (task.type === "deadline") {
       if (task.timeSpentMinutes >= task.timeNeededMinutes) {
@@ -348,7 +400,9 @@ export const refreshLocalTasks = (
       continue;
     }
 
-    if (task.type === "fixed" && task.status !== "suspended") {
+    // Stable occurrence status is a user-approved extension to Celechron's
+    // rolling task.dart:249-263 lifecycle; never reset explicit completion.
+    if (task.type === "fixed" && task.status !== "suspended" && task.status !== "completed") {
       task.status = "running";
     }
   }
@@ -381,13 +435,17 @@ const buildTaskInstances = (
   const start = parseDate(task.startAt, "任务开始时间");
   const end = parseDate(task.endAt, "任务结束时间");
   const addInstance = (instanceStart: Date, instanceEnd: Date, occurrenceIndex: number): void => {
-    const occurrenceKey = String(occurrenceIndex);
-    const occurrenceId = `${task.id}:${occurrenceKey}`;
+    const globalIndex = (task.seriesOccurrenceOffset ?? 0) + occurrenceIndex;
+    if (globalIndex >= (task.seriesEndBefore ?? Infinity)) return;
+    const occurrenceKey = String(globalIndex);
+    const occurrenceId = `${task.seriesGroupId ?? task.id}:${occurrenceKey}`;
     const override = task.occurrenceOverrides?.[occurrenceKey];
     const resolvedStart = override?.startAt ? parseDate(override.startAt, "实例开始时间") : instanceStart;
     const resolvedEnd = override?.endAt ? parseDate(override.endAt, "实例结束时间") : instanceEnd;
     if (resolvedEnd <= resolvedStart) return;
     if (override?.status === "deleted") return;
+    const status = override?.status ?? task.status;
+    if (task.occurrenceDeletions?.some((range) => globalIndex >= range.from && globalIndex < (range.to ?? Infinity) && (range.includeCompleted || status !== "completed"))) return;
     if (resolvedEnd.getTime() <= rangeStart.getTime() || resolvedStart.getTime() >= rangeEnd.getTime()) return;
     for (
       let cursor = startOfDay(resolvedStart);
@@ -405,11 +463,11 @@ const buildTaskInstances = (
         startAt: chopped.start.toISOString(),
         endAt: chopped.end.toISOString(),
         type: task.type,
-        status: override?.status ?? (task.type === "fixed" && resolvedEnd.getTime() < Date.now() ? "outdated" : task.status),
+        status: status === "running" && task.type === "fixed" && resolvedEnd.getTime() < Date.now() ? "outdated" : status,
         blocksPlanning: task.blocksPlanning,
         occurrenceId,
         occurrenceKey,
-        occurrenceIndex,
+        occurrenceIndex: globalIndex,
         occurrenceStartAt: resolvedStart.toISOString(),
         occurrenceEndAt: resolvedEnd.toISOString(),
         seriesGroupId: task.seriesGroupId ?? task.id
@@ -483,7 +541,8 @@ export function getTaskOccurrenceBounds(
   occurrenceKey: string
 ): { startAt: string; endAt: string } | null {
   if (!/^\d+$/.test(occurrenceKey)) return null;
-  const targetIndex = Number(occurrenceKey);
+  const targetIndex = Number(occurrenceKey) - (task.seriesOccurrenceOffset ?? 0);
+  if (Number(occurrenceKey) >= (task.seriesEndBefore ?? Infinity)) return null;
   if (!Number.isSafeInteger(targetIndex) || targetIndex < 0 || targetIndex >= 20_000) return null;
   const start = parseDate(task.startAt, "任务开始时间");
   const end = parseDate(task.endAt, "任务结束时间");

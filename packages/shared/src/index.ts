@@ -34,6 +34,7 @@ export * from "./assistantDraft";
 export * from "./appNavigationBridge";
 export * from "./feedbackBridge";
 export * from "./retryClassification";
+export * from "./localTaskReminder";
 
 export type CampusPermission =
   | `network:${string}`

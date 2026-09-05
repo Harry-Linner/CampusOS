@@ -47,6 +47,7 @@ import {
   restoreNotificationRecords
 } from "./notificationCenter";
 import type { NotificationRecord } from "../shared/notificationBridge";
+import { closeOfficialDatabaseService } from "./officialDatabaseService";
 
 const temporaryDirectories: string[] = [];
 
@@ -73,6 +74,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeOfficialDatabaseService();
   delete process.env.ELECTRON_RENDERER_URL;
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) =>

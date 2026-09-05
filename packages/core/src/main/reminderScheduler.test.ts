@@ -207,6 +207,23 @@ describe("reminder scheduler", () => {
     expect(notificationState.add).not.toHaveBeenCalled();
   });
 
+  it("catches up a missed default lead while the course is still upcoming", () => {
+    scheduleWorkspaceReminders({ ...snapshot([]), courses: [{
+      id: "missed-course", title: "Upcoming course", sourceId: "academic-affairs", location: "Room A",
+      startAt: new Date(now.getTime() + 10 * 60_000).toISOString(),
+      endAt: new Date(now.getTime() + 70 * 60_000).toISOString()
+    }] }, { enabled: true, leadMinutes: [15], savedAt: null, storagePath: null }, now);
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({ id: "reminder:missed-course-lead-15" }));
+  });
+
+  it("never revives a past local deadline with stale running status", () => {
+    scheduleWorkspaceReminders(snapshot([]), { enabled: true, leadMinutes: [15], savedAt: null, storagePath: null }, now, [localTask({
+      endAt: new Date(now.getTime() - 5 * 60_000).toISOString(),
+      startAt: new Date(now.getTime() - 60 * 60_000).toISOString(), status: "running"
+    })]);
+    expect(notificationState.add).not.toHaveBeenCalled();
+  });
+
   it("cancels existing timers as soon as reminders are disabled", () => {
     scheduleWorkspaceReminders(snapshot([reminder()]), {
       enabled: true,

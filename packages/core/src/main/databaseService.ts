@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
 import type { BriefCachedItem } from "@campusos/shared";
+import type { NotificationRecord } from "../shared/notificationBridge";
 
 // Legacy schema compatibility only. New academic GPA business logic follows
 // Celechron's first returned attempt and never reads or writes this table.
@@ -60,6 +61,7 @@ export interface DatabaseService {
   readonly databasePath: string;
   readonly schemaVersion: number;
   close: () => void;
+  transaction: <T>(operation: () => T) => T;
   saveWorkspaceSnapshot: (snapshot: unknown, savedAt: string) => void;
   loadWorkspaceSnapshot: () => StoredWorkspaceSnapshot | null;
   upsertCapabilityRecord: (
@@ -110,6 +112,9 @@ export interface DatabaseService {
   saveCampusFeedRefreshState: (sourceId: string, lastSuccessAt: string) => void;
   saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
   loadCampusFeedAiSettings: () => { settings: unknown; savedAt: string } | null;
+  loadNotifications: () => NotificationRecord[];
+  saveNotifications: (records: readonly NotificationRecord[], markLegacyImported?: boolean) => void;
+  hasImportedLegacyNotifications: () => boolean;
 }
 
 const capabilityAccountKey = (accountId: string | null): string =>
@@ -258,6 +263,17 @@ const migrate = (database: Database.Database): void => {
       saved_at TEXT NOT NULL
     );
   `);
+  applyMigration(13, `
+    CREATE TABLE notifications (
+      id TEXT PRIMARY KEY,
+      record_json TEXT NOT NULL
+    );
+    CREATE TABLE notification_storage_meta (
+      singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+      legacy_imported INTEGER NOT NULL DEFAULT 0 CHECK (legacy_imported IN (0, 1))
+    );
+    INSERT INTO notification_storage_meta (singleton, legacy_imported) VALUES (1, 0);
+  `);
 };
 
 export const createDatabaseService = ({
@@ -278,6 +294,19 @@ export const createDatabaseService = ({
       return row.version ?? 0;
     },
     close: () => database.close(),
+    transaction: (operation) => database.transaction(operation)(),
+    loadNotifications: () => (database.prepare("SELECT record_json FROM notifications").all() as { record_json: string }[])
+      .map((row) => JSON.parse(row.record_json) as NotificationRecord),
+    hasImportedLegacyNotifications: () => (database.prepare("SELECT legacy_imported FROM notification_storage_meta WHERE singleton = 1").get() as { legacy_imported: number }).legacy_imported === 1,
+    saveNotifications: (records, markLegacyImported = false) => {
+      // The bounded notification set and its migration marker commit together.
+      database.transaction(() => {
+        database.prepare("DELETE FROM notifications").run();
+        const insert = database.prepare("INSERT INTO notifications (id, record_json) VALUES (?, ?)");
+        for (const record of records) insert.run(record.id, JSON.stringify(record));
+        if (markLegacyImported) database.prepare("UPDATE notification_storage_meta SET legacy_imported = 1 WHERE singleton = 1").run();
+      })();
+    },
     saveWorkspaceSnapshot: (snapshot, savedAt) => {
       if (!Number.isFinite(Date.parse(savedAt))) {
         throw new Error("工作区快照保存时间无效。");

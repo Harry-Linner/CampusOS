@@ -25,7 +25,7 @@ import {
   createTaskRecord,
   getTaskCalendarPeriods,
   getTaskOccurrenceBounds,
-  normalizeTaskRecord,
+  normalizeTaskSeries,
   refreshLocalTasks
 } from "./scheduleDomain";
 
@@ -51,7 +51,7 @@ const previousShanghaiDate = (iso: string): string => {
 const readStoredTasks = (): LocalTaskRecord[] => {
   const stored = getOfficialDatabaseService().loadLocalTasks();
   if (!stored || !Array.isArray(stored.tasks)) return [];
-  return (stored.tasks as LocalTaskRecord[]).map((task) => normalizeTaskRecord(task));
+  return normalizeTaskSeries(stored.tasks as LocalTaskRecord[]);
 };
 
 const persistTasks = (tasks: LocalTaskRecord[]): LocalTasksData => {
@@ -96,13 +96,16 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
       };
     }
   }
-  const next = createTaskRecord(input);
   const existingIndex = input.id
     ? source.findIndex((task) => task.id === input.id)
     : -1;
   if (input.id && existingIndex < 0) {
     throw new Error("要编辑的任务不存在。");
   }
+  // Single-instance commands cannot change the series rule; validate their own
+  // time interval without rejecting a moved occurrence against the series cutoff.
+  const next = createTaskRecord(input.editScope === "single" && existingIndex >= 0 ? { ...input, repeatType: "norepeat" } : input);
+  let savedTaskId = next.id;
   if (existingIndex >= 0) {
     const existing = source[existingIndex];
     if (existing.type === "fixedlegacy") {
@@ -111,6 +114,8 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
     const scope = input.editScope ?? "series";
     const occurrenceKey = input.occurrenceKey;
     const recurringOccurrence = existing.type === "fixed" && existing.repeatType !== "norepeat" && occurrenceKey !== undefined;
+    const originalOccurrence = recurringOccurrence ? getTaskOccurrenceBounds(existing, occurrenceKey) : null;
+    if (recurringOccurrence && !originalOccurrence) throw new Error("任务实例不存在。");
     if (recurringOccurrence && scope === "single") {
       source.splice(existingIndex, 1, {
         ...existing,
@@ -130,22 +135,59 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
           }
         }
       });
-    } else if (recurringOccurrence && scope === "future") {
-      const originalOccurrence = getTaskOccurrenceBounds(existing, occurrenceKey);
-      if (!originalOccurrence) throw new Error("任务实例不存在。");
-      source.splice(existingIndex, 1, {
-        ...existing,
-        repeatEndMode: "date",
-        repeatEndsOn: previousShanghaiDate(originalOccurrence.startAt)
-      });
+    } else if (existing.type === "fixed" && existing.repeatType !== "norepeat") {
+      // Celechron has no stable occurrence/segment model. This implements the
+      // approved scope contract in docs/specs/desk-calendar-and-recurrence.md.
+      const groupId = existing.seriesGroupId ?? existing.id;
+      const group = source.filter((task) => (task.seriesGroupId ?? task.id) === groupId)
+        .sort((a, b) => (a.seriesOccurrenceOffset ?? 0) - (b.seriesOccurrenceOffset ?? 0));
+      const root = group[0];
+      const tail = group[group.length - 1];
+      const isFuture = scope === "future" && originalOccurrence !== null;
+      const boundary = isFuture ? Number(occurrenceKey) : 0;
+      const prior = occurrenceKey === undefined ? undefined : existing.occurrenceOverrides?.[occurrenceKey];
+      const displayedStart = prior?.startAt ?? originalOccurrence?.startAt ?? existing.startAt;
+      const displayedEnd = prior?.endAt ?? originalOccurrence?.endAt ?? existing.endAt;
+      const deltaStart = Date.parse(next.startAt) - Date.parse(displayedStart);
+      const deltaEnd = Date.parse(next.endAt) - Date.parse(displayedEnd);
+      const startAt = isFuture ? next.startAt : new Date(Date.parse(root.startAt) + deltaStart).toISOString();
+      const endAt = isFuture ? next.endAt : new Date(Date.parse(root.endAt) + deltaEnd).toISOString();
+      const unchangedEnd = input.repeatEndMode === existing.repeatEndMode && input.repeatEndsOn === existing.repeatEndsOn && (input.repeatCount ?? null) === (existing.repeatCount ?? null);
+      const originalTotal = (tail.seriesOccurrenceOffset ?? 0) + (tail.repeatCount ?? 1);
       const segment = createTaskRecord({
-        ...input,
-        id: undefined,
-        occurrenceKey: undefined,
-        editScope: undefined,
-        seriesGroupId: existing.seriesGroupId ?? existing.id
+        ...input, id: isFuture ? undefined : root.id, startAt, endAt,
+        seriesGroupId: groupId,
+        ...(unchangedEnd ? { repeatEndMode: tail.repeatEndMode, repeatEndsOn: tail.repeatEndsOn,
+          repeatCount: tail.repeatEndMode === "count" ? Math.max(1, originalTotal - boundary) : null } : {}),
+        reminderAt: next.reminderAt ? new Date(Date.parse(startAt) + Date.parse(next.reminderAt) - Date.parse(next.startAt)).toISOString() : null
       });
-      source.push(segment);
+      segment.seriesOccurrenceOffset = boundary;
+      segment.occurrenceOverrides = Object.fromEntries(group.flatMap((task) => Object.entries(task.occurrenceOverrides ?? {})).filter(([key]) => Number(key) >= boundary));
+      for (const [key, override] of Object.entries(segment.occurrenceOverrides)) {
+        const updated = { ...override };
+        // A changed common field applies to the selected scope, while unrelated
+        // instance exceptions and completion/deletion history remain intact.
+        if (next.title !== (prior?.title ?? existing.title)) delete updated.title;
+        if (next.description !== (prior?.description ?? existing.description)) delete updated.description;
+        if (next.location !== (prior?.location ?? existing.location)) delete updated.location;
+        if (deltaStart && updated.startAt) updated.startAt = new Date(Date.parse(updated.startAt) + deltaStart).toISOString();
+        if (deltaEnd && updated.endAt) updated.endAt = new Date(Date.parse(updated.endAt) + deltaEnd).toISOString();
+        if (deltaStart && updated.reminderAt) updated.reminderAt = new Date(Date.parse(updated.reminderAt) + deltaStart).toISOString();
+        segment.occurrenceOverrides[key] = updated;
+      }
+      segment.occurrenceDeletions = group.flatMap((task) => task.occurrenceDeletions ?? []);
+      savedTaskId = segment.id;
+      const retained = source.filter((task) => (task.seriesGroupId ?? task.id) !== groupId || (isFuture && (task.seriesOccurrenceOffset ?? 0) < boundary));
+      for (const task of retained) {
+        if ((task.seriesGroupId ?? task.id) !== groupId || (task.seriesEndBefore ?? Infinity) <= boundary) continue;
+        task.seriesEndBefore = boundary;
+        if (originalOccurrence) {
+          task.repeatEndMode = "date";
+          task.repeatEndsOn = previousShanghaiDate(originalOccurrence.startAt);
+        }
+        task.occurrenceOverrides = Object.fromEntries(Object.entries(task.occurrenceOverrides ?? {}).filter(([key]) => Number(key) < boundary));
+      }
+      source.splice(0, source.length, ...retained, segment);
     } else {
       source.splice(existingIndex, 1, {
         ...next,
@@ -165,7 +207,7 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
   }
   const refreshed = refreshLocalTasks(source, new Date());
   const result = persistTasks(refreshed.tasks);
-  result.operation = { kind: existingIndex >= 0 ? "updated" : "created", taskId: next.id };
+  result.operation = { kind: existingIndex >= 0 ? "updated" : "created", taskId: savedTaskId };
   notifyScheduleChanged();
   await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());
   return result;
