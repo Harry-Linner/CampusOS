@@ -221,21 +221,4 @@ describe("reminder scheduler", () => {
     expect(state.scheduledCount).toBe(0);
   });
 
-  it("uses a floating task's explicit reminder without assigning it a calendar time", () => {
-    const reminderAt = new Date(now.getTime() + 60_000).toISOString();
-    const state = scheduleWorkspaceReminders(snapshot([]), {
-      enabled: true,
-      leadMinutes: [15],
-      savedAt: null,
-      storagePath: null
-    }, now, [localTask({ type: "floating", reminderMode: "custom", reminderAt })]);
-
-    expect(state.scheduledCount).toBe(1);
-    vi.advanceTimersByTime(60_000);
-    expect(notificationState.options).toEqual([{
-      title: "本地任务",
-      body: "时间到了",
-      silent: false
-    }]);
-  });
 });

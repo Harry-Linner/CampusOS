@@ -204,16 +204,16 @@ describe("schedule domain", () => {
     expect(first.content).toContain("LOCATION:Room\\, 1");
   });
 
-  it("keeps a floating task out of the calendar while preserving its task record", () => {
-    const floating = createTaskRecord({
+  it("migrates a legacy floating task to a dated deadline", () => {
+    const floating = {
       ...task({}),
       title: "Inbox item",
       type: "floating",
       reminderMode: "none"
-    });
+    } as unknown as LocalTaskRecord;
     const refreshed = refreshLocalTasks([floating], now);
     expect(refreshed.tasks).toHaveLength(1);
-    expect(refreshed.tasks[0]).toMatchObject({ title: "Inbox item", type: "floating", status: "running" });
-    expect(getTaskCalendarPeriods(refreshed.tasks, now, new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000))).toEqual([]);
+    expect(refreshed.tasks[0]).toMatchObject({ title: "Inbox item", type: "deadline", status: "running" });
+    expect(getTaskCalendarPeriods(refreshed.tasks, now, new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000))).toHaveLength(1);
   });
 });

@@ -57,7 +57,7 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
     loadTasks: vi.fn(async () => ({ tasks, updatedAt: now.toISOString() })),
     loadPeriods: vi.fn(async (): Promise<LocalTaskPeriod[]> =>
       tasks
-        .filter((task) => task.type !== "floating" && task.type !== "fixedlegacy")
+        .filter((task) => task.type !== "fixedlegacy")
         .map((task) => ({
           id: `period-${task.id}`,
           taskId: task.id,

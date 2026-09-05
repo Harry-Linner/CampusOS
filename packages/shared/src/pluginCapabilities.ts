@@ -428,7 +428,7 @@ export type AiAssistantParseResult =
   | AiAssistantExtractionResult
   | AiAssistantAcademicQueryResult;
 
-export type LocalTaskType = "deadline" | "fixed" | "floating" | "fixedlegacy";
+export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
 export type LocalTaskStatus =
   | "running"
   | "suspended"

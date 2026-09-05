@@ -51,7 +51,7 @@ The grades view does not expose connector source-state badges. Major labels are 
 - Use a Monday-first, continuous 7 × 6 monthly grid with thin shared borders.
 - Provide exactly four views in one page: 月历, 周视图, 日程, and 日视图. The view switcher sits alongside date navigation; it does not create new navigation destinations.
 - 自动排程已于 2026-08-22 决议删除（见文末"决策同步"节）；"规划（plan）"类能力不再属于日程，preload 计划接口已移除，数据库 migration 10 删除历史 `planner_schedules` 表。
-- Keep task creation and editing, undated tasks, repeat rules, reminders, filters, and iCal/Markdown/image export inside the 日程 page; none creates a separate first-level destination.
+- Keep dated task creation and editing, repeat rules, reminders, filters, and iCal/Markdown/image export inside the 日程 page; none creates a separate first-level destination. Every local task requires a start and end time.
 - 周视图 uses the available desktop content width directly and must not create a nested horizontal scroll container. At narrow widths, horizontal scrolling is allowed on the calendar page itself.
 - 月历 places courses, assignments, and exams directly inside the matching date cell.
 - 日程 is a linear, chronological list grouped by date for the visible month, rather than a secondary summary panel.

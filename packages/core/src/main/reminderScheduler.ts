@@ -115,20 +115,12 @@ export const buildLocalTaskReminders = (
   globalLeadMinutes: number[]
 ): ScheduledReminder[] => tasks.flatMap((task) => {
   if (task.status === "completed" || task.status === "deleted" || task.status === "outdated" || task.status === "overdue") return [];
-  const eventStartAt = task.type === "deadline"
-    ? task.endAt
-    : task.type === "floating"
-      ? task.reminderAt ?? ""
-      : task.startAt;
+  const eventStartAt = task.type === "deadline" ? task.endAt : task.startAt;
   const eventStartMs = Date.parse(eventStartAt);
   if (!Number.isFinite(eventStartMs)) return [];
   const mode = task.reminderMode ?? "global";
   if (mode === "none") return [];
-  const entries = task.type === "floating"
-    ? !task.reminderAt
-      ? []
-      : [{ fireAt: task.reminderAt, leadMinutes: 0 }]
-    : mode === "custom"
+  const entries = mode === "custom"
     ? [{ fireAt: task.reminderAt ?? "", leadMinutes: Math.max(0, Math.round((eventStartMs - Date.parse(task.reminderAt ?? "")) / 60_000)) }]
     : mode === "at-time"
       ? [{ fireAt: eventStartAt, leadMinutes: 0 }]

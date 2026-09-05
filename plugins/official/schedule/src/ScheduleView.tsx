@@ -41,7 +41,7 @@ interface TaskFormState {
   endAt: string;
   location: string;
   breakable: boolean;
-  type: "deadline" | "fixed" | "floating";
+  type: "deadline" | "fixed";
   repeatType: "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
   repeatPeriod: number;
   repeatEndsOn: string;
@@ -400,13 +400,6 @@ export const ScheduleView = ({
     () => selectedEvent?.taskId ? tasks.find((task) => task.id === selectedEvent.taskId) ?? null : null,
     [selectedEvent, tasks]
   );
-  const floatingTasks = useMemo(
-    () => tasks
-      .filter((task) => task.type === "floating" && task.status !== "deleted" && task.status !== "completed")
-      .sort((left, right) => left.title.localeCompare(right.title, "zh-CN")),
-    [tasks]
-  );
-
   useEffect(() => {
     try {
       globalThis.localStorage?.setItem("campusos.schedule.event-style", eventStyle);
@@ -717,7 +710,7 @@ export const ScheduleView = ({
         repeatPeriod: form.repeatPeriod,
         repeatEndsOn: form.repeatEndsOn,
         repeatWeekdays: form.repeatWeekdays ?? [],
-        blocksPlanning: form.type === "floating" ? false : form.blocksPlanning,
+        blocksPlanning: form.blocksPlanning,
         reminderMode: form.reminderMode,
         reminderLeadMinutes: form.reminderMode === "lead" ? form.reminderLeadMinutes : null,
         reminderAt: form.reminderMode === "custom" ? fromDateTimeInput(form.reminderAt) : null
@@ -1079,24 +1072,6 @@ export const ScheduleView = ({
             </div>
           ) : null}
 
-          {floatingTasks.length > 0 ? (
-            <section className="schedule-floating-strip" aria-label="无日期待办">
-              <header>
-                <strong>无日期待办</strong>
-                <span>{floatingTasks.length} 项</span>
-              </header>
-              <ul>
-                {floatingTasks.map((task) => (
-                  <li key={task.id}>
-                    <span className={`floating-task-dot is-${task.status}`} aria-hidden="true" />
-                    <button type="button" onClick={() => setForm(taskToForm(task))}>{task.title}</button>
-                    {task.status !== "completed" ? <button type="button" className="floating-task-complete" onClick={() => void mutate(task, "completed")}>完成</button> : null}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
           {viewMode === "month" ? (
             <div className={`schedule-month-grid${eventStyle === "dot" ? " is-dot" : ""}${density === "compact" ? " is-compact" : ""}`}>
               {weekdayLabels.map((label) => <span className="schedule-weekday" key={label}>{label}</span>)}
@@ -1268,10 +1243,10 @@ export const ScheduleView = ({
             <form className="schedule-task-form" onSubmit={(event) => void saveForm(event)}>
               <label>标题<input required value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
               <label>说明<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-              {form.type !== "floating" ? <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div> : <p className="schedule-form-hint">无日期待办不会出现在日历中；可单独设置提醒时间。</p>}
+              <div className="schedule-form-grid"><label>开始<input type="datetime-local" required value={form.startAt} onChange={(event) => setForm({ ...form, startAt: event.target.value })} /></label><label>结束<input type="datetime-local" required value={form.endAt} onChange={(event) => setForm({ ...form, endAt: event.target.value })} /></label></div>
               <div className="schedule-form-grid"><label>所需分钟<input type="number" min="1" value={form.timeNeededMinutes} onChange={(event) => setForm({ ...form, timeNeededMinutes: Number(event.target.value) })} /></label><label>已用分钟<input type="number" min="0" value={form.timeSpentMinutes} onChange={(event) => setForm({ ...form, timeSpentMinutes: Number(event.target.value) })} /></label></div>
               <label>地点<input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></label>
-              <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option><option value="floating">无日期待办</option></select></label>
+              <label>类型<select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value as TaskFormState["type"] })}><option value="deadline">DDL</option><option value="fixed">日程</option></select></label>
               <label>单项提醒<select value={form.reminderMode === "lead" ? `lead:${form.reminderLeadMinutes}` : form.reminderMode} onChange={(event) => { const value = event.target.value; if (value.startsWith("lead:")) setForm({ ...form, reminderMode: "lead", reminderLeadMinutes: Number(value.slice(5)) }); else setForm({ ...form, reminderMode: value as TaskFormState["reminderMode"] }); }}><option value="global">使用全局提前量</option><option value="none">不提醒</option><option value="at-time">开始/截止时</option><option value="lead:5">提前 5 分钟</option><option value="lead:15">提前 15 分钟</option><option value="lead:30">提前 30 分钟</option><option value="lead:60">提前 1 小时</option><option value="lead:1440">提前 1 天</option><option value="custom">自定义时间</option></select></label>
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" required value={form.reminderAt} onChange={(event) => setForm({ ...form, reminderAt: event.target.value })} /></label> : null}
               {form.type === "fixed" ? <>

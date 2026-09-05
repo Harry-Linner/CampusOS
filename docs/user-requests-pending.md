@@ -515,7 +515,7 @@ if is_today:
 
 - **格子**：`contextMenuEvent`/单击非本月 → 新建/跳月（calendar_grid `_open_create_dialog`/`_jump_to_month`）；非本月格子滚动区 `WA_TransparentForMouseEvents` 使点击落到格子。
 - **任务条**（task_chip.py）：`勾选框 + 8px 彩点 + 名称(ElidingLabel)`；**双击/右键 → 编辑**（`mouseDoubleClickEvent`/`contextMenuEvent` → editRequested）。
-- **新增/编辑弹窗**（task_dialog.py 381 行）：名称 + 优先级(白/橙/绿/红 `PRIORITY_COLORS`) + 周期类型(单次/范围每天/范围内每周几/指定多日) + 各日期字段（once/range/weekly/specific）+ MiniCalendarPicker(多选日期) + 弹窗高度随选中 tab 变化。**`floating=True` 时隐藏周期**（无日期待办）。
+- **新增/编辑弹窗（历史对照）**（task_dialog.py 381 行）：DeskToDo 原实现包含颜色优先级、四类周期和 `floating` 无日期待办；CampusOS 后续决策已明确不迁入颜色优先级和无日期待办，只保留待重新定稿的重复规则作为交互参考。
 
 ### 六、设置面板 / 托盘（config_window.py 749 行 + tray_icon.py）
 
