@@ -5,8 +5,10 @@ import type {
   ReminderSettingsRecord
 } from "../shared/reminderBridge";
 import { createDefaultReminderSchedulerState } from "../shared/reminderBridge";
+import { addNotification } from "./notificationCenter";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
+const STARTUP_CATCH_UP_MS = 24 * 60 * 60 * 1000;
 
 const scheduledTimers = new Map<string, NodeJS.Timeout>();
 type ScheduledReminder = Pick<CampusReminder, "id" | "title" | "fireAt" | "eventStartAt" | "leadMinutes" | "location"> & {
@@ -58,18 +60,19 @@ const buildReminderBody = (reminder: ScheduledReminder): string => {
   return `将在 ${reminder.leadMinutes} 分钟后开始`;
 };
 
-const showReminderNotification = (reminder: ScheduledReminder): void => {
-  if (!notificationsSupported()) {
-    return;
-  }
-
-  const notification = new Notification({
+const emitReminderNotification = async (reminder: ScheduledReminder): Promise<void> => {
+  await addNotification({
+    id: `reminder:${reminder.id}`,
+    kind: reminder.kind === "course" ? "course" : reminder.kind === "deadline" ? "assignment" : "task",
     title: reminder.title,
     body: buildReminderBody(reminder),
-    silent: false
+    actionTarget: { viewId: "schedule" },
+    source: "schedule",
+    sourceId: reminder.kind,
+    entityId: reminder.id,
+    publishedAt: reminder.fireAt,
+    showDesktop: true
   });
-
-  notification.show();
 };
 
 const updateSchedulerState = (
@@ -94,7 +97,7 @@ const scheduleReminder = (reminder: ScheduledReminder, nowMs: number): boolean =
   const timer = setTimeout(() => {
     scheduledTimers.delete(reminder.id);
     scheduledReminderById.delete(reminder.id);
-    showReminderNotification(reminder);
+    void emitReminderNotification(reminder);
     updateSchedulerState({
       scheduledCount: scheduledTimers.size,
       nextFireAt: getNextFireAt()
@@ -174,6 +177,11 @@ export const scheduleWorkspaceReminders = (
   const nowMs = now.getTime();
 
   for (const reminder of sortedReminders) {
+    const fireAtMs = Date.parse(reminder.fireAt);
+    if (Number.isFinite(fireAtMs) && fireAtMs <= nowMs && nowMs - fireAtMs <= STARTUP_CATCH_UP_MS) {
+      void emitReminderNotification(reminder);
+      continue;
+    }
     scheduleReminder(reminder, nowMs);
   }
 

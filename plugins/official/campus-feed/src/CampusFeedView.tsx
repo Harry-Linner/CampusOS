@@ -77,8 +77,10 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [viewMode, setViewMode] = useState<"grouped" | "all">("grouped");
   const [collapsedSources, setCollapsedSources] = useState<Set<string>>(new Set());
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const focusedIndexRef = useRef(0);
   const busyRef = useRef(false);
+  const handledNavigationRef = useRef<string | null>(null);
 
   const refreshAll = useCallback(async (): Promise<void> => {
     if (!feed || busyRef.current) return;
@@ -124,9 +126,11 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
 
   const openOriginal = useCallback((item: FeedItemRecord): void => {
     if (!feed) return;
-    void feed.openExternal(item.url).catch((cause) =>
-      toast.error("无法打开原文", { description: cause instanceof Error ? cause.message : "链接未通过本地安全检查。" })
-    );
+    void feed.markRead([item.id])
+      .then(() => feed.openExternal(item.url))
+      .catch((cause) =>
+        toast.error("无法打开原文", { description: cause instanceof Error ? cause.message : "链接未通过本地安全检查。" })
+      );
   }, [feed]);
 
   const markAllRead = useCallback(async (): Promise<void> => {
@@ -231,6 +235,33 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const orderedItems = viewMode === "all"
     ? visibleItems
     : visibleSources.flatMap((source) => visibleItems.filter((item) => item.sourceId === source.id));
+
+  useEffect(() => {
+    const target = props.navigationTarget;
+    if (
+      !feed || !snapshot || target?.viewId !== "campus-feed" || !target.entityId ||
+      handledNavigationRef.current === target.requestId
+    ) return;
+    const item = snapshot.items.find((candidate) => candidate.id === target.entityId);
+    if (!item) return;
+    handledNavigationRef.current = target.requestId;
+    setTab("feed");
+    setSelectedSourceId(null);
+    setSelectedCategory(null);
+    setSelectedTag(null);
+    setOnlyUnread(false);
+    setViewMode("all");
+    setHighlightedItemId(item.id);
+    void feed.markRead([item.id]);
+    const frame = requestAnimationFrame(() => {
+      document.querySelector(`[data-feed-item-id="${item.id}"]`)?.scrollIntoView({ block: "center" });
+    });
+    const timer = window.setTimeout(() => setHighlightedItemId(null), 2400);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [feed, props.navigationTarget, snapshot]);
   const resetFilters = (): void => {
     setSelectedSourceId(null); setSelectedCategory(null); setSelectedTag(null); setOnlyUnread(false);
   };
@@ -447,7 +478,7 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
               {viewMode === "all" ? (
                 <div className="divide-y divide-border/60">
                   {orderedItems.map((item, index) => (
-                    <article key={item.id} data-feed-index={index} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
+                    <article key={item.id} data-feed-index={index} data-feed-item-id={item.id} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""} ${highlightedItemId === item.id ? "ring-2 ring-primary/40 ring-offset-4" : ""}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2 text-xs leading-5 text-muted-foreground">
@@ -491,7 +522,7 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                       {!collapsed ? (
                         <div className="divide-y divide-border/60">
                           {sourceItems.map((item) => (
-                            <article key={item.id} data-feed-index={orderedItems.indexOf(item)} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""}`}>
+                            <article key={item.id} data-feed-index={orderedItems.indexOf(item)} data-feed-item-id={item.id} className={`py-4 ${item.state === "new" ? "bg-primary/[0.03]" : ""} ${highlightedItemId === item.id ? "ring-2 ring-primary/40 ring-offset-4" : ""}`}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <h3 className="text-base font-semibold leading-7 text-foreground">{item.title}</h3>

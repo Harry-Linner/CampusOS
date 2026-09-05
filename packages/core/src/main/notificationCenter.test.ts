@@ -4,7 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const electronState = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
-  userDataPath: ""
+  userDataPath: "",
+  notifications: [] as Array<{ handlers: Map<string, () => void>; show: ReturnType<typeof vi.fn> }>,
+  navigate: vi.fn()
+}));
+
+vi.mock("./appLifecycle", () => ({
+  getAppLifecycleSettings: vi.fn(async () => ({ notificationEnabled: true })),
+  navigateCampusMainWindow: electronState.navigate
 }));
 
 vi.mock("electron", () => ({
@@ -21,8 +28,12 @@ vi.mock("electron", () => ({
   BrowserWindow: {
     getAllWindows: vi.fn(() => [])
   },
-  Notification: {
-    isSupported: vi.fn(() => false)
+  Notification: class {
+    static isSupported = vi.fn(() => true);
+    handlers = new Map<string, () => void>();
+    show = vi.fn();
+    constructor() { electronState.notifications.push(this); }
+    on(event: string, handler: () => void): void { this.handlers.set(event, handler); }
   },
   safeStorage: {
     isEncryptionAvailable: vi.fn(() => true)
@@ -32,8 +43,10 @@ vi.mock("electron", () => ({
 import {
   addNotification,
   readNotificationRecords,
-  registerNotificationHandlers
+  registerNotificationHandlers,
+  restoreNotificationRecords
 } from "./notificationCenter";
+import type { NotificationRecord } from "../shared/notificationBridge";
 
 const temporaryDirectories: string[] = [];
 
@@ -53,6 +66,8 @@ beforeEach(async () => {
   temporaryDirectories.push(root);
   electronState.userDataPath = root;
   electronState.handlers.clear();
+  electronState.notifications.length = 0;
+  electronState.navigate.mockClear();
   process.env.ELECTRON_RENDERER_URL = "http://localhost:5173/";
   registerNotificationHandlers();
 });
@@ -91,9 +106,9 @@ describe("Notification IPC", () => {
     expect(batched.find((entry) => entry.id === first.id)?.state).toBe("unread");
     expect(batched.find((entry) => entry.id === second.id)?.state).toBe("read");
 
-    const cleared = await invoke("campusos:notifications:clear-all");
-    expect(cleared).toEqual([]);
-    expect(await readNotificationRecords()).toEqual([]);
+    const cleared = await invoke<Array<{ state: string }>>("campusos:notifications:clear-all");
+    expect(cleared.every((entry) => entry.state === "handled")).toBe(true);
+    expect((await readNotificationRecords()).every((entry) => entry.state === "handled")).toBe(true);
   });
 
   it("rejects an untrusted renderer on the batch channel", async () => {
@@ -107,5 +122,44 @@ describe("Notification IPC", () => {
   it("rejects invalid batch payloads", async () => {
     await expect(invoke("campusos:notifications:batch", { ids: "nope", state: "read" })).rejects.toThrow("参数无效");
     await expect(invoke("campusos:notifications:batch", { ids: [], state: "bogus" })).rejects.toThrow("参数无效");
+  });
+
+  it("keeps at most 500 records and protects unread entries before read history", async () => {
+    const makeRecord = (index: number, state: "unread" | "read"): NotificationRecord => ({
+      id: `record-${index}`,
+      kind: "system",
+      title: `通知 ${index}`,
+      body: "正文",
+      state,
+      createdAt: new Date(Date.UTC(2026, 7, 1, 0, index % 60, index)).toISOString(),
+      expiresAt: new Date(Date.UTC(2027, 7, 1)).toISOString(),
+      actionTarget: null,
+      source: "system"
+    });
+    const incoming = [makeRecord(1000, "unread"), makeRecord(1001, "unread")];
+    for (let index = 0; index < 500; index += 1) incoming.push(makeRecord(index, "read"));
+
+    const restored = await restoreNotificationRecords(incoming, "replace");
+    expect(restored).toHaveLength(500);
+    expect(restored.filter((entry) => entry.state === "unread").map((entry) => entry.id)).toEqual(["record-1001", "record-1000"]);
+  });
+
+  it("opens the target and marks a persistent notification read when its native toast is clicked", async () => {
+    const added = await addNotification({
+      id: "click-target",
+      kind: "feed",
+      title: "校园资讯",
+      body: "一条新资讯",
+      source: "campus-feed",
+      actionTarget: { viewId: "campus-feed", entityId: "feed-1" }
+    });
+    expect(added.state).toBe("unread");
+    expect(electronState.notifications).toHaveLength(1);
+
+    electronState.notifications[0].handlers.get("click")?.();
+    expect(electronState.navigate).toHaveBeenCalledWith({ viewId: "campus-feed", entityId: "feed-1" });
+    await vi.waitFor(async () => {
+      expect((await readNotificationRecords()).find((entry) => entry.id === added.id)?.state).toBe("read");
+    });
   });
 });

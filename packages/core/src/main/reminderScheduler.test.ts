@@ -3,24 +3,19 @@ import type { CampusReminder, CampusWorkspaceSnapshot, LocalTaskRecord } from "@
 
 const notificationState = vi.hoisted(() => ({
   supported: true,
-  options: [] as Array<{ title: string; body: string; silent: boolean }>,
-  show: vi.fn()
+  add: vi.fn(async () => undefined)
 }));
 
 vi.mock("electron", () => ({
-  Notification: class {
-    static isSupported(): boolean {
+  Notification: {
+    isSupported(): boolean {
       return notificationState.supported;
     }
-
-    constructor(options: { title: string; body: string; silent: boolean }) {
-      notificationState.options.push(options);
-    }
-
-    show(): void {
-      notificationState.show();
-    }
   }
+}));
+
+vi.mock("./notificationCenter", () => ({
+  addNotification: notificationState.add
 }));
 
 import {
@@ -90,8 +85,7 @@ describe("reminder scheduler", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     notificationState.supported = true;
-    notificationState.options.length = 0;
-    notificationState.show.mockClear();
+    notificationState.add.mockClear();
     scheduleWorkspaceReminders(snapshot([]), {
       enabled: false,
       leadMinutes: [15],
@@ -104,7 +98,7 @@ describe("reminder scheduler", () => {
     vi.useRealTimers();
   });
 
-  it("fires a valid future reminder through Electron and updates scheduler state", () => {
+  it("fires a valid future reminder into the notification center and updates scheduler state", async () => {
     const state = scheduleWorkspaceReminders(snapshot([reminder()]), {
       enabled: true,
       leadMinutes: [15],
@@ -119,21 +113,24 @@ describe("reminder scheduler", () => {
       nextFireAt: reminder().fireAt
     });
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
 
-    expect(notificationState.options).toEqual([{
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
+      id: "reminder:deadline-1-lead-15",
+      kind: "assignment",
       title: "课程作业 即将截止",
       body: "将在 15 分钟后截止",
-      silent: false
-    }]);
-    expect(notificationState.show).toHaveBeenCalledOnce();
+      source: "schedule",
+      actionTarget: { viewId: "schedule" },
+      showDesktop: true
+    }));
     expect(getReminderSchedulerState()).toMatchObject({
       scheduledCount: 0,
       nextFireAt: null
     });
   });
 
-  it("uses the same mocked Electron boundary for a course reminder fixture", () => {
+  it("records a course reminder with its schedule source", async () => {
     const courseReminder = reminder({
       id: "course-1-lead-15",
       title: "数据结构",
@@ -148,14 +145,14 @@ describe("reminder scheduler", () => {
       storagePath: null
     }, now);
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
 
-    expect(notificationState.options).toEqual([{
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "course",
       title: "数据结构",
       body: "课程将在 15 分钟后开始，地点：教室 A",
-      silent: false
-    }]);
-    expect(notificationState.show).toHaveBeenCalledOnce();
+      source: "schedule"
+    }));
   });
 
   it("rejects an invalid fire time instead of scheduling an immediate notification", () => {
@@ -170,7 +167,7 @@ describe("reminder scheduler", () => {
 
     expect(state.scheduledCount).toBe(0);
     vi.runAllTimers();
-    expect(notificationState.show).not.toHaveBeenCalled();
+    expect(notificationState.add).not.toHaveBeenCalled();
   });
 
   it("cancels existing timers as soon as reminders are disabled", () => {
@@ -190,10 +187,10 @@ describe("reminder scheduler", () => {
     vi.runAllTimers();
 
     expect(state).toMatchObject({ enabled: false, scheduledCount: 0, nextFireAt: null });
-    expect(notificationState.show).not.toHaveBeenCalled();
+    expect(notificationState.add).not.toHaveBeenCalled();
   });
 
-  it("schedules a local task with its own lead time instead of the global value", () => {
+  it("schedules a local task with its own lead time instead of the global value", async () => {
     const state = scheduleWorkspaceReminders(snapshot([]), {
       enabled: true,
       leadMinutes: [15],
@@ -202,12 +199,35 @@ describe("reminder scheduler", () => {
     }, now, [localTask({ reminderMode: "lead", reminderLeadMinutes: 60 })]);
 
     expect(state.scheduledCount).toBe(1);
-    vi.advanceTimersByTime(60_000);
-    expect(notificationState.options).toEqual([{
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
       title: "本地任务",
       body: "将在 60 分钟后开始",
-      silent: false
-    }]);
+      kind: "task"
+    }));
+  });
+
+  it("catches up reminders fired within the last 24 hours and dedupes by occurrence id", async () => {
+    const missed = reminder({ fireAt: new Date(now.getTime() - 60 * 60 * 1000).toISOString() });
+    scheduleWorkspaceReminders(snapshot([missed]), {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+    await Promise.resolve();
+
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({ id: `reminder:${missed.id}` }));
+
+    notificationState.add.mockClear();
+    scheduleWorkspaceReminders(snapshot([reminder({ fireAt: new Date(now.getTime() - 25 * 60 * 60 * 1000).toISOString() })]), {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+    await Promise.resolve();
+    expect(notificationState.add).not.toHaveBeenCalled();
   });
 
   it("does not schedule a local task whose reminder is disabled", () => {

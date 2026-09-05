@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CampusDownloadTask } from "@campusos/shared";
-import type { NotificationKind, NotificationRecord } from "../shared/notificationBridge";
 
 const electronState = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -122,21 +121,9 @@ describe("download IPC", () => {
 
   it("announces a naturally settled failed batch once and suppresses manual clearing", async () => {
     const notify = vi.fn(async (input: {
-      kind: NotificationKind;
       title: string;
       body: string;
-      actionTarget?: string | null;
-      showDesktop?: boolean;
-    }): Promise<NotificationRecord> => ({
-      id: "notification-1",
-      kind: input.kind,
-      title: input.title,
-      body: input.body,
-      state: "unread" as const,
-      createdAt: "2026-09-05T00:00:00.000Z",
-      expiresAt: "2026-10-05T00:00:00.000Z",
-      actionTarget: input.actionTarget ?? null
-    }));
+    }): Promise<void> => { void input; });
     const broadcastSound = vi.fn();
     const tracker = createDownloadCompletionTracker({
       notify,

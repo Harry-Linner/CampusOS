@@ -24,7 +24,7 @@ describe("database service", () => {
     });
 
     try {
-      expect(database.schemaVersion).toBe(10);
+      expect(database.schemaVersion).toBe(11);
       database.saveWorkspaceSnapshot({
         generatedAt: "2026-07-20T08:00:00.000Z",
         sources: ["fixture"]
@@ -90,6 +90,9 @@ describe("database service", () => {
         savedAt: "2026-07-20T08:05:00.000Z"
       });
       expect(database.loadAcademicGpaStrategy("account-b")).toBeNull();
+      expect(database.loadCampusFeedRefreshState("xgb-pingjiang")).toBeNull();
+      database.saveCampusFeedRefreshState("xgb-pingjiang", "2026-07-20T08:06:00.000Z");
+      expect(database.loadCampusFeedRefreshState("xgb-pingjiang")).toBe("2026-07-20T08:06:00.000Z");
 
       expect(() =>
         database.saveAcademicGpaStrategy("", "first", "2026-07-20T08:05:00.000Z")
@@ -140,7 +143,7 @@ describe("database service", () => {
 
     const database = createDatabaseService({ databasePath });
     try {
-      expect(database.schemaVersion).toBe(10);
+      expect(database.schemaVersion).toBe(11);
     } finally {
       database.close();
     }
@@ -154,6 +157,11 @@ describe("database service", () => {
       expect(
         migratedDatabase
           .prepare("SELECT 1 AS applied FROM schema_migrations WHERE version = 10")
+          .get()
+      ).toEqual({ applied: 1 });
+      expect(
+        migratedDatabase
+          .prepare("SELECT 1 AS applied FROM schema_migrations WHERE version = 11")
           .get()
       ).toEqual({ applied: 1 });
     } finally {

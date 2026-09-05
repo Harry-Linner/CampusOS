@@ -1,5 +1,11 @@
-export type NotificationKind = "course" | "exam" | "assignment" | "task" | "grade" | "sync" | "system";
+export type NotificationKind = "course" | "exam" | "assignment" | "task" | "grade" | "sync" | "feed" | "system";
 export type NotificationState = "unread" | "read" | "handled" | "expired";
+export type NotificationSource = "system" | "schedule" | "campus-feed" | "academic";
+
+export interface NotificationActionTarget {
+  viewId: string;
+  entityId?: string;
+}
 
 export interface NotificationRecord {
   id: string;
@@ -9,7 +15,13 @@ export interface NotificationRecord {
   state: NotificationState;
   createdAt: string;
   expiresAt: string;
-  actionTarget?: string | null;
+  actionTarget?: string | NotificationActionTarget | null;
+  source: NotificationSource;
+  sourceId?: string | null;
+  sourceLabel?: string | null;
+  groupId?: string | null;
+  entityId?: string | null;
+  publishedAt?: string | null;
 }
 
 export interface NotificationCenterBridge {

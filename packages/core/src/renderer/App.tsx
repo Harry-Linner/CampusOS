@@ -136,11 +136,19 @@ export const App = (): JSX.Element => {
     return () => window.clearTimeout(timer);
   }, [navigationTarget, activeView]);
 
-  // 渲染进程内部导航（如通知中心点击跳转）：自定义事件携带目标视图 id。
+  // 渲染进程内部导航（如通知中心点击跳转）：兼容旧字符串与带实体定位的结构化目标。
   useEffect(() => {
     const handleInternalNavigate = (event: Event): void => {
-      const detail = (event as CustomEvent<string>).detail;
-      if (typeof detail === "string" && detail) setActiveView(detail);
+      const detail = (event as CustomEvent<string | Omit<AppNavigationRequest, "requestId">>).detail;
+      if (typeof detail === "string" && detail) {
+        setActiveView(detail);
+        return;
+      }
+      if (detail && typeof detail === "object" && typeof detail.viewId === "string") {
+        const request = { ...detail, requestId: crypto.randomUUID() } satisfies AppNavigationRequest;
+        setActiveView(request.viewId);
+        setNavigationTarget(request);
+      }
     };
     window.addEventListener("campusos:navigate", handleInternalNavigate);
     return () => window.removeEventListener("campusos:navigate", handleInternalNavigate);

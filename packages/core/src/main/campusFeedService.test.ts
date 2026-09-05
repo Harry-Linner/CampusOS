@@ -61,7 +61,7 @@ describe("campusFeedService", () => {
     expect(snapshot.items).toEqual([]);
   });
 
-  it("fetches a source, stores items, dedupes on refresh, and notifies once", async () => {
+  it("establishes a silent first-sync baseline and dedupes unchanged refreshes", async () => {
     const fetchFn = createFetch({
       "http://www.xgb.zju.edu.cn/53395/list.htm": XGB_HTML
     });
@@ -70,10 +70,7 @@ describe("campusFeedService", () => {
 
     const first = await service.refreshSource("xgb-pingjiang");
     expect(first).toHaveLength(2);
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "学工门户 · 评奖评优", actionTarget: "campus-feed" })
-    );
+    expect(notify).not.toHaveBeenCalled();
 
     let snapshot = await service.getSnapshot();
     expect(snapshot.items).toHaveLength(2);
@@ -83,7 +80,7 @@ describe("campusFeedService", () => {
     // Second refresh inserts nothing new and does not notify again.
     const second = await service.refreshSource("xgb-pingjiang");
     expect(second).toHaveLength(2);
-    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).not.toHaveBeenCalled();
     snapshot = await service.getSnapshot();
     expect(snapshot.items).toHaveLength(2);
   });
@@ -269,7 +266,7 @@ describe("campusFeedService", () => {
       service = createCampusFeedService({ database, fetchFn, notify, startScheduler: false });
       await service.refreshSource("xgb-pingjiang");
       await service.markRead((await service.getSnapshot()).items.map((item) => item.id));
-      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).not.toHaveBeenCalled();
 
       const again = await service.refreshSource("xgb-pingjiang");
       expect(again).toHaveLength(2);
@@ -277,7 +274,13 @@ describe("campusFeedService", () => {
       // The edited item is unread again; the unchanged one stays read.
       expect(snapshot.items.filter((item) => item.state === "new")).toHaveLength(1);
       expect(snapshot.items.filter((item) => item.title.includes("已更新"))[0].state).toBe("new");
-      expect(notify).toHaveBeenCalledTimes(2);
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+        sourceId: "xgb-pingjiang",
+        sourceName: "学工门户 · 评奖评优",
+        batchId: expect.stringContaining("campus-feed:xgb-pingjiang:"),
+        items: [expect.objectContaining({ title: expect.stringContaining("已更新") })]
+      }));
     });
 
     it("caps the snapshot per source and drops items outside the time window (F0-2)", async () => {
@@ -303,7 +306,7 @@ describe("campusFeedService", () => {
       await service.refreshSource("xgb-pingjiang");
       const ids = (await service.getSnapshot()).items.map((item) => item.id);
       await service.markRead(ids);
-      expect(onItemsRead).toHaveBeenCalledTimes(1);
+      expect(onItemsRead).toHaveBeenCalledWith(ids);
     });
   });
 

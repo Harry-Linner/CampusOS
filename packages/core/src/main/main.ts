@@ -22,7 +22,7 @@ import {
   registerInvariantHandlers,
   runInvariants
 } from "./invariants";
-import { addNotification, markNotificationsReadByTarget, registerNotificationHandlers } from "./notificationCenter";
+import { addNotification, markNotificationsHandledByEntities, registerNotificationHandlers } from "./notificationCenter";
 import { registerBackupHandlers } from "./backupStore";
 import {
   CAMPUSMOD_RENDERER_SCHEME
@@ -206,10 +206,29 @@ const startCampusApp = (): void => {
     }));
     registerCampusFeedHandlers(createCampusFeedService({
       database: getOfficialDatabaseService(),
-      notify: (input) => addNotification({ kind: "system", ...input, showDesktop: false }),
+      notify: async (input) => {
+        for (const [index, item] of input.items.entries()) {
+          await addNotification({
+            id: `campus-feed:${item.id}:${item.contentHash}`,
+            kind: "feed",
+            title: item.title,
+            body: item.summary ?? "暂无摘要，可前往校园资讯查看详情。",
+            actionTarget: { viewId: "campus-feed", entityId: item.id },
+            source: "campus-feed",
+            sourceId: input.sourceId,
+            sourceLabel: input.sourceName,
+            groupId: input.batchId,
+            entityId: item.id,
+            publishedAt: item.publishedAt,
+            showDesktop: index === 0,
+            desktopTitle: input.sourceName,
+            desktopBody: `新增 ${input.items.length} 条校园资讯`
+          });
+        }
+      },
       encryptSecret: (value) => briefVault.encrypt(value),
       decryptSecret: (value) => briefVault.decrypt(value),
-      onItemsRead: () => markNotificationsReadByTarget("campus-feed"),
+      onItemsRead: (ids) => markNotificationsHandledByEntities("campus-feed", ids),
       recordDiagnostic: appendDiagnosticEntry,
       saveTask: async (input) => {
         const result = await saveScheduleTask(input);

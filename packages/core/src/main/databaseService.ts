@@ -98,6 +98,8 @@ export interface DatabaseService {
   listCampusFeedItemsBySource: (sourceId: string, sinceIso: string, limit: number) => { item: unknown; savedAt: string }[];
   markCampusFeedItemsRead: (ids: string[]) => void;
   findCampusFeedItem: (id: string) => unknown | null;
+  loadCampusFeedRefreshState: (sourceId: string) => string | null;
+  saveCampusFeedRefreshState: (sourceId: string, lastSuccessAt: string) => void;
   saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
   loadCampusFeedAiSettings: () => { settings: unknown; savedAt: string } | null;
 }
@@ -234,6 +236,12 @@ const migrate = (database: Database.Database): void => {
   `);
   applyMigration(10, `
     DROP TABLE IF EXISTS planner_schedules;
+  `);
+  applyMigration(11, `
+    CREATE TABLE campus_feed_refresh_state (
+      source_id TEXT PRIMARY KEY,
+      last_success_at TEXT NOT NULL
+    );
   `);
 };
 
@@ -705,6 +713,23 @@ export const createDatabaseService = ({
         fetchedAt: row.fetched_at,
         state: row.state
       };
+    },
+    loadCampusFeedRefreshState: (sourceId) => {
+      const row = database.prepare(
+        "SELECT last_success_at FROM campus_feed_refresh_state WHERE source_id = ?"
+      ).get(sourceId) as { last_success_at: string } | undefined;
+      return row?.last_success_at ?? null;
+    },
+    saveCampusFeedRefreshState: (sourceId, lastSuccessAt) => {
+      if (!Number.isFinite(Date.parse(lastSuccessAt))) {
+        throw new Error("校园资讯刷新时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_refresh_state (source_id, last_success_at)
+        VALUES (?, ?)
+        ON CONFLICT(source_id) DO UPDATE SET
+          last_success_at = excluded.last_success_at
+      `).run(sourceId, lastSuccessAt);
     },
     saveCampusFeedAiSettings: (settings, savedAt) => {
       if (!Number.isFinite(Date.parse(savedAt))) {

@@ -5,7 +5,7 @@ import { DownloadEngine } from "./downloadEngine";
 import { getOfficialDownloadQueuePersistence } from "./sqliteDownloadQueuePersistence";
 import { requestZjuLearningDownload } from "./academicCredentialStore";
 import { classifyCampusDownloadRequest } from "./downloadRequestPolicy";
-import { addNotification } from "./notificationCenter";
+import { showTransientNotification } from "./notificationCenter";
 import { getAppLifecycleSettings } from "./appLifecycle";
 
 let downloadEngine: DownloadEngine | null = null;
@@ -30,13 +30,13 @@ export const DOWNLOAD_COMPLETION_SOUND_CHANNEL =
   "campusos:downloads:completion-sound";
 
 interface DownloadCompletionTrackerDependencies {
-  notify?: typeof addNotification;
+  notify?: (input: { title: string; body: string }) => Promise<void>;
   isSoundEnabled?: () => Promise<boolean>;
   broadcastSound?: () => void;
 }
 
 export const createDownloadCompletionTracker = ({
-  notify = addNotification,
+  notify = showTransientNotification,
   isSoundEnabled = async () => (await getAppLifecycleSettings()).notificationEnabled,
   broadcastSound = () => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -69,10 +69,8 @@ export const createDownloadCompletionTracker = ({
         : "下载队列中的资料已全部下载完毕。";
 
     void notify({
-      kind: "system",
       title,
-      body,
-      showDesktop: true
+      body
     }).catch(() => undefined);
     void isSoundEnabled()
       .then((enabled) => {

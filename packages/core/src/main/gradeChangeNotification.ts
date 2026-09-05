@@ -1,4 +1,3 @@
-import { Notification } from "electron";
 import type {
   AcademicGradesData,
   CapabilityRecord
@@ -29,16 +28,18 @@ const CHANGE_NOTIFICATION: GradeChangeNotificationMessage = {
   body: "有新出分的课程，可在 CampusOS 的学业页面中刷新查看。"
 };
 
-const showElectronNotification = ({
+const showGradeNotification = async ({
   title,
   body
-}: GradeChangeNotificationMessage): void => {
-  try {
-    if (!Notification.isSupported()) return;
-  } catch {
-    return;
-  }
-  new Notification({ title, body, silent: false }).show();
+}: GradeChangeNotificationMessage): Promise<void> => {
+  await addNotification({
+    kind: "grade",
+    title,
+    body,
+    actionTarget: { viewId: "academic" },
+    source: "academic",
+    showDesktop: true
+  });
 };
 
 export const processGradeChangeNotification = async ({
@@ -47,7 +48,7 @@ export const processGradeChangeNotification = async ({
   gradeRecord,
   enabled,
   database,
-  notify = showElectronNotification,
+  notify = showGradeNotification,
   now = new Date()
 }: {
   accountId: string;
@@ -80,7 +81,6 @@ export const processGradeChangeNotification = async ({
   const previous = database.loadAcademicGradeNotificationBaseline(accountId);
 
   if (!previous) {
-    try { await addNotification({ kind: "grade", ...FIRST_NOTIFICATION, showDesktop: false }); } catch (error) { void error; }
     await notify(FIRST_NOTIFICATION);
     database.saveAcademicGradeNotificationBaseline(accountId, nextBaseline);
     return "baseline-created";
@@ -90,7 +90,6 @@ export const processGradeChangeNotification = async ({
     previous.fivePointGpa !== nextBaseline.fivePointGpa ||
     previous.gradedCourseCount !== nextBaseline.gradedCourseCount;
   if (changed) {
-    try { await addNotification({ kind: "grade", ...CHANGE_NOTIFICATION, showDesktop: false }); } catch (error) { void error; }
     await notify(CHANGE_NOTIFICATION);
   }
   database.saveAcademicGradeNotificationBaseline(accountId, nextBaseline);

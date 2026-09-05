@@ -1,6 +1,6 @@
 /* @vitest-environment jsdom */
 import { createElement } from "react";
-import { cleanup, fireEvent, render, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusFeedBridge, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
 import { CampusFeedView } from "../../../../../plugins/official/campus-feed/src/CampusFeedView";
@@ -89,6 +89,22 @@ describe("campus-feed view (source/tag/unread filters)", () => {
     expect(readButtons.length).toBeGreaterThanOrEqual(2);
     fireEvent.click(readButtons[1]);
     expect(markRead).toHaveBeenCalledWith(["1"]);
+  });
+
+  it("locates and marks read the feed item named by a navigation target", async () => {
+    const markRead = vi.fn(async () => undefined);
+    const feed = makeBridge([sourceA], [item("target", "s-a", "new", "目标资讯")], { markRead });
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const targetProps = {
+      ...baseProps,
+      campusFeed: feed,
+      navigationTarget: { requestId: "request-1", viewId: "campus-feed", entityId: "target" }
+    };
+    const { findByText } = render(createElement(CampusFeedView, targetProps));
+    expect(await findByText("目标资讯")).toBeTruthy();
+    await waitFor(() => expect(markRead).toHaveBeenCalledWith(["target"]));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
   });
 });
 

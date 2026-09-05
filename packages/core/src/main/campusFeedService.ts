@@ -48,9 +48,10 @@ const BACKOFF_BASE_MS = 5 * 60 * 1000;
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 export interface CampusFeedNotifyInput {
-  title: string;
-  body: string;
-  actionTarget?: string | null;
+  sourceId: string;
+  sourceName: string;
+  batchId: string;
+  items: Array<Pick<FeedItemRecord, "id" | "title" | "summary" | "publishedAt" | "contentHash">>;
 }
 
 export interface CampusFeedServiceDependencies {
@@ -67,8 +68,8 @@ export interface CampusFeedServiceDependencies {
   decryptSecret?: (value: string) => string;
   /** Persists an extracted schedule entry; defaults to the schedule store. */
   saveTask?: (input: LocalTaskInput) => Promise<CampusFeedScheduleImportResult>;
-  /** Invoked after feed items are marked read, to sync the notification center (campus-feed target). */
-  onItemsRead?: () => Promise<unknown> | void;
+  /** Invoked after feed items are marked read, to sync their notification references. */
+  onItemsRead?: (ids: string[]) => Promise<unknown> | void;
   /**
    * B4-1：刷新台账写入钩子（module=feed 源 id，operation=refresh）。
    * 生产环境由 main.ts 注入 appendDiagnosticEntry；测试可注入 mock。
@@ -386,13 +387,16 @@ export const createCampusFeedService = ({
     source: FeedSourceDescriptor,
     startedAt: number
   ): Promise<FeedItemRecord[]> => {
+    const hadBaseline = database.loadCampusFeedRefreshState(source.id) !== null;
     const outcome = await fetchSourceList(source, { fetchFn, now });
     const items = outcome.items;
     const fresh: FeedItemRecord[] = [];
     for (const item of items) {
       if (database.upsertCampusFeedItem(item)) fresh.push(item);
     }
-    lastRefresh[source.id] = now().toISOString();
+    const refreshedAt = now().toISOString();
+    lastRefresh[source.id] = refreshedAt;
+    database.saveCampusFeedRefreshState(source.id, refreshedAt);
     failures.delete(source.id);
     // B4-1：每次成功刷新写一条带请求指纹的台账记录。
     record({
@@ -402,16 +406,18 @@ export const createCampusFeedService = ({
       durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
       requestFingerprint: outcome.requestFingerprint
     });
-    if (fresh.length > 0 && notify) {
-      const body = fresh
-        .slice(0, 5)
-        .map((item) => item.title)
-        .join("、");
-      const suffix = fresh.length > 5 ? ` 等 ${fresh.length} 条` : "";
+    if (hadBaseline && fresh.length > 0 && notify) {
       void notify({
-        title: source.name,
-        body: `${body}${suffix}`.slice(0, 160),
-        actionTarget: "campus-feed"
+        sourceId: source.id,
+        sourceName: source.name,
+        batchId: `campus-feed:${source.id}:${refreshedAt}`,
+        items: fresh.map(({ id, title, summary, publishedAt, contentHash }) => ({
+          id,
+          title,
+          summary,
+          publishedAt,
+          contentHash
+        }))
       });
     }
     return items;
@@ -495,7 +501,7 @@ export const createCampusFeedService = ({
       const clean = ids.filter((id) => typeof id === "string" && id.length > 0);
       if (clean.length > 0) {
         database.markCampusFeedItemsRead(clean);
-        if (onItemsRead) void onItemsRead();
+        if (onItemsRead) void onItemsRead(clean);
         broadcast();
       }
     },

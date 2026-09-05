@@ -16,6 +16,7 @@ import type {
   AppLifecycleSettingsPatch,
   CloseBehavior
 } from "../shared/appLifecycleBridge";
+import type { AppNavigationRequest } from "@campusos/shared";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import {
   launchDeskCalendar,
@@ -94,6 +95,17 @@ export const showCampusMainWindow = (): void => {
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+};
+
+export const navigateCampusMainWindow = (
+  target: Omit<AppNavigationRequest, "requestId">
+): void => {
+  showCampusMainWindow();
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("campusos:navigation:request", {
+    ...target,
+    requestId: randomUUID()
+  } satisfies AppNavigationRequest);
 };
 
 const developmentTrayIconPath = (): string => {
