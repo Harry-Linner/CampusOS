@@ -1,0 +1,641 @@
+import type { PluginCapability } from "./index";
+import type { CampusSourceId } from "./campus";
+
+export type CapabilityDataState =
+  | "live"
+  | "cache"
+  | "fallback"
+  | "unavailable";
+
+export interface CapabilityPublication<T = unknown> {
+  capability: PluginCapability;
+  accountId: string | null;
+  state: CapabilityDataState;
+  updatedAt: string;
+  data: T | null;
+  message?: string;
+}
+
+export interface CapabilityRecord<T = unknown>
+  extends CapabilityPublication<T> {
+  providerId: string;
+}
+
+export interface PluginCapabilityClient {
+  read: <T>(capability: PluginCapability) => Promise<CapabilityRecord<T>[]>;
+}
+
+export interface AcademicProfileData {
+  studentId: string;
+  educationLevel: "undergraduate" | "graduate";
+  verifiedAt: string;
+  verifiedService: string;
+}
+
+export type AcademicTimetableSeason = "1|秋" | "1|冬" | "2|春" | "2|夏";
+
+export interface AcademicTimetableSession {
+  sourceId: string;
+  /** Raw course selection id when the timetable endpoint exposes one. */
+  courseId?: string;
+  courseName: string;
+  teacher: string;
+  location: string | null;
+  dayOfWeek: number;
+  periods: number[];
+  firstHalf: boolean;
+  secondHalf: boolean;
+  weekPattern: "all" | "odd" | "even";
+  weeks?: number[];
+  confirmed: boolean;
+}
+
+export interface AcademicTimetableTermData {
+  /** Live timetable origin; cache state separately describes freshness. */
+  source?: "zdbk" | "eta";
+  academicYearStart: number;
+  season: AcademicTimetableSeason;
+  state: CapabilityDataState;
+  sessions: AcademicTimetableSession[];
+  message?: string;
+}
+
+export interface AcademicTimetableData {
+  terms: AcademicTimetableTermData[];
+}
+
+/**
+ * The normalized course projection shared by the academic and materials
+ * workspaces. A course keeps its source term and the related grade/exam IDs
+ * so consumers can open one record without scraping a second endpoint.
+ */
+export interface AcademicCourseRecord {
+  sourceId: string;
+  /** Celechron Course.realId display key, when the source provides an id. */
+  realId?: string | null;
+  courseCode: string | null;
+  courseName: string;
+  teachers: string[];
+  credit: number;
+  academicYearStart: number | null;
+  season: AcademicTimetableSeason | null;
+  semesterLabel: string | null;
+  courseCategory: string | null;
+  gradeSourceId: string | null;
+  examSourceIds: string[];
+  sessions: AcademicTimetableSession[];
+  /**
+   * 仅由课表/考试派生、尚无成绩关联的课程标记（学分尚未出）。
+   * 与 Celechron 的“未出成绩课程 credit 恒为 0”行为对齐，供前端区分展示。
+   */
+  derivedOnly?: boolean;
+}
+
+export interface AcademicCourseCatalogData {
+  courses: AcademicCourseRecord[];
+}
+
+export interface AcademicCalendarQuarter {
+  academicYearStart: number;
+  season: AcademicTimetableSeason;
+  startDate: string;
+  classesBeginDate: string;
+  endDate: string;
+}
+
+/** 校历里「不排课」的日期区间：法定节假日、校运动会、学生节、考试周与停课考试。 */
+export interface AcademicCalendarClosedRange {
+  /** 含首尾（date-only，Asia/Shanghai）。 */
+  startDate: string;
+  endDate: string;
+  label: string;
+}
+
+/** 校历里的调课：`fromDate` 当天的课移到 `toDate` 上，`fromDate` 当日不再排课。 */
+export interface AcademicCalendarMovedDay {
+  fromDate: string;
+  toDate: string;
+}
+
+/** 按学年内置的官方校历排课规则。 */
+export interface AcademicCalendarTermRules {
+  academicYearStart: number;
+  closedRanges: AcademicCalendarClosedRange[];
+  movedDays: AcademicCalendarMovedDay[];
+}
+
+export interface AcademicCalendarConfigData {
+  timezone: "Asia/Shanghai";
+  sourceUrl: string;
+  quarters: AcademicCalendarQuarter[];
+  periodTimes: PeriodTimeRecord[];
+  /** 已收录学年的内置官方校历规则；未收录的学年按「无节假日与调休信息」处理。 */
+  termRules?: AcademicCalendarTermRules[];
+}
+
+export interface PeriodTimeRecord {
+  period: number;
+  start: string;
+  end: string;
+}
+
+export interface AcademicExamRecord {
+  sourceId: string;
+  courseId: string;
+  courseName: string;
+  kind: "midterm" | "final";
+  scheduleText: string;
+  startAt: string | null;
+  endAt: string | null;
+  dateLabel: string | null;
+  location: string | null;
+  seat: string | null;
+}
+
+export interface AcademicExamsData {
+  exams: AcademicExamRecord[];
+}
+
+export interface AcademicGradeRecord {
+  sourceId: string;
+  /** Celechron Grade.realId display key, when the source provides an id. */
+  realId?: string | null;
+  courseCode: string | null;
+  courseName: string;
+  credit: number;
+  originalScore: string;
+  gradePoint: number | null;
+  academicYearStart: number | null;
+  termNumber: 1 | 2 | null;
+  isMajorCourse: boolean;
+  courseCategory: string | null;
+  /** Explicit source flags override the derived undergraduate rules. */
+  gpaIncluded?: boolean;
+  creditIncluded?: boolean;
+}
+
+export interface AcademicMajorGradeSummary {
+  /** Old snapshots may not include provenance; never assign them a fresh timestamp. */
+  state?: "live" | "cache";
+  updatedAt?: string;
+  fivePointGpa: number | null;
+  fourPointGpa: number | null;
+  fourPointLegacyGpa: number | null;
+  hundredPointGpa: number | null;
+  /** GPA denominator credits from the dedicated major response. */
+  gpaCredits: number;
+  earnedCredits: number;
+}
+
+export type GpaScale = "4.0" | "4.3" | "5.0";
+
+export interface AcademicGradesData {
+  grades: AcademicGradeRecord[];
+  /** Independent getMajorGrade projection from Celechron's undergraduate flow. */
+  majorSummary?: AcademicMajorGradeSummary;
+}
+
+export interface AcademicPracticeRecord {
+  sourceId: string;
+  categoryId: number;
+  categoryName: string;
+  projectName: string;
+  projectType: string;
+  qualityType: string;
+  score: number;
+  statusValue: number | null;
+  statusLabel: string;
+  approved: boolean;
+  deleted: boolean;
+  role: string | null;
+  remark: string | null;
+  activityStart: string | null;
+  activityEnd: string | null;
+  updatedAt: string | null;
+}
+
+export type AcademicPracticeSummarySource =
+  | "networkMyInfo"
+  | "cachedMyInfo"
+  | "calculatedFromRecords"
+  | "unavailable";
+
+export interface AcademicPracticeSummary {
+  secondClassPoints: number;
+  thirdClassPoints: number;
+  fourthClassPoints: number;
+  totalPoints: number;
+  myPassed: boolean | null;
+  lastYearPassed: boolean | null;
+  source: AcademicPracticeSummarySource;
+  updatedAt: string;
+  stale: boolean;
+}
+
+export interface AcademicPracticeData {
+  records: AcademicPracticeRecord[];
+  summary: AcademicPracticeSummary | null;
+  detailsAvailable: boolean;
+}
+
+export interface LearningAssignmentRecord {
+  sourceId: string;
+  title: string;
+  courseName: string;
+  dueAt: string | null;
+  /** 学在浙大网页上的作业描述（抓取时已转成纯文本），作为事件简介展示。 */
+  description?: string | null;
+  /** 该作业的附件文件名（含后缀名），追加在事件简介里。 */
+  attachments?: string[];
+  /**
+   * 上游该作业的更新时间（有则用于「以较晚抓取为准」的比较）；抓取时间戳由 capability
+   * 发布的 `updatedAt` 提供，两者都用于在 DDL 被老师改动时替换旧事件。
+   */
+  upstreamUpdatedAt?: string | null;
+}
+
+export interface LearningAssignmentsData {
+  assignments: LearningAssignmentRecord[];
+}
+
+export interface LearningCourseRecord {
+  sourceId: string;
+  name: string;
+  academicYearId: string | null;
+  semesterId: string | null;
+  semesterName: string | null;
+}
+
+export interface LearningMaterialRecord {
+  sourceId: string;
+  uploadId: string;
+  referenceId: string;
+  fileName: string;
+  courseId: string;
+  courseName: string;
+  semesterName: string;
+  size: number | null;
+  updatedAt: string | null;
+  downloadUrl: string;
+  downloadFallbackUrl: string;
+}
+
+export interface LearningMaterialsData {
+  courses: LearningCourseRecord[];
+  materials: LearningMaterialRecord[];
+}
+
+/**
+ * 上游日历事件种类。本地任务不属于这里：本地任务走 `tasks.local@1`，
+ * 由日程视图与桌历直接读取，从不经 `calendar.events@1` 投影。
+ */
+export type CalendarEventKind = "course" | "exam" | "assignment";
+
+export interface CalendarEventRecord {
+  id: string;
+  originId: string;
+  originCapability: PluginCapability;
+  sourceId: CampusSourceId;
+  kind: CalendarEventKind;
+  title: string;
+  startAt: string;
+  endAt: string | null;
+  timezone: "Asia/Shanghai";
+  location: string | null;
+  courseName: string | null;
+  note: string | null;
+}
+
+export interface CalendarEventsData {
+  feedId: string;
+  sourceId: CampusSourceId;
+  sourceLabel: string;
+  sourceUpdatedAt: string;
+  upstreamCapability: PluginCapability;
+  upstreamProviderId: string | null;
+  upstreamProviderIds: string[];
+  accountScoped: boolean;
+  supportedKinds: CalendarEventKind[];
+  totalItems: number;
+  omittedItems: number;
+  /** Safe, source-level reasons why records could not be placed on the calendar. */
+  diagnostics?: string[];
+  events: CalendarEventRecord[];
+}
+
+export interface AiAssistantSettingsRecord {
+  configured: boolean;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
+  model: string;
+  savedAt: string | null;
+  encrypted: boolean;
+}
+
+export type AiAssistantProvider = "openai" | "deepseek" | "anthropic" | "gemini" | "openai-compatible";
+export type AiAssistantProtocol = "openai-responses" | "openai-chat-completions" | "anthropic-messages" | "gemini-generate-content";
+
+export interface AiAssistantSettingsInput {
+  apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
+  model: string;
+}
+
+export interface AiAssistantConnectionTestInput {
+  apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
+  model: string;
+}
+
+export interface AiAssistantConnectionTestResult {
+  ok: true;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  model: string;
+  checkedAt: string;
+  latencyMs: number;
+  structuredOutput: true;
+  modelListingSupported: boolean;
+}
+
+export interface AiAssistantModelDiscoveryInput {
+  apiKey: string;
+  provider: AiAssistantProvider;
+  protocol: AiAssistantProtocol;
+  baseUrl: string;
+}
+
+export interface AiAssistantModelDiscoveryResult {
+  provider: AiAssistantProvider;
+  models: string[];
+  checkedAt: string;
+  latencyMs: number;
+}
+
+export interface AiAssistantMessageSource {
+  app: "manual" | "wechat" | "dingtalk";
+  conversationId?: string | null;
+  messageId?: string | null;
+  sender?: string | null;
+  sentAt?: string | null;
+}
+
+export interface AiAssistantParseInput {
+  text: string;
+  mode?: "auto" | "extract" | "academic-query";
+  courseNames: string[];
+  now: string;
+  source?: AiAssistantMessageSource;
+}
+
+export type AiAssistantConfidence = "high" | "medium" | "low";
+export type AiAssistantFieldOrigin = "explicit" | "inferred" | "default";
+
+export interface AiAssistantEvidenceSpan {
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface AiAssistantExtractedField<T> {
+  value: T;
+  confidence: AiAssistantConfidence;
+  source: AiAssistantFieldOrigin;
+  evidence: AiAssistantEvidenceSpan | null;
+  needsConfirmation: boolean;
+}
+
+export type AiAssistantIntent = "create" | "update" | "cancel";
+export type AiAssistantIntentKind = "task" | "deadline" | "event" | "reminder";
+
+export interface AiAssistantExtractionIntent {
+  id: string;
+  intent: AiAssistantIntent;
+  kind: AiAssistantIntentKind;
+  title: AiAssistantExtractedField<string>;
+  description: AiAssistantExtractedField<string>;
+  deadlineAt: AiAssistantExtractedField<string | null>;
+  startAt: AiAssistantExtractedField<string | null>;
+  endAt: AiAssistantExtractedField<string | null>;
+  durationMinutes: AiAssistantExtractedField<number | null>;
+  location: AiAssistantExtractedField<string | null>;
+  courseName: AiAssistantExtractedField<string | null>;
+  confidence: AiAssistantConfidence;
+  missingFields: string[];
+  warnings: string[];
+  fingerprint: string;
+}
+
+export interface AiAssistantExtractionResult {
+  intent: "general";
+  sourceText: string;
+  source: AiAssistantMessageSource;
+  schemaVersion: 3;
+  promptVersion: string;
+  intents: AiAssistantExtractionIntent[];
+  unresolvedQuestions: string[];
+}
+
+export interface AiAssistantEvidenceSource {
+  capability: PluginCapability;
+  label: string;
+  capturedAt: string;
+  state: CapabilityDataState;
+  message?: string;
+  /** 回答中引用到的该来源具体数值/条目。 */
+  values?: string[];
+}
+
+export interface AiAssistantAcademicQueryInput {
+  text: string;
+  now: string;
+  source?: AiAssistantMessageSource;
+}
+
+export interface AiAssistantAcademicQueryResult {
+  intent: "academic-query";
+  sourceText: string;
+  source: AiAssistantMessageSource;
+  answer: string;
+  evidence: AiAssistantEvidenceSource[];
+  degraded: boolean;
+  generatedAt: string;
+  promptVersion: string;
+}
+
+export type AiAssistantParseResult =
+  | AiAssistantExtractionResult
+  | AiAssistantAcademicQueryResult;
+
+export type LocalTaskType = "deadline" | "fixed" | "fixedlegacy";
+export type LocalTaskStatus =
+  | "running"
+  | "suspended"
+  | "completed"
+  | "overdue"
+  | "deleted"
+  | "outdated";
+export type LocalTaskRepeatType = "norepeat" | "days" | "weeks" | "weekdays" | "month" | "year";
+export type LocalTaskReminderMode = "global" | "none" | "at-time" | "lead" | "custom";
+export type LocalTaskRepeatEndMode = "never" | "date" | "count";
+export type LocalTaskEditScope = "single" | "future" | "series";
+
+export interface LocalTaskOccurrenceOverride {
+  status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
+  timeSpentMinutes?: number;
+  title?: string;
+  description?: string;
+  startAt?: string;
+  endAt?: string;
+  location?: string;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
+  deletedAt?: string | null;
+}
+
+/** Inclusive start, exclusive end; null end covers an unbounded recurrence. */
+export interface LocalTaskOccurrenceDeletion {
+  from: number;
+  to: number | null;
+  includeCompleted: boolean;
+  deletedAt: string;
+  permanent?: boolean;
+}
+
+export interface LocalTaskRecord {
+  id: string;
+  status: LocalTaskStatus;
+  description: string;
+  timeSpentMinutes: number;
+  timeNeededMinutes: number;
+  startAt: string;
+  endAt: string;
+  location: string;
+  title: string;
+  breakable: boolean;
+  type: LocalTaskType;
+  repeatType: LocalTaskRepeatType;
+  repeatPeriod: number;
+  repeatEndsOn: string;
+  repeatWeekdays?: number[];
+  repeatEndMode?: LocalTaskRepeatEndMode;
+  repeatCount?: number | null;
+  seriesGroupId?: string;
+  seriesOccurrenceOffset?: number;
+  seriesEndBefore?: number;
+  occurrenceDeletions?: LocalTaskOccurrenceDeletion[];
+  occurrenceOverrides?: Record<string, LocalTaskOccurrenceOverride>;
+  blocksPlanning: boolean;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
+  fromId: string | null;
+  deletedAt?: string | null;
+  courseName?: string | null;
+  source?: LocalTaskSource | null;
+}
+
+export interface LocalTaskSource {
+  kind: "ai-assistant";
+  fingerprint: string;
+  provider: AiAssistantProvider;
+  model: string;
+  importedAt: string;
+}
+
+export interface LocalTaskInput {
+  id?: string;
+  description: string;
+  timeSpentMinutes: number;
+  timeNeededMinutes: number;
+  startAt: string;
+  endAt: string;
+  location: string;
+  title: string;
+  breakable: boolean;
+  type: Exclude<LocalTaskType, "fixedlegacy">;
+  repeatType: LocalTaskRepeatType;
+  repeatPeriod: number;
+  repeatEndsOn: string;
+  repeatWeekdays?: number[];
+  repeatEndMode?: LocalTaskRepeatEndMode;
+  repeatCount?: number | null;
+  editScope?: LocalTaskEditScope;
+  occurrenceKey?: string;
+  seriesGroupId?: string;
+  blocksPlanning: boolean;
+  reminderMode?: LocalTaskReminderMode;
+  reminderLeadMinutes?: number | null;
+  reminderAt?: string | null;
+  courseName?: string | null;
+  source?: LocalTaskSource | null;
+}
+
+export interface LocalTaskMutation {
+  id: string;
+  status?: Extract<LocalTaskStatus, "running" | "suspended" | "completed" | "deleted">;
+  action?: "restore" | "purge";
+  scope?: "single" | "future" | "series";
+  occurrenceKey?: string;
+  includeCompleted?: boolean;
+  timeSpentMinutes?: number;
+}
+
+export interface LocalTasksData {
+  tasks: LocalTaskRecord[];
+  updatedAt: string;
+  operation?: {
+    kind: "created" | "updated" | "deduplicated";
+    taskId?: string;
+  };
+}
+
+export interface LocalTaskPeriod {
+  id: string;
+  taskId: string;
+  title: string;
+  description: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  type: LocalTaskType;
+  status: LocalTaskStatus;
+  blocksPlanning: boolean;
+  occurrenceId?: string;
+  occurrenceKey?: string;
+  occurrenceIndex?: number;
+  occurrenceStartAt?: string;
+  occurrenceEndAt?: string;
+  seriesGroupId?: string;
+}
+
+export interface CalendarEventPersonalization {
+  note: string;
+  reminderLeadMinutes: number | null;
+  updatedAt: string;
+}
+
+export interface UnifiedCalendarData {
+  holidays: { date: string; label: string; holiday: boolean }[];
+  weeks: Record<string, number>;
+  currentWeek: number | null;
+}
+
+export interface CalendarExportInput {
+  academicYearStart: number;
+  termLabel: string;
+  includeExams?: boolean;
+  includeTasks?: boolean;
+}
+
+export interface CalendarExportResult {
+  filePath: string;
+  eventCount: number;
+  generatedAt: string;
+}

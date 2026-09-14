@@ -1,0 +1,16 @@
+/*
+ * schedule-deleted styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Deleted schedule entries: the group heading and the delete-scope decision dialog.
+ */
+
+.schedule-delete-decision { position: fixed; inset: auto 24px 24px auto; z-index: 35; width: min(460px, calc(100vw - 48px)); padding: 18px; border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface-raised); box-shadow: var(--shadow-elevated); }
+.schedule-delete-decision p { margin: 6px 0 14px; color: var(--ink-muted); }

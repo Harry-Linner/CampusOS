@@ -1,0 +1,129 @@
+/*
+ * global-search styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Global search dialog: backdrop, field, result list and result copy.
+ */
+
+.global-search-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: clamp(72px, 12vh, 132px) 24px 24px;
+  background: rgba(23, 33, 43, 0.32);
+  backdrop-filter: blur(5px);
+}
+
+.global-search-dialog {
+  width: min(660px, 100%);
+  max-height: min(620px, calc(100dvh - 112px));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-float);
+}
+
+.global-search-field {
+  display: grid;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.global-search-field input {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+  outline: 0;
+}
+
+.global-search-field input::placeholder {
+  color: var(--ink-faint);
+}
+
+.global-search-results {
+  max-height: min(540px, calc(100dvh - 190px));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 8px;
+}
+
+.global-search-results ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.global-search-results li button {
+  display: grid;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 140ms ease;
+}
+
+.global-search-results li button:hover,
+.global-search-results li button:focus-visible {
+  background: var(--accent-wash);
+}
+
+.global-search-kind {
+  color: var(--accent-deep);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.global-search-result-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.global-search-result-copy strong,
+.global-search-result-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-search-result-copy strong {
+  font-size: 0.86rem;
+}
+
+.global-search-result-copy small,
+.global-search-hint {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+}
+
+.global-search-hint {
+  margin: 0;
+  padding: 28px 18px;
+  text-align: center;
+}

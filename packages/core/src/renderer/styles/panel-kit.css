@@ -1,0 +1,117 @@
+/*
+ * panel-kit styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shared plugin panel kit: module tabs, page header, panel card, data list and row, badge, meta line and muted/page copy.
+ */
+
+.panel-error {
+  margin: 0;
+  border-left: 2px solid var(--danger);
+  color: var(--danger);
+  padding-left: 10px;
+  font-size: 0.82rem;
+}
+
+.module-tabs {
+  display: flex;
+  width: fit-content;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-deep);
+}
+
+.module-tabs button {
+  min-width: 72px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.module-tabs button:hover {
+  color: var(--ink);
+}
+
+.module-tabs button.is-active {
+  background: var(--paper);
+  color: var(--accent-deep);
+  box-shadow: 0 1px 2px rgba(23, 33, 43, 0.08);
+}
+
+.panel-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.page-copy,
+.muted {
+  color: var(--ink-soft);
+}
+
+.page-copy,
+.muted {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.panel-card {
+  padding: 18px 0;
+  border-top: 1px solid var(--line-strong);
+}
+
+.data-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 11px 0;
+}
+
+.data-row > div:first-child,
+.row-side {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.row-side {
+  align-items: flex-end;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.meta-line {
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+}
+
+.badge {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  padding: 4px 7px;
+}

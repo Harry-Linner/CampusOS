@@ -1,0 +1,319 @@
+/*
+ * AI assistant styles.
+ *
+ * Peeled out of styles.css in batch 13 of the ADR-0006 program. globals.css
+ * imports it inside the same `legacy` cascade layer, directly after
+ * styles.css. Only AssistantView.tsx uses these selectors, and styles.css has no
+ * other rule matching them, so the section is position-independent.
+ */
+
+.assistant-page {
+  gap: 24px;
+}
+
+.assistant-heading {
+  align-items: center;
+}
+
+.assistant-settings {
+  width: min(680px, 100%);
+  border-top: 1px solid var(--line-strong);
+  padding-top: 20px;
+}
+
+.assistant-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.7fr) minmax(420px, 1.3fr);
+  gap: 24px;
+  border-top: 1px solid var(--line-strong);
+  padding-top: 20px;
+}
+
+.assistant-input-panel,
+.assistant-draft-panel {
+  min-width: 0;
+}
+
+.assistant-input-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistant-draft-form label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.assistant-draft-form input,
+.assistant-draft-form textarea,
+.assistant-draft-form select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.assistant-time-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--paper-soft) 72%, var(--paper));
+  padding: 14px;
+}
+
+.assistant-time-copy {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.assistant-time-copy label {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.assistant-time-copy p {
+  margin: 5px 0 0;
+  color: var(--ink-faint);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.assistant-time-control {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.assistant-time-control input {
+  min-height: 36px;
+  max-width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 7px 9px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.assistant-draft-panel {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+
+.assistant-draft-panel .section-heading {
+  align-items: center;
+}
+
+.assistant-candidate-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.assistant-candidate {
+  min-width: 0;
+  padding: 18px 0 24px;
+  border-top: 1px solid var(--line);
+}
+
+.assistant-candidate:first-child {
+  border-top: 0;
+}
+
+.assistant-candidate-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+}
+
+.assistant-candidate-heading > div {
+  min-width: 0;
+}
+
+.assistant-candidate-heading h3 {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.assistant-candidate-kind {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.assistant-draft-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.assistant-draft-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.assistant-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.assistant-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.assistant-save-actions {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.assistant-confidence {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.assistant-confidence.is-high {
+  border-color: #a8cbb6;
+  color: var(--success);
+}
+
+.assistant-confidence.is-low,
+.assistant-warning {
+  color: var(--warning);
+}
+
+.assistant-warning,
+.assistant-evidence {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.assistant-evidence {
+  color: var(--ink-faint);
+}
+
+.assistant-evidence-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.assistant-evidence mark {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--warning) 18%, var(--paper));
+  color: var(--ink);
+  padding: 1px 4px;
+}
+
+.assistant-mode-badge {
+  color: var(--success);
+  font-size: 0.72rem;
+}
+
+.assistant-academic-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.assistant-academic-answer {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.assistant-academic-degraded {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.assistant-evidence-block {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.assistant-evidence-title {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.assistant-evidence-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-evidence-source {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.assistant-evidence-source time {
+  color: var(--ink-faint);
+}
+
+.assistant-quiet-copy {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .assistant-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-draft-panel {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding: 20px 0 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .assistant-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-time-control { justify-content: flex-start; }
+}

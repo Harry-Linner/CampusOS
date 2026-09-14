@@ -1,0 +1,39 @@
+/*
+ * settings-fields styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shared settings field stack and action row, including the reminder legend they share.
+ */
+
+.settings-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-stack > span,
+.reminder-options legend {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.settings-actions {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 12px;
+}

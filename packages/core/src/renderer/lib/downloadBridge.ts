@@ -1,0 +1,60 @@
+import type { CampusDownloadRequest } from "@campusos/shared";
+import type { CampusosBridge } from "../../shared/campusBridge";
+
+const requireCampusosBridge = (): CampusosBridge => {
+  if (typeof window === "undefined" || !window.campusos) {
+    throw new Error("CampusOS 主进程连接不可用，无法管理下载任务。");
+  }
+  return window.campusos;
+};
+
+export const listDownloads = async () =>
+  requireCampusosBridge().downloads.list();
+
+export const enqueueDownload = async (input: CampusDownloadRequest): Promise<void> => {
+  await requireCampusosBridge().downloads.enqueue(input);
+};
+
+export const pauseDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.pause(id);
+};
+
+export const resumeDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.resume(id);
+};
+
+export const cancelDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.cancel(id);
+};
+
+export const clearAllDownloads = async (): Promise<number> => {
+  return requireCampusosBridge().downloads.clearAll();
+};
+
+export const openDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.open(id);
+};
+
+export const revealDownload = async (id: string): Promise<void> => {
+  await requireCampusosBridge().downloads.reveal(id);
+};
+
+export const verifyDownload = async (id: string) =>
+  requireCampusosBridge().downloads.verify(id);
+
+export const clearDownloadHistory = async (): Promise<number> =>
+  requireCampusosBridge().downloads.clearHistory();
+
+export const getDownloadPreferences = async () =>
+  requireCampusosBridge().downloads.getPreferences();
+
+export const saveDownloadPreferences = async (input: { completionSound: boolean }) =>
+  requireCampusosBridge().downloads.savePreferences(input);
+
+export const subscribeToDownloadChanges = (listener: () => void): (() => void) =>
+  requireCampusosBridge().downloads.subscribe(listener);
+
+export const subscribeToDownloadCompletionSound = (
+  listener: () => void
+): (() => void) =>
+  requireCampusosBridge().downloads.subscribeToCompletionSound(listener);

@@ -1,0 +1,203 @@
+/*
+ * extension styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Extensions view: entries, details, registry issues and update prompts.
+ */
+
+.extension-entry {
+  border-bottom: 1px solid var(--line);
+}
+
+.extension-summary {
+  display: grid;
+  min-height: 76px;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.extension-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--accent-deep);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.extension-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.extension-title strong {
+  overflow: hidden;
+  font-size: 0.96rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-title span {
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+}
+
+.extension-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(250px, 0.8fr);
+  gap: 34px;
+  margin: 0 0 18px;
+  border-left: 2px solid var(--accent);
+  background: rgba(231, 238, 245, 0.42);
+  padding: 15px 18px;
+}
+
+.extension-error {
+  margin: 12px 0 0;
+}
+
+.extension-status {
+  width: fit-content;
+}
+
+.extension-status.is-active {
+  color: var(--success);
+}
+
+.extension-status.is-blocked {
+  color: var(--danger);
+}
+
+.extension-details-copy {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.extension-details p {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.extension-issues {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  border-left: 2px solid var(--danger);
+  background: #f9eeee;
+  color: #9c3937;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.extension-permissions {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.extension-permissions h2 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.extension-permission-list {
+  display: grid;
+  gap: 8px;
+}
+
+.extension-permission-list label {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.extension-permission-list input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent-deep);
+}
+
+.extension-no-permissions {
+  color: var(--ink-faint) !important;
+}
+
+.extension-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.extension-package-actions p {
+  flex-basis: 100%;
+}
+
+.danger-button {
+  min-height: 36px;
+  border: 1px solid #c86b68;
+  border-radius: var(--radius-sm);
+  background: #fff4f3;
+  color: #983b38;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.danger-button:hover {
+  border-color: #ad4f4c;
+  background: #fbe5e3;
+}
+
+.extension-details dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.extension-details dl > div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.extension-details dt,
+.extension-details dd {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.extension-details dt {
+  color: var(--ink-faint);
+}
+
+.extension-details dd {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}

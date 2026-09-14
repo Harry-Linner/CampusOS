@@ -1,0 +1,31 @@
+/*
+ * focus-visible styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shared interactive-control completion: cursor and hover on the danger button plus the focus-visible outline group spanning the academic program picker, search trigger, module tabs and course options.
+ */
+
+/* 统一按键交互补全：光标、悬停与键盘焦点（legacy 组件） */
+.danger-button {
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+.academic-program-options label:hover:not(:has(input:disabled)) {
+  background: var(--paper-muted);
+}
+.academic-program-options label:has(input:focus-visible),
+.danger-button:focus-visible,
+.search-trigger:focus-visible,
+.module-tabs button:focus-visible,
+.academic-course-option:focus-visible,
+.materials-course-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

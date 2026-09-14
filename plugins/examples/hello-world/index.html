@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Hello World</title></head>
+<body>
+<div id="app">
+  <h1>Hello, CampusOS!</h1>
+  <p>这是一个最小第三方插件示例。</p>
+  <p>当前沙箱 origin: <code id="origin"></code></p>
+</div>
+<script>
+  document.getElementById("origin").textContent = window.location.origin;
+  // 这个插件在 campusmod://mod-org-example-hello-world 隔离 origin 运行
+  // 无 Node、无网络、无文件系统，只有 storage:local
+  const stored = localStorage.getItem("campusos.demo.visits") ?? "0";
+  const visits = Number.parseInt(stored, 10) + 1;
+  localStorage.setItem("campusos.demo.visits", String(visits));
+  const counter = document.createElement("p");
+  counter.textContent = `你已访问 ${visits} 次。`;
+  document.getElementById("app").appendChild(counter);
+</script>
+</body>
+</html>

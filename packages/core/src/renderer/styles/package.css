@@ -1,0 +1,205 @@
+/*
+ * package styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Package review and install UI, plus the campusmod sandbox frame that directly follows it.
+ */
+
+.package-review {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(236, 241, 236, 0.76));
+  box-shadow: var(--shadow-soft);
+  padding: 20px;
+}
+
+.package-review > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.package-review h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+.package-review header p {
+  max-width: 58ch;
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.package-signature {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 5px 9px;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.schedule-week-badge {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.package-signature.is-unsigned {
+  border-color: #d8b46a;
+  background: #fff7df;
+  color: #805f1f;
+}
+
+.package-signature.is-verified {
+  border-color: #71a983;
+  background: #edf8ef;
+  color: #2f7041;
+}
+
+.package-signature.is-invalid {
+  border-color: #cf7773;
+  background: #fff0ef;
+  color: #963d39;
+}
+
+.package-review-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.package-review-facts > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+  padding: 10px;
+}
+
+.package-review-facts dt,
+.package-review-facts dd {
+  margin: 0;
+}
+
+.package-review-facts dt {
+  color: var(--ink-faint);
+  font-size: 0.68rem;
+}
+
+.package-review-facts dd {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.package-review-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.package-review-permissions strong {
+  font-size: 0.78rem;
+}
+
+.package-review-permissions span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 5px 8px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.package-sandbox-note {
+  margin: 0;
+  border-left: 2px solid #d8b46a;
+  padding-left: 11px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.package-audit {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.package-audit-badge {
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+}
+
+.package-audit-badge.is-verified {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--line));
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 7%, var(--paper));
+}
+
+.package-audit-badge.is-suspicious {
+  border-color: color-mix(in srgb, var(--warning) 50%, var(--line));
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 10%, var(--paper));
+}
+
+.package-audit-findings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.package-audit-findings li {
+  border-left: 2px solid var(--warning);
+  padding-left: 10px;
+  overflow-wrap: anywhere;
+}
+
+.package-audit-clean {
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+}
+
+.package-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.campusmod-sandbox-frame {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  height: calc(100dvh - 112px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  box-shadow: var(--shadow-soft);
+}

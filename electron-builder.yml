@@ -1,0 +1,41 @@
+appId: io.github.harry-linner.campusos
+productName: CampusOS
+copyright: Copyright © 2026 Harry-Linner
+
+directories:
+  output: ../../dist
+  buildResources: ../../build
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: ../../build/icon.ico
+    to: icon.ico
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Resolved inside buildResources (../../build). A path like "build/icon.ico"
+  # would not resolve from packages/core, so electron-builder would silently
+  # fall back to the default Electron icon.
+  icon: icon.ico
+  artifactName: "${productName}-${version}-win-x64.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CampusOS
+
+asar: true
+compression: maximum
+
+publish:
+  provider: github
+  owner: Harry-Linner
+  repo: CampusOS

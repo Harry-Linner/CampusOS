@@ -1,0 +1,5 @@
+{
+  "name": "campusos-headless-sandbox-smoke",
+  "private": true,
+  "main": "main.cjs"
+}

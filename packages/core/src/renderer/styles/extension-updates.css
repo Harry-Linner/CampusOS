@@ -1,0 +1,16 @@
+/*
+ * extension-updates styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Extension update list and row, as rendered by the extensions view.
+ */
+
+.extension-update-list { display: grid; gap: 12px; margin: 0 0 18px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper-muted); }
+.extension-update-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; border-top: 1px solid var(--line); }

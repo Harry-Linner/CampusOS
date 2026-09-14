@@ -1,0 +1,34 @@
+/*
+ * shell-responsive styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shell media query for the 920px breakpoint: the app shell rows, the in-flow notification centre and the main pane.
+ */
+
+/* Narrow navigation can wrap or scroll as modules change. Keep notifications
+ * in document flow instead of guessing the navigation's height with offsets. */
+@media (max-width: 920px) {
+  .app-shell {
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .notification-center {
+    position: relative;
+    top: auto;
+    right: auto;
+    grid-row: 2;
+    justify-self: end;
+    margin: 12px 24px 0;
+  }
+
+  .main-pane {
+    grid-row: 3;
+  }
+}

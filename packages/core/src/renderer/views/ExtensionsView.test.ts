@@ -1,0 +1,270 @@
+/* @vitest-environment jsdom */
+
+import { createElement } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
+import type {
+  PluginPackageInspection,
+  PluginPackageRegistrySnapshot
+} from "../../shared/pluginBridge";
+import type { LoadedPlugin } from "../lib/pluginHost";
+import { ExtensionsView } from "./ExtensionsView";
+
+afterEach(cleanup);
+
+const blockedMaterials: LoadedPlugin = {
+  manifest: materialsManifest,
+  Component: () => createElement("div"),
+  capabilities: {
+    read: async () => []
+  },
+  runtime: {
+    id: materialsManifest.id,
+    manifest: materialsManifest,
+    enabled: true,
+    grantedPermissions: [],
+    status: "blocked",
+    bindings: {},
+    issues: materialsManifest.permissions.map(
+      (permission) => `权限未授权：${permission}`
+    )
+  }
+};
+
+const emptyPackageRegistry: PluginPackageRegistrySnapshot = {
+  packages: [],
+  issues: []
+};
+
+const createProps = () => ({
+  plugins: [blockedMaterials],
+  loading: false,
+  error: null,
+  packageRegistry: emptyPackageRegistry,
+  onConfigure: vi.fn(async () => undefined),
+  onSelectPackage: vi.fn(async () => null),
+  onDiscardPackage: vi.fn(async () => undefined),
+  onInstallPackage: vi.fn(async () => undefined),
+  onUninstallPackage: vi.fn(async () => undefined)
+});
+
+describe("ExtensionsView", () => {
+  it("submits only permissions explicitly selected by the user", async () => {
+    const configure = vi.fn(async () => undefined);
+    render(
+      createElement(ExtensionsView, {
+        ...createProps(),
+        onConfigure: configure
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "详情" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "资料领域数据" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存并启用" }));
+
+    await waitFor(() => {
+      expect(configure).toHaveBeenCalledWith({
+        pluginId: materialsManifest.id,
+        enabled: true,
+        grantedPermissions: ["storage:domain:materials"]
+      });
+    });
+  });
+
+  it("reviews an unsigned package and requires explicit confirmation before install", async () => {
+    const inspection: PluginPackageInspection = {
+      token: "58ac2bea-45ab-497e-85e5-1856063b674d",
+      manifest: {
+        ...scheduleManifest,
+        id: "dev.example.countdown",
+        name: "countdown",
+        displayName: "考试倒计时",
+        permissions: ["storage:local"],
+        requires: [],
+        optionalRequires: []
+      },
+      entrypoints: { renderer: "dist/renderer.js" },
+      archiveSize: 2048,
+      unpackedSize: 4096,
+      fileCount: 3,
+      sha256: "a".repeat(64),
+      signatureStatus: "unsigned",
+      capabilityAudit: { status: "verified", findings: [] }
+    };
+    const installPackage = vi.fn(async () => undefined);
+    render(
+      createElement(ExtensionsView, {
+        ...createProps(),
+        onSelectPackage: vi.fn(async () => inspection),
+        onInstallPackage: installPackage
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
+
+    expect(await screen.findByRole("region", { name: "插件安装确认" })).toBeTruthy();
+    expect(screen.getByText("未签名")).toBeTruthy();
+    expect(screen.getByText("插件隔离本地存储")).toBeTruthy();
+    expect(installPackage).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认安装" }));
+    await waitFor(() => {
+      expect(installPackage).toHaveBeenCalledWith(inspection.token);
+    });
+  });
+
+  it("shows verified signature status during package review", async () => {
+    const inspection: PluginPackageInspection = {
+      token: "58ac2bea-45ab-497e-85e5-1856063b674d",
+      manifest: {
+        ...scheduleManifest,
+        id: "dev.example.signed-countdown",
+        name: "signed-countdown",
+        displayName: "已签名倒计时",
+        permissions: ["storage:local"],
+        requires: [],
+        optionalRequires: []
+      },
+      entrypoints: { renderer: "dist/renderer.js" },
+      archiveSize: 2048,
+      unpackedSize: 4096,
+      fileCount: 3,
+      sha256: "a".repeat(64),
+      signatureStatus: "verified",
+      capabilityAudit: { status: "verified", findings: [] }
+    };
+    render(createElement(ExtensionsView, {
+      ...createProps(),
+      onSelectPackage: vi.fn(async () => inspection)
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
+
+    expect(await screen.findByText("签名已验证")).toBeTruthy();
+  });
+
+  it("能力声明存疑时禁用确认安装，仅提供降级安装", async () => {
+    const inspection: PluginPackageInspection = {
+      token: "58ac2bea-45ab-497e-85e5-1856063b674d",
+      manifest: {
+        ...scheduleManifest,
+        id: "dev.example.suspicious-countdown",
+        name: "suspicious-countdown",
+        displayName: "可疑倒计时",
+        permissions: ["storage:local"],
+        requires: [],
+        optionalRequires: []
+      },
+      entrypoints: { renderer: "dist/renderer.js" },
+      archiveSize: 2048,
+      unpackedSize: 4096,
+      fileCount: 3,
+      sha256: "a".repeat(64),
+      signatureStatus: "unsigned",
+      capabilityAudit: {
+        status: "suspicious",
+        findings: [
+          {
+            category: "network",
+            detail: "[renderer] 检测到 fetch 调用",
+            line: 3
+          }
+        ]
+      }
+    };
+    const installPackage = vi.fn(async () => undefined);
+    render(createElement(ExtensionsView, {
+      ...createProps(),
+      onSelectPackage: vi.fn(async () => inspection),
+      onInstallPackage: installPackage
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "从文件安装" }));
+
+    expect(await screen.findByText("能力声明存疑")).toBeTruthy();
+    expect(screen.getByText(/检测到 fetch 调用/)).toBeTruthy();
+    expect(
+      (screen.getByRole("button", { name: "确认安装" }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "仅安装并保持停用" }));
+    await waitFor(() => {
+      expect(installPackage).toHaveBeenCalledWith(inspection.token);
+    });
+  });
+
+  it("grants and enables only an eligible installed sandbox view", async () => {
+    const manifest = {
+      ...scheduleManifest,
+      id: "dev.example.countdown",
+      name: "countdown",
+      displayName: "考试倒计时",
+      permissions: ["storage:local" as const],
+      provides: [],
+      requires: [],
+      optionalRequires: [],
+      contributes: {
+        views: [{
+          id: "countdown-main",
+          title: "倒计时",
+          icon: "Clock",
+          location: "activity" as const,
+          activityTarget: "mod-dev-example-countdown"
+        }]
+      }
+    };
+    const plugin: LoadedPlugin = {
+      manifest,
+      runtime: {
+        id: manifest.id,
+        manifest,
+        enabled: false,
+        grantedPermissions: [],
+        status: "disabled",
+        bindings: {},
+        issues: []
+      },
+      capabilities: { read: async () => [] }
+    };
+    const configure = vi.fn(async () => undefined);
+    render(createElement(ExtensionsView, {
+      ...createProps(),
+      plugins: [plugin],
+      packageRegistry: {
+        packages: [{
+          manifest,
+          entrypoints: { renderer: "dist/renderer.js" },
+          archiveSize: 2048,
+          unpackedSize: 4096,
+          fileCount: 2,
+          sha256: "a".repeat(64),
+          signatureStatus: "unsigned",
+          capabilityAudit: { status: "verified", findings: [] },
+          installedAt: "2026-07-19T00:00:00.000Z",
+          sourceFilename: "countdown.campusmod"
+        }],
+        issues: []
+      },
+      onConfigure: configure
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "详情" }));
+    fireEvent.click(screen.getByRole("checkbox", {
+      name: "插件隔离本地存储"
+    }));
+    fireEvent.click(screen.getByRole("button", {
+      name: "保存并启用沙箱视图"
+    }));
+
+    await waitFor(() => {
+      expect(configure).toHaveBeenCalledWith({
+        pluginId: manifest.id,
+        enabled: true,
+        grantedPermissions: ["storage:local"]
+      });
+    });
+  });
+});

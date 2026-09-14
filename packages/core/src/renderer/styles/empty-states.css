@@ -1,0 +1,39 @@
+/*
+ * empty-state rules.
+ *
+ * Peeled out of styles.css in batch 24 of the ADR-0006 program. globals.css
+ * imports this inside the same `legacy` cascade layer, directly after
+ * styles.css. The blocks own their selectors, so their cascade position does not
+ * matter; none of them is used by the desk-calendar window.
+ */
+
+.quiet-empty-state {
+  display: grid;
+  min-height: 170px;
+  place-items: center;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-size: 0.9rem;
+}
+
+.quiet-empty-compact {
+  min-height: 120px;
+  border-top: 0;
+}
+.empty-state {
+  padding: 26px 0;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.empty-state p {
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}

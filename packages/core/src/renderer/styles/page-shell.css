@@ -1,0 +1,64 @@
+/*
+ * page-shell styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shared page scaffolding: page shell, page heading and term context.
+ */
+
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.page-heading {
+  display: flex;
+  min-height: 44px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.page-heading h1 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.2vw, 3rem);
+  font-weight: 650;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.page-heading p {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.term-context,
+.plain-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.term-context strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.term-context span::before {
+  color: var(--line-strong);
+  content: "/";
+  margin-right: 10px;
+}

@@ -1,0 +1,80 @@
+/*
+ * notification styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Notification centre: panel, groups, entries and details.
+ */
+
+.notification-center {
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 30;
+  width: fit-content;
+}
+.notification-trigger {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  padding: 8px 13px;
+  box-shadow: var(--shadow-soft);
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+.notification-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--paper-deep);
+}
+.notification-trigger:focus-visible,
+.notification-summary:focus-visible,
+.notification-group-toggle:focus-visible,
+.notification-detail-actions button:focus-visible,
+.notification-filters button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.notification-badge { display: inline-flex; min-width: 18px; justify-content: center; margin-left: 6px; border-radius: 999px; background: var(--accent); color: white; font-size: 11px; }
+.notification-popover { position: absolute; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 160px)); overflow-y: auto; scrollbar-gutter: stable; padding: 14px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--notification-panel-bg); box-shadow: var(--shadow-elevated); }
+.notification-popover > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 10px; }
+.notification-header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.notification-filters { display: flex; gap: 3px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.notification-filters button { min-height: 28px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--ink-soft); cursor: pointer; padding: 0 10px; font-size: 0.76rem; }
+.notification-filters button:hover,
+.notification-filters button.is-active { border-color: var(--line); background: var(--paper-deep); color: var(--ink); }
+.notification-list { margin: 0; padding: 0; list-style: none; }
+.notification-item { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px 10px 16px; position: relative; border-radius: var(--radius-md); }
+.notification-item + .notification-item { margin-top: 2px; }
+.notification-item.is-unread { background: color-mix(in srgb, var(--accent) 6%, var(--paper)); }
+.notification-item.is-unread::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--accent); }
+.notification-item.is-selected { background: var(--paper-deep); }
+.notification-check { flex-shrink: 0; padding-top: 4px; }
+.notification-check input { margin: 0; }
+.notification-content { flex: 1; min-width: 0; }
+.notification-summary { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; row-gap: 3px; min-width: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: var(--radius-sm); padding: 2px 4px; transition: background-color 160ms ease; }
+.notification-summary:hover { background: var(--paper-muted); }
+.notification-summary:active { background: var(--paper-deep); }
+.notification-summary strong { grid-column: 1; min-width: 0; overflow-wrap: anywhere; }
+.notification-summary time { grid-column: 2; grid-row: 1; color: var(--ink-faint); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.notification-summary span { grid-column: 1 / -1; min-width: 0; color: var(--ink-muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.notification-summary .is-clamped { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.notification-detail { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 4px 0; padding-top: 8px; border-top: 1px solid var(--line); }
+.notification-source { color: var(--ink-faint); font-size: 11px; }
+.notification-detail-actions { display: flex; gap: 4px; }
+.notification-detail-actions svg { width: 14px; height: 14px; }
+.notification-group { margin-top: 6px; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+.notification-group-toggle { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: var(--paper-muted); color: var(--ink); padding: 8px 12px; text-align: left; cursor: pointer; }
+.notification-group-toggle:hover { background: var(--paper-deep); }
+.notification-group-toggle span { display: flex; align-items: baseline; gap: 8px; }
+.notification-group-toggle small { color: var(--ink-muted); }
+.notification-group-toggle svg { width: 16px; height: 16px; color: var(--ink-faint); transition: transform 160ms ease; }
+.notification-group-toggle svg.is-open { transform: rotate(180deg); }
+.notification-group > ul { margin: 0; padding: 4px; list-style: none; }
+.notification-group .notification-item { border-radius: var(--radius-sm); }

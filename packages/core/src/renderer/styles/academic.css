@@ -1,0 +1,188 @@
+/*
+ * academic styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Academic module panels, course layouts, statistics and selects.
+ */
+
+.academic-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.academic-panel-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.academic-panel-heading h2,
+.academic-course-detail h3 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.academic-select-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.academic-select-label select {
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.academic-checkbox-label {
+  min-height: 34px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.academic-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.academic-record-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.academic-record-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 13px 0;
+}
+
+.academic-record-row.is-search-highlight,
+.academic-record-row.is-search-highlight > div {
+  background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 6px;
+}
+
+.academic-record-row > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.academic-course-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.3fr);
+  gap: 26px;
+}
+
+.academic-course-list {
+  max-height: 55vh;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  border-top: 1px solid var(--line-strong);
+}
+
+.academic-course-option {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 12px 10px;
+  text-align: left;
+}
+
+.academic-course-option:hover,
+.academic-course-option.is-active {
+  background: var(--paper-deep);
+}
+
+.academic-course-detail {
+  align-self: start;
+  border-top: 1px solid var(--line-strong);
+  padding-top: 14px;
+}
+
+.academic-course-detail h3 {
+  margin-top: 4px;
+  font-size: 1.35rem;
+}
+
+.academic-detail-list {
+  display: grid;
+  gap: 1px;
+  margin: 18px 0 0;
+  background: var(--line);
+}
+
+.academic-detail-list div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 14px;
+  background: var(--paper);
+  padding: 10px 12px;
+}
+
+.academic-detail-list dt {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.academic-detail-list dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.academic-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line-strong);
+  background: var(--line-strong);
+}
+
+.academic-stat-strip span {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--paper);
+  padding: 13px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.academic-stat-strip strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}

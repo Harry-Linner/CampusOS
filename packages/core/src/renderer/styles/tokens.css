@@ -1,0 +1,50 @@
+/*
+ * Legacy CampusOS tokens.
+ *
+ * These are the light-theme fallbacks and the pre-theme-rework aliases that
+ * `styles.css` carried at its top. They stay in the `legacy` cascade layer
+ * (imported by globals.css before styles.css) so per-theme values in
+ * theme.css keep winning, and they remain the fallback when no
+ * `data-theme` attribute is set.
+ *
+ * New component styles belong in `styles/<module>.css` (imported at the point
+ * of use), not appended to styles.css. Add new tokens to theme.css when they
+ * vary per theme, or here when they are theme-independent.
+ */
+:root {
+  --ink: #17212b;
+  --ink-soft: #56616b;
+  --ink-faint: #7c8790;
+  --paper: #f8f9f7;
+  --paper-muted: #f0f2ef;
+  --paper-deep: #e9ece8;
+  --line: #d9ded9;
+  --line-strong: #c8cfca;
+  --accent: #315f8e;
+  --accent-deep: #234a72;
+  --accent-wash: #e7eef5;
+  --danger: #b54542;
+  --warning: #a56d22;
+  --success: #356b57;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-float: 0 14px 32px rgba(23, 33, 43, 0.13);
+  /* Legacy token aliases: older components referenced these names before the
+   * theme rework; keep them mapped to the live theme tokens so popovers,
+   * menus and muted text follow light/dark/high-contrast for free. */
+  --ink-muted: var(--ink-soft);
+  --text-muted: var(--ink-soft);
+  --text: var(--ink);
+  --surface: var(--card-bg);
+  --surface-raised: var(--card-bg);
+  --paper-soft: var(--paper-muted);
+  --accent-soft: var(--accent-wash);
+  --shadow-soft: 0 1px 2px rgba(23, 33, 43, 0.06), 0 2px 10px rgba(23, 33, 43, 0.08);
+  --shadow-elevated: 0 12px 32px rgba(23, 33, 43, 0.16);
+  --font-display: "Bahnschrift SemiCondensed", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif;
+  --font-body: "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-mono: "Cascadia Mono", "Consolas", monospace;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}

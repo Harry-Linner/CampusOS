@@ -1,0 +1,474 @@
+/*
+ * Onboarding wizard styles.
+ *
+ * Peeled out of styles.css in batch 12 of the ADR-0006 program. globals.css
+ * imports it inside the same `legacy` cascade layer, directly after
+ * styles.css. The section owns its selectors (.onboarding-*), and its final
+ * block is the narrow-width layout.
+ */
+
+/* Onboarding Wizard */
+
+.onboarding-shell {
+  display: grid;
+  min-height: 100dvh;
+  grid-template-columns: minmax(19rem, 0.82fr) minmax(0, 1.18fr);
+  background: #f3f4ef;
+}
+
+.onboarding-aside {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 44px;
+  justify-content: space-between;
+  background: #253438;
+  color: #f5f6ef;
+  padding: 48px;
+}
+
+.onboarding-aside-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #f5f6ef;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.onboarding-aside-copy {
+  display: flex;
+  max-width: 31rem;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.onboarding-eyebrow {
+  margin: 0;
+  color: var(--accent-deep);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.onboarding-aside .onboarding-eyebrow {
+  color: #a8c3bd;
+}
+
+.onboarding-aside-copy h1 {
+  max-width: 10ch;
+  margin: 0;
+  color: #f7f8f1;
+  font-family: var(--font-display);
+  font-size: 2.65rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.onboarding-aside-copy > p:not(.onboarding-eyebrow) {
+  max-width: 37ch;
+  margin: 0;
+  color: #cad4d0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.onboarding-aside-points {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.onboarding-aside-points > div {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 12px;
+  border-top: 1px solid rgba(202, 212, 208, 0.22);
+  padding-top: 12px;
+}
+
+.onboarding-aside-points dt {
+  color: #a8c3bd;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.onboarding-aside-points dd {
+  margin: 0;
+  color: #eff3ec;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.onboarding-main {
+  display: grid;
+  place-items: center;
+  padding: 48px;
+}
+
+.onboarding-card {
+  display: flex;
+  width: min(680px, 100%);
+  flex-direction: column;
+  gap: 38px;
+  border: 1px solid #dce0d9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(37, 52, 56, 0.1);
+  padding: 42px;
+}
+
+/* Progress Indicator */
+
+.onboarding-progress {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-step-marker {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+}
+
+.onboarding-step-dot {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 650;
+  transition: border-color 200ms ease, background-color 200ms ease, color 200ms ease;
+}
+
+.onboarding-step-marker.is-complete .onboarding-step-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.onboarding-step-marker.is-current .onboarding-step-dot {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+
+.onboarding-step-label {
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* Step Content */
+
+.onboarding-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.onboarding-step-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.onboarding-lede {
+  max-width: 42ch;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+/* Welcome */
+
+.onboarding-welcome-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.onboarding-welcome-brand h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 2.35rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+/* Actions */
+
+.onboarding-actions {
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+
+.onboarding-actions .primary-button {
+  margin-left: auto;
+}
+
+.onboarding-save-note {
+  display: block;
+}
+
+/* Sync */
+
+.onboarding-sync-placeholder {
+  display: grid;
+  min-height: 96px;
+  place-items: center start;
+}
+
+.onboarding-sync-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.onboarding-sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.onboarding-sync-spinner {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: onboarding-spin 700ms linear infinite;
+}
+
+@keyframes onboarding-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.onboarding-sync-label {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.onboarding-sync-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.onboarding-sync-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-muted);
+  padding: 14px;
+  text-align: center;
+}
+
+.onboarding-sync-stat strong {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 650;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.onboarding-sync-stat span {
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+}
+
+.onboarding-sync-result {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Plugin List */
+
+.onboarding-plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onboarding-plugin-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper-muted);
+}
+
+.onboarding-plugin-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.onboarding-plugin-info strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.onboarding-plugin-info span {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.onboarding-plugin-badge {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: var(--ink-faint);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.onboarding-plugin-badge.is-active {
+  border-color: var(--success);
+  background: #e5f0ea;
+  color: var(--success);
+}
+
+.onboarding-skip-note {
+  margin: 0;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* Done */
+
+.onboarding-done-mark {
+  display: inline-grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 2px solid var(--success);
+  border-radius: 6px;
+  background: #e5f0ea;
+  color: var(--success);
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 650;
+}
+
+.onboarding-done-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.onboarding-done-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.onboarding-done-item strong {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.onboarding-done-item span {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.onboarding-enter-button {
+  width: 100%;
+  min-height: 44px;
+  font-size: 0.92rem;
+}
+
+.inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 620px) {
+  .onboarding-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-aside {
+    min-height: auto;
+    gap: 28px;
+    padding: 28px 22px;
+  }
+
+  .onboarding-aside-copy h1 {
+    max-width: 17ch;
+    font-size: 2rem;
+  }
+
+  .onboarding-aside-points {
+    display: none;
+  }
+
+  .onboarding-main {
+    padding: 16px;
+  }
+
+  .onboarding-card {
+    gap: 28px;
+    padding: 28px 22px;
+  }
+
+  .onboarding-welcome-brand h2 {
+    font-size: 1.8rem;
+  }
+
+  .onboarding-sync-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-step-label {
+    font-size: 0.65rem;
+  }
+}

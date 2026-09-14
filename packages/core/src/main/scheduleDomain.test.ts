@@ -1,0 +1,244 @@
+import type { CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
+import type { CalendarEventRecord } from "@campusos/shared";
+import {
+  applyTaskMutation,
+  createIcalContent,
+  createTaskRecord,
+  getTaskCalendarPeriods,
+  refreshLocalTasks
+} from "./scheduleDomain";
+
+const now = new Date("2026-08-04T10:00:00+08:00");
+
+const task = (overrides: Partial<LocalTaskRecord>): LocalTaskRecord => ({
+  id: "task-1",
+  status: "running",
+  description: "",
+  timeSpentMinutes: 0,
+  timeNeededMinutes: 60,
+  startAt: "2026-08-04T08:00:00+08:00",
+  endAt: "2026-08-04T18:00:00+08:00",
+  location: "",
+  title: "Task",
+  breakable: true,
+  type: "deadline",
+  repeatType: "norepeat",
+  repeatPeriod: 1,
+  repeatEndsOn: "2026-08-04",
+  blocksPlanning: true,
+  fromId: null,
+  ...overrides
+});
+
+const snapshot = (courses: CampusWorkspaceSnapshot["courses"] = []): CampusWorkspaceSnapshot => ({
+  generatedAt: now.toISOString(),
+  term: {
+    label: "2026-2027 Autumn",
+    phase: "upcoming",
+    currentWeek: null,
+    progressPercent: 0
+  },
+  sourceStates: [],
+  courses,
+  todayCourses: courses,
+  deadlines: [],
+  materials: [],
+  downloads: [],
+  reminders: [],
+  summary: {
+    readySources: 0,
+    totalSources: 0,
+    downloadsInFlight: 0,
+    materialsReady: 0,
+    remindersQueued: 0,
+    deadlinesDueSoon: 0
+  }
+});
+
+const calendarEvent = (
+  overrides: Partial<CalendarEventRecord> = {}
+): CalendarEventRecord => ({
+  id: "event-1",
+  originId: "origin-1",
+  originCapability: "academic.exams@1",
+  sourceId: "academic-affairs",
+  kind: "exam",
+  title: "Final exam",
+  startAt: "2026-08-04T11:00:00+08:00",
+  endAt: "2026-08-04T13:00:00+08:00",
+  timezone: "Asia/Shanghai",
+  location: "Exam room",
+  courseName: "Final exam",
+  note: "Seat 1",
+  ...overrides
+});
+
+describe("schedule domain", () => {
+  it("keeps the recurring series anchor stable while refreshing derived statuses", () => {
+    let id = 0;
+    const refreshed = refreshLocalTasks(
+      [
+        task({ id: "done", timeSpentMinutes: 60 }),
+        task({
+          id: "overdue",
+          startAt: "2026-08-03T08:00:00+08:00",
+          endAt: "2026-08-03T18:00:00+08:00"
+        }),
+        task({
+          id: "weekly",
+          title: "Weekly",
+          type: "fixed",
+          startAt: "2026-08-01T09:00:00+08:00",
+          endAt: "2026-08-01T10:00:00+08:00",
+          repeatType: "days",
+          repeatPeriod: 1,
+          repeatEndsOn: "2026-08-07",
+          breakable: false
+        })
+      ],
+      now,
+      { idFactory: () => `legacy-${++id}` }
+    );
+
+    expect(refreshed.tasks.find((item) => item.id === "done")?.status).toBe("completed");
+    expect(refreshed.tasks.find((item) => item.id === "overdue")?.status).toBe("overdue");
+    expect(refreshed.tasks.filter((item) => item.type === "fixedlegacy")).toHaveLength(0);
+    expect(refreshed.tasks.find((item) => item.id === "weekly")?.startAt).toBe(
+      "2026-08-01T01:00:00.000Z"
+    );
+  });
+
+  it("clamps monthly dates to month end and restores the anchor day later", () => {
+    const record = createTaskRecord(
+      {
+        title: "Monthly",
+        description: "",
+        timeSpentMinutes: 0,
+        timeNeededMinutes: 30,
+        startAt: "2026-01-31T09:00:00+08:00",
+        endAt: "2026-01-31T10:00:00+08:00",
+        location: "",
+        breakable: false,
+        type: "fixed",
+        repeatType: "month",
+        repeatPeriod: 1,
+        repeatEndsOn: "2026-04-30",
+        blocksPlanning: true
+      },
+      { idFactory: () => "monthly" }
+    );
+    const periods = getTaskCalendarPeriods(
+      [record],
+      new Date("2026-01-01T00:00:00+08:00"),
+      new Date("2026-05-01T00:00:00+08:00")
+    );
+    expect(periods.map((item) => item.startAt.slice(0, 10))).toEqual([
+      "2026-01-31",
+      "2026-02-28",
+      "2026-03-31",
+      "2026-04-30"
+    ]);
+  });
+
+  it("supports every-N-weeks weekdays, count limits, and independent occurrence state", () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now.getTime());
+    onTestFinished(() => clock.mockRestore());
+    const record = createTaskRecord({
+      title: "Seminar", description: "", timeSpentMinutes: 0, timeNeededMinutes: 60,
+      startAt: "2026-09-07T09:00:00+08:00", endAt: "2026-09-07T10:00:00+08:00",
+      location: "", breakable: false, type: "fixed", repeatType: "weeks", repeatPeriod: 2,
+      repeatWeekdays: [1, 3], repeatEndsOn: "2027-01-01", repeatEndMode: "count",
+      repeatCount: 4, blocksPlanning: true
+    }, { idFactory: () => "series" });
+    const completed = applyTaskMutation([record], { id: "series", occurrenceKey: "1", status: "completed" });
+    const periods = getTaskCalendarPeriods(completed, new Date("2026-09-01T00:00:00+08:00"), new Date("2026-10-01T00:00:00+08:00"));
+    expect(periods.map((item) => [item.startAt.slice(0, 10), item.status, item.occurrenceId])).toEqual([
+      ["2026-09-07", "running", "series:0"],
+      ["2026-09-09", "completed", "series:1"],
+      ["2026-09-21", "running", "series:2"],
+      ["2026-09-23", "running", "series:3"]
+    ]);
+  });
+
+  it("can truncate an endless series from a later occurrence", () => {
+    const record = createTaskRecord({
+      title: "Weekly", description: "", timeSpentMinutes: 0, timeNeededMinutes: 60,
+      startAt: "2026-09-07T09:00:00+08:00", endAt: "2026-09-07T10:00:00+08:00",
+      location: "", breakable: false, type: "fixed", repeatType: "weeks", repeatPeriod: 1,
+      repeatWeekdays: [1], repeatEndsOn: "2026-09-07", repeatEndMode: "never",
+      repeatCount: null, blocksPlanning: true
+    }, { idFactory: () => "endless" });
+
+    const [truncated] = applyTaskMutation([record], {
+      id: "endless",
+      occurrenceKey: "10",
+      scope: "future",
+      status: "deleted"
+    });
+    const periods = getTaskCalendarPeriods([truncated], new Date("2026-09-01T00:00:00+08:00"), new Date("2026-12-01T00:00:00+08:00"));
+    expect(periods).toHaveLength(10);
+    expect(periods.at(-1)?.startAt).toBe("2026-11-09T01:00:00.000Z");
+    const restored = applyTaskMutation([truncated], { id: "endless", scope: "series", action: "restore" });
+    expect(getTaskCalendarPeriods(restored, new Date("2026-11-16T00:00:00+08:00"), new Date("2026-11-17T00:00:00+08:00"))).toHaveLength(1);
+  });
+
+  it("chops multi-day tasks into day periods", () => {
+    const periods = getTaskCalendarPeriods(
+      [
+        task({
+          startAt: "2026-08-04T23:00:00+08:00",
+          endAt: "2026-08-05T02:00:00+08:00",
+          breakable: false
+        })
+      ],
+      new Date("2026-08-04T00:00:00+08:00"),
+      new Date("2026-08-06T00:00:00+08:00")
+    );
+    expect(periods).toHaveLength(2);
+    expect(new Date(periods[0].endAt).getTime() - new Date(periods[0].startAt).getTime()).toBe(60 * 60_000);
+    expect(new Date(periods[1].endAt).getTime() - new Date(periods[1].startAt).getTime()).toBe(2 * 60 * 60_000);
+  });
+
+  it("exports canonical exam times and does not turn them into one-hour deadlines", () => {
+    const result = createIcalContent(
+      { ...snapshot(), calendarEvents: [calendarEvent()] },
+      [],
+      { academicYearStart: 2026, termLabel: "2026-2027 ç§‹å†¬" },
+      now
+    );
+    expect(result.eventCount).toBe(1);
+    expect(result.content).toContain("SUMMARY:Final exam");
+    expect(result.content).toContain("DTSTART;TZID=Asia/Shanghai:20260804T110000");
+    expect(result.content).toContain("DTEND;TZID=Asia/Shanghai:20260804T130000");
+  });
+
+  it("generates stable RFC 5545 content with escaped fields", () => {
+    const input = { academicYearStart: 2026, termLabel: "Autumn, 2026" };
+    const first = createIcalContent(
+      snapshot(),
+      [task({ title: "Task; A", description: "line 1\nline 2", location: "Room, 1" })],
+      input,
+      now
+    );
+    const second = createIcalContent(snapshot(), [task({ title: "Task; A", description: "line 1\nline 2", location: "Room, 1" })], input, now);
+    expect(first).toEqual(second);
+    expect(first.eventCount).toBe(1);
+    expect(first.content).toContain("SUMMARY:Task\\; A");
+    expect(first.content).toContain("DESCRIPTION:line 1\\nline 2");
+    expect(first.content).toContain("LOCATION:Room\\, 1");
+  });
+
+  it("migrates a legacy floating task to a dated deadline", () => {
+    const floating = {
+      ...task({}),
+      title: "Inbox item",
+      type: "floating",
+      reminderMode: "none"
+    } as unknown as LocalTaskRecord;
+    const refreshed = refreshLocalTasks([floating], now);
+    expect(refreshed.tasks).toHaveLength(1);
+    expect(refreshed.tasks[0]).toMatchObject({ title: "Inbox item", type: "deadline", status: "running" });
+    expect(getTaskCalendarPeriods(refreshed.tasks, now, new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000))).toHaveLength(1);
+  });
+});

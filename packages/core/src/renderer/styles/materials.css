@@ -1,0 +1,309 @@
+/*
+ * Materials workspace styles.
+ *
+ * Peeled out of styles.css in batch 14 of the ADR-0006 program. globals.css
+ * imports it inside the same `legacy` cascade layer, directly after
+ * styles.css. Only the materials plugin (plugins/official/materials) uses these
+ * selectors. The single `.materials-course-option:focus-visible` rule stays in
+ * styles.css because it is part of the shared focus-visible group.
+ */
+
+/* Materials workspace */
+
+.materials-page {
+  gap: 24px;
+}
+
+.materials-heading {
+  align-items: flex-end;
+}
+
+.materials-heading .module-tabs {
+  flex: 0 0 auto;
+}
+
+.materials-browser {
+  display: grid;
+  min-height: 520px;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.materials-course-pane {
+  min-width: 0;
+  border-right: 1px solid var(--line-strong);
+  padding: 18px 18px 22px 0;
+}
+
+.materials-course-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 14px;
+}
+
+.materials-course-tools label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.materials-course-tools select,
+.materials-course-tools input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.materials-course-list {
+  display: flex;
+  max-height: 58vh;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.materials-course-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 12px 10px;
+  text-align: left;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.materials-course-option:hover,
+.materials-course-option.is-active {
+  background: var(--paper-deep);
+}
+
+.materials-course-option strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materials-course-option span {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.materials-file-pane {
+  min-width: 0;
+  padding: 18px 0 22px 24px;
+}
+
+.materials-file-heading {
+  display: flex;
+  min-height: 62px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 14px;
+}
+
+.materials-file-heading > div:first-child {
+  min-width: 0;
+}
+
+.materials-file-heading h2 {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materials-selection-actions,
+.materials-selection-actions label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.materials-selection-actions label {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.materials-selection-actions input,
+.materials-file-row > input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  accent-color: var(--accent);
+}
+
+.materials-file-list,
+.materials-download-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.materials-file-row {
+  display: grid;
+  min-height: 66px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 4px;
+}
+
+.materials-file-row.is-search-highlight,
+.materials-file-row.is-search-highlight * {
+  background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 6px;
+}
+
+.materials-file-copy,
+.materials-download-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.materials-file-copy strong,
+.materials-download-copy strong {
+  overflow-wrap: anywhere;
+  font-size: 0.84rem;
+}
+
+.materials-file-copy > span,
+.materials-download-copy > span {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.materials-local-state {
+  width: fit-content;
+  color: var(--ink-soft) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.materials-local-state.is-ready {
+  color: var(--success) !important;
+}
+
+.materials-local-state.is-failed {
+  color: var(--danger) !important;
+}
+
+.materials-downloads {
+  border-top: 1px solid var(--line-strong);
+  padding-top: 18px;
+}
+
+.materials-download-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(160px, 0.6fr) auto;
+  align-items: center;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+}
+
+.materials-download-progress {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.materials-download-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .materials-heading,
+  .materials-file-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .materials-browser {
+    grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  }
+
+  .materials-download-row {
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 0.5fr);
+  }
+
+  .materials-download-row .inline-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .materials-heading .module-tabs,
+  .materials-selection-actions {
+    width: 100%;
+  }
+
+  .materials-browser {
+    grid-template-columns: 1fr;
+  }
+
+  .materials-course-pane {
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+    padding-right: 0;
+  }
+
+  .materials-course-list {
+    max-height: 240px;
+  }
+
+  .materials-file-pane {
+    padding-left: 0;
+  }
+
+  .materials-selection-actions {
+    justify-content: space-between;
+  }
+
+  .materials-file-row,
+  .materials-download-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .materials-file-row > .text-button,
+  .materials-file-row > .meta-line,
+  .materials-download-progress,
+  .materials-download-row .inline-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

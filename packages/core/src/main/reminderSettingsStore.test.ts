@@ -1,0 +1,125 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReminderSettingsRecord } from "../shared/reminderBridge";
+
+const electronState = vi.hoisted(() => ({
+  userDataPath: "",
+  handlers: new Map<string, (...args: unknown[]) => unknown>()
+}));
+
+vi.mock("electron", () => ({
+  app: {
+    getPath: vi.fn(() => electronState.userDataPath)
+  },
+  ipcMain: {
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      electronState.handlers.set(channel, handler);
+    })
+  }
+}));
+
+vi.mock("./reminderScheduler", () => ({
+  getReminderSchedulerState: vi.fn(() => ({
+    enabled: true,
+    supported: true,
+    scheduledCount: 0,
+    nextFireAt: null,
+    lastScheduledAt: null,
+    transport: "electron"
+  }))
+}));
+
+import { registerReminderSettingsHandlers } from "./reminderSettingsStore";
+
+const temporaryDirectories: string[] = [];
+
+const trustedEvent = (): { senderFrame: { url: string }; sender: { mainFrame: unknown } } => {
+  const mainFrame = { url: "http://127.0.0.1:5173/" };
+  return { senderFrame: mainFrame, sender: { mainFrame } };
+};
+
+beforeEach(() => {
+  electronState.handlers.clear();
+  process.env.ELECTRON_RENDERER_URL = "http://127.0.0.1:5173/";
+});
+
+afterEach(async () => {
+  delete process.env.ELECTRON_RENDERER_URL;
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) =>
+      rm(directory, { recursive: true, force: true })
+    )
+  );
+});
+
+describe("reminder settings IPC", () => {
+  it("reschedules local workspace reminders immediately after persisting settings", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    const onSettingsSaved = vi.fn(async () => undefined);
+    registerReminderSettingsHandlers({ onSettingsSaved });
+    const save = electronState.handlers.get("campusos:reminders:settings:save");
+    if (!save) throw new Error("reminder settings save handler was not registered");
+
+    const record = await save(trustedEvent(), {
+      enabled: false,
+      leadMinutes: [120, 15, 15]
+    }) as ReminderSettingsRecord;
+
+    expect(record).toMatchObject({ enabled: false, leadMinutes: [15, 120] });
+    expect(onSettingsSaved).toHaveBeenCalledOnce();
+    expect(onSettingsSaved).toHaveBeenCalledWith(record);
+    await expect(readFile(record.storagePath!, "utf8")).resolves.toContain(
+      '"enabled": false'
+    );
+  });
+
+  it("defaults the independent grade-change switch on for legacy settings", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    const storagePath = join(storageRoot, "settings", "reminder-settings.json");
+    await (await import("node:fs/promises")).mkdir(join(storageRoot, "settings"), { recursive: true });
+    await (await import("node:fs/promises")).writeFile(storagePath, JSON.stringify({
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: "2026-08-05T08:00:00.000Z"
+    }), "utf8");
+
+    registerReminderSettingsHandlers();
+    const load = electronState.handlers.get("campusos:reminders:settings:load");
+    if (!load) throw new Error("reminder settings load handler was not registered");
+
+    await expect(load(trustedEvent())).resolves.toMatchObject({ gradeChangesEnabled: true });
+  });
+
+  it("persists settings when Electron already owns the preferences path as a file", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-reminders-"));
+    temporaryDirectories.push(storageRoot);
+    electronState.userDataPath = storageRoot;
+    await (await import("node:fs/promises")).writeFile(
+      join(storageRoot, "preferences"),
+      JSON.stringify({ spellcheck: true }),
+      "utf8"
+    );
+
+    registerReminderSettingsHandlers();
+    const save = electronState.handlers.get("campusos:reminders:settings:save");
+    if (!save) throw new Error("reminder settings save handler was not registered");
+
+    const record = await save(trustedEvent(), {
+      enabled: true,
+      leadMinutes: [15]
+    }) as ReminderSettingsRecord;
+
+    expect(record.storagePath).toBe(
+      join(storageRoot, "settings", "reminder-settings.json")
+    );
+    await expect(readFile(record.storagePath!, "utf8")).resolves.toContain(
+      '"enabled": true'
+    );
+  });
+});

@@ -1,0 +1,256 @@
+/*
+ * responsive styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * The main responsive block: the 920px shell/plugin layout, the 620px narrow layout and the reduced-motion override.
+ */
+
+@media (max-width: 920px) {
+  /* Narrow layouts scroll at the document level (.main-pane stops scrolling),
+   * so reserve the document gutter to keep the scrollbar appearance from
+   * shifting the layout. */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  .app-shell {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .grade-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .grade-gpa-matrix-heading,
+  .grade-gpa-matrix-row {
+    grid-template-columns: minmax(100px, 1fr) repeat(2, minmax(70px, 0.5fr));
+  }
+
+  .academic-panel-heading,
+  .academic-course-layout {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .academic-stat-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .navigation-rail {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+  }
+
+  .brand-lockup {
+    padding: 0 7px 0 0;
+    white-space: nowrap;
+  }
+
+  .search-trigger {
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .primary-navigation,
+  .utility-navigation {
+    flex-direction: row;
+  }
+
+  .primary-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .utility-navigation {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 0;
+    margin-left: auto;
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .nav-item {
+    flex: 0 0 auto;
+    min-height: 36px;
+    gap: 7px;
+    white-space: nowrap;
+  }
+
+  .main-pane {
+    min-height: auto;
+    overflow-y: visible;
+    padding: 12px 24px 44px;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-section {
+    padding-right: 0;
+  }
+
+  .todo-section {
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+
+@media (max-width: 620px) {
+  .navigation-rail {
+    gap: 6px 10px;
+  }
+
+  .brand-lockup {
+    width: auto;
+  }
+
+  .search-trigger kbd {
+    display: none;
+  }
+
+  .nav-item {
+    flex: 1 0 auto;
+    min-width: 36px;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  .nav-item span {
+    display: none;
+  }
+
+  .utility-navigation {
+    margin-left: 0;
+  }
+
+  .main-pane {
+    padding: 24px 18px 38px;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .extension-heading-actions {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .package-review > header {
+    flex-direction: column;
+  }
+
+  .calendar-controls {
+    width: 100%;
+  }
+
+
+  .calendar-view-switcher {
+    width: 100%;
+  }
+
+  .calendar-view-switcher button {
+    flex: 1;
+  }
+
+  .calendar-controls .text-button {
+    margin-left: auto;
+  }
+
+
+  .course-timeline {
+    --course-time-column: 64px;
+    --course-marker-column: 26px;
+  }
+
+  .course-item {
+    grid-template-columns:
+      var(--course-time-column)
+      var(--course-marker-column)
+      minmax(0, 1fr);
+  }
+
+  .todo-item {
+    grid-template-columns: 3px minmax(0, 1fr);
+    gap: 11px;
+    padding: 13px 0;
+  }
+
+  .todo-deadline {
+    grid-column: 2;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .extension-details {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-left: 18px;
+  }
+
+  .academic-program-options,
+  .settings-fields,
+  .about-data {
+    grid-template-columns: 1fr;
+  }
+
+  .about-data > div + div {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .credential-proof-heading {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .credential-proof-data {
+    grid-template-columns: 1fr;
+  }
+
+  .credential-proof-data > div + div {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

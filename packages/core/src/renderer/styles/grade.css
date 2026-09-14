@@ -1,0 +1,110 @@
+/*
+ * grade styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Grades view: summary grid, GPA matrix and per-term rows.
+ */
+
+.grade-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.grade-major-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--accent-deep);
+  font-size: 0.64rem;
+  font-weight: 650;
+  vertical-align: middle;
+}
+
+.grade-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line-strong);
+  background: var(--line-strong);
+}
+
+.grade-summary-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  background: var(--paper);
+}
+
+.grade-summary-card span,
+.grade-term-heading span {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.grade-summary-card strong {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  letter-spacing: -0.05em;
+}
+
+.grade-term-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.grade-gpa-matrix {
+  border-top: 1px solid var(--line-strong);
+}
+
+.grade-gpa-matrix-heading,
+.grade-gpa-matrix-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) repeat(2, minmax(90px, 0.5fr));
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.grade-gpa-matrix-heading {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.grade-gpa-matrix-heading span {
+  grid-column: 2 / -1;
+  text-align: right;
+}
+
+.grade-gpa-matrix-row strong {
+  text-align: right;
+}
+
+/* GPA 口径矩阵：百分制是最后一行，删除其下的浅色分隔线（软编码，按结构定位）。 */
+.grade-gpa-matrix-row:last-child {
+  border-bottom: 0;
+}
+
+/* 每个学期的最后一门课不重复画浅色分隔线（软编码，按列表末项定位）。 */
+.grade-terms .data-row:last-child {
+  border-bottom: 0;
+}
+
+/* 最末学期的最后一门课下方补上深色分隔线（与每个学期开始前的线一致，保留原间距）。 */
+.grade-terms .panel-card:last-child .data-row:last-child {
+  border-bottom: 1px solid var(--line-strong);
+}

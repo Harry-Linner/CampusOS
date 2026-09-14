@@ -1,0 +1,556 @@
+import type { CampusDownloadPreferences, CampusDownloadRequest, CampusDownloadVerification, CampusWorkspaceSnapshot } from "./campus";
+import type { AppNavigationRequest } from "./appNavigationBridge";
+import type { BriefBridge } from "./brief";
+import type { CampusFeedBridge } from "./campusFeed";
+import type { AcademicCalendarBridge } from "./academicCalendar";
+import type { DesktopPetControlBridge } from "./desktopPet";
+import type {
+  AiAssistantConnectionTestInput,
+  AiAssistantConnectionTestResult,
+  AiAssistantModelDiscoveryInput,
+  AiAssistantModelDiscoveryResult,
+  AiAssistantParseInput,
+  AiAssistantParseResult,
+  AiAssistantSettingsInput,
+  AiAssistantSettingsRecord,
+  CalendarExportInput,
+  CalendarExportResult,
+  CalendarEventPersonalization,
+  UnifiedCalendarData,
+  LocalTaskInput,
+  LocalTaskMutation,
+  LocalTaskPeriod,
+  LocalTasksData,
+  PluginCapabilityClient
+} from "./pluginCapabilities";
+
+export * from "./campus";
+export * from "./academicSemester";
+export * from "./brief";
+export * from "./campusFeed";
+export * from "./academicCalendar";
+export * from "./pluginCapabilities";
+export * from "./assistantDraft";
+export * from "./appNavigationBridge";
+export * from "./feedbackBridge";
+export * from "./desktopPet";
+export * from "./retryClassification";
+export * from "./localTaskReminder";
+
+export type CampusPermission =
+  | `network:${string}`
+  | `auth:service:${string}`
+  | `storage:domain:${string}`
+  | "data:account:academic-profile"
+  | "storage:local"
+  | "notification"
+  | "credential";
+
+export type PluginCapability = `${string}@${number}`;
+
+export type PluginCapabilityBinding = string | readonly string[];
+
+export const collectionCapabilities = [
+  "academic.profile@1",
+  "academic.course-catalog@1",
+  "academic.timetable@1",
+  "academic.exams@1",
+  "academic.grades@1",
+  "practice.records@1",
+  "calendar.events@1"
+] as const satisfies readonly PluginCapability[];
+
+export const isCollectionCapability = (
+  capability: PluginCapability
+): boolean => collectionCapabilities.includes(
+  capability as (typeof collectionCapabilities)[number]
+);
+
+export type PluginKind = "connector" | "feature";
+
+export interface PluginContributions {
+  views?: PluginActivityView[];
+  syncJobs?: string[];
+  settings?: string[];
+  searchProviders?: string[];
+  commands?: string[];
+}
+
+export interface PluginManifestV2 {
+  id: string;
+  name: string;
+  displayName: string;
+  version: string;
+  apiVersion: 2;
+  kind: PluginKind;
+  description: string;
+  icon: string;
+  permissions: CampusPermission[];
+  sourceScope: string[];
+  releaseStage: "ready" | "placeholder";
+  provides: PluginCapability[];
+  requires: PluginCapability[];
+  optionalRequires: PluginCapability[];
+  contentHash?: string;
+  developerSignature?: string;
+  developerPublicKey?: string;
+  contributes: PluginContributions;
+}
+
+export interface PluginRegistration {
+  manifest: PluginManifestV2;
+  enabled: boolean;
+  grantedPermissions: CampusPermission[];
+}
+
+export type PluginRuntimeStatus =
+  | "active"
+  | "blocked"
+  | "disabled"
+  | "placeholder";
+
+export interface PluginRuntimeRecord {
+  id: string;
+  manifest: PluginManifestV2;
+  enabled: boolean;
+  grantedPermissions: CampusPermission[];
+  status: PluginRuntimeStatus;
+  bindings: Partial<Record<PluginCapability, PluginCapabilityBinding>>;
+  issues: string[];
+}
+
+export interface PluginRuntimeConfigurationInput {
+  pluginId: string;
+  enabled: boolean;
+  grantedPermissions: CampusPermission[];
+}
+
+export interface PluginRuntimeSnapshot {
+  apiVersion: 2;
+  generatedAt: string;
+  plugins: PluginRuntimeRecord[];
+}
+
+export type CoreActivityItemId =
+  | "dashboard"
+  | "extensions"
+  | "settings";
+
+export type ActivityItemId = string;
+
+export interface PluginActivityView {
+  id: string;
+  title: string;
+  icon: string;
+  location: "activity" | "extensions";
+  activityTarget?: ActivityItemId;
+  /** 侧栏子 Tab：把本视图归入某个一级 activityTarget 之下（需指向已有 activity view 的 activityTarget）。 */
+  parentActivityTarget?: string;
+  order?: number;
+}
+
+export interface PluginManifest {
+  id: string;
+  name: string;
+  displayName: string;
+  version: string;
+  description: string;
+  icon: string;
+  permissions: CampusPermission[];
+  sourceScope: string[];
+  status: "active" | "placeholder";
+  views: PluginActivityView[];
+}
+
+export interface PluginComponentProps {
+  snapshot: CampusWorkspaceSnapshot | null;
+  loading: boolean;
+  capabilities: PluginCapabilityClient;
+  onRefresh: () => Promise<void>;
+  navigationTarget?: AppNavigationRequest | null;
+  downloads?: {
+    enqueue: (input: CampusDownloadRequest) => Promise<void>;
+    pause: (id: string) => Promise<void>;
+    resume: (id: string) => Promise<void>;
+    cancel: (id: string) => Promise<void>;
+    clearAll: () => Promise<number>;
+    open: (id: string) => Promise<void>;
+    reveal: (id: string) => Promise<void>;
+    verify?: (id: string) => Promise<CampusDownloadVerification>;
+    clearHistory?: () => Promise<number>;
+    getPreferences?: () => Promise<CampusDownloadPreferences>;
+    savePreferences?: (input: CampusDownloadPreferences) => Promise<CampusDownloadPreferences>;
+  };
+  schedule?: {
+    loadTasks: () => Promise<LocalTasksData>;
+    loadPeriods: (input: { startAt: string; endAt: string }) => Promise<LocalTaskPeriod[]>;
+    saveTask: (input: LocalTaskInput) => Promise<LocalTasksData>;
+    mutateTask: (input: LocalTaskMutation) => Promise<LocalTasksData>;
+    loadPersonalizations?: () => Promise<Record<string, CalendarEventPersonalization>>;
+    savePersonalization?: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) => Promise<CalendarEventPersonalization>;
+    loadCalendarData?: (input: { today: string; startAt: string; endAt: string }) => Promise<UnifiedCalendarData>;
+    exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
+    subscribe: (listener: () => void) => () => void;
+  };
+  assistant?: {
+    loadSettings: () => Promise<AiAssistantSettingsRecord>;
+    saveSettings: (input: AiAssistantSettingsInput) => Promise<AiAssistantSettingsRecord>;
+    clearSettings: () => Promise<AiAssistantSettingsRecord>;
+    testConnection: (input: AiAssistantConnectionTestInput) => Promise<AiAssistantConnectionTestResult>;
+    parseMessage: (input: AiAssistantParseInput) => Promise<AiAssistantParseResult>;
+    discoverModels: (input: AiAssistantModelDiscoveryInput) => Promise<AiAssistantModelDiscoveryResult>;
+  };
+  desktopPet?: DesktopPetControlBridge;
+  brief?: BriefBridge;
+  campusFeed?: CampusFeedBridge;
+  academicCalendar?: AcademicCalendarBridge;
+  desktopCalendarHost?: {
+    start: () => Promise<{ running: boolean }>;
+    stop: () => Promise<{ running: boolean }>;
+    status: () => Promise<{ running: boolean }>;
+    refreshFeed: () => Promise<{ ok: boolean }>;
+  };
+}
+
+export interface PluginValidationResult {
+  ok: boolean;
+  issues: string[];
+}
+
+export const getSandboxedRendererActivityTarget = (
+  pluginId: string
+): string => `mod-${pluginId.replace(/[.-]/g, "-")}`;
+
+export const getSandboxedRendererExecutionIssue = (
+  manifest: PluginManifestV2
+): string | null => {
+  if (manifest.kind !== "feature") {
+    return "当前隔离执行只支持纯视图 feature 插件。";
+  }
+  if (
+    manifest.permissions.length !== 1 ||
+    manifest.permissions[0] !== "storage:local"
+  ) {
+    return "当前隔离执行只开放 storage:local，且必须显式声明。";
+  }
+  if (
+    manifest.provides.length > 0 ||
+    manifest.requires.length > 0 ||
+    manifest.optionalRequires.length > 0
+  ) {
+    return "当前隔离视图不能提供或读取 capability。";
+  }
+  if (
+    (manifest.contributes.syncJobs?.length ?? 0) > 0 ||
+    (manifest.contributes.settings?.length ?? 0) > 0 ||
+    (manifest.contributes.searchProviders?.length ?? 0) > 0 ||
+    (manifest.contributes.commands?.length ?? 0) > 0
+  ) {
+    return "当前隔离执行不支持后台作业、设置、搜索或命令贡献。";
+  }
+
+  const views = manifest.contributes.views ?? [];
+  const expectedTarget = getSandboxedRendererActivityTarget(manifest.id);
+  if (
+    views.length !== 1 ||
+    views[0]?.location !== "activity" ||
+    views[0].activityTarget !== expectedTarget
+  ) {
+    return `当前隔离执行要求唯一活动视图使用目标：${expectedTarget}`;
+  }
+  return null;
+};
+
+const isExactHttpsOrigin = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.origin === value;
+  } catch {
+    return false;
+  }
+};
+
+const isManifestV2Permission = (permission: string): boolean => {
+  if (permission === "notification") return true;
+  if (permission === "data:account:academic-profile") return true;
+  if (permission === "storage:local") return true;
+  if (/^storage:(?:domain|files):[a-z0-9.-]+$/.test(permission)) return true;
+
+  for (const prefix of ["network:", "auth:service:"] as const) {
+    if (permission.startsWith(prefix)) {
+      return isExactHttpsOrigin(permission.slice(prefix.length));
+    }
+  }
+
+  return false;
+};
+
+const isCapability = (value: unknown): value is PluginCapability =>
+  typeof value === "string" &&
+  /^[a-z][a-z0-9.-]*@[1-9][0-9]*$/.test(value);
+
+const isNonEmptyStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every((item) => typeof item === "string" && item.trim().length > 0);
+
+export const validateManifestV2 = (
+  manifest: unknown
+): PluginValidationResult => {
+  if (typeof manifest !== "object" || manifest === null) {
+    return {
+      ok: false,
+      issues: ["Manifest v2 必须是对象"]
+    };
+  }
+
+  const candidate = manifest as Record<string, unknown>;
+  const issues: string[] = [];
+
+  if (candidate.apiVersion !== 2) {
+    issues.push(`不支持的插件 API 版本：${String(candidate.apiVersion)}`);
+  }
+
+  for (const field of [
+    "id",
+    "name",
+    "displayName",
+    "version",
+    "description",
+    "icon"
+  ]) {
+    if (typeof candidate[field] !== "string" || candidate[field] === "") {
+      issues.push(`Manifest v2 缺少字段：${field}`);
+    }
+  }
+
+  if (candidate.kind !== "connector" && candidate.kind !== "feature") {
+    issues.push("Manifest v2 kind 无效");
+  }
+
+  if (
+    candidate.releaseStage !== "ready" &&
+    candidate.releaseStage !== "placeholder"
+  ) {
+    issues.push("Manifest v2 releaseStage 无效");
+  }
+
+  const signatureFields = [
+    "contentHash",
+    "developerSignature",
+    "developerPublicKey"
+  ] as const;
+  const suppliedSignatureFields = signatureFields.filter(
+    (field) => candidate[field] !== undefined
+  );
+  if (
+    suppliedSignatureFields.length > 0 &&
+    suppliedSignatureFields.length !== signatureFields.length
+  ) {
+    issues.push("Manifest v2 签名字段必须同时提供");
+  } else if (suppliedSignatureFields.length === signatureFields.length) {
+    if (
+      typeof candidate.contentHash !== "string" ||
+      !/^[a-f0-9]{64}$/.test(candidate.contentHash)
+    ) {
+      issues.push("Manifest v2 contentHash 必须是 SHA-256 十六进制摘要");
+    }
+    for (const field of ["developerSignature", "developerPublicKey"] as const) {
+      const value = candidate[field];
+      if (
+        typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > 512 ||
+        !/^[A-Za-z0-9_-]+$/.test(value)
+      ) {
+        issues.push(`Manifest v2 ${field} 必须是 base64url 编码`);
+      }
+    }
+  }
+
+  if (!Array.isArray(candidate.permissions)) {
+    issues.push("Manifest v2 permissions 必须是数组");
+  } else {
+    for (const permission of candidate.permissions) {
+      if (permission === "credential") {
+        issues.push("Manifest v2 禁止权限：credential");
+      } else if (
+        typeof permission !== "string" ||
+        !isManifestV2Permission(permission)
+      ) {
+        issues.push(`Manifest v2 权限无效：${String(permission)}`);
+      }
+    }
+  }
+
+  for (const field of ["provides", "requires", "optionalRequires"]) {
+    const capabilities = candidate[field];
+    if (!Array.isArray(capabilities)) {
+      issues.push(`Manifest v2 ${field} 必须是数组`);
+    } else if (!capabilities.every(isCapability)) {
+      issues.push(`Manifest v2 ${field} 包含无效能力`);
+    }
+  }
+
+  if (!isNonEmptyStringArray(candidate.sourceScope)) {
+    issues.push("Manifest v2 sourceScope 必须是非空字符串数组");
+  }
+
+  if (typeof candidate.contributes !== "object" || candidate.contributes === null) {
+    issues.push("Manifest v2 contributes 必须是对象");
+  } else {
+    const contributes = candidate.contributes as Record<string, unknown>;
+    if (contributes.views !== undefined && !Array.isArray(contributes.views)) {
+      issues.push("Manifest v2 contributes.views 必须是数组");
+    } else if (Array.isArray(contributes.views)) {
+      for (const view of contributes.views) {
+        if (typeof view !== "object" || view === null) {
+          issues.push("Manifest v2 view 必须是对象");
+          continue;
+        }
+
+        const candidateView = view as Record<string, unknown>;
+        for (const field of ["id", "title", "icon"]) {
+          if (
+            typeof candidateView[field] !== "string" ||
+            candidateView[field] === ""
+          ) {
+            issues.push(`Manifest v2 view 缺少字段：${field}`);
+          }
+        }
+        if (
+          candidateView.location !== "activity" &&
+          candidateView.location !== "extensions"
+        ) {
+          issues.push("Manifest v2 view location 无效");
+        }
+        if (
+          candidateView.location === "activity" &&
+          (typeof candidateView.activityTarget !== "string" ||
+            !/^[a-z][a-z0-9-]*$/.test(candidateView.activityTarget))
+        ) {
+          issues.push("Manifest v2 activity view 缺少有效 activityTarget");
+        }
+        if (
+          candidateView.parentActivityTarget !== undefined &&
+          (typeof candidateView.parentActivityTarget !== "string" ||
+            !/^[a-z][a-z0-9-]*$/.test(candidateView.parentActivityTarget))
+        ) {
+          issues.push("Manifest v2 parentActivityTarget 无效");
+        }
+        if (
+          candidateView.order !== undefined &&
+          (typeof candidateView.order !== "number" ||
+            !Number.isFinite(candidateView.order))
+        ) {
+          issues.push("Manifest v2 view order 无效");
+        }
+      }
+    }
+
+    for (const field of [
+      "syncJobs",
+      "settings",
+      "searchProviders",
+      "commands"
+    ]) {
+      if (
+        contributes[field] !== undefined &&
+        !isNonEmptyStringArray(contributes[field])
+      ) {
+        issues.push(`Manifest v2 contributes.${field} 必须是非空字符串数组`);
+      }
+    }
+  }
+
+  // parentActivityTarget 必须指向本 manifest 内某个 activity view 的 activityTarget。
+  const candidateWithViews = manifest as {
+    contributes?: {
+      views?: Array<{ activityTarget?: string; parentActivityTarget?: string }>;
+    };
+  };
+  const declaredTargets = new Set(
+    (candidateWithViews.contributes?.views ?? [])
+      .map((view) => view.activityTarget)
+      .filter((target): target is string => typeof target === "string")
+  );
+  for (const view of candidateWithViews.contributes?.views ?? []) {
+    if (
+      typeof view.parentActivityTarget === "string" &&
+      !declaredTargets.has(view.parentActivityTarget)
+    ) {
+      issues.push(
+        `Manifest v2 parentActivityTarget ${view.parentActivityTarget} 未指向任何 activityTarget`
+      );
+    }
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues
+  };
+};
+
+/** Validate the only user-installable campusmod shape. */
+export const validateUserPluginManifestV2 = (
+  manifest: unknown
+): PluginValidationResult => {
+  const base = validateManifestV2(manifest);
+  if (!base.ok) return base;
+
+  const candidate = manifest as PluginManifestV2;
+  const issues = [...base.issues];
+  const views = candidate.contributes.views ?? [];
+  if (candidate.kind !== "feature") {
+    issues.push("User campusmod must be a feature module.");
+  }
+  if (
+    views.length !== 1 ||
+    views[0]?.location !== "activity" ||
+    typeof views[0].activityTarget !== "string"
+  ) {
+    issues.push("User campusmod must contribute exactly one activity view.");
+  }
+  if (
+    (candidate.contributes.syncJobs?.length ?? 0) > 0 ||
+    (candidate.contributes.settings?.length ?? 0) > 0 ||
+    (candidate.contributes.searchProviders?.length ?? 0) > 0 ||
+    (candidate.contributes.commands?.length ?? 0) > 0
+  ) {
+    issues.push("User campusmod cannot contribute headless jobs or Core commands.");
+  }
+  const sandboxIssue = getSandboxedRendererExecutionIssue(candidate);
+  if (sandboxIssue) {
+    issues.push(`User campusmod is not executable in the renderer sandbox: ${sandboxIssue}`);
+  }
+  return { ok: issues.length === 0, issues };
+};
+
+export const validateManifest = (
+  manifest: Partial<PluginManifest>
+): PluginValidationResult => {
+  const issues: string[] = [];
+
+  if (!manifest.id) issues.push("missing id");
+  if (!manifest.name) issues.push("missing name");
+  if (!manifest.displayName) issues.push("missing displayName");
+  if (!manifest.version) issues.push("missing version");
+  if (!manifest.description) issues.push("missing description");
+  if (!manifest.icon) issues.push("missing icon");
+
+  if (!Array.isArray(manifest.permissions)) {
+    issues.push("permissions must be an array");
+  }
+
+  if (!Array.isArray(manifest.sourceScope) || manifest.sourceScope.length === 0) {
+    issues.push("sourceScope must include at least one source");
+  }
+
+  if (!Array.isArray(manifest.views)) {
+    issues.push("views must be an array");
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues
+  };
+};

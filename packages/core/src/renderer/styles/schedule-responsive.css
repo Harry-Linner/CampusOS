@@ -1,0 +1,54 @@
+/*
+ * schedule-responsive styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Schedule media queries for the 980px and 620px layouts.
+ */
+
+@media (max-width: 980px) {
+  .schedule-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-calendar-section {
+    padding-right: 0;
+  }
+
+  .schedule-sidebar {
+    border-top: 1px solid var(--line-strong);
+    border-left: 0;
+    padding: 22px 0 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .schedule-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .schedule-actions {
+    width: 100%;
+  }
+
+  .schedule-actions .text-button {
+    flex: 1;
+  }
+
+  .schedule-calendar-toolbar {
+    min-width: 700px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .schedule-display-row {
+    min-width: 700px;
+  }
+}

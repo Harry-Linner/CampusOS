@@ -1,0 +1,369 @@
+/* @vitest-environment jsdom */
+
+import { createElement } from "react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CampusWorkspaceSnapshot, PluginCapabilityClient } from "@campusos/shared";
+import { Component as MaterialsView } from "@campusos/plugin-materials";
+
+afterEach(cleanup);
+
+const snapshot: CampusWorkspaceSnapshot = {
+  generatedAt: "2026-07-28T04:00:00.000Z",
+  term: {
+    label: "2025-2026 春夏学期",
+    phase: "active",
+    currentWeek: 1,
+    progressPercent: 10
+  },
+  sourceStates: [],
+  courses: [],
+  todayCourses: [],
+  deadlines: [],
+  materials: [
+    {
+      id: "material-a",
+      title: "资料 A.pdf",
+      courseName: "课程 A",
+      semester: "2025-2026春夏",
+      sourceId: "learning-platform",
+      updatedAt: "2026-07-20T08:00:00.000Z",
+      sizeBytes: 1024,
+      downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/100/blob",
+      downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/10/blob"
+    },
+    {
+      id: "material-b",
+      title: "资料 B.pdf",
+      courseName: "课程 B",
+      semester: "2025-2026春",
+      sourceId: "learning-platform",
+      updatedAt: "2026-07-21T08:00:00.000Z",
+      sizeBytes: 2048,
+      downloadUrl: "https://courses.zju.edu.cn/api/uploads/reference/200/blob",
+      downloadFallbackUrl: "https://courses.zju.edu.cn/api/uploads/20/blob"
+    }
+  ],
+  downloads: [
+    {
+      id: "ready-download",
+      title: "已下载资料",
+      courseName: "测试课程",
+      sourceId: "learning-platform",
+      progress: 100,
+      status: "ready",
+      targetPath: "downloads/ready-file"
+    },
+    {
+      id: "failed-download",
+      title: "失败资料",
+      courseName: "测试课程",
+      sourceId: "learning-platform",
+      progress: 0,
+      status: "failed",
+      targetPath: "downloads/failed-file",
+      failureMessage: "下载失败：HTTP 503"
+    },
+    {
+      id: "paused-download",
+      title: "暂停资料",
+      courseName: "测试课程",
+      sourceId: "learning-platform",
+      progress: 40,
+      status: "paused",
+      targetPath: "downloads/paused-file"
+    }
+  ],
+  reminders: [],
+  summary: {
+    readySources: 0,
+    totalSources: 0,
+    downloadsInFlight: 2,
+    materialsReady: 2,
+    remindersQueued: 0,
+    deadlinesDueSoon: 0
+  }
+};
+
+describe("MaterialsView", () => {
+  it("allows retrying a failed initial read and renders the recovered workspace", async () => {
+    const onRefresh = vi.fn().mockRejectedValueOnce(new Error("读取失败，请检查连接。"));
+    const props = { capabilities: {} as PluginCapabilityClient, loading: false, onRefresh, snapshot: null };
+    const view = render(createElement(MaterialsView, props));
+    fireEvent.click(screen.getByRole("button", { name: "重试读取" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("读取失败"));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    onRefresh.mockResolvedValueOnce(undefined);
+    fireEvent.click(screen.getByRole("button", { name: "重试读取" }));
+    await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(2));
+    view.rerender(createElement(MaterialsView, { ...props, snapshot }));
+    expect(screen.getByRole("button", { name: "课程资料" })).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps the summer short term separate from spring-summer materials", () => {
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      loading: false,
+      onRefresh: vi.fn(async () => undefined),
+      snapshot: {
+        ...snapshot,
+        materials: [
+          ...snapshot.materials,
+          {
+            ...snapshot.materials[0],
+            id: "material-short",
+            courseName: "短学期课程",
+            semester: "2025-2026短"
+          }
+        ]
+      }
+    }));
+
+    expect(screen.getByRole("option", { name: "2025-2026 短学期" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "2025-2026 春夏学期" })).toBeTruthy();
+    expect(screen.queryByText(/含小学期/)).toBeNull();
+  });
+
+  it("browses the target semester by course and enqueues selected files", async () => {
+    const enqueue = vi.fn(async () => undefined);
+    const onRefresh = vi.fn(async () => undefined);
+
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue,
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
+      },
+      loading: false,
+      onRefresh,
+      snapshot
+    }));
+
+    expect(screen.getByRole("button", { name: /课程 A/ })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /课程 B/ }));
+    expect(screen.getByText("资料 B.pdf")).toBeDefined();
+    expect(screen.queryByText("资料 A.pdf")).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择资料 B.pdf" }));
+    fireEvent.click(screen.getByRole("button", { name: /^下载选中/ }));
+
+    await waitFor(() => {
+      expect(enqueue).toHaveBeenCalledTimes(1);
+      expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+        title: "资料 B.pdf",
+        courseName: "课程 B"
+      }));
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("shows a failed reason and retries through the download bridge", async () => {
+    const resume = vi.fn(async () => undefined);
+    const onRefresh = vi.fn(async () => undefined);
+    const capabilities = {
+      read: vi.fn(async () => [])
+    } as PluginCapabilityClient;
+
+    render(createElement(MaterialsView, {
+      capabilities,
+      downloads: {
+        enqueue: vi.fn(async () => undefined),
+        pause: vi.fn(async () => undefined),
+        resume,
+        cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
+      },
+      loading: false,
+      onRefresh,
+      snapshot
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    expect(screen.getByRole("alert").textContent).toBe("下载失败：HTTP 503");
+    expect(screen.getByRole("button", { name: "继续" })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+
+    await waitFor(() => {
+      expect(resume).toHaveBeenCalledWith("failed-download");
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("opens or reveals only completed downloads through the bridge", async () => {
+    const open = vi.fn(async () => undefined);
+    const reveal = vi.fn(async () => undefined);
+    const onRefresh = vi.fn(async () => undefined);
+
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue: vi.fn(async () => undefined),
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined),
+        clearAll: vi.fn(async () => 0),
+        open,
+        reveal
+      },
+      loading: false,
+      onRefresh,
+      snapshot
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    fireEvent.click(screen.getByRole("button", { name: "打开" }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith("ready-download"));
+
+    fireEvent.click(screen.getByRole("button", { name: "在文件夹中显示" }));
+    await waitFor(() => {
+      expect(reveal).toHaveBeenCalledWith("ready-download");
+      expect(onRefresh).not.toHaveBeenCalled();
+    });
+  });
+
+  it("sorts the queue by enqueue time and excludes finished records from the in-progress count", async () => {
+    const clearAll = vi.fn(async () => 3);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue: vi.fn(async () => undefined),
+        pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined),
+        clearAll,
+        open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined)
+      },
+      loading: false,
+      onRefresh: vi.fn(async () => undefined),
+      snapshot: {
+        ...snapshot,
+        downloads: [
+          { ...snapshot.downloads[0], title: "旧记录", createdAt: "2026-07-28T00:00:00.000Z" },
+          { ...snapshot.downloads[1], title: "新记录", createdAt: "2026-07-29T00:00:00.000Z" },
+          { ...snapshot.downloads[2], title: "进行中", status: "syncing", createdAt: "2026-07-28T12:00:00.000Z" }
+        ]
+      }
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    const queue = screen.getByRole("region", { name: "下载队列" });
+    expect(within(queue).getByText("1 个进行中")).toBeTruthy();
+    const rows = within(queue).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("新记录"),
+      expect.stringContaining("进行中"),
+      expect.stringContaining("旧记录")
+    ]);
+    fireEvent.click(within(queue).getByRole("button", { name: "清空记录" }));
+    await waitFor(() => expect(clearAll).toHaveBeenCalledTimes(1));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("取消正在进行的下载"));
+    await waitFor(() => {
+      expect(screen.getByText("已清空 3 条下载任务。")).toBeTruthy();
+    });
+  });
+
+  it("reports local verification, clears terminal history, and saves the sound preference", async () => {
+    const verify = vi.fn(async () => ({ status: "verified" as const, actualBytes: 10, expectedBytes: 10 }));
+    const clearHistory = vi.fn(async () => 2);
+    const savePreferences = vi.fn(async (input: { completionSound: boolean }) => input);
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue: vi.fn(async () => undefined), pause: vi.fn(async () => undefined),
+        resume: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined),
+        open: vi.fn(async () => undefined), reveal: vi.fn(async () => undefined), verify,
+        clearHistory, getPreferences: vi.fn(async () => ({ completionSound: true })), savePreferences,
+        clearAll: vi.fn(async () => 0)
+      },
+      loading: false, onRefresh: vi.fn(async () => undefined), snapshot
+    }));
+    fireEvent.click(screen.getByRole("button", { name: /^下载队列/ }));
+    fireEvent.click(screen.getByRole("button", { name: "校验本地文件" }));
+    expect(await screen.findByText(/本地文件校验通过/)).toBeDefined();
+    fireEvent.click(screen.getByRole("checkbox", { name: "完成时播放提示音" }));
+    await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ completionSound: false }));
+    fireEvent.click(screen.getByRole("button", { name: "清除历史" }));
+    await waitFor(() => expect(clearHistory).toHaveBeenCalled());
+  });
+
+  it("does not reuse a completed download from another semester or URL", async () => {
+    const material = snapshot.materials[0]!;
+    const enqueue = vi.fn(async () => undefined);
+    const verify = vi.fn(async () => ({
+      status: "verified" as const,
+      actualBytes: material.sizeBytes ?? null,
+      expectedBytes: material.sizeBytes ?? null
+    }));
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue, pause: vi.fn(async () => undefined), resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined), open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined), verify, clearAll: vi.fn(async () => 0)
+      },
+      loading: false, onRefresh: vi.fn(async () => undefined),
+      snapshot: {
+        ...snapshot,
+        materials: [material],
+        downloads: [
+          { id: "same-name-old-semester", title: material.title, courseName: material.courseName,
+            semester: "2024-2025秋冬", sourceUrl: material.downloadUrl, sourceId: material.sourceId,
+            progress: 100, status: "ready", targetPath: "downloads/old-semester.pdf" },
+          { id: "same-name-old-url", title: material.title, courseName: material.courseName,
+            semester: material.semester, sourceUrl: "https://courses.zju.edu.cn/api/uploads/reference/old/blob",
+            sourceId: material.sourceId, progress: 100, status: "ready", targetPath: "downloads/old-url.pdf" }
+        ]
+      }
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "下载" }));
+    await waitFor(() => expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      url: material.downloadUrl, semester: material.semester
+    })));
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "size-mismatch"] as const)("requeues a matching material when verification reports %s", async (verificationStatus) => {
+    const material = snapshot.materials[0]!;
+    const enqueue = vi.fn(async () => undefined);
+    const verify = vi.fn(async () => ({
+      status: verificationStatus,
+      actualBytes: verificationStatus === "missing" ? null : (material.sizeBytes ?? 0) + 1,
+      expectedBytes: material.sizeBytes ?? null
+    }));
+    const onRefresh = vi.fn(async () => undefined);
+    render(createElement(MaterialsView, {
+      capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
+      downloads: {
+        enqueue, pause: vi.fn(async () => undefined), resume: vi.fn(async () => undefined),
+        cancel: vi.fn(async () => undefined), open: vi.fn(async () => undefined),
+        reveal: vi.fn(async () => undefined), verify, clearAll: vi.fn(async () => 0)
+      },
+      loading: false, onRefresh,
+      snapshot: {
+        ...snapshot, materials: [material], downloads: [{
+          id: "matching-local-copy", title: material.title, courseName: material.courseName,
+          semester: material.semester, sourceUrl: material.downloadUrl, sourceId: material.sourceId,
+          progress: 100, status: "ready", targetPath: "downloads/missing-copy.pdf"
+        }]
+      }
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "校验文件" }));
+    await waitFor(() => {
+      expect(verify).toHaveBeenCalledWith("matching-local-copy");
+      expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({ url: material.downloadUrl, semester: material.semester }));
+      expect(onRefresh).toHaveBeenCalledOnce();
+    });
+    expect(await screen.findByText(/已重新加入下载队列/)).toBeDefined();
+  });
+});

@@ -1,0 +1,50 @@
+/*
+ * Legacy stylesheet, now an ordered aggregator.
+ *
+ * Batch 27 introduced the aggregator and the parts below are the legacy rules split
+ * into modules, in the order they used to appear. A nested unlayered @import inherits
+ * this file's layer context, so the main window (layer(legacy) via globals.css) and
+ * the desk-calendar window (which loads this file a second time, unlayered) both keep
+ * the exact order and priority the rules had while they lived in one file; the
+ * production build proves it, because the main-window CSS asset keeps its hash.
+ *
+ * Move whole rules between parts only with scripts/peel-css-module.mjs, and add new
+ * styles to styles/<module>.css imported where they are used. The recipe and the
+ * evidence for every batch live in docs/specs/refactor-tax-program.md.
+ */
+@import "./styles/base.css";
+@import "./styles/app-shell.css";
+@import "./styles/global-search.css";
+@import "./styles/page-shell.css";
+@import "./styles/dashboard.css";
+@import "./styles/dashboard-lists.css";
+@import "./styles/calendar-controls.css";
+@import "./styles/controls.css";
+@import "./styles/extension-list.css";
+@import "./styles/package.css";
+@import "./styles/extension.css";
+@import "./styles/settings.css";
+@import "./styles/academic-program.css";
+@import "./styles/settings-fields.css";
+@import "./styles/about.css";
+@import "./styles/primary-button.css";
+@import "./styles/save-note.css";
+@import "./styles/credential-proof.css";
+@import "./styles/error-copy.css";
+@import "./styles/reminder.css";
+@import "./styles/module-page.css";
+@import "./styles/academic.css";
+@import "./styles/panel-kit.css";
+@import "./styles/grade.css";
+@import "./styles/workspace-error.css";
+@import "./styles/responsive.css";
+@import "./styles/schedule-page.css";
+@import "./styles/schedule.css";
+@import "./styles/schedule-tasks.css";
+@import "./styles/schedule-responsive.css";
+@import "./styles/notification.css";
+@import "./styles/schedule-deleted.css";
+@import "./styles/extension-updates.css";
+@import "./styles/focus-visible.css";
+@import "./styles/settings-responsive.css";
+@import "./styles/shell-responsive.css";

@@ -1,0 +1,19 @@
+{
+  "id": "org.example.simple-scraper",
+  "name": "simple-scraper",
+  "displayName": "简单 HTTP 抓取示例",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "kind": "connector",
+  "description": "演示 connector 型插件模式——通过 headless syncJob 定时抓取外部数据，发布到能力仓库。第三方 headless 插件在 QuickJS/WASM 沙箱中运行。",
+  "icon": "Extensions",
+  "permissions": ["network:https://httpbin.org", "storage:domain:demo-scraper"],
+  "sourceScope": ["capability:demo.data"],
+  "releaseStage": "ready",
+  "provides": ["demo.scraped-data@1"],
+  "requires": ["core.refresh@1", "core.provenance-store@1"],
+  "optionalRequires": [],
+  "contributes": {
+    "syncJobs": ["scrape-demo"]
+  }
+}

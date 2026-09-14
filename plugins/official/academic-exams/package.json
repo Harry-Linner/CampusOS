@@ -1,0 +1,16 @@
+{
+  "name": "@campusos/plugin-academic-exams",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./src/manifest.ts",
+    "./main": "./src/main.ts"
+  },
+  "dependencies": {
+    "@campusos/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

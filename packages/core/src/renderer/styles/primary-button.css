@@ -1,0 +1,37 @@
+/*
+ * primary-button styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Primary button states. The rule sits after the about panel in cascade order, so it belongs at this position rather than with the other buttons.
+ */
+
+.primary-button {
+  min-height: 36px;
+  border: 1px solid var(--accent-deep);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  box-shadow: 0 5px 12px rgba(49, 95, 142, 0.16);
+  color: #fff;
+  cursor: pointer;
+  padding: 0 13px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-deep);
+  box-shadow: 0 7px 16px rgba(49, 95, 142, 0.22);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

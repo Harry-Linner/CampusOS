@@ -1,0 +1,754 @@
+import { createHash } from "node:crypto";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import Database from "better-sqlite3";
+import type { BriefCachedItem } from "@campusos/shared";
+import type { NotificationRecord } from "../shared/notificationBridge";
+import { migrate } from "./databaseMigrations";
+
+// Legacy schema compatibility only. New academic GPA business logic follows
+// Celechron's first returned attempt and never reads or writes this table.
+type LegacyAcademicGpaStrategy = "best" | "first";
+
+export interface StoredWorkspaceSnapshot {
+  snapshot: unknown;
+  savedAt: string;
+}
+
+export interface StoredCapabilityRecord {
+  providerId: string;
+  accountId: string | null;
+  payload: unknown;
+}
+
+export interface StoredDownloadQueue {
+  queue: unknown;
+  savedAt: string;
+}
+
+export interface StoredLocalTasks {
+  tasks: unknown;
+  savedAt: string;
+}
+
+export interface StoredDesktopCalendarState {
+  value: unknown;
+  savedAt: string;
+}
+
+export interface StoredAcademicGpaStrategy {
+  strategy: LegacyAcademicGpaStrategy;
+  savedAt: string;
+}
+
+export interface StoredAcademicGradeNotificationBaseline {
+  fivePointGpa: number;
+  gradedCourseCount: number;
+  fused: true;
+  savedAt: string;
+}
+
+export interface StoredBriefProfile {
+  profile: unknown;
+  savedAt: string;
+}
+
+export interface StoredBriefSnapshot {
+  snapshot: unknown;
+  savedAt: string;
+}
+
+export interface DatabaseService {
+  readonly databasePath: string;
+  readonly schemaVersion: number;
+  close: () => void;
+  transaction: <T>(operation: () => T) => T;
+  saveWorkspaceSnapshot: (snapshot: unknown, savedAt: string) => void;
+  loadWorkspaceSnapshot: () => StoredWorkspaceSnapshot | null;
+  upsertCapabilityRecord: (
+    capability: string,
+    providerId: string,
+    accountId: string | null,
+    payload: unknown
+  ) => void;
+  readCapabilityRecords: (capability: string) => StoredCapabilityRecord[];
+  saveDownloadQueue: (queue: unknown, savedAt: string) => void;
+  loadDownloadQueue: () => StoredDownloadQueue | null;
+  saveLocalTasks: (tasks: unknown, savedAt: string) => void;
+  loadLocalTasks: () => StoredLocalTasks | null;
+  saveDesktopCalendarState: (key: string, value: unknown, savedAt: string) => void;
+  loadDesktopCalendarState: (key: string) => StoredDesktopCalendarState | null;
+  deleteDesktopCalendarState: (key: string) => void;
+  saveAcademicGpaStrategy: (
+    accountId: string,
+    strategy: LegacyAcademicGpaStrategy,
+    savedAt: string
+  ) => void;
+  loadAcademicGpaStrategy: (accountId: string) => StoredAcademicGpaStrategy | null;
+  saveAcademicGradeNotificationBaseline: (
+    accountId: string,
+    baseline: Omit<StoredAcademicGradeNotificationBaseline, "fused">
+  ) => void;
+  loadAcademicGradeNotificationBaseline: (
+    accountId: string
+  ) => StoredAcademicGradeNotificationBaseline | null;
+  saveBriefProfile: (profile: unknown, savedAt: string) => void;
+  loadBriefProfile: () => StoredBriefProfile | null;
+  saveBriefSnapshot: (snapshot: unknown, savedAt: string) => void;
+  loadBriefSnapshot: () => StoredBriefSnapshot | null;
+  /** Returns true when the item was newly inserted (dedupe across days). */
+  upsertBriefItem: (item: BriefCachedItem) => boolean;
+  findBriefItem: (fingerprint: string) => BriefCachedItem | null;
+  listCampusFeedSources: () => { config: unknown; savedAt: string }[];
+  saveCampusFeedSource: (id: string, config: unknown, savedAt: string) => void;
+  deleteCampusFeedSource: (id: string) => void;
+  /** Returns true when the item was newly inserted or its content changed (canonical-URL dedupe + edit detection). */
+  upsertCampusFeedItem: (item: unknown) => boolean;
+  listCampusFeedItems: (limit: number) => { item: unknown; savedAt: string }[];
+  /** Lists one source's items within a fetched-at time window, newest first, capped per source. */
+  listCampusFeedItemsBySource: (sourceId: string, sinceIso: string, limit: number) => { item: unknown; savedAt: string }[];
+  searchCampusFeedHistory: (terms: string[], sourceText: Record<string, string>, offset: number, limit: number) => { items: unknown[]; total: number };
+  markCampusFeedItemsRead: (ids: string[]) => void;
+  findCampusFeedItem: (id: string) => unknown | null;
+  loadCampusFeedRefreshState: (sourceId: string) => string | null;
+  saveCampusFeedRefreshState: (sourceId: string, lastSuccessAt: string) => void;
+  saveCampusFeedAiSettings: (settings: unknown, savedAt: string) => void;
+  loadCampusFeedAiSettings: () => { settings: unknown; savedAt: string } | null;
+  saveCampusFeedNotificationSettings: (settings: unknown, savedAt: string) => void;
+  loadCampusFeedNotificationSettings: () => { settings: unknown; savedAt: string } | null;
+  saveCampusFeedPreferences: (preferences: unknown, savedAt: string) => void;
+  loadCampusFeedPreferences: () => unknown | null;
+  saveCampusFeedDetail: (itemId: string, detail: unknown, savedAt: string) => boolean;
+  loadCampusFeedDetail: (itemId: string) => unknown | null;
+  clearCampusFeedItemsBySource: (sourceId: string) => void;
+  loadNotifications: () => NotificationRecord[];
+  saveNotifications: (records: readonly NotificationRecord[], markLegacyImported?: boolean) => void;
+  hasImportedLegacyNotifications: () => boolean;
+}
+
+const capabilityAccountKey = (accountId: string | null): string =>
+  accountId === null
+    ? "no-account"
+    : createHash("sha256").update(accountId, "utf8").digest("hex");
+
+export const createDatabaseService = ({
+  databasePath
+}: {
+  databasePath: string;
+}): DatabaseService => {
+  mkdirSync(dirname(databasePath), { recursive: true });
+  const database = new Database(databasePath);
+  migrate(database);
+
+  return {
+    databasePath,
+    get schemaVersion(): number {
+      const row = database
+        .prepare("SELECT MAX(version) AS version FROM schema_migrations")
+        .get() as { version: number | null };
+      return row.version ?? 0;
+    },
+    close: () => database.close(),
+    transaction: (operation) => database.transaction(operation)(),
+    loadNotifications: () => (database.prepare("SELECT record_json FROM notifications").all() as { record_json: string }[])
+      .map((row) => JSON.parse(row.record_json) as NotificationRecord),
+    hasImportedLegacyNotifications: () => (database.prepare("SELECT legacy_imported FROM notification_storage_meta WHERE singleton = 1").get() as { legacy_imported: number }).legacy_imported === 1,
+    saveNotifications: (records, markLegacyImported = false) => {
+      // The bounded notification set and its migration marker commit together.
+      database.transaction(() => {
+        database.prepare("DELETE FROM notifications").run();
+        const insert = database.prepare("INSERT INTO notifications (id, record_json) VALUES (?, ?)");
+        for (const record of records) insert.run(record.id, JSON.stringify(record));
+        if (markLegacyImported) database.prepare("UPDATE notification_storage_meta SET legacy_imported = 1 WHERE singleton = 1").run();
+      })();
+    },
+    saveCampusFeedPreferences: (preferences, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) throw new Error("偏好保存时间无效。");
+      database.prepare(`INSERT INTO campus_feed_preferences VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET preferences_json=excluded.preferences_json, saved_at=excluded.saved_at`)
+        .run(JSON.stringify(preferences), savedAt);
+    },
+    loadCampusFeedPreferences: () => {
+      const row = database.prepare("SELECT preferences_json FROM campus_feed_preferences WHERE singleton=1").get() as { preferences_json: string } | undefined;
+      return row ? JSON.parse(row.preferences_json) as unknown : null;
+    },
+    saveCampusFeedDetail: (itemId, detail, savedAt) => {
+      if (!itemId || !Number.isFinite(Date.parse(savedAt))) throw new Error("正文缓存参数无效。");
+      return database.transaction(() => {
+        const previous = database.prepare("SELECT detail_json FROM campus_feed_details WHERE item_id=?").get(itemId) as { detail_json: string } | undefined;
+        let changed = false;
+        if (previous) {
+          try {
+            const oldHash = (JSON.parse(previous.detail_json) as { contentHash?: unknown }).contentHash;
+            const newHash = (detail as { contentHash?: unknown })?.contentHash;
+            changed = typeof oldHash === "string" && typeof newHash === "string" && oldHash !== newHash;
+          } catch { changed = true; }
+        }
+        database.prepare(`INSERT INTO campus_feed_details VALUES (?, ?, ?)
+          ON CONFLICT(item_id) DO UPDATE SET detail_json=excluded.detail_json, saved_at=excluded.saved_at`)
+          .run(itemId, JSON.stringify(detail), savedAt);
+        if (changed) database.prepare("UPDATE campus_feed_items SET state='new' WHERE id=?").run(itemId);
+        return changed;
+      })();
+    },
+    loadCampusFeedDetail: (itemId) => {
+      const row = database.prepare("SELECT detail_json FROM campus_feed_details WHERE item_id=?").get(itemId) as { detail_json: string } | undefined;
+      return row ? JSON.parse(row.detail_json) as unknown : null;
+    },
+    clearCampusFeedItemsBySource: (sourceId) => {
+      if (!sourceId) throw new Error("校园资讯源 ID 无效。");
+      database.transaction(() => {
+        database.prepare("DELETE FROM campus_feed_details WHERE item_id IN (SELECT id FROM campus_feed_items WHERE source_id = ?)").run(sourceId);
+        database.prepare("DELETE FROM campus_feed_items WHERE source_id = ?").run(sourceId);
+        database.prepare("DELETE FROM campus_feed_refresh_state WHERE source_id = ?").run(sourceId);
+      })();
+    },
+    saveWorkspaceSnapshot: (snapshot, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("工作区快照保存时间无效。");
+      }
+      database
+        .prepare(`
+          INSERT INTO workspace_snapshots (singleton, snapshot_json, saved_at)
+          VALUES (1, ?, ?)
+          ON CONFLICT(singleton) DO UPDATE SET
+            snapshot_json = excluded.snapshot_json,
+            saved_at = excluded.saved_at
+        `)
+        .run(JSON.stringify(snapshot), savedAt);
+    },
+    loadWorkspaceSnapshot: () => {
+      const row = database
+        .prepare(
+          "SELECT snapshot_json, saved_at FROM workspace_snapshots WHERE singleton = 1"
+        )
+        .get() as { snapshot_json: string; saved_at: string } | undefined;
+      if (!row) return null;
+      return {
+        snapshot: JSON.parse(row.snapshot_json) as unknown,
+        savedAt: row.saved_at
+      };
+    },
+    upsertCapabilityRecord: (capability, providerId, accountId, payload) => {
+      if (!capability || !providerId) {
+        throw new Error("Capability 和 provider 不能为空。");
+      }
+      database
+        .prepare(`
+          INSERT INTO capability_records (
+            capability, provider_id, account_key, account_id, payload_json
+          ) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(capability, provider_id, account_key) DO UPDATE SET
+            account_id = excluded.account_id,
+            payload_json = excluded.payload_json
+        `)
+        .run(
+          capability,
+          providerId,
+          capabilityAccountKey(accountId),
+          accountId,
+          JSON.stringify(payload)
+        );
+    },
+    readCapabilityRecords: (capability) =>
+      (database
+        .prepare(`
+          SELECT provider_id, account_id, payload_json
+          FROM capability_records
+          WHERE capability = ?
+          ORDER BY provider_id ASC, account_id ASC
+        `)
+        .all(capability) as {
+        provider_id: string;
+        account_id: string | null;
+        payload_json: string;
+      }[]).map((row) => ({
+        providerId: row.provider_id,
+        accountId: row.account_id,
+        payload: JSON.parse(row.payload_json) as unknown
+      })),
+    saveDownloadQueue: (queue, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("下载队列保存时间无效。");
+      }
+      database
+        .prepare(`
+          INSERT INTO download_queues (singleton, queue_json, saved_at)
+          VALUES (1, ?, ?)
+          ON CONFLICT(singleton) DO UPDATE SET
+            queue_json = excluded.queue_json,
+            saved_at = excluded.saved_at
+        `)
+        .run(JSON.stringify(queue), savedAt);
+    },
+    loadDownloadQueue: () => {
+      const row = database
+        .prepare(
+          "SELECT queue_json, saved_at FROM download_queues WHERE singleton = 1"
+        )
+        .get() as { queue_json: string; saved_at: string } | undefined;
+      if (!row) return null;
+      return {
+        queue: JSON.parse(row.queue_json) as unknown,
+        savedAt: row.saved_at
+      };
+    },
+    saveLocalTasks: (tasks, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("任务保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO local_task_sets (singleton, tasks_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          tasks_json = excluded.tasks_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(tasks), savedAt);
+    },
+    loadLocalTasks: () => {
+      const row = database.prepare(
+        "SELECT tasks_json, saved_at FROM local_task_sets WHERE singleton = 1"
+      ).get() as { tasks_json: string; saved_at: string } | undefined;
+      return row ? { tasks: JSON.parse(row.tasks_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    saveDesktopCalendarState: (key, value, savedAt) => {
+      if (!key.trim()) throw new Error("桌历状态键不能为空。");
+      if (!Number.isFinite(Date.parse(savedAt))) throw new Error("桌历状态保存时间无效。");
+      database.prepare(`
+        INSERT INTO desktop_calendar_state (state_key, value_json, saved_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(state_key) DO UPDATE SET
+          value_json = excluded.value_json,
+          saved_at = excluded.saved_at
+      `).run(key, JSON.stringify(value), savedAt);
+    },
+    loadDesktopCalendarState: (key) => {
+      const row = database.prepare(`
+        SELECT value_json, saved_at FROM desktop_calendar_state WHERE state_key = ?
+      `).get(key) as { value_json: string; saved_at: string } | undefined;
+      return row ? { value: JSON.parse(row.value_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    deleteDesktopCalendarState: (key) => {
+      database.prepare("DELETE FROM desktop_calendar_state WHERE state_key = ?").run(key);
+    },
+    saveAcademicGpaStrategy: (accountId, strategy, savedAt) => {
+      if (!accountId.trim()) throw new Error("GPA 策略账户不能为空。");
+      if (strategy !== "best" && strategy !== "first") {
+        throw new Error("GPA 策略必须是 best 或 first。");
+      }
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("GPA 策略保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO academic_gpa_strategies (
+          account_key, account_id, strategy, saved_at
+        ) VALUES (?, ?, ?, ?)
+        ON CONFLICT(account_key) DO UPDATE SET
+          account_id = excluded.account_id,
+          strategy = excluded.strategy,
+          saved_at = excluded.saved_at
+      `).run(capabilityAccountKey(accountId), accountId, strategy, savedAt);
+    },
+    loadAcademicGpaStrategy: (accountId) => {
+      if (!accountId.trim()) return null;
+      const row = database.prepare(`
+        SELECT strategy, saved_at
+        FROM academic_gpa_strategies
+        WHERE account_key = ? AND account_id = ?
+      `).get(capabilityAccountKey(accountId), accountId) as {
+        strategy: string;
+        saved_at: string;
+      } | undefined;
+      if (!row || (row.strategy !== "best" && row.strategy !== "first")) {
+        return null;
+      }
+      return { strategy: row.strategy, savedAt: row.saved_at };
+    },
+    saveAcademicGradeNotificationBaseline: (accountId, baseline) => {
+      if (!accountId.trim()) {
+        throw new Error("Grade notification account cannot be empty.");
+      }
+      if (!Number.isFinite(baseline.fivePointGpa)) {
+        throw new Error("Grade notification GPA must be finite.");
+      }
+      if (
+        !Number.isInteger(baseline.gradedCourseCount) ||
+        baseline.gradedCourseCount < 0
+      ) {
+        throw new Error("Grade notification course count must be a non-negative integer.");
+      }
+      if (!Number.isFinite(Date.parse(baseline.savedAt))) {
+        throw new Error("Grade notification baseline time is invalid.");
+      }
+      database.prepare(`
+        INSERT INTO academic_grade_notification_baselines (
+          account_key, five_point_gpa, graded_course_count, fused, saved_at
+        ) VALUES (?, ?, ?, 1, ?)
+        ON CONFLICT(account_key) DO UPDATE SET
+          five_point_gpa = excluded.five_point_gpa,
+          graded_course_count = excluded.graded_course_count,
+          fused = excluded.fused,
+          saved_at = excluded.saved_at
+      `).run(
+        capabilityAccountKey(accountId),
+        baseline.fivePointGpa,
+        baseline.gradedCourseCount,
+        baseline.savedAt
+      );
+    },
+    loadAcademicGradeNotificationBaseline: (accountId) => {
+      if (!accountId.trim()) return null;
+      const row = database.prepare(`
+        SELECT five_point_gpa, graded_course_count, fused, saved_at
+        FROM academic_grade_notification_baselines
+        WHERE account_key = ?
+      `).get(capabilityAccountKey(accountId)) as {
+        five_point_gpa: number;
+        graded_course_count: number;
+        fused: number;
+        saved_at: string;
+      } | undefined;
+      if (!row || row.fused !== 1) return null;
+      return {
+        fivePointGpa: row.five_point_gpa,
+        gradedCourseCount: row.graded_course_count,
+        fused: true,
+        savedAt: row.saved_at
+      };
+    },
+    saveBriefProfile: (profile, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("早报画像保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO brief_profiles (singleton, profile_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          profile_json = excluded.profile_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(profile), savedAt);
+    },
+    loadBriefProfile: () => {
+      const row = database.prepare(
+        "SELECT profile_json, saved_at FROM brief_profiles WHERE singleton = 1"
+      ).get() as { profile_json: string; saved_at: string } | undefined;
+      return row ? { profile: JSON.parse(row.profile_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    saveBriefSnapshot: (snapshot, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("早报快照保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO brief_snapshots (singleton, snapshot_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          snapshot_json = excluded.snapshot_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(snapshot), savedAt);
+    },
+    loadBriefSnapshot: () => {
+      const row = database.prepare(
+        "SELECT snapshot_json, saved_at FROM brief_snapshots WHERE singleton = 1"
+      ).get() as { snapshot_json: string; saved_at: string } | undefined;
+      return row ? { snapshot: JSON.parse(row.snapshot_json) as unknown, savedAt: row.saved_at } : null;
+    },
+    upsertBriefItem: (item) => {
+      if (!item.fingerprint || !item.url || !item.title || !item.sourceId) {
+        throw new Error("早报条目缺少必要字段。");
+      }
+      if (!Number.isFinite(Date.parse(item.fetchedAt))) {
+        throw new Error("早报条目抓取时间无效。");
+      }
+      const result = database.prepare(`
+        INSERT OR IGNORE INTO brief_item_cache (
+          fingerprint, source_id, url, title, summary, published_at, fetched_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        item.fingerprint,
+        item.sourceId,
+        item.url,
+        item.title,
+        item.summary,
+        item.publishedAt,
+        item.fetchedAt
+      );
+      return result.changes === 1;
+    },
+    findBriefItem: (fingerprint) => {
+      const row = database.prepare(`
+        SELECT fingerprint, source_id, url, title, summary, published_at, fetched_at
+        FROM brief_item_cache
+        WHERE fingerprint = ?
+      `).get(fingerprint) as {
+        fingerprint: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        fetched_at: string;
+      } | undefined;
+      if (!row) return null;
+      return {
+        fingerprint: row.fingerprint,
+        sourceId: row.source_id,
+        url: row.url,
+        title: row.title,
+        summary: row.summary,
+        publishedAt: row.published_at,
+        fetchedAt: row.fetched_at
+      };
+    },
+    listCampusFeedSources: () => {
+      const rows = database.prepare(
+        "SELECT config_json, saved_at FROM campus_feed_sources ORDER BY saved_at ASC"
+      ).all() as { config_json: string; saved_at: string }[];
+      return rows.map((row) => ({
+        config: JSON.parse(row.config_json) as unknown,
+        savedAt: row.saved_at
+      }));
+    },
+    saveCampusFeedSource: (id, config, savedAt) => {
+      if (!id || !Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯订阅源保存参数无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_sources (id, config_json, saved_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          config_json = excluded.config_json,
+          saved_at = excluded.saved_at
+      `).run(id, JSON.stringify(config), savedAt);
+    },
+    deleteCampusFeedSource: (id) => {
+      database.transaction(() => {
+        database.prepare("DELETE FROM campus_feed_sources WHERE id = ?").run(id);
+        database.prepare("DELETE FROM campus_feed_items WHERE source_id = ?").run(id);
+        database.prepare("DELETE FROM campus_feed_refresh_state WHERE source_id = ?").run(id);
+      })();
+    },
+    upsertCampusFeedItem: (item) => {
+      const candidate = item as {
+        id: string;
+        sourceId: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        publishedAt: string | null;
+        contentHash: string;
+        fetchedAt: string;
+      };
+      if (!candidate.id || !candidate.sourceId || !candidate.url || !candidate.title || !candidate.contentHash) {
+        throw new Error("校园资讯条目缺少必要字段。");
+      }
+      if (!Number.isFinite(Date.parse(candidate.fetchedAt))) {
+        throw new Error("校园资讯条目抓取时间无效。");
+      }
+      const existing = database.prepare(
+        "SELECT title, summary FROM campus_feed_items WHERE id = ?"
+      ).get(candidate.id) as { title: string; summary: string | null } | undefined;
+      // User-visible edits are defined by the fields used for notification matching.
+      const isNewOrChanged = !existing || existing.title !== candidate.title || existing.summary !== candidate.summary;
+      database.prepare(`
+        INSERT INTO campus_feed_items (
+          id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')
+        ON CONFLICT(id) DO UPDATE SET
+          url = excluded.url,
+          title = excluded.title,
+          summary = excluded.summary,
+          published_at = excluded.published_at,
+          content_hash = excluded.content_hash,
+          fetched_at = excluded.fetched_at,
+          state = CASE
+            WHEN campus_feed_items.title != excluded.title OR campus_feed_items.summary IS NOT excluded.summary THEN 'new'
+            ELSE campus_feed_items.state
+          END
+      `).run(
+        candidate.id,
+        candidate.sourceId,
+        candidate.url,
+        candidate.title,
+        candidate.summary,
+        candidate.publishedAt,
+        candidate.contentHash,
+        candidate.fetchedAt
+      );
+      return isNewOrChanged;
+    },
+    listCampusFeedItems: (limit) => {
+      const rows = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        ORDER BY (published_at IS NULL), published_at DESC, fetched_at DESC, id ASC
+        LIMIT ?
+      `).all(limit) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      }[];
+      return rows.map((row) => ({
+        item: {
+          id: row.id,
+          sourceId: row.source_id,
+          url: row.url,
+          title: row.title,
+          summary: row.summary,
+          publishedAt: row.published_at,
+          contentHash: row.content_hash,
+          fetchedAt: row.fetched_at,
+          state: row.state
+        },
+        savedAt: row.fetched_at
+      }));
+    },
+    searchCampusFeedHistory: (terms, sourceText, offset, limit) => {
+      const entries = Object.entries(sourceText);
+      if (!entries.length || !terms.length) return { items: [], total: 0 };
+      const sourceValues = entries.map(() => "(?, ?)").join(",");
+      const parameters = entries.flatMap(([id, text]) => [id, text.toLowerCase()]);
+      const haystack = "lower(i.title || ' ' || coalesce(i.summary, '') || ' ' || i.url || ' ' || i.source_id || ' ' || coalesce(i.published_at, '') || ' ' || i.fetched_at || ' ' || s.search_text)";
+      const where = terms.map(() => `instr(${haystack}, ?) > 0`).join(" AND ");
+      const cte = `WITH source_text(id, search_text) AS (VALUES ${sourceValues})`;
+      const from = `FROM campus_feed_items i JOIN source_text s ON s.id = i.source_id WHERE ${where}`;
+      const args = [...parameters, ...terms];
+      const total = (database.prepare(`${cte} SELECT count(*) AS total ${from}`).get(...args) as { total: number }).total;
+      const rows = database.prepare(`${cte} SELECT i.id, i.source_id AS sourceId, i.title, i.url, i.summary, i.published_at AS publishedAt, i.fetched_at AS fetchedAt, i.content_hash AS contentHash, i.state ${from} ORDER BY (i.published_at IS NULL), i.published_at DESC, i.fetched_at DESC, i.id ASC LIMIT ? OFFSET ?`).all(...args, limit, offset);
+      return { items: rows, total };
+    },
+    listCampusFeedItemsBySource: (sourceId, sinceIso, limit) => {
+      const rows = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        WHERE source_id = ? AND fetched_at >= ?
+        ORDER BY (published_at IS NULL), published_at DESC, fetched_at DESC, id ASC
+        LIMIT ?
+      `).all(sourceId, sinceIso, limit) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      }[];
+      return rows.map((row) => ({
+        item: {
+          id: row.id,
+          sourceId: row.source_id,
+          url: row.url,
+          title: row.title,
+          summary: row.summary,
+          publishedAt: row.published_at,
+          contentHash: row.content_hash,
+          fetchedAt: row.fetched_at,
+          state: row.state
+        },
+        savedAt: row.fetched_at
+      }));
+    },
+    markCampusFeedItemsRead: (ids) => {
+      if (ids.length === 0) return;
+      const statement = database.prepare(
+        "UPDATE campus_feed_items SET state = 'read' WHERE id = ?"
+      );
+      database.transaction(() => {
+        for (const id of ids) statement.run(id);
+      })();
+    },
+    findCampusFeedItem: (id) => {
+      const row = database.prepare(`
+        SELECT id, source_id, url, title, summary, published_at, content_hash, fetched_at, state
+        FROM campus_feed_items
+        WHERE id = ?
+      `).get(id) as {
+        id: string;
+        source_id: string;
+        url: string;
+        title: string;
+        summary: string | null;
+        published_at: string | null;
+        content_hash: string;
+        fetched_at: string;
+        state: string;
+      } | undefined;
+      if (!row) return null;
+      return {
+        id: row.id,
+        sourceId: row.source_id,
+        url: row.url,
+        title: row.title,
+        summary: row.summary,
+        publishedAt: row.published_at,
+        contentHash: row.content_hash,
+        fetchedAt: row.fetched_at,
+        state: row.state
+      };
+    },
+    loadCampusFeedRefreshState: (sourceId) => {
+      const row = database.prepare(
+        "SELECT last_success_at FROM campus_feed_refresh_state WHERE source_id = ?"
+      ).get(sourceId) as { last_success_at: string } | undefined;
+      return row?.last_success_at ?? null;
+    },
+    saveCampusFeedRefreshState: (sourceId, lastSuccessAt) => {
+      if (!Number.isFinite(Date.parse(lastSuccessAt))) {
+        throw new Error("校园资讯刷新时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_refresh_state (source_id, last_success_at)
+        VALUES (?, ?)
+        ON CONFLICT(source_id) DO UPDATE SET
+          last_success_at = excluded.last_success_at
+      `).run(sourceId, lastSuccessAt);
+    },
+    saveCampusFeedAiSettings: (settings, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯 AI 设置保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_ai_settings (singleton, settings_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          settings_json = excluded.settings_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(settings), savedAt);
+    },
+    loadCampusFeedAiSettings: () => {
+      const row = database.prepare(
+        "SELECT settings_json, saved_at FROM campus_feed_ai_settings WHERE singleton = 1"
+      ).get() as { settings_json: string; saved_at: string } | undefined;
+      return row
+        ? { settings: JSON.parse(row.settings_json) as unknown, savedAt: row.saved_at }
+        : null;
+    },
+    saveCampusFeedNotificationSettings: (settings, savedAt) => {
+      if (!Number.isFinite(Date.parse(savedAt))) {
+        throw new Error("校园资讯通知设置保存时间无效。");
+      }
+      database.prepare(`
+        INSERT INTO campus_feed_notification_settings (singleton, settings_json, saved_at)
+        VALUES (1, ?, ?)
+        ON CONFLICT(singleton) DO UPDATE SET
+          settings_json = excluded.settings_json,
+          saved_at = excluded.saved_at
+      `).run(JSON.stringify(settings), savedAt);
+    },
+    loadCampusFeedNotificationSettings: () => {
+      const row = database.prepare(
+        "SELECT settings_json, saved_at FROM campus_feed_notification_settings WHERE singleton = 1"
+      ).get() as { settings_json: string; saved_at: string } | undefined;
+      return row
+        ? { settings: JSON.parse(row.settings_json) as unknown, savedAt: row.saved_at }
+        : null;
+    }
+  };
+};

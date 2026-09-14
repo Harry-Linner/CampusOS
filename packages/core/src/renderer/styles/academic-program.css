@@ -1,0 +1,88 @@
+/*
+ * academic-program styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Academic program picker: the fieldset, its option list and per-program copy. It sits between the settings and about blocks in cascade order.
+ */
+
+.academic-program-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.academic-program-fieldset legend {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.academic-program-options {
+  display: flex;
+  gap: 10px;
+}
+
+.academic-program-options label {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 12px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.academic-program-options label:hover:not(:has(input:disabled)) {
+  border-color: var(--accent);
+}
+
+.academic-program-options label.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.academic-program-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.academic-program-options span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.academic-program-options strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.academic-program-options small {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.academic-program-fieldset:disabled label {
+  cursor: wait;
+  opacity: 0.62;
+}

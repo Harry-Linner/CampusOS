@@ -1,0 +1,39 @@
+/*
+ * view subtab rules.
+ *
+ * Peeled out of styles.css in batch 24 of the ADR-0006 program. globals.css
+ * imports this inside the same `legacy` cascade layer, directly after
+ * styles.css. The blocks own their selectors, so their cascade position does not
+ * matter; none of them is used by the desk-calendar window.
+ */
+
+.view-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.view-subtab {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 6px 12px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.view-subtab:hover {
+  border-color: var(--line);
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.view-subtab.is-active {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--accent-deep);
+  font-weight: 600;
+}

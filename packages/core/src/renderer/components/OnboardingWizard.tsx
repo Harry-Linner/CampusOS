@@ -1,0 +1,821 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AcademicProgram } from "../../shared/credentialBridge";
+import { manifest as academicManifest } from "@campusos/plugin-academic/manifest";
+import { manifest as scheduleManifest } from "@campusos/plugin-schedule/manifest";
+import { manifest as materialsManifest } from "@campusos/plugin-materials/manifest";
+import { manifest as assistantManifest } from "@campusos/plugin-ai-assistant/manifest";
+import { useAcademicCredential } from "../hooks/useAcademicCredential";
+import { useCampusWorkspace } from "../hooks/useCampusWorkspace";
+import { usePluginHost } from "../hooks/usePluginHost";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import campusIcon from "../../../../../build/icon.svg";
+
+interface OnboardingWizardProps {
+  onComplete: () => void;
+}
+
+type OnboardingStep = "welcome" | "account" | "sync" | "plugins" | "preferences" | "done";
+
+const STEP_LABELS: { step: OnboardingStep; label: string }[] = [
+  { step: "welcome", label: "开始" },
+  { step: "account", label: "账号" },
+  { step: "sync", label: "同步" },
+  { step: "plugins", label: "扩展" },
+  { step: "preferences", label: "偏好" },
+  { step: "done", label: "完成" }
+];
+
+const STEP_ORDER: OnboardingStep[] = [
+  "welcome",
+  "account",
+  "sync",
+  "plugins",
+  "preferences",
+  "done"
+];
+
+const RECOMMENDED_PLUGIN_IDS = [
+  academicManifest.id,
+  scheduleManifest.id,
+  materialsManifest.id,
+  assistantManifest.id
+];
+
+const recommendedPluginPermissions = new Map([
+  academicManifest,
+  scheduleManifest,
+  materialsManifest,
+  assistantManifest
+].map((manifest) => [manifest.id, manifest.permissions] as const));
+
+const RECOMMENDED_PLUGIN_DETAILS: Record<
+  string,
+  { name: string; description: string }
+> = {
+  "org.campusos.academic": {
+    name: "学业",
+    description: "在一个模块内查看课表、课程、考试、成绩与实践数据。"
+  },
+  "org.campusos.schedule": {
+    name: "日程",
+    description: "统一查看课程、考试、截止事项与个人安排。"
+  },
+  "org.campusos.materials": {
+    name: "资料",
+    description: "按课程浏览资料，并使用受控下载队列保存文件。"
+  },
+  "org.campusos.ai-assistant": {
+    name: "AI 助手",
+    description: "将你主动提交的消息提取为可确认的日程候选。"
+  }
+};
+
+const ONBOARDING_STORAGE_KEY = "campusos.onboarding.completed";
+
+export const readOnboardingCompleted = (): boolean =>
+  globalThis.localStorage?.getItem(ONBOARDING_STORAGE_KEY) === "1";
+
+export const resetOnboardingCompleted = (): void => {
+  globalThis.localStorage?.removeItem(ONBOARDING_STORAGE_KEY);
+};
+
+const persistOnboardingCompleted = (): void => {
+  globalThis.localStorage?.setItem(ONBOARDING_STORAGE_KEY, "1");
+};
+
+const stepIndexOf = (step: OnboardingStep): number =>
+  Math.max(STEP_ORDER.indexOf(step), 0);
+
+const ProgressIndicator = ({
+  current
+}: {
+  current: OnboardingStep;
+}): JSX.Element => {
+  const currentIndex = stepIndexOf(current);
+
+  return (
+    <nav aria-label="引导步骤">
+      <ol className="onboarding-progress">
+      {STEP_LABELS.map(({ step, label }, index) => {
+        const state: "complete" | "current" | "future" =
+          index < currentIndex
+            ? "complete"
+            : index === currentIndex
+              ? "current"
+              : "future";
+
+        return (
+          <li key={step} className={`onboarding-step-marker is-${state}`}>
+            <span className="onboarding-step-dot" aria-hidden="true">
+              {state === "complete" ? (
+                "✓"
+              ) : (
+                index + 1
+              )}
+            </span>
+            <span className="onboarding-step-label">{label}</span>
+          </li>
+        );
+      })}
+      </ol>
+    </nav>
+  );
+};
+
+export const OnboardingWizard = ({
+  onComplete
+}: OnboardingWizardProps): JSX.Element => {
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
+  const academicCredential = useAcademicCredential();
+  const workspace = useCampusWorkspace();
+  const pluginHost = usePluginHost();
+  const initialPluginLoad = useRef(pluginHost.load);
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [program, setProgram] = useState<AcademicProgram>("undergraduate");
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const [syncStarted, setSyncStarted] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const [pluginConfiguring, setPluginConfiguring] = useState(false);
+  const [pluginConfigured, setPluginConfigured] = useState(false);
+  const [pluginErrors, setPluginErrors] = useState<string[]>([]);
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [preferenceSaving, setPreferenceSaving] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
+  const [analyticsAvailable, setAnalyticsAvailable] = useState(false);
+
+  useEffect(() => {
+    const record = academicCredential.record;
+    if (record?.verificationState !== "verified" || !record.username || !record.program) return;
+    setUsername(record.username);
+    setProgram(record.program);
+    // A newly connected account may arrive here after the profile restart.
+    // Its verified credential is already in this profile; do not ask twice.
+    setCurrentStep(step => step === "welcome" ? "sync" : step);
+  }, [academicCredential.record]);
+
+  useEffect(() => {
+    void window.campusos?.analytics?.load().then((record) => {
+      setAnalyticsConsent(record.consent);
+      setAnalyticsAvailable(record.available);
+    }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    void initialPluginLoad.current();
+  }, []);
+
+  useEffect(() => {
+    void window.campusos?.lifecycle?.load().then((record) => {
+      setLaunchAtLogin(record.launchAtLogin);
+      setNotificationEnabled(record.notificationEnabled);
+    }).catch(() => undefined);
+  }, []);
+
+  const goTo = (step: OnboardingStep): void => {
+    setCurrentStep(step);
+  };
+
+  const handleConnect = async (): Promise<void> => {
+    if (username.trim().length === 0 || password.length === 0) return;
+
+    setAuthError(null);
+    try {
+      await academicCredential.connect({
+        username: username.trim(),
+        password,
+        program
+      });
+    } catch (error) {
+      setAuthError(
+        error instanceof Error ? error.message : "统一认证连接失败，请重试。"
+      );
+    }
+  };
+
+  const handleSync = async (): Promise<void> => {
+    setSyncStarted(true);
+    setSyncError(null);
+    void window.campusos?.analytics?.track("sync_started");
+    try {
+      await workspace.sync();
+      void window.campusos?.analytics?.track("sync_finished");
+    } catch (error) {
+      setSyncError(
+        error instanceof Error ? error.message : "数据刷新失败。"
+      );
+    }
+  };
+
+  const handleConfigurePlugins = async (): Promise<void> => {
+    setPluginConfiguring(true);
+    setPluginErrors([]);
+
+    const errors: string[] = [];
+    for (const pluginId of RECOMMENDED_PLUGIN_IDS) {
+      try {
+        const plugin = pluginHost.plugins.find(
+          (candidate) => candidate.manifest.id === pluginId
+        );
+        await pluginHost.configure({
+          pluginId,
+          enabled: true,
+          grantedPermissions: [
+            ...(plugin?.manifest.permissions ??
+              recommendedPluginPermissions.get(pluginId) ?? [])
+          ]
+        });
+      } catch (error) {
+        errors.push(
+          error instanceof Error ? error.message : `${pluginId} 启用失败`
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      setPluginErrors(errors);
+    }
+    setPluginConfiguring(false);
+    setPluginConfigured(true);
+    goTo(window.campusos?.lifecycle ? "preferences" : "done");
+  };
+
+  const handleSavePreferences = async (): Promise<void> => {
+    const lifecycle = window.campusos?.lifecycle;
+    if (!lifecycle) {
+      goTo("done");
+      return;
+    }
+    setPreferenceSaving(true);
+    setPreferenceError(null);
+    try {
+      await lifecycle.save({
+        launchAtLogin,
+        notificationEnabled,
+        notificationPrompted: true
+      });
+      await window.campusos?.analytics?.setConsent(analyticsConsent);
+      await window.campusos?.analytics?.track("onboarding_completed");
+      goTo("done");
+    } catch (error) {
+      setPreferenceError(error instanceof Error ? error.message : "偏好保存失败。");
+    } finally {
+      setPreferenceSaving(false);
+    }
+  };
+
+  const handleFinish = (): void => {
+    persistOnboardingCompleted();
+    onComplete();
+  };
+
+  const authProfile =
+    academicCredential.record?.verificationState === "verified"
+      ? academicCredential.record.authenticatedProfile
+      : null;
+
+  const verified =
+    academicCredential.record?.verificationState === "verified" &&
+    academicCredential.record.username === username.trim() &&
+    academicCredential.record.program === program;
+
+  const hasSynced = syncStarted && workspace.ready && !workspace.loading;
+  const hasWorkspaceData = Boolean(
+    workspace.snapshot &&
+      (workspace.snapshot.courses.length > 0 ||
+        workspace.snapshot.deadlines.length > 0 ||
+        workspace.snapshot.materials.length > 0)
+  );
+
+  const readyPluginIds = useMemo(
+    () =>
+      pluginHost.plugins
+        .filter(
+          (plugin) =>
+            RECOMMENDED_PLUGIN_IDS.includes(plugin.manifest.id) &&
+            plugin.manifest.releaseStage === "ready" &&
+            plugin.runtime.enabled &&
+            plugin.runtime.status === "active"
+        )
+        .map((plugin) => plugin.manifest.id),
+    [pluginHost.plugins]
+  );
+
+  const formattedDate = new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    day: "numeric",
+    weekday: "long"
+  }).format(new Date());
+
+  return (
+    <div className="onboarding-shell">
+      <aside className="onboarding-aside" aria-labelledby="onboarding-brand-title">
+        <div className="onboarding-aside-brand">
+          <img src={campusIcon} width={34} height={34} alt="" />
+          <span>CampusOS</span>
+        </div>
+        <div className="onboarding-aside-copy">
+          <p className="onboarding-eyebrow">Zhejiang University</p>
+          <h1 id="onboarding-brand-title">把所有校园生活工具集成在一起</h1>
+          <p>
+            配置你需要的连接，从今天开始使用。
+          </p>
+        </div>
+        <dl className="onboarding-aside-points">
+          <div>
+            <dt>01</dt>
+            <dd>统一查看学习安排</dd>
+          </div>
+          <div>
+            <dt>02</dt>
+            <dd>在本机保存设置与凭据</dd>
+          </div>
+          <div>
+            <dt>03</dt>
+            <dd>按需启用官方扩展</dd>
+          </div>
+        </dl>
+      </aside>
+
+      <main className="onboarding-main">
+        <section className="onboarding-card" aria-label="CampusOS 首次配置">
+          <ProgressIndicator current={currentStep} />
+
+        {/* Step: Welcome */}
+        {currentStep === "welcome" ? (
+          <div className="onboarding-step-content">
+            <div className="onboarding-welcome-brand">
+              <p className="onboarding-eyebrow">首次配置</p>
+              <h2>按照你的学习节奏开始。</h2>
+            </div>
+
+            <p className="page-copy onboarding-lede">
+              将所有课程、作业、考试和课件聚合到一个桌面工作台。
+              由你掌控，为你所用。
+            </p>
+
+            <div className="settings-actions onboarding-actions">
+              <Button
+                type="button"
+                onClick={() => goTo("account")}
+              >
+                开始配置
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Step: Account */}
+        {currentStep === "account" ? (
+          <div className="onboarding-step-content">
+            <h2 className="onboarding-step-title">连接 ZJU 统一认证</h2>
+            <p className="page-copy">
+              输入你的学号和密码以拉取课表、考试和作业。
+              密码由操作系统安全加密保存，不会上传或泄露。
+            </p>
+
+            <fieldset
+              className="academic-program-fieldset"
+              disabled={academicCredential.loading}
+            >
+              <legend>培养层次</legend>
+              <div className="academic-program-options">
+                <label
+                  className={program === "undergraduate" ? "selected" : undefined}
+                >
+                  <input
+                    type="radio"
+                    name="onboarding-program"
+                    value="undergraduate"
+                    checked={program === "undergraduate"}
+                    onChange={() => setProgram("undergraduate")}
+                  />
+                  <span>
+                    <strong>本科生</strong>
+                    <small>验证本科教务与素拓业务数据</small>
+                  </span>
+                </label>
+                <label
+                  className={program === "graduate" ? "selected" : undefined}
+                >
+                  <input
+                    type="radio"
+                    name="onboarding-program"
+                    value="graduate"
+                    checked={program === "graduate"}
+                    onChange={() => setProgram("graduate")}
+                  />
+                  <span>
+                    <strong>研究生</strong>
+                    <small>验证研究生院 token 与成绩数据</small>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div className="settings-fields">
+              <div className="field-stack">
+                <Label htmlFor="onboarding-username">学号 / 统一认证账号</Label>
+                <Input
+                  id="onboarding-username"
+                  type="text"
+                  autoComplete="username"
+                  disabled={academicCredential.loading}
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="输入账号"
+                />
+              </div>
+
+              <div className="field-stack">
+                <Label htmlFor="onboarding-password">密码</Label>
+                <Input
+                  id="onboarding-password"
+                  type="password"
+                  autoComplete="current-password"
+                  disabled={academicCredential.loading}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="输入密码"
+                />
+              </div>
+            </div>
+
+            {authProfile ? (
+              <section
+                className="credential-proof"
+                aria-label="认证后业务数据回执"
+              >
+                <header className="credential-proof-heading">
+                  <div>
+                    <strong>认证成功</strong>
+                    <span>
+                      {authProfile.source === "zju-quality-development"
+                        ? "浙江大学素质拓展平台 · getMyInfo"
+                        : "浙江大学研究生院 · 成绩数据接口"}
+                    </span>
+                  </div>
+                </header>
+
+                <dl className="credential-proof-data">
+                  <div>
+                    <dt>
+                      {authProfile.source === "zju-quality-development"
+                        ? "返回学号"
+                        : "认证账号"}
+                    </dt>
+                    <dd>{authProfile.studentId}</dd>
+                  </div>
+                  {authProfile.source === "zju-quality-development" ? (
+                    <>
+                      <div>
+                        <dt>第二课堂</dt>
+                        <dd>
+                          {new Intl.NumberFormat("zh-CN", {
+                            maximumFractionDigits: 2
+                          }).format(authProfile.secondClassPoints)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>第三课堂</dt>
+                        <dd>
+                          {new Intl.NumberFormat("zh-CN", {
+                            maximumFractionDigits: 2
+                          }).format(authProfile.thirdClassPoints)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>第四课堂</dt>
+                        <dd>
+                          {new Intl.NumberFormat("zh-CN", {
+                            maximumFractionDigits: 2
+                          }).format(authProfile.fourthClassPoints)}
+                        </dd>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <dt>验证数据</dt>
+                        <dd>研究生成绩记录</dd>
+                      </div>
+                      <div>
+                        <dt>返回记录</dt>
+                        <dd>{authProfile.recordCount} 条</dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+              </section>
+            ) : null}
+
+            {authError ? (
+              <p className="error-copy" role="alert">
+                {authError}
+              </p>
+            ) : null}
+
+            <div className="settings-actions onboarding-actions">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => goTo("welcome")}
+              >
+                返回
+              </Button>
+
+              {verified ? (
+                <Button
+                  type="button"
+                  onClick={() => goTo("sync")}
+                >
+                  继续同步
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={
+                    academicCredential.loading ||
+                    username.trim().length === 0 ||
+                    password.length === 0
+                  }
+                  onClick={() => void handleConnect()}
+                >
+                  {academicCredential.loading
+                    ? academicCredential.record === null
+                      ? "读取账号…"
+                      : "连接中…"
+                    : "连接并保存"}
+                </Button>
+              )}
+            </div>
+
+            {!academicCredential.loading && verified ? (
+              <span className="save-note onboarding-save-note" role="status">
+                已验证并安全保存
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Step: Sync */}
+        {currentStep === "sync" ? (
+          <div className="onboarding-step-content">
+            <h2 className="onboarding-step-title">同步数据</h2>
+            <p className="page-copy">
+              从教务系统和学在浙大拉取课程、考试和作业。
+              首次同步可能需要几秒钟。
+            </p>
+
+            {!syncStarted ? (
+              <div className="onboarding-sync-placeholder">
+                <Button
+                  type="button"
+                  onClick={() => void handleSync()}
+                >
+                  开始同步
+                </Button>
+              </div>
+            ) : workspace.loading ? (
+              <div className="onboarding-sync-progress">
+                <div className="onboarding-sync-indicator" aria-busy="true">
+                  <span className="onboarding-sync-spinner" aria-hidden="true" />
+                  <span className="onboarding-sync-label">正在拉取数据…</span>
+                </div>
+                {workspace.snapshot ? (
+                  <div className="onboarding-sync-preview">
+                    <div className="onboarding-sync-stat">
+                      <strong>{workspace.snapshot.todayCourses.length}</strong>
+                      <span>今日课程</span>
+                    </div>
+                    <div className="onboarding-sync-stat">
+                      <strong>{workspace.snapshot.deadlines.length}</strong>
+                      <span>待办事项</span>
+                    </div>
+                    <div className="onboarding-sync-stat">
+                      <strong>
+                        {workspace.snapshot.summary.readySources}
+                      </strong>
+                      <span>已连接数据源</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : hasSynced ? (
+              <div className="onboarding-sync-result">
+                <div className="onboarding-sync-preview">
+                  <div className="onboarding-sync-stat">
+                    <strong>
+                      {workspace.snapshot?.todayCourses.length ?? 0}
+                    </strong>
+                    <span>今日课程</span>
+                  </div>
+                  <div className="onboarding-sync-stat">
+                    <strong>{workspace.snapshot?.deadlines.length ?? 0}</strong>
+                    <span>待办事项</span>
+                  </div>
+                  <div className="onboarding-sync-stat">
+                    <strong>
+                      {workspace.snapshot?.summary.readySources ?? 0}
+                    </strong>
+                    <span>已连接数据源</span>
+                  </div>
+                </div>
+                {workspace.snapshot ? (
+                  <p className="page-copy">
+                    {workspace.snapshot.term.phase === "active" &&
+                    workspace.snapshot.term.currentWeek
+                      ? `当前：${workspace.snapshot.term.label} · 第 ${workspace.snapshot.term.currentWeek} 周`
+                      : `当前：${workspace.snapshot.term.label}`}
+                  </p>
+                ) : null}
+                <p className="page-copy">看起来对吗？</p>
+              </div>
+            ) : null}
+
+            {syncError ? (
+              <p className="error-copy" role="alert">
+                {syncError}
+              </p>
+            ) : null}
+
+            <div className="settings-actions onboarding-actions">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => goTo("account")}
+              >
+                返回
+              </Button>
+              {syncStarted && !workspace.loading && !syncError ? (
+                <Button
+                  type="button"
+                  onClick={() => goTo("plugins")}
+                >
+                  确认，继续
+                </Button>
+              ) : null}
+              {syncError ? (
+                <Button
+                  type="button"
+                  onClick={() => void handleSync()}
+                >
+                  重试
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Step: Plugins */}
+        {currentStep === "plugins" ? (
+          <div className="onboarding-step-content">
+            <h2 className="onboarding-step-title">推荐扩展</h2>
+            <p className="page-copy">
+              CampusOS 通过官方扩展提供核心功能。以下扩展将自动启用，你随时可以在扩展面板中管理。
+            </p>
+
+            <ul className="onboarding-plugin-list">
+              {RECOMMENDED_PLUGIN_IDS.map((pluginId) => {
+                const details = RECOMMENDED_PLUGIN_DETAILS[pluginId];
+                const active = readyPluginIds.includes(pluginId);
+
+                return (
+                  <li key={pluginId} className="onboarding-plugin-card">
+                    <div className="onboarding-plugin-info">
+                      <strong>{details?.name ?? pluginId}</strong>
+                      <span>{details?.description ?? ""}</span>
+                    </div>
+                    <span
+                      className={
+                        active
+                          ? "onboarding-plugin-badge is-active"
+                          : "onboarding-plugin-badge"
+                      }
+                    >
+                      {active ? "已就绪" : "待启用"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {pluginErrors.length > 0 ? (
+              <div className="error-copy" role="alert">
+                {pluginErrors.map((error, index) => (
+                  <p key={index}>{error}</p>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="settings-actions onboarding-actions">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => goTo("sync")}
+              >
+                返回
+              </Button>
+              <Button
+                type="button"
+                disabled={pluginConfiguring}
+                onClick={() => void handleConfigurePlugins()}
+              >
+                {pluginConfiguring
+                  ? "启用中…"
+                  : pluginConfigured
+                    ? "已完成"
+                    : "安装选中插件"}
+              </Button>
+            </div>
+
+            <p className="page-copy onboarding-skip-note">
+              后续可在扩展面板中发现更多社区插件。
+            </p>
+          </div>
+        ) : null}
+
+        {/* Step: Preferences */}
+        {currentStep === "preferences" ? (
+          <div className="onboarding-step-content">
+            <h2 className="onboarding-step-title">后台与通知</h2>
+            <p className="page-copy">桌面日历属于 CampusOS 日程插件。开启开机自启后，CampusOS 会在登录系统时后台启动，并恢复你已启用的桌面日历和提醒。</p>
+            <div className="onboarding-preference-list">
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>登录系统时启动 CampusOS</strong><span>默认关闭，之后可在设置中修改。</span></span>
+                <input type="checkbox" checked={launchAtLogin} onChange={(event) => setLaunchAtLogin(event.target.checked)} />
+              </label>
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>允许匿名使用分析</strong><span>{analyticsAvailable ? "默认关闭，仅用于功能漏斗，不收集账号、课程、任务、文件或密钥。之后可在设置中修改。" : "分析服务未配置，当前不会发送任何数据。"}</span></span>
+                <input type="checkbox" checked={analyticsConsent} disabled={!analyticsAvailable} onChange={(event) => setAnalyticsConsent(event.target.checked)} />
+              </label>
+              <label className="onboarding-plugin-card">
+                <span className="onboarding-plugin-info"><strong>允许桌面通知</strong><span>用于课程、考试、作业和本地任务提醒；关闭不会阻塞其他功能。</span></span>
+                <input type="checkbox" checked={notificationEnabled} onChange={(event) => setNotificationEnabled(event.target.checked)} />
+              </label>
+            </div>
+            {preferenceError ? <p className="error-copy" role="alert">{preferenceError}</p> : null}
+            <div className="settings-actions onboarding-actions">
+              <Button variant="ghost" type="button" onClick={() => goTo("plugins")}>返回</Button>
+              <Button type="button" disabled={preferenceSaving} onClick={() => void handleSavePreferences()}>{preferenceSaving ? "保存中…" : "保存并继续"}</Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Step: Done */}
+        {currentStep === "done" ? (
+          <div className="onboarding-step-content">
+              <div className="onboarding-done-mark" aria-hidden="true">✓</div>
+
+            <h2 className="onboarding-step-title">一切就绪</h2>
+            <p className="page-copy">
+              今天是 {formattedDate}。
+              CampusOS 已经配置完成 — 课表、考试、作业和扩展都已接入。
+            </p>
+
+            <div className="onboarding-done-highlights">
+                <div className="onboarding-done-item">
+                  <strong>账号已连接</strong>
+                  <span>
+                    {`${program === "undergraduate" ? "本科生" : "研究生"} · 凭据由系统安全保管`}
+                  </span>
+                </div>
+                <div className="onboarding-done-item">
+                  <strong>数据已同步</strong>
+                <span>
+                  {hasWorkspaceData
+                    ? "课程与待办事项已汇入工作台"
+                    : "暂无可用课程与待办数据，请先连接真实账号"}
+                </span>
+              </div>
+                <div className="onboarding-done-item">
+                  <strong>扩展已就绪</strong>
+                <span>
+                  学业、日程、资料和 AI 助手模块可用
+                </span>
+              </div>
+            </div>
+
+            <div className="settings-actions onboarding-actions">
+              <Button
+                className="onboarding-enter-button"
+                type="button"
+                onClick={handleFinish}
+              >
+                进入 CampusOS
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        </section>
+      </main>
+    </div>
+  );
+};

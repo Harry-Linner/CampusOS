@@ -1,0 +1,39 @@
+/*
+ * extension-list styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Extensions list and registry issue notices. These rules sit here in cascade order, ahead of the package and extension blocks.
+ */
+
+.extension-list {
+  border-top: 1px solid var(--line-strong);
+}
+
+.extension-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.extension-registry-issues {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #dfb5b2;
+  border-radius: var(--radius-sm);
+  background: #f9eeee;
+  padding: 13px 15px;
+  color: #8f3432;
+  font-size: 0.78rem;
+}
+
+.extension-registry-issues p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

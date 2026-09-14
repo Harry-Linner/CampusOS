@@ -1,0 +1,78 @@
+/*
+ * schedule-tasks styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Schedule task rows, history section, task form, weekday picker and personalization fields.
+ */
+
+.schedule-task-form {
+  border-top: 1px solid var(--line-strong);
+  padding-top: 15px;
+}
+
+.schedule-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.schedule-task-form label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.schedule-task-form input,
+.schedule-task-form textarea,
+.schedule-task-form select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 6px 8px;
+}
+
+.schedule-task-form textarea {
+  min-height: 62px;
+  resize: vertical;
+}
+.schedule-weekday-picker { display: flex; flex-wrap: wrap; gap: 8px 12px; margin: 0; padding: 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); }
+.schedule-weekday-picker legend { padding: 0 4px; font-size: 0.72rem; color: var(--ink-faint); }
+.schedule-task-form .schedule-weekday-picker label { width: auto; flex-direction: row; align-items: center; gap: 4px; }
+.schedule-task-form .schedule-weekday-picker input { width: 15px; min-height: 15px; }
+.schedule-personalization-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.78rem; color: var(--ink-soft); }
+.schedule-personalization-field textarea, .schedule-personalization-field select { width: 100%; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--ink); padding: 8px; }
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.schedule-check {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 7px !important;
+}
+
+.schedule-check input {
+  width: auto;
+  min-height: auto;
+}
+
+.text-button.is-danger {
+  color: var(--danger);
+}

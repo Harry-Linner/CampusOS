@@ -1,0 +1,23 @@
+/*
+ * error-copy styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Shared inline error copy used by the dashboard, plugins and settings panels. It sits ahead of the reminder block in cascade order.
+ */
+
+.error-copy {
+  margin: 0;
+  border-left: 2px solid var(--danger);
+  background: #f9eeee;
+  color: #9c3937;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  padding: 9px 11px;
+}

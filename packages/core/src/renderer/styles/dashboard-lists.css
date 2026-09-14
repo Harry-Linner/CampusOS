@@ -1,0 +1,227 @@
+/*
+ * dashboard-lists styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Dashboard course timeline and todo lists. Course and todo rules interleave and share selectors, so they stay one part.
+ */
+
+.course-timeline,
+.todo-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todo-group + .todo-group { margin-top: 10px; }
+
+.todo-group-label {
+  margin: 0 0 6px;
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.todo-omitted-note {
+  margin: 0 0 10px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.todo-group-toggle {
+  margin: 0 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 0;
+}
+
+.todo-group-toggle:hover { color: var(--accent-deep); }
+
+.course-timeline {
+  --course-time-column: 80px;
+  --course-marker-column: 32px;
+  --course-track-gap: 8px;
+  --course-timeline-axis: calc(
+    var(--course-time-column) +
+    var(--course-track-gap) +
+    (var(--course-marker-column) / 2)
+  );
+  position: relative;
+}
+
+.course-timeline::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--course-timeline-axis);
+  width: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.course-item {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    var(--course-time-column)
+    var(--course-marker-column)
+    minmax(0, 1fr);
+  min-height: 104px;
+  gap: var(--course-track-gap);
+  padding: 17px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.course-item.is-complete {
+  color: var(--ink-faint);
+}
+
+.course-time {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.course-time strong {
+  color: inherit;
+  font-weight: 600;
+}
+
+.course-time span {
+  color: var(--accent-deep);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.timeline-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: start center;
+}
+
+.timeline-marker span {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.course-item.is-current .timeline-marker span,
+.course-item.is-next .timeline-marker span {
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-wash);
+}
+
+.course-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.course-content strong,
+.todo-content strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-item.is-complete .course-content strong {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.course-content > span,
+.todo-content > span,
+.course-content small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-content small {
+  color: var(--ink-faint);
+  font-size: 0.74rem;
+}
+
+.todo-item {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) minmax(112px, auto);
+  min-height: 78px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.priority-mark {
+  width: 3px;
+  min-height: 35px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.priority-routine {
+  background: #95a4ae;
+}
+
+.priority-important {
+  background: var(--warning);
+}
+
+.priority-urgent {
+  background: var(--danger);
+}
+
+.todo-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.todo-deadline {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.todo-deadline strong {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+}

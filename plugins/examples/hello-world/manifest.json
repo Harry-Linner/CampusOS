@@ -1,0 +1,28 @@
+{
+  "id": "org.example.hello-world",
+  "name": "hello-world",
+  "displayName": "Hello World",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "kind": "feature",
+  "description": "最小 renderer 插件示例，展示如何注册一个活动视图。",
+  "icon": "Extensions",
+  "permissions": ["storage:local"],
+  "sourceScope": ["workspace:demo"],
+  "releaseStage": "ready",
+  "provides": [],
+  "requires": [],
+  "optionalRequires": [],
+  "contributes": {
+    "views": [
+      {
+        "id": "hello-main",
+        "title": "Hello",
+        "icon": "Extensions",
+        "location": "activity",
+        "activityTarget": "mod-org-example-hello-world",
+        "order": 10
+      }
+    ]
+  }
+}

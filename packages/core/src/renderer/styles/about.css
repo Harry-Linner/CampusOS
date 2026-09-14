@@ -1,0 +1,80 @@
+/*
+ * about styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * About panel data rows and version copy, followed by the license disclosure that renders in the same panel.
+ */
+
+.about-data {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.about-data > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 12px;
+}
+
+.about-data > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.about-data dt,
+.about-data dd {
+  margin: 0;
+}
+
+.about-data dt {
+  color: var(--ink-faint);
+  font-size: 0.7rem;
+}
+
+.about-data dd {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.license-disclosure {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.license-disclosure summary {
+  width: fit-content;
+  color: var(--accent-deep);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.license-disclosure pre {
+  max-height: 260px;
+  margin: 14px 0 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-muted);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}

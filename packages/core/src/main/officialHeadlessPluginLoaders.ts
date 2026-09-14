@@ -1,0 +1,691 @@
+import { manifest as zjuUndergraduateManifest } from "@campusos/plugin-zju-undergraduate/manifest";
+import { manifest as zjuCalendarConfigManifest } from "@campusos/plugin-zju-calendar-config/manifest";
+import { manifest as zjuLearningManifest } from "@campusos/plugin-zju-learning/manifest";
+import { manifest as zjuGraduateManifest } from "@campusos/plugin-zju-graduate/manifest";
+import { manifest as academicExamsManifest } from "@campusos/plugin-academic-exams/manifest";
+import { manifest as deadlineAssistantManifest } from "@campusos/plugin-deadline-assistant/manifest";
+import { manifest as academicTimetableEventsManifest } from "@campusos/plugin-academic-timetable-events/manifest";
+import type {
+  AcademicCalendarConfigData,
+  AcademicCourseCatalogData,
+  AcademicExamsData,
+  AcademicGradesData,
+  AcademicPracticeData,
+  AcademicTimetableData,
+  CalendarEventsData,
+  CapabilityRecord,
+  LearningAssignmentsData,
+  LearningMaterialsData
+} from "@campusos/shared";
+import {
+  readAcademicCredentialRecord,
+  requestGraduateAcademicService,
+  requestUndergraduateAcademicService,
+  requestZjuEtaTimetable,
+  requestZjuQualityDevelopmentService,
+  requestZjuLearningService
+} from "./academicCredentialStore";
+import type { CapabilityRepository } from "./capabilityRepository";
+import type { HeadlessPluginLoader } from "./pluginLifecycle";
+import { pluginRefreshCoordinator } from "./refreshCoordinator";
+import {
+  requestE2eOfficialCalendar,
+  requestOfficialAcademicCalendar,
+  useE2eFixtureSources
+} from "./officialAcademicCalendarRequest";
+import {
+  createFingerprintCollector,
+  trackRefreshResultFingerprint
+} from "./requestFingerprint";
+import { ZjuUnifiedAuthError } from "./zjuAuthContracts";
+
+const readVerifiedStudentId = async (): Promise<string | null> => {
+  const record = await readAcademicCredentialRecord();
+  return record.verificationState === "verified" && record.authenticatedProfile
+    ? record.authenticatedProfile.studentId
+    : null;
+};
+
+/**
+ * Latest data-bearing record for a provider regardless of account. Used by the
+ * connectors' "not verified" path so a startup sync never clobbers the last
+ * successful content: when the account is unknown, the previous cache is still
+ * found and republished as cache instead of unavailable.
+ */
+const latestCachedRecord = <T>(
+  records: readonly CapabilityRecord<T>[],
+  providerId: string
+): T | null => {
+  const candidates = records.filter(
+    (candidate) =>
+      candidate.providerId === providerId && candidate.data !== null
+  );
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((left, right) =>
+    right.updatedAt.localeCompare(left.updatedAt)
+  )[0].data;
+};
+
+const formatUndergraduateRequestFailure = (error: unknown): string => {
+  if (error instanceof ZjuUnifiedAuthError) {
+    const status = error.statusCode === undefined ? "" : `，HTTP ${error.statusCode}`;
+    return `本科教务请求失败（${error.code}${status}）：${error.message}`;
+  }
+  return error instanceof Error ? error.message : "教务网课表请求失败。";
+};
+
+const isSharedUndergraduateFailure = (error: unknown): boolean =>
+  error instanceof ZjuUnifiedAuthError && [
+    "interactive-verification-required",
+    "network-error",
+    "protocol-error",
+    "service-unavailable",
+    "service-verification-failed",
+    "timeout"
+  ].includes(error.code);
+
+const selectAccountRecord = <T>(
+  records: CapabilityRecord<T>[],
+  providerId: string,
+  accountId: string | null
+): CapabilityRecord<T> | null =>
+  records.find(
+    (record) =>
+      accountId !== null &&
+      record.providerId === providerId &&
+      record.accountId === accountId
+  ) ??
+  records.find(
+    (record) => record.providerId === providerId && record.accountId === null
+  ) ??
+  null;
+
+export const createOfficialHeadlessPluginLoaders = ({
+  capabilityRepository
+}: {
+  capabilityRepository: CapabilityRepository;
+}): Record<string, HeadlessPluginLoader> => ({
+  [academicExamsManifest.id]: async () => {
+    // B4-2：插件 main（connector 工厂）动态加载，避免打进主进程首包。
+    const { createAcademicExamsFeature } = await import("@campusos/plugin-academic-exams/main");
+    return createAcademicExamsFeature({
+      loadExamsRecords: async (providerIds) => {
+        const records = await capabilityRepository.read<AcademicExamsData>(
+          "academic.exams@1"
+        );
+        const accountId = await readVerifiedStudentId();
+        return providerIds.flatMap((providerId) => {
+          const record = selectAccountRecord(records, providerId, accountId);
+          return record ? [record] : [];
+        });
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish<CalendarEventsData>(
+          academicExamsManifest.id,
+          academicExamsManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job, options) =>
+        pluginRefreshCoordinator.register(sourceId, job, options)
+    });
+  },
+  [academicTimetableEventsManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createAcademicTimetableEventsFeature } = await import("@campusos/plugin-academic-timetable-events/main");
+    return createAcademicTimetableEventsFeature({
+      loadTimetableRecords: async (providerIds) => {
+        const records = await capabilityRepository.read<AcademicTimetableData>(
+          "academic.timetable@1"
+        );
+        const accountId = await readVerifiedStudentId();
+        return providerIds.flatMap((providerId) => {
+          const record = selectAccountRecord(records, providerId, accountId);
+          return record ? [record] : [];
+        });
+      },
+      loadCalendarConfig: async () => {
+        const records =
+          await capabilityRepository.read<AcademicCalendarConfigData>(
+            "academic.calendar-config@1"
+          );
+        return (
+          records.find(
+            (candidate) =>
+              candidate.providerId === zjuCalendarConfigManifest.id &&
+              candidate.accountId === null &&
+              candidate.data !== null
+          ) ?? null
+        );
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish<CalendarEventsData>(
+          academicTimetableEventsManifest.id,
+          academicTimetableEventsManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job, options) =>
+        pluginRefreshCoordinator.register(sourceId, job, options)
+    });
+  },
+  [deadlineAssistantManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createDeadlineAssistant } = await import("@campusos/plugin-deadline-assistant/main");
+    return createDeadlineAssistant({
+      loadAssignmentsRecord: async () =>
+        selectAccountRecord(
+          await capabilityRepository.read<LearningAssignmentsData>(
+            "learning.assignments@1"
+          ),
+          zjuLearningManifest.id,
+          await readVerifiedStudentId()
+        ),
+      publish: async (publication) => {
+        await capabilityRepository.publish<CalendarEventsData>(
+          deadlineAssistantManifest.id,
+          deadlineAssistantManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job, options) =>
+        pluginRefreshCoordinator.register(sourceId, job, options)
+    });
+  },
+  [zjuLearningManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuLearningConnector } = await import("@campusos/plugin-zju-learning/main");
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuLearningConnector({
+      loadAcademicProfileProof: async () => {
+        const record = await readAcademicCredentialRecord();
+        if (
+          record.verificationState !== "verified" ||
+          !record.authenticatedProfile
+        ) {
+          return null;
+        }
+        return { studentId: record.authenticatedProfile.studentId };
+      },
+      fetchAssignments: async () => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "todos"
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message:
+              error instanceof Error
+                ? error.message
+                : "学在浙大作业请求失败。"
+          };
+        }
+      },
+      fetchSemesters: async () => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "semesters"
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大学期请求失败。"
+          };
+        }
+      },
+      fetchCoursesPage: async (page) => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "courses",
+            page,
+            // The local ZJU Learning Assistant reference requests active courses only;
+            // CampusOS widens this adapter boundary because Materials must expose user-requested history.
+            scope: "all"
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大课程请求失败。"
+          };
+        }
+      },
+      fetchCourseActivities: async (courseId) => {
+        try {
+          const response = await requestZjuLearningService({
+            operation: "course-activities",
+            courseId
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error
+              ? error.message
+              : "学在浙大课件请求失败。"
+          };
+        }
+      },
+      loadCachedAssignments: async (accountId) => {
+        const records =
+          await capabilityRepository.read<LearningAssignmentsData>(
+            "learning.assignments@1"
+          );
+        if (accountId === null) return latestCachedRecord(records, zjuLearningManifest.id);
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuLearningManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      loadCachedMaterials: async (accountId) => {
+        const records =
+          await capabilityRepository.read<LearningMaterialsData>(
+            "learning.materials@1"
+          );
+        if (accountId === null) return latestCachedRecord(records, zjuLearningManifest.id);
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuLearningManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish(
+          zjuLearningManifest.id,
+          zjuLearningManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job) =>
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
+  [zjuCalendarConfigManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuCalendarConfigConnector } = await import("@campusos/plugin-zju-calendar-config/main");
+    return createZjuCalendarConfigConnector({
+      fetchCalendarPage: useE2eFixtureSources()
+        ? requestE2eOfficialCalendar
+        : requestOfficialAcademicCalendar,
+      loadCachedCalendar: async () => {
+        const records =
+          await capabilityRepository.read<AcademicCalendarConfigData>(
+            "academic.calendar-config@1"
+          );
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuCalendarConfigManifest.id &&
+            candidate.accountId === null &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish(
+          zjuCalendarConfigManifest.id,
+          zjuCalendarConfigManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job) =>
+        pluginRefreshCoordinator.register(sourceId, job)
+    });
+  },
+  [zjuGraduateManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuGraduateConnector } = await import("@campusos/plugin-zju-graduate/main");
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuGraduateConnector({
+      loadAcademicProfileProof: async () => {
+        const record = await readAcademicCredentialRecord();
+        if (
+          record.verificationState !== "verified" ||
+          record.program !== "graduate" ||
+          record.verifiedService !== "graduate-academic-affairs" ||
+          !record.verifiedAt ||
+          !record.authenticatedProfile
+        ) {
+          return null;
+        }
+        return {
+          studentId: record.authenticatedProfile.studentId,
+          verifiedAt: record.verifiedAt,
+          verifiedService: record.verifiedService
+        };
+      },
+      fetchTimetableTerms: async (queries) => {
+        const results = [];
+        for (const query of queries) {
+          try {
+            const response = await requestGraduateAcademicService({
+              operation: "timetable",
+              academicYearStart: query.academicYearStart,
+              term: query.term
+            });
+            fingerprintCollector.add(response.requestFingerprint);
+            results.push({ query, ok: true as const, body: response.body });
+          } catch (error) {
+            results.push({
+              query,
+              ok: false as const,
+              message: error instanceof Error ? error.message : "研究生院课表请求失败。"
+            });
+          }
+        }
+        return results;
+      },
+      loadCachedTimetable: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicTimetableData>(
+          "academic.timetable@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
+        const record = records.find((candidate) =>
+          candidate.providerId === zjuGraduateManifest.id &&
+          candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchExams: async (queries) => {
+        const results = [];
+        for (const query of queries) {
+          try {
+            const response = await requestGraduateAcademicService({
+              operation: "exams",
+              academicYearStart: query.academicYearStart,
+              term: query.term
+            });
+            fingerprintCollector.add(response.requestFingerprint);
+            results.push({ ...query, ok: true as const, body: response.body });
+          } catch (error) {
+            results.push({
+              ...query,
+              ok: false as const,
+              message: error instanceof Error ? error.message : "研究生院考试请求失败。"
+            });
+          }
+        }
+        return results;
+      },
+      loadCachedExams: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicExamsData>(
+          "academic.exams@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
+        const record = records.find((candidate) =>
+          candidate.providerId === zjuGraduateManifest.id &&
+          candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchGrades: async () => {
+        try {
+          const response = await requestGraduateAcademicService({
+            operation: "grades"
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error ? error.message : "研究生院成绩请求失败。"
+          };
+        }
+      },
+      loadCachedGrades: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicGradesData>(
+          "academic.grades@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
+        const record = records.find((candidate) =>
+          candidate.providerId === zjuGraduateManifest.id &&
+          candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      loadCachedCourseCatalog: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicCourseCatalogData>(
+          "academic.course-catalog@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuGraduateManifest.id);
+        const record = records.find((candidate) =>
+          candidate.providerId === zjuGraduateManifest.id &&
+          candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish(
+          zjuGraduateManifest.id,
+          zjuGraduateManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job) =>
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
+  [zjuUndergraduateManifest.id]: async () => {
+    // B4-2：插件 main 动态加载，避免打进主进程首包。
+    const { createZjuUndergraduateConnector } = await import("@campusos/plugin-zju-undergraduate/main");
+    // B4-1：采集当次刷新所有请求的指纹，聚合后穿透到 RefreshSourceResult.requestFingerprint。
+    const fingerprintCollector = createFingerprintCollector();
+    return createZjuUndergraduateConnector({
+      fetchEtaTimetable: requestZjuEtaTimetable,
+      loadAcademicProfileProof: async () => {
+        const record = await readAcademicCredentialRecord();
+        if (
+          record.verificationState !== "verified" ||
+          record.program !== "undergraduate" ||
+          !record.verifiedAt ||
+          record.verifiedService !== "undergraduate-academic-affairs" ||
+          !record.authenticatedProfile
+        ) {
+          return null;
+        }
+
+        return {
+          studentId: record.authenticatedProfile.studentId,
+          verifiedAt: record.verifiedAt,
+          verifiedService: record.verifiedService
+        };
+      },
+      fetchTimetableTerms: async (queries) => {
+        const results = [];
+        let sharedFailure: string | null = null;
+        for (const query of queries) {
+          if (sharedFailure) {
+            results.push({ query, ok: false as const, message: sharedFailure });
+            continue;
+          }
+          try {
+            const response = await requestUndergraduateAcademicService({
+              operation: "timetable",
+              academicYearStart: query.academicYearStart,
+              season: query.season
+            });
+            fingerprintCollector.add(response.requestFingerprint);
+            results.push({ query, ok: true as const, body: response.body });
+          } catch (error) {
+            const message = formatUndergraduateRequestFailure(error);
+            results.push({
+              query,
+              ok: false as const,
+              message
+            });
+            if (isSharedUndergraduateFailure(error)) sharedFailure = message;
+          }
+        }
+        return results;
+      },
+      loadCachedTimetable: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicTimetableData>(
+          "academic.timetable@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchExams: async () => {
+        try {
+          const response = await requestUndergraduateAcademicService({
+            operation: "exams"
+          });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error ? error.message : "教务网考试请求失败。"
+          };
+        }
+      },
+      loadCachedExams: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicExamsData>(
+          "academic.exams@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchGrades: async () => {
+        const [transcript, major] = await Promise.allSettled([
+          requestUndergraduateAcademicService({ operation: "grades" }),
+          requestUndergraduateAcademicService({ operation: "major-grades" })
+        ]);
+        if (transcript.status === "rejected") {
+          const error = transcript.reason;
+          return {
+            ok: false as const,
+            message: error instanceof Error ? error.message : "教务网成绩请求失败。"
+          };
+        }
+        fingerprintCollector.add(transcript.value.requestFingerprint);
+        if (major.status === "fulfilled") {
+          fingerprintCollector.add(major.value.requestFingerprint);
+        }
+        return {
+          ok: true as const,
+          body: transcript.value.body,
+          ...(major.status === "fulfilled"
+            ? { majorBody: major.value.body }
+            : {
+                majorMessage:
+                  major.reason instanceof Error ? major.reason.message : "主修成绩请求失败。"
+              })
+        };
+      },
+      loadCachedGrades: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicGradesData>(
+          "academic.grades@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
+        const record = records.find(
+          (candidate) =>
+            candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId &&
+            candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      fetchPractice: async () => {
+        try {
+          const [practice, summary] = await Promise.allSettled([
+            requestZjuQualityDevelopmentService({ operation: "practice" }),
+            requestZjuQualityDevelopmentService({ operation: "summary" })
+          ]);
+          if (practice.status === "rejected" && summary.status === "rejected") {
+            throw practice.reason;
+          }
+          if (practice.status === "fulfilled") {
+            fingerprintCollector.add(practice.value.requestFingerprint);
+          }
+          if (summary.status === "fulfilled") {
+            fingerprintCollector.add(summary.value.requestFingerprint);
+          }
+          return {
+            ok: true as const,
+            ...(practice.status === "fulfilled" ? { body: practice.value.body } : {
+              detailsMessage: "Practice detail request failed."
+            }),
+            ...(summary.status === "fulfilled" ? { summaryBody: summary.value.body } : {
+              summaryMessage: "Practice summary request failed."
+            })
+          };
+        } catch (error) {
+          return {
+            ok: false as const,
+            message: error instanceof Error ? error.message : "素质拓展实践请求失败。"
+          };
+        }
+      },
+      loadCachedPractice: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicPracticeData>(
+          "practice.records@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
+        const record = records.find(
+          (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      loadCachedCourseCatalog: async (accountId) => {
+        const records = await capabilityRepository.read<AcademicCourseCatalogData>(
+          "academic.course-catalog@1"
+        );
+        if (accountId === null) return latestCachedRecord(records, zjuUndergraduateManifest.id);
+        const record = records.find(
+          (candidate) => candidate.providerId === zjuUndergraduateManifest.id &&
+            candidate.accountId === accountId && candidate.data !== null
+        );
+        return record?.data ?? null;
+      },
+      publish: async (publication) => {
+        await capabilityRepository.publish(
+          zjuUndergraduateManifest.id,
+          zjuUndergraduateManifest.provides,
+          publication
+        );
+      },
+      registerRefreshJob: (sourceId, job) =>
+        pluginRefreshCoordinator.register(
+          sourceId,
+          trackRefreshResultFingerprint(fingerprintCollector, job)
+        )
+    });
+  },
+});

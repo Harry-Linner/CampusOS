@@ -1,0 +1,77 @@
+/*
+ * dashboard styles.
+ *
+ * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
+ * styles.css program: styles.css imports the parts in rule order and a nested
+ * unlayered @import inherits the caller's layer context, so the main window
+ * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
+ * these rules were written in. Keep that property when editing this file: move whole
+ * rules between parts only through scripts/peel-css-module.mjs, which rebuilds the
+ * ordered rule lines and verifies they are unchanged before it writes anything.
+ *
+ * Dashboard layout: content sections, section headings and the download-in-progress counter.
+ */
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-top: 1px solid var(--line-strong);
+}
+
+.content-section {
+  min-width: 0;
+  padding: 22px 0 0;
+}
+
+.schedule-section {
+  padding-right: clamp(30px, 4vw, 58px);
+}
+
+.todo-section {
+  padding-left: clamp(28px, 4vw, 58px);
+  border-left: 1px solid var(--line);
+}
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-heading h2,
+.settings-section-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.section-heading span {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+/* 下载队列"进行中"计数：放大、加粗并突出，让用户一眼看到还有多少在下。 */
+.section-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.download-in-progress-count,
+.section-heading-actions .download-in-progress-count {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.section-heading-actions .download-in-progress-count:empty {
+  display: none;
+}

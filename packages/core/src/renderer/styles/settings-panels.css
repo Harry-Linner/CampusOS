@@ -1,0 +1,173 @@
+/*
+ * Settings panel styles: connector health and the diagnostic log list.
+ *
+ * Peeled out of styles.css in batch 15 of the ADR-0006 program. globals.css
+ * imports it inside the same `legacy` cascade layer, directly after
+ * styles.css. Only SettingsHealthPanel.tsx and SettingsDiagnosticPanel.tsx use
+ * these selectors, and no other rule in styles.css matches them.
+ */
+
+.diagnostic-count {
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+}
+
+.diagnostic-list {
+  display: grid;
+  max-height: 360px;
+  gap: 0;
+  margin: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.diagnostic-list li {
+  display: grid;
+  gap: 7px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.diagnostic-entry-heading,
+.diagnostic-entry-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.diagnostic-entry-heading strong {
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.diagnostic-entry-heading span {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.diagnostic-entry-heading span[data-state="live"] {
+  color: var(--success);
+}
+
+.diagnostic-entry-heading span[data-state="unavailable"] {
+  color: var(--danger);
+}
+
+.diagnostic-entry-meta,
+.diagnostic-list p {
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+}
+
+.diagnostic-list p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.health-source-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.health-source-list li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.health-source-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.health-source-heading strong {
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.health-source-heading span {
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.health-source-heading span[data-state="live"] {
+  color: var(--success);
+}
+
+.health-source-heading span[data-state="cache"],
+.health-source-heading span[data-state="fallback"] {
+  color: var(--warning);
+}
+
+.health-source-heading span[data-state="unavailable"] {
+  color: var(--danger);
+}
+
+.health-dot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+
+.health-dot[data-state="live"] {
+  background: var(--success);
+}
+
+.health-dot[data-state="cache"],
+.health-dot[data-state="fallback"] {
+  background: var(--warning);
+}
+
+.health-dot[data-state="unavailable"] {
+  background: var(--danger);
+}
+
+.health-dot-empty {
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+}
+
+.health-source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+}
+
+.health-upstream {
+  color: var(--warning);
+}
+
+.health-last-message {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+.health-source-actions {
+  display: flex;
+  gap: 8px;
+}

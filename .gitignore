@@ -1,0 +1,28 @@
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+out/
+coverage/
+.tmp/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+*.env
+!.env.example
+.agents/
+.claude/
+
+# 内部文档与维护者专用脚本（人类活动记录、私有台账、真账号验收/重构工具）
+# 这些内容不进公开仓库，但保留在本地工作区供维护者与协作 agent 使用。
+docs-internal/
+scripts-internal/
+
+# 本地诊断与 .dsh 备份（可能含会话/路径等隐私信息，禁止入库）
+/diagnostics-*.zip
+/.dsh.before.zip
+
+# dsh-vision-toolkit 的临时截图 Artifact（视觉验收产物，不入库）
+/.dsh-vision-toolkit/
