@@ -272,7 +272,7 @@ describe("ScheduleView", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(schedule.savePersonalization).toHaveBeenCalledWith(
       "course:course-readonly",
-      { note: "Bring notes", reminderLeadMinutes: null }
+      { note: "Bring notes", reminderLeadMinutes: null, zhiyunUrl: null }
     ));
   });
 

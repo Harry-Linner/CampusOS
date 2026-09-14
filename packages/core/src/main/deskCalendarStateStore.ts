@@ -40,17 +40,31 @@ export const loadCalendarEventPersonalizations = (): CalendarEventPersonalizatio
 
 export const saveCalendarEventPersonalization = (
   eventId: string,
-  input: { note?: string; reminderLeadMinutes?: number | null }
+  input: {
+    note?: string;
+    reminderLeadMinutes?: number | null;
+    zhiyunUrl?: string | null;
+    completed?: boolean;
+    completedAt?: string | null;
+  }
 ): CalendarEventPersonalization => {
   if (!eventId.trim()) throw new Error("事件不存在。");
   const records = loadCalendarEventPersonalizations();
+  const existing = records[eventId];
   const next: CalendarEventPersonalization = {
-    note: typeof input.note === "string" ? input.note.slice(0, 4_000) : (records[eventId]?.note ?? ""),
+    note: typeof input.note === "string" ? input.note.slice(0, 4_000) : (existing?.note ?? ""),
     reminderLeadMinutes: input.reminderLeadMinutes === null
       ? null
       : Number.isFinite(input.reminderLeadMinutes)
         ? Math.max(0, Math.round(input.reminderLeadMinutes ?? 0))
-        : (records[eventId]?.reminderLeadMinutes ?? null),
+        : (existing?.reminderLeadMinutes ?? null),
+    zhiyunUrl: input.zhiyunUrl !== undefined
+      ? (typeof input.zhiyunUrl === "string" && input.zhiyunUrl.trim() ? input.zhiyunUrl.trim().slice(0, 1_000) : null)
+      : (existing?.zhiyunUrl ?? null),
+    completed: input.completed !== undefined ? Boolean(input.completed) : (existing?.completed ?? false),
+    completedAt: input.completed !== undefined
+      ? (input.completed ? (input.completedAt ?? new Date().toISOString()) : null)
+      : (existing?.completedAt ?? null),
     updatedAt: new Date().toISOString()
   };
   saveDesktopState(DESK_CALENDAR_STATE_KEYS.personalizations, { ...records, [eventId]: next });

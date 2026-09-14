@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, Fragment, useRef } from "react";
 import { createRoot } from "react-dom/client";
+import { extractMeetingNumber, resolveZhiyunCourseUrl } from "@campusos/shared";
 import {
   addDays,
   buildMonthDays,
@@ -45,6 +46,7 @@ interface ScheduleEvent {
   note?: string;
   taskId?: string;
   status?: string;
+  zhiyunUrl?: string | null;
   origin: "local" | "upstream";
   occurrenceKey?: string;
   repeatType?: RepeatType;
@@ -73,6 +75,7 @@ interface RawItem {
   note?: string;
   location?: string;
   status?: string;
+  zhiyunUrl?: string | null;
   origin: "local" | "upstream";
   startAt: string;
   endAt: string;
@@ -116,6 +119,7 @@ interface CalData {
   weeks?: Record<string, number>;
   theme?: "light" | "dark" | "high-contrast";
   currentWeek?: number | null;
+  courseReminderLeadMinutes?: number;
 }
 
 declare global {
@@ -138,8 +142,11 @@ declare global {
         taskId?: string;
         occurrenceKey?: string;
         editScope?: "single" | "future" | "series";
-        date: string;
-        title: string;
+        date?: string;
+        title?: string;
+        completed?: boolean;
+        completedAt?: string | null;
+        zhiyunUrl?: string | null;
         repeatType?: RepeatType;
         repeatPeriod?: number;
         repeatEndsOn?: string;
@@ -166,8 +173,8 @@ declare global {
 
 const formatEventMeta = (event: ScheduleEvent): string =>
   event.kind === "deadline" ? `截止 ${formatDateTime(event.endAt)}` : formatTimeRange(event.startAt, event.endAt);
-const eventClassName = (event: ScheduleEvent): string =>
-  `schedule-event schedule-event-${event.kind}${event.status === "completed" ? " is-complete" : ""}`;
+const eventClassName = (event: ScheduleEvent, isImminent = false): string =>
+  `schedule-event schedule-event-${event.kind}${event.status === "completed" ? " is-complete" : ""}${isImminent ? " is-imminent" : ""}`;
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: "norepeat", label: "不重复" },
@@ -320,6 +327,7 @@ export default function DeskCalendar(): JSX.Element {
         return {
           id: item.id, title: item.title, kind, startAt: item.startAt, endAt: item.endAt,
           taskId: item.taskId, location: item.location, note: item.note, status: item.status,
+          zhiyunUrl: item.zhiyunUrl,
           origin: item.origin, occurrenceKey: item.occurrenceKey, repeatType: item.repeatType,
           repeatPeriod: item.repeatPeriod, repeatEndsOn: item.repeatEndsOn,
           repeatEndMode: item.repeatEndMode, repeatCount: item.repeatCount,
@@ -353,6 +361,15 @@ export default function DeskCalendar(): JSX.Element {
     return () => { unsub?.(); };
   }, [eventRange, loadData]);
   const eventsByDay = useMemo(() => groupEventsByDay(events, eventRange), [events, eventRange]);
+  const leadMinutes = data.courseReminderLeadMinutes ?? 20;
+  const isEventImminent = useCallback((event: ScheduleEvent): boolean => {
+    if (event.kind !== "course") return false;
+    const now = Date.now();
+    const start = Date.parse(event.startAt);
+    const end = Date.parse(event.endAt);
+    if (!Number.isFinite(start)) return false;
+    return now >= start - leadMinutes * 60 * 1000 && now <= (Number.isFinite(end) ? end : start + 60 * 60 * 1000);
+  }, [leadMinutes]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(selDate), i)), [selDate]);
   const holidayMap = useMemo(() => {
     const m = new Map<string, { label: string; holiday: boolean }>();
@@ -587,7 +604,7 @@ export default function DeskCalendar(): JSX.Element {
                           })()}
                           <div className="dk-month-cell-list">
                             {items.map((event) => (
-                              <button key={event.id} className={eventClassName(event)} type="button"
+                              <button key={event.id} className={eventClassName(event, isEventImminent(event))} type="button"
                                 onClick={(e) => { e.stopPropagation(); onEventClick(event); }}
                                 onDoubleClick={(e) => { e.stopPropagation(); onEventDoubleClick(event); }}>
                                 {event.title}
@@ -612,7 +629,7 @@ export default function DeskCalendar(): JSX.Element {
                 <header><span>{weekdayLabels[(getShanghaiWeekday(day) + 6) % 7]}</span><strong>{getShanghaiDayNumber(day)}</strong></header>
                 <div className="dk-week-col-list">
                   {(eventsByDay.get(dayKey(day)) ?? []).map((event) => (
-                    <button key={event.id} className={eventClassName(event)} type="button"
+                    <button key={event.id} className={eventClassName(event, isEventImminent(event))} type="button"
                       onClick={() => onEventClick(event)} onDoubleClick={() => onEventDoubleClick(event)}>
                       <strong>{event.title}</strong><small>{formatEventMeta(event)}</small>
                     </button>
@@ -627,7 +644,7 @@ export default function DeskCalendar(): JSX.Element {
         {viewMode === "day" ? (
           <div className="dk-day-timeline">
             {(eventsByDay.get(dayKey(selDate)) ?? []).map((event) => (
-              <button key={event.id} className={eventClassName(event)} type="button" onClick={() => onEventClick(event)} onDoubleClick={() => onEventDoubleClick(event)}>
+              <button key={event.id} className={eventClassName(event, isEventImminent(event))} type="button" onClick={() => onEventClick(event)} onDoubleClick={() => onEventDoubleClick(event)}>
                 <strong>{event.title}</strong><small>{formatEventMeta(event)}</small>
               </button>
             ))}
@@ -644,9 +661,56 @@ export default function DeskCalendar(): JSX.Element {
             {infoEvent.note ? <p className="dk-info-note">{infoEvent.note}</p> : null}
             {infoEvent.location ? <p>📍 {infoEvent.location}</p> : null}
             <p>{formatEventMeta(infoEvent)}</p>
+            {(() => {
+              const meetingNumber = extractMeetingNumber(`${infoEvent.location ?? ""} ${infoEvent.note ?? ""}`);
+              return meetingNumber ? (
+                <div className="dk-meeting-copy">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(meetingNumber);
+                    }}
+                  >
+                    复制会议号 ({meetingNumber})
+                  </button>
+                </div>
+              ) : null;
+            })()}
             <div className="dk-info-actions">
+              {infoEvent.kind === "course" ? (
+                <button
+                  type="button"
+                  className="dk-info-primary"
+                  onClick={() => {
+                    const url = resolveZhiyunCourseUrl({
+                      customUrl: infoEvent.zhiyunUrl,
+                      courseName: infoEvent.title
+                    });
+                    window.open(url, "_blank");
+                  }}
+                >
+                  打开智云课堂
+                </button>
+              ) : null}
               {infoEvent.taskId ? (
                 <button type="button" className="dk-info-primary" onClick={() => void completeTask(infoEvent)}>
+                  {infoEvent.status === "completed" ? "恢复未完成" : "标记完成"}
+                </button>
+              ) : infoEvent.origin === "upstream" && (infoEvent.kind === "deadline" || infoEvent.kind === "exam") ? (
+                <button
+                  type="button"
+                  className="dk-info-primary"
+                  onClick={() => {
+                    const nextCompleted = infoEvent.status !== "completed";
+                    void window.deskCalendar?.saveEvent({
+                      id: infoEvent.id,
+                      origin: "upstream",
+                      completed: nextCompleted
+                    }).then(() => {
+                      setInfoEvent((cur) => cur ? { ...cur, status: nextCompleted ? "completed" : undefined } : null);
+                    });
+                  }}
+                >
                   {infoEvent.status === "completed" ? "恢复未完成" : "标记完成"}
                 </button>
               ) : null}

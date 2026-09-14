@@ -431,7 +431,9 @@ describe("SettingsView", () => {
     expect(window.campusos?.reminders.saveSettings).toHaveBeenCalledWith({
       enabled: false,
       leadMinutes: [15, 120],
-      gradeChangesEnabled: true
+      gradeChangesEnabled: true,
+      courseReminderLeadMinutes: 20,
+      departurePromptText: "勾勾够出发喽"
     });
     expect(onRefresh).not.toHaveBeenCalled();
   });

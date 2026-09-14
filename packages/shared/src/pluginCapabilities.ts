@@ -619,6 +619,9 @@ export interface CalendarEventPersonalization {
   note: string;
   reminderLeadMinutes: number | null;
   updatedAt: string;
+  zhiyunUrl?: string | null;
+  completed?: boolean;
+  completedAt?: string | null;
 }
 
 export interface UnifiedCalendarData {

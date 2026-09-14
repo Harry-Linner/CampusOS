@@ -65,6 +65,11 @@
 
 .schedule-event.is-complete {
   opacity: 0.58;
+  color: var(--ink-faint);
+}
+
+.schedule-event.is-complete strong {
+  text-decoration: line-through;
 }
 
 .schedule-event.is-dragging {

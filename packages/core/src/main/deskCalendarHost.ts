@@ -26,6 +26,7 @@ import {
   saveDeskCalendarSettings,
   type DeskCalendarSettings
 } from "./deskCalendarSettings";
+import { readReminderSettingsRecord } from "./reminderSettingsStore";
 
 /** 桌面日历窗口对外暴露的数据（渲染层 CalData）。 */
 interface DeskCalendarData {
@@ -37,6 +38,7 @@ interface DeskCalendarData {
   /** 当前校历周次（用于"今天/选中时"显示） */
   currentWeek: number | null;
   theme: "light" | "dark" | "high-contrast";
+  courseReminderLeadMinutes?: number;
   /** 主界面同款事件结构：kind/location/note(教师)/status 都在 */
   items: {
     id: string;
@@ -47,27 +49,28 @@ interface DeskCalendarData {
     color?: string;
     note?: string;
     location?: string;
-      status?: string;
-      origin: "local" | "upstream";
-      startAt: string;
-      endAt: string;
-      taskId?: string;
-      occurrenceKey?: string;
-      repeatType?: string;
-      repeatPeriod?: number;
-      repeatEndsOn?: string;
-      repeatEndMode?: "never" | "date" | "count";
-      repeatCount?: number | null;
-      repeatWeekdays?: number[];
-      reminderMode?: "global" | "none" | "at-time" | "lead" | "custom";
-      reminderLeadMinutes?: number | null;
-      reminderAt?: string | null;
-      taskType?: "deadline" | "fixed";
-      timeSpentMinutes?: number;
-      timeNeededMinutes?: number;
-      breakable?: boolean;
-      blocksPlanning?: boolean;
-    }[];
+    zhiyunUrl?: string | null;
+    status?: string;
+    origin: "local" | "upstream";
+    startAt: string;
+    endAt: string;
+    taskId?: string;
+    occurrenceKey?: string;
+    repeatType?: string;
+    repeatPeriod?: number;
+    repeatEndsOn?: string;
+    repeatEndMode?: "never" | "date" | "count";
+    repeatCount?: number | null;
+    repeatWeekdays?: number[];
+    reminderMode?: "global" | "none" | "at-time" | "lead" | "custom";
+    reminderLeadMinutes?: number | null;
+    reminderAt?: string | null;
+    taskType?: "deadline" | "fixed";
+    timeSpentMinutes?: number;
+    timeNeededMinutes?: number;
+    breakable?: boolean;
+    blocksPlanning?: boolean;
+  }[];
 }
 
 let deskCalendarWindow: BrowserWindow | null = null;
@@ -240,6 +243,8 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       time: shanghaiTimeOf(start),
       note: personalizations[id]?.note || event.note || undefined,
       location: event.location ?? undefined,
+      status: personalizations[id]?.completed ? "completed" : undefined,
+      zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
       startAt: start,
       endAt: end,
@@ -263,6 +268,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       color: "var(--accent)",
       note: personalizations[id]?.note || course.note || undefined,
       location: course.location ?? undefined,
+      zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
       startAt: start,
       endAt: end,
@@ -289,6 +295,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       time: shanghaiTimeOf(start),
       color: deadline.kind === "exam" ? "#c0392b" : "#a56d22",
       note: personalizations[id]?.note || deadline.note || undefined,
+      status: personalizations[id]?.completed ? "completed" : undefined,
       origin: "upstream",
       startAt: start,
       endAt: end,
@@ -340,7 +347,15 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
     });
   }
 
-  return { today, theme, items, ...calendarData };
+  const reminderSettings = await readReminderSettingsRecord().catch(() => null);
+
+  return {
+    today,
+    theme,
+    items,
+    courseReminderLeadMinutes: reminderSettings?.courseReminderLeadMinutes ?? 20,
+    ...calendarData
+  };
 };
 
 const sendDataToWindow = async (): Promise<void> => {
@@ -598,7 +613,13 @@ export const registerDeskCalendarHostHandlers = (): void => {
     };
     if (origin === "upstream") {
       if (!id) return { ok: false, error: "事件不存在。" };
-      saveCalendarEventPersonalization(id, { note, reminderLeadMinutes: reminderLeadMinutes ?? null });
+      saveCalendarEventPersonalization(id, {
+        note,
+        reminderLeadMinutes: reminderLeadMinutes ?? null,
+        zhiyunUrl: (input as { zhiyunUrl?: string | null })?.zhiyunUrl,
+        completed: (input as { completed?: boolean })?.completed,
+        completedAt: (input as { completedAt?: string | null })?.completedAt
+      });
       await sendDataToWindow();
       return { ok: true };
     }

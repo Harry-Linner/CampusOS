@@ -54,14 +54,29 @@ export function DesktopPet({ surface = new URLSearchParams(window.location.searc
   const [visible, setVisible] = useState(() => !document.hidden);
   const lastPointer = useRef<{ x: number; y: number } | null>(null);
 
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [activeReminder, setActiveReminder] = useState<{ title: string; body: string } | null>(null);
+
   useEffect(() => {
     if (!bridge) return;
     let active = true;
     void bridge.getState().then((next) => { if (active) setState(next); }).catch((reason) => setError(reason instanceof Error ? reason.message : "桌宠状态读取失败。"));
     const unsubscribe = bridge.subscribe((next) => setState(next));
-    return () => { active = false; unsubscribe(); };
+    const unsubReminder = bridge.onReminder?.((reminder) => {
+      setActiveReminder({ title: reminder.title, body: reminder.body });
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+      unsubReminder?.();
+    };
   }, [bridge]);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeReminder) return;
+    const timer = window.setTimeout(() => setActiveReminder(null), 10000);
+    return () => window.clearTimeout(timer);
+  }, [activeReminder]);
   const jobs = state?.jobs ?? [];
   const latest = jobs.find((job) => job.id === selectedJobId) ?? jobs[0];
   const preference = state?.settings.appearance ?? "auto";
@@ -78,7 +93,7 @@ export function DesktopPet({ surface = new URLSearchParams(window.location.searc
     const timer = window.setInterval(() => setIdleIndex((index) => (index + 1) % idleForms.length), 12000);
     return () => window.clearInterval(timer);
   }, [preference, latest, dragging, error, reducedMotion, visible]);
-  const automaticForm: DesktopPetForm = dragging ? "wave" : error ? "puzzled" : latest
+  const automaticForm: DesktopPetForm = dragging ? "wave" : error ? "puzzled" : activeReminder ? "wave" : latest
     ? ({ queued: "think", processing: "think", ready: "celebrate", error: "puzzled", cancelled: "puzzled" } as const)[latest.status]
     : reducedMotion ? "idle" : idleForms[idleIndex];
   const requestedForm = preference === "auto" ? automaticForm : preference;
@@ -113,13 +128,13 @@ export function DesktopPet({ surface = new URLSearchParams(window.location.searc
   return <main className={`${isPanel ? "pet-panel" : "pet-shell"}${dragging ? " is-dragging" : ""}`} onDragEnter={(event) => { event.preventDefault(); setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { const related = event.relatedTarget; if (!(related instanceof Node) || !event.currentTarget.contains(related)) setDragging(false); }} onDrop={drop}>
     {isPanel && !settingsOpen ? <section className="pet-bubble" aria-live="polite">
       <header>
-        <strong>{latest ? stateText(latest) : "把消息喂给我吧"}</strong>
+        <strong>{activeReminder ? activeReminder.title : latest ? stateText(latest) : "把消息喂给我吧"}</strong>
         <div className="pet-actions"><button type="button" aria-label="桌宠设置" onClick={() => bridge && void run(async () => { await bridge.setPanelView("settings"); setSettingsOpen(true); })}>⚙</button><button type="button" aria-label="关闭桌宠面板" onClick={() => bridge && void run(() => bridge.closePanel())}>×</button></div>
       </header>
       {jobs.length > 1 ? <select className="pet-job-picker" aria-label="待处理消息" value={latest?.id} onChange={(event) => setSelectedJobId(event.target.value)}>
         {jobs.map((job, index) => <option key={job.id} value={job.id}>{index + 1}. {job.label} · {stateText(job)}</option>)}
       </select> : null}
-      <p>{error || latest?.message || "拖入文字、TXT/Markdown 或图片，也可以显式读取一次剪贴板。"}</p>
+      <p>{activeReminder ? activeReminder.body : error || latest?.message || "拖入文字、TXT/Markdown 或图片，也可以显式读取一次剪贴板。"}</p>
       {latest ? <div className="pet-job-actions">
         {latest.status === "processing" || latest.status === "queued" ? <button type="button" onClick={() => bridge && void run(() => bridge.cancel(latest.id))}>取消</button> : null}
         {latest.status === "error" || latest.status === "cancelled" ? <button type="button" onClick={() => bridge && void run(() => bridge.retry(latest.id))}>重试</button> : null}
@@ -143,7 +158,15 @@ export function DesktopPet({ surface = new URLSearchParams(window.location.searc
         <small>开启穿透后，用 {state.shortcutRegistered ? state.settings.shortcut : "CampusOS 托盘菜单"} 恢复交互；穿透时不能接收拖放。</small>
         </div>
       </section> : null}
-    {!isPanel ? <>{error ? <p className="pet-error" role="alert">{error}</p> : null}<button className="pet-move" type="button" aria-label="移动桌宠" onPointerDown={startMove} onPointerMove={move} onPointerUp={finishMove} onPointerCancel={finishMove}>⠿ 移动</button>
+    {!isPanel ? <>
+      {activeReminder ? (
+        <div className="pet-reminder-bubble" onClick={() => setActiveReminder(null)} role="status">
+          <strong>{activeReminder.title}</strong>
+          <p>{activeReminder.body}</p>
+        </div>
+      ) : null}
+      {error ? <p className="pet-error" role="alert">{error}</p> : null}
+      <button className="pet-move" type="button" aria-label="移动桌宠" onPointerDown={startMove} onPointerMove={move} onPointerUp={finishMove} onPointerCancel={finishMove}>⠿ 移动</button>
     <button type="button" className="pet-character" aria-label="打开桌宠面板" onClick={() => bridge && void run(() => bridge.openPanel())} data-appearance={missingForms.has(displayedForm) ? "fallback" : displayedForm}>
       {missingForms.has(displayedForm) ? <div className="pet-fallback" aria-hidden="true">🐳</div> : <img key={displayedForm} src={formAssets[displayedForm]} title={appearanceLabels[displayedForm]} alt="蓝发鲸鱼女仆桌宠" draggable={false} onError={() => markMissing(displayedForm)} />}
     </button></> : null}

@@ -183,6 +183,15 @@
   border-bottom: 1px solid var(--line);
 }
 
+.todo-item.is-complete {
+  opacity: 0.58;
+}
+
+.todo-item.is-complete .todo-content strong {
+  text-decoration: line-through;
+  color: var(--ink-faint);
+}
+
 .priority-mark {
   width: 3px;
   min-height: 35px;

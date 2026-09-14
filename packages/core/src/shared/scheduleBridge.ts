@@ -15,7 +15,7 @@ export interface ScheduleBridge {
   saveTask: (input: LocalTaskInput) => Promise<LocalTasksData>;
   mutateTask: (input: LocalTaskMutation) => Promise<LocalTasksData>;
   loadPersonalizations?: () => Promise<Record<string, CalendarEventPersonalization>>;
-  savePersonalization?: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) => Promise<CalendarEventPersonalization>;
+  savePersonalization?: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null; zhiyunUrl?: string | null; completed?: boolean; completedAt?: string | null }) => Promise<CalendarEventPersonalization>;
   loadCalendarData?: (input: { today: string; startAt: string; endAt: string }) => Promise<UnifiedCalendarData>;
   exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
   subscribe: (listener: () => void) => () => void;

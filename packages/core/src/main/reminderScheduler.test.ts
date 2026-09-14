@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CampusReminder, CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
+import type {
+  CalendarEventPersonalization,
+  CampusReminder,
+  CampusWorkspaceSnapshot,
+  LocalTaskRecord
+} from "@campusos/shared";
 
 const notificationState = vi.hoisted(() => ({
   supported: true,
   add: vi.fn(async () => undefined)
 }));
 const personalizationState = vi.hoisted(() => ({
-  records: {} as Record<string, { note: string; reminderLeadMinutes: number | null; updatedAt: string }>
+  records: {} as Record<string, CalendarEventPersonalization>
 }));
 
 vi.mock("electron", () => ({
@@ -295,4 +300,108 @@ describe("reminder scheduler", () => {
     expect(state.scheduledCount).toBe(0);
   });
 
+  it("course reminder appends departure prompt and respects courseReminderLeadMinutes", async () => {
+    const courseStart = new Date(now.getTime() + 21 * 60_000).toISOString();
+    scheduleWorkspaceReminders({
+      ...snapshot([]),
+      courses: [{
+        id: "c-dept",
+        title: "高等数学",
+        sourceId: "academic-affairs",
+        location: "东1-101",
+        startAt: courseStart,
+        endAt: new Date(now.getTime() + 66 * 60_000).toISOString()
+      }]
+    }, {
+      enabled: true,
+      leadMinutes: [15],
+      courseReminderLeadMinutes: 20,
+      departurePromptText: "勾勾够出发喽",
+      savedAt: null,
+      storagePath: null
+    }, now);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "course",
+      title: "高等数学 即将开始",
+      body: "课程将在 20 分钟后开始，地点：东1-101\n勾勾够出发喽"
+    }));
+  });
+
+  it("suppresses all deadline reminders when marked completed before 24h", () => {
+    // Completed 22 hours ago (before the 24h checkpoint which was ~20.9 hours ago)
+    personalizationState.records = {
+      "deadline:d-done-early": {
+        note: "",
+        reminderLeadMinutes: null,
+        completed: true,
+        completedAt: new Date(now.getTime() - 22 * 60 * 60 * 1000).toISOString(),
+        updatedAt: now.toISOString()
+      }
+    };
+    const dueAt = new Date(now.getTime() + 185 * 60_000).toISOString();
+    scheduleWorkspaceReminders({
+      ...snapshot([]),
+      deadlines: [{
+        id: "d-done-early",
+        title: "离散数学作业",
+        sourceId: "learning-platform",
+        dueAt,
+        kind: "assignment",
+        priority: "routine"
+      }]
+    }, {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+
+    // Both 24h and 3h checkpoints are suppressed
+    expect(notificationState.add).not.toHaveBeenCalled();
+  });
+
+  it("fires 24h reminder but suppresses 3h reminder when completed between 24h and 3h", async () => {
+    // Completed 10 seconds ago (between 24h checkpoint and 3h checkpoint)
+    personalizationState.records = {
+      "deadline:d-done-mid": {
+        note: "",
+        reminderLeadMinutes: null,
+        completed: true,
+        completedAt: new Date(now.getTime() - 10_000).toISOString(),
+        updatedAt: now.toISOString()
+      }
+    };
+    const dueAt = new Date(now.getTime() + 185 * 60_000).toISOString();
+    scheduleWorkspaceReminders({
+      ...snapshot([]),
+      deadlines: [{
+        id: "d-done-mid",
+        title: "离散数学作业",
+        sourceId: "learning-platform",
+        dueAt,
+        kind: "assignment",
+        priority: "routine"
+      }]
+    }, {
+      enabled: true,
+      leadMinutes: [15],
+      savedAt: null,
+      storagePath: null
+    }, now);
+
+    // 24h catch-up fired
+    expect(notificationState.add).toHaveBeenCalledTimes(1);
+    expect(notificationState.add).toHaveBeenCalledWith(expect.objectContaining({
+      entityId: "d-done-mid-lead-1440"
+    }));
+
+    notificationState.add.mockClear();
+    // Advance time past the 3h checkpoint (in 5 minutes)
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    // 3h checkpoint must NOT fire
+    expect(notificationState.add).not.toHaveBeenCalled();
+  });
 });

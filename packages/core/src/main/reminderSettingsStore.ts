@@ -19,6 +19,8 @@ interface StoredReminderSettingsPayload {
   enabled: boolean;
   leadMinutes: number[];
   gradeChangesEnabled?: boolean;
+  courseReminderLeadMinutes?: number;
+  departurePromptText?: string;
   savedAt: string;
 }
 
@@ -36,6 +38,12 @@ const toReminderSettingsRecord = (
   enabled: payload.enabled,
   leadMinutes: normalizeReminderLeadMinutes(payload.leadMinutes),
   gradeChangesEnabled: payload.gradeChangesEnabled !== false,
+  courseReminderLeadMinutes: typeof payload.courseReminderLeadMinutes === "number" && Number.isFinite(payload.courseReminderLeadMinutes)
+    ? Math.max(0, Math.min(120, Math.trunc(payload.courseReminderLeadMinutes)))
+    : 20,
+  departurePromptText: typeof payload.departurePromptText === "string"
+    ? payload.departurePromptText.slice(0, 100)
+    : "勾勾够出发喽",
   savedAt: payload.savedAt,
   storagePath
 });
@@ -87,6 +95,12 @@ export const saveReminderSettingsRecord = async (
     enabled: input.enabled,
     leadMinutes: normalizeReminderLeadMinutes(input.leadMinutes),
     gradeChangesEnabled: input.gradeChangesEnabled !== false,
+    courseReminderLeadMinutes: typeof input.courseReminderLeadMinutes === "number" && Number.isFinite(input.courseReminderLeadMinutes)
+      ? Math.max(0, Math.min(120, Math.trunc(input.courseReminderLeadMinutes)))
+      : 20,
+    departurePromptText: typeof input.departurePromptText === "string"
+      ? input.departurePromptText.slice(0, 100)
+      : "勾勾够出发喽",
     savedAt: new Date().toISOString()
   };
 

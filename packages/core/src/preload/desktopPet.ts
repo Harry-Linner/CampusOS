@@ -20,5 +20,10 @@ contextBridge.exposeInMainWorld("desktopPet", {
   cancel: (id) => ipcRenderer.invoke(`${channel}cancel`, id),
   retry: (id) => ipcRenderer.invoke(`${channel}retry`, id),
   openReview: (id) => ipcRenderer.invoke(`${channel}review`, id),
-  move: (delta) => ipcRenderer.invoke(`${channel}move`, delta)
+  move: (delta) => ipcRenderer.invoke(`${channel}move`, delta),
+  onReminder: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, reminder: Parameters<typeof listener>[0]) => listener(reminder);
+    ipcRenderer.on("campusos:reminder:fired", handler);
+    return () => ipcRenderer.removeListener("campusos:reminder:fired", handler);
+  }
 } satisfies DesktopPetBridge);

@@ -5,7 +5,7 @@
  * shared AI provider adapter, ADR-0004 structured generation).
  */
 
-export const CAMPUS_FEED_PROMPT_VERSION = "campus-feed-schedule-v2";
+export const CAMPUS_FEED_PROMPT_VERSION = "campus-feed-schedule-v3";
 
 export const CAMPUS_FEED_SYSTEM_PROMPT = [
   "你是浙江大学校园通知的日程提取器。",
@@ -17,7 +17,11 @@ export const CAMPUS_FEED_SYSTEM_PROMPT = [
   "每个候选必须提供evidence：从content中逐字摘取包含活动时间/截止时间的连续原文片段，最多300字；没有证据就不输出。",
   "type 字段：报名/材料/评选材料提交等以截止为关键时间点的用 deadline（截止时刻填入 startAt，endAt 与 startAt 相同）；答辩、讲座、活动、演出等有具体时段或用时段的用 fixed。",
   "title 用通顺的中文短标题（去掉通知编号和“关于/开展”等套话，例如“尚德学子奖学金申报截止”），不超过 60 字。",
-  "location 与 note 没有就填 null。"
+  "location 规范：线下活动提取具体校区、楼宇及教室/报告厅（如“紫金港校区蒙民伟楼138”、“玉泉校区教11-214”）；线上活动若通过腾讯会议/钉钉等开展，填入平台名称（如“腾讯会议”）。",
+  "note 规范（行前须知与线上凭证）：",
+  "  1. 若原文有现场签到/凭证核销要求（如“需携带校园卡刷卡”、“钉钉扫码签到”），在 note 中写明【行前提示】；",
+  "  2. 若为线上活动且有会议号/密码（如“腾讯会议：123-456-789”），在 note 中结构化写明，方便一键复制；",
+  "  3. 没有额外说明则填 null。"
 ].join("\n");
 
 export const CAMPUS_FEED_SCHEMA: Record<string, unknown> = {

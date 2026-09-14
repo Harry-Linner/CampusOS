@@ -278,7 +278,7 @@ export const registerScheduleHandlers = (options?: { onChanged?: () => void | Pr
   registerTrustedIpcHandler("campusos:schedule:personalizations:load", async () => {
     return loadCalendarEventPersonalizations();
   });
-  registerTrustedIpcHandler("campusos:schedule:personalization:save", async (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) => {
+  registerTrustedIpcHandler("campusos:schedule:personalization:save", async (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null; zhiyunUrl?: string | null; completed?: boolean; completedAt?: string | null }) => {
     const result = saveCalendarEventPersonalization(eventId, input ?? {});
     notifyScheduleChanged();
     await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CampusFeedScheduleCandidate, CampusFeedSnapshot, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
+import { extractMeetingNumber } from "@campusos/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -668,6 +669,24 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
                     {candidate.location ? ` · ${candidate.location}` : ""}
                   </p>
                   {candidate.note ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{candidate.note}</p> : null}
+                  {(() => {
+                    const meetingNumber = extractMeetingNumber(`${candidate.location ?? ""} ${candidate.note ?? ""} ${candidate.evidence ?? ""}`);
+                    return meetingNumber ? (
+                      <div className="mt-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(meetingNumber);
+                            toast.success(`已复制会议号：${meetingNumber}`);
+                          }}
+                        >
+                          复制会议号 ({meetingNumber})
+                        </Button>
+                      </div>
+                    ) : null;
+                  })()}
                   {candidate.evidence && <blockquote className="mt-2 border-l-2 border-primary pl-3 text-xs leading-6 text-muted-foreground">原文依据：{candidate.evidence}</blockquote>}
                 </div><Button size="icon" variant="ghost" aria-label={`移除 ${candidate.title}`} onClick={() => setScheduleCandidates((current) => current.filter((_entry, candidateIndex) => candidateIndex !== index))}><X className="size-4" aria-hidden="true" /></Button></div>
               ))}

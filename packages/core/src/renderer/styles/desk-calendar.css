@@ -257,9 +257,18 @@
   text-overflow: ellipsis;
   cursor: pointer;
 }
-.dk-month-cell-list .schedule-event.is-complete {
+.desk-cal-root .schedule-event.is-complete {
   text-decoration: line-through;
   opacity: 0.5;
+  color: var(--ink-faint, #888);
+}
+.desk-cal-root .schedule-event.is-imminent {
+  box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.15);
+  animation: dk-pulse-imminent 2s ease-in-out infinite;
+}
+@keyframes dk-pulse-imminent {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.78; }
 }
 
 /* 周视图：7 列自适应 */
@@ -318,7 +327,33 @@
 .dk-info-card strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 6px; }
 .dk-info-card p { margin: 2px 0; font-size: 12px; color: var(--ink-soft); }
 .dk-info-card .dk-info-note { color: var(--ink); }
-.dk-info-card button { margin-top: 10px; border: 0; background: var(--accent); color: #fff; border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+.dk-info-card .dk-info-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.dk-info-card button {
+  border: 1px solid var(--line-strong, #ccc);
+  background: var(--paper, #fff);
+  color: var(--ink, #333);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dk-info-card button.dk-info-primary {
+  border: 0;
+  background: var(--accent, #1a73e8);
+  color: #fff;
+}
+.dk-info-card .dk-meeting-copy {
+  margin-top: 6px;
+}
+.dk-info-card .dk-meeting-copy button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
 
 /* 新增/编辑事件 */
 .dk-form-backdrop {

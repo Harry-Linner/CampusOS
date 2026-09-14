@@ -260,6 +260,7 @@ export const App = (): JSX.Element => {
         loading={workspace.loading}
         snapshot={workspace.snapshot}
         academicCalendar={window.campusos?.academicCalendar}
+        schedule={window.campusos?.schedule}
       />
     );
   } else if (activeView === "extensions") {

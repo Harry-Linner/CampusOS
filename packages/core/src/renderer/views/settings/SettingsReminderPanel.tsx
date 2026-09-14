@@ -3,6 +3,7 @@ import { useReminderSettings } from "../../hooks/useReminderSettings";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Switch } from "../../components/ui/switch";
+import { Input } from "../../components/ui/input";
 
 const reminderLeadOptions = [15, 60, 120];
 
@@ -16,6 +17,8 @@ export const SettingsReminderPanel = () => {
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [gradeChangesEnabled, setGradeChangesEnabled] = useState(true);
   const [selectedLeadMinutes, setSelectedLeadMinutes] = useState<number[]>([15, 120]);
+  const [courseReminderLeadMinutes, setCourseReminderLeadMinutes] = useState(20);
+  const [departurePromptText, setDeparturePromptText] = useState("勾勾够出发喽");
   const [reminderSaved, setReminderSaved] = useState(false);
 
   useEffect(() => {
@@ -23,6 +26,12 @@ export const SettingsReminderPanel = () => {
       setReminderEnabled(reminderSettings.record.enabled);
       setSelectedLeadMinutes(reminderSettings.record.leadMinutes);
       setGradeChangesEnabled(reminderSettings.record.gradeChangesEnabled !== false);
+      if (reminderSettings.record.courseReminderLeadMinutes !== undefined) {
+        setCourseReminderLeadMinutes(reminderSettings.record.courseReminderLeadMinutes);
+      }
+      if (reminderSettings.record.departurePromptText !== undefined) {
+        setDeparturePromptText(reminderSettings.record.departurePromptText);
+      }
     }
   }, [reminderSettings.record]);
 
@@ -52,6 +61,39 @@ export const SettingsReminderPanel = () => {
           onCheckedChange={(checked) => {
             setReminderSaved(false);
             setGradeChangesEnabled(checked);
+          }}
+        />
+      </div>
+
+      <div className="space-y-2 py-1">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="course-reminder-lead">课前提醒提前量</Label>
+          <span className="text-sm text-muted-foreground font-mono">{courseReminderLeadMinutes} 分钟</span>
+        </div>
+        <input
+          id="course-reminder-lead"
+          type="range"
+          min="0"
+          max="120"
+          step="5"
+          className="w-full accent-primary cursor-pointer"
+          value={courseReminderLeadMinutes}
+          onChange={(event) => {
+            setReminderSaved(false);
+            setCourseReminderLeadMinutes(Number(event.target.value));
+          }}
+        />
+      </div>
+
+      <div className="space-y-1.5 py-1">
+        <Label htmlFor="departure-prompt">通知底部提示文字</Label>
+        <Input
+          id="departure-prompt"
+          value={departurePromptText}
+          placeholder="勾勾够出发喽"
+          onChange={(event) => {
+            setReminderSaved(false);
+            setDeparturePromptText(event.target.value);
           }}
         />
       </div>
@@ -97,7 +139,9 @@ export const SettingsReminderPanel = () => {
               const saved = await reminderSettings.save({
                 enabled: reminderEnabled,
                 leadMinutes: selectedLeadMinutes,
-                gradeChangesEnabled
+                gradeChangesEnabled,
+                courseReminderLeadMinutes,
+                departurePromptText: departurePromptText.trim() || "勾勾够出发喽"
               });
               setReminderSaved(saved);
             })();

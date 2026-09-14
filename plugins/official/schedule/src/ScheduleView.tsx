@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { resolveLocalTaskReminderAt } from "@campusos/shared";
+import {
+  extractMeetingNumber,
+  formatCountdown,
+  resolveLocalTaskReminderAt,
+  resolveZhiyunCourseUrl
+} from "@campusos/shared";
 import type {
   CalendarEventPersonalization,
   LocalTaskInput,
@@ -9,6 +14,7 @@ import type {
 } from "@campusos/shared";
 import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
+import { ScheduleSettingsDialog } from "./ScheduleSettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -302,6 +308,7 @@ const buildEvents = (
       endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
       location: event.location ?? undefined,
       note: personalizations[`calendar:${event.id}`]?.note || event.note || undefined,
+      status: (personalizations[`calendar:${event.id}`]?.completed ? "completed" : undefined) as LocalTaskRecord["status"] | undefined,
       origin: "upstream" as const
     })),
     ...snapshot.courses
@@ -358,8 +365,14 @@ export const groupEventsByDay = (
   return result;
 };
 
-const formatEventMeta = (event: ScheduleEvent): string =>
-  formatTimeRange(event.startAt, event.endAt);
+const formatEventMeta = (event: ScheduleEvent): string => {
+  const time = formatTimeRange(event.startAt, event.endAt);
+  if (event.kind === "assignment") {
+    const countdown = formatCountdown(event.endAt, event.status === "completed");
+    return `${time} · ${countdown}`;
+  }
+  return time;
+};
 
 const eventClassName = (event: ScheduleEvent): string =>
   `schedule-event schedule-event-${event.kind}${event.status === "completed" ? " is-complete" : ""}`;
@@ -401,7 +414,13 @@ export const ScheduleView = ({
   const [personalizations, setPersonalizations] = useState<Record<string, CalendarEventPersonalization>>({});
   const [calendarWeeks, setCalendarWeeks] = useState<Record<string, number>>({});
   const [form, setForm] = useState<TaskFormState | null>(null);
-  const [personalizationForm, setPersonalizationForm] = useState<{ event: ScheduleEvent; note: string; reminderLeadMinutes: number | null } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [personalizationForm, setPersonalizationForm] = useState<{
+    event: ScheduleEvent;
+    note: string;
+    reminderLeadMinutes: number | null;
+    zhiyunUrl: string;
+  } | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -674,7 +693,12 @@ export const ScheduleView = ({
       return;
     }
     const saved = personalizations[event.id];
-    setPersonalizationForm({ event, note: saved?.note ?? event.note ?? "", reminderLeadMinutes: saved?.reminderLeadMinutes ?? null });
+    setPersonalizationForm({
+      event,
+      note: saved?.note ?? event.note ?? "",
+      reminderLeadMinutes: saved?.reminderLeadMinutes ?? null,
+      zhiyunUrl: saved?.zhiyunUrl ?? ""
+    });
   };
 
   const savePersonalization = async (): Promise<void> => {
@@ -683,13 +707,35 @@ export const ScheduleView = ({
     try {
       const saved = await schedule.savePersonalization(personalizationForm.event.id, {
         note: personalizationForm.note,
-        reminderLeadMinutes: personalizationForm.reminderLeadMinutes
+        reminderLeadMinutes: personalizationForm.reminderLeadMinutes,
+        zhiyunUrl: personalizationForm.zhiyunUrl.trim() || null
       });
       setPersonalizations((current) => ({ ...current, [personalizationForm.event.id]: saved }));
       setPersonalizationForm(null);
       setNotice("个性化内容已保存");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "个性化内容保存失败。");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleUpstreamEventCompleted = async (event: ScheduleEvent): Promise<void> => {
+    if (!schedule?.savePersonalization) return;
+    const isCompleted = event.status === "completed";
+    const existing = personalizations[event.id];
+    setBusy(true);
+    try {
+      const saved = await schedule.savePersonalization(event.id, {
+        ...existing,
+        completed: !isCompleted,
+        completedAt: !isCompleted ? new Date().toISOString() : null
+      });
+      setPersonalizations((current) => ({ ...current, [event.id]: saved }));
+      setSelectedEvent((current) => (current?.id === event.id ? { ...current, status: !isCompleted ? "completed" : undefined } : current));
+      setNotice(!isCompleted ? "已标记为完成" : "已标记为未完成");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "更新完成状态失败。");
     } finally {
       setBusy(false);
     }
@@ -1012,6 +1058,10 @@ export const ScheduleView = ({
           <h1>日程</h1>
         </div>
         <div className="schedule-actions">
+          <Button variant="ghost" type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+            <AppIcon name="settings" className="size-4 mr-1" />
+            提醒设置
+          </Button>
           <Button variant="ghost" type="button" disabled={busy || !schedule} onClick={() => setForm(defaultTaskForm(selectedDate))}>
             新建
           </Button>
@@ -1356,13 +1406,61 @@ export const ScheduleView = ({
             <div className="space-y-3">
               <p className="text-sm leading-6 text-muted-foreground">{formatEventMeta(selectedEvent)}</p>
               {selectedEvent.location || selectedEvent.note ? <p className="text-sm leading-6">{selectedEvent.location || selectedEvent.note}</p> : null}
-              {selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? (
-                <div className="settings-actions">
-                  <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask, selectedEvent))}>编辑</Button>
-                  {selectedEvent.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed", { occurrenceKey: selectedEvent.occurrenceKey })}>完成</Button> : null}
-                  <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask, selectedEvent.occurrenceKey)}>删除</Button>
-                </div>
-              ) : <div className="settings-actions"><Button variant="outline" type="button" onClick={() => editEvent(selectedEvent)}>编辑个人备注与提醒</Button></div>}
+              {(() => {
+                const meetingNumber = extractMeetingNumber(`${selectedEvent.location ?? ""} ${selectedEvent.note ?? ""}`);
+                return meetingNumber ? (
+                  <div className="pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(meetingNumber);
+                        setNotice(`已复制会议号：${meetingNumber}`);
+                      }}
+                    >
+                      复制会议号 ({meetingNumber})
+                    </Button>
+                  </div>
+                ) : null;
+              })()}
+              <div className="settings-actions">
+                {selectedEvent.kind === "course" ? (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => {
+                      const url = resolveZhiyunCourseUrl({
+                        customUrl: personalizations[selectedEvent.id]?.zhiyunUrl,
+                        courseName: selectedEvent.title
+                      });
+                      window.open(url, "_blank");
+                    }}
+                  >
+                    <AppIcon name="external-link" className="size-4 mr-1" />
+                    打开智云课堂
+                  </Button>
+                ) : null}
+                {selectedEvent.origin === "upstream" && (selectedEvent.kind === "assignment" || selectedEvent.kind === "exam") ? (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void toggleUpstreamEventCompleted(selectedEvent)}
+                  >
+                    {selectedEvent.status === "completed" ? "标记为未完成" : "标记为已完成"}
+                  </Button>
+                ) : null}
+                {selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? (
+                  <>
+                    <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask, selectedEvent))}>编辑</Button>
+                    {selectedEvent.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed", { occurrenceKey: selectedEvent.occurrenceKey })}>完成</Button> : null}
+                    <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask, selectedEvent.occurrenceKey)}>删除</Button>
+                  </>
+                ) : (
+                  <Button variant="outline" type="button" onClick={() => editEvent(selectedEvent)}>编辑个人备注与提醒</Button>
+                )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -1391,6 +1489,17 @@ export const ScheduleView = ({
           <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
             <DialogHeader><DialogTitle>个性化“{personalizationForm.event.title}”</DialogTitle></DialogHeader>
             <p className="text-xs leading-5 text-muted-foreground">名称、时间和地点由学校数据源维护，不会被本地修改。</p>
+            {personalizationForm.event.kind === "course" ? (
+              <label className="schedule-personalization-field">
+                智云课堂网址（可选，默认按课程名跳转）
+                <input
+                  type="url"
+                  placeholder="https://interactivemeta.cmc.zju.edu.cn/#/replay?..."
+                  value={personalizationForm.zhiyunUrl}
+                  onChange={(event) => setPersonalizationForm({ ...personalizationForm, zhiyunUrl: event.target.value })}
+                />
+              </label>
+            ) : null}
             <label className="schedule-personalization-field">个人备注<textarea value={personalizationForm.note} onChange={(event) => setPersonalizationForm({ ...personalizationForm, note: event.target.value })} /></label>
             <label className="schedule-personalization-field">提醒<select value={personalizationForm.reminderLeadMinutes ?? "none"} onChange={(event) => setPersonalizationForm({ ...personalizationForm, reminderLeadMinutes: event.target.value === "none" ? null : Number(event.target.value) })}><option value="none">不额外提醒</option><option value="0">准时</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label>
             <div className="settings-actions"><Button type="button" disabled={busy} onClick={() => void savePersonalization()}>保存</Button></div>
@@ -1427,6 +1536,9 @@ export const ScheduleView = ({
             </form>
           </DialogContent>
         </Dialog>
+      ) : null}
+      {settingsOpen ? (
+        <ScheduleSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       ) : null}
     </section>
   );

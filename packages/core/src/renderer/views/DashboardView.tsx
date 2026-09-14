@@ -1,9 +1,12 @@
-import type {
-  CampusCourseSession,
-  CampusDeadline,
-  CampusPriority,
-  CampusWorkspaceSnapshot
+import {
+  formatCountdown,
+  type CalendarEventPersonalization,
+  type CampusCourseSession,
+  type CampusDeadline,
+  type CampusPriority,
+  type CampusWorkspaceSnapshot
 } from "@campusos/shared";
+import type { ScheduleBridge } from "../../shared/scheduleBridge";
 import { useEffect, useRef, useState } from "react";
 import {
   formatDateTime,
@@ -21,6 +24,7 @@ interface DashboardViewProps {
   loading: boolean;
   snapshot: CampusWorkspaceSnapshot | null;
   academicCalendar?: import("@campusos/shared").AcademicCalendarBridge;
+  schedule?: ScheduleBridge;
 }
 
 interface MakeupDayInfo {
@@ -133,14 +137,31 @@ const DashboardSkeleton = (): JSX.Element => (
 export const DashboardView = ({
   loading,
   snapshot,
-  academicCalendar
+  academicCalendar,
+  schedule
 }: DashboardViewProps): JSX.Element => {
   const [makeupDays, setMakeupDays] = useState<MakeupDayInfo[]>([]);
   const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
+  const [personalizations, setPersonalizations] = useState<Record<string, CalendarEventPersonalization>>({});
   const pageRef = useRef<HTMLElement | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showFartherDeadlines, setShowFartherDeadlines] = useState(false);
+
+  useEffect(() => {
+    const bridge = schedule ?? (window as unknown as { campusos?: { schedule?: ScheduleBridge } }).campusos?.schedule;
+    if (!bridge?.loadPersonalizations) return undefined;
+    let active = true;
+    void bridge.loadPersonalizations().then((data: Record<string, CalendarEventPersonalization>) => {
+      if (active) setPersonalizations(data);
+    }).catch(() => undefined);
+    const unsub = bridge.subscribe?.(() => {
+      void bridge.loadPersonalizations?.().then((data: Record<string, CalendarEventPersonalization>) => {
+        if (active) setPersonalizations(data);
+      }).catch(() => undefined);
+    });
+    return () => { active = false; unsub?.(); };
+  }, [schedule]);
 
   useEffect(() => {
     if (!academicCalendar) return undefined;
@@ -397,24 +418,30 @@ export const DashboardView = ({
                   )}
                   {!collapsed ? (
                     <ol className="todo-list">
-                      {group.items.map((deadline) => (
-                        <li key={deadline.id} className="todo-item">
-                          <span
-                            className={`priority-mark priority-${deadline.priority}`}
-                            aria-label={priorityLabelMap[deadline.priority]}
-                          />
-                          <div className="todo-content">
-                            <strong>{deadline.title}</strong>
-                            <span>
-                              {deadline.courseName ?? deadlineKindLabelMap[deadline.kind]}
-                            </span>
-                          </div>
-                          <div className="todo-deadline">
-                            <strong>{formatRelativeToNow(deadline.dueAt)}</strong>
-                            <span>{formatDateTime(deadline.dueAt)}</span>
-                          </div>
-                        </li>
-                      ))}
+                      {group.items.map((deadline) => {
+                        const isCompleted = Boolean(
+                          personalizations[`calendar:${deadline.id}`]?.completed ||
+                          personalizations[`deadline:${deadline.id}`]?.completed
+                        );
+                        return (
+                          <li key={deadline.id} className={`todo-item${isCompleted ? " is-complete" : ""}`}>
+                            <span
+                              className={`priority-mark priority-${deadline.priority}`}
+                              aria-label={priorityLabelMap[deadline.priority]}
+                            />
+                            <div className="todo-content">
+                              <strong>{deadline.title}</strong>
+                              <span>
+                                {deadline.courseName ?? deadlineKindLabelMap[deadline.kind]}
+                              </span>
+                            </div>
+                            <div className="todo-deadline">
+                              <strong>{formatCountdown(deadline.dueAt, isCompleted) || formatRelativeToNow(deadline.dueAt)}</strong>
+                              <span>{formatDateTime(deadline.dueAt)}</span>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ol>
                   ) : null}
                 </div>

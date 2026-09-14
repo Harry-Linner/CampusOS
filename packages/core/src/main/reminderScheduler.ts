@@ -1,11 +1,14 @@
-import { Notification } from "electron";
+import { BrowserWindow, Notification } from "electron";
 import { resolveLocalTaskReminderAt } from "@campusos/shared";
 import type { CampusReminder, CampusWorkspaceSnapshot, LocalTaskRecord } from "@campusos/shared";
 import type {
   ReminderSchedulerState,
   ReminderSettingsRecord
 } from "../shared/reminderBridge";
-import { createDefaultReminderSchedulerState } from "../shared/reminderBridge";
+import {
+  createDefaultReminderSchedulerState,
+  normalizeReminderLeadMinutes
+} from "../shared/reminderBridge";
 import { addNotification } from "./notificationCenter";
 import { getTaskCalendarPeriods } from "./scheduleDomain";
 import { loadCalendarEventPersonalizations } from "./deskCalendarStateStore";
@@ -52,19 +55,48 @@ const getNextFireAt = (): string | null => {
   return reminders[0]?.fireAt ?? null;
 };
 
+export const REMINDER_FIRED_CHANNEL = "campusos:reminder:fired";
+let currentDeparturePrompt = "";
+
 const buildReminderBody = (reminder: ScheduledReminder): string => {
   if (reminder.kind === "course") {
-    return reminder.location
+    const loc = reminder.location
       ? `课程将在 ${reminder.leadMinutes} 分钟后开始，地点：${reminder.location}`
       : `课程将在 ${reminder.leadMinutes} 分钟后开始`;
+    const prompt = currentDeparturePrompt.trim();
+    return prompt ? `${loc}\n${prompt}` : loc;
   }
 
-  if (reminder.kind === "deadline") return `将在 ${reminder.leadMinutes} 分钟后截止`;
+  if (reminder.kind === "deadline") {
+    const hours = Math.round(reminder.leadMinutes / 60);
+    return hours >= 1 && reminder.leadMinutes % 60 === 0
+      ? `将在 ${hours} 小时后截止`
+      : `将在 ${reminder.leadMinutes} 分钟后截止`;
+  }
   if (reminder.leadMinutes === 0) return "时间到了";
   return `将在 ${reminder.leadMinutes} 分钟后开始`;
 };
 
 const emitReminderNotification = async (reminder: ScheduledReminder): Promise<void> => {
+  try {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send(REMINDER_FIRED_CHANNEL, {
+          id: reminder.id,
+          title: reminder.title,
+          kind: reminder.kind,
+          leadMinutes: reminder.leadMinutes,
+          location: reminder.location,
+          eventStartAt: reminder.eventStartAt,
+          departurePrompt: currentDeparturePrompt,
+          body: buildReminderBody(reminder)
+        });
+      }
+    }
+  } catch {
+    // Window broadcast safe fallback
+  }
+
   await addNotification({
     id: `reminder:${reminder.id}`,
     kind: reminder.kind === "course" ? "course" : reminder.kind === "deadline" ? "assignment" : "task",
@@ -172,6 +204,7 @@ export const scheduleWorkspaceReminders = (
   localTasks: LocalTaskRecord[] = []
 ): ReminderSchedulerState => {
   clearScheduledTimers();
+  currentDeparturePrompt = typeof settings.departurePromptText === "string" ? settings.departurePromptText.trim() : "";
 
   const supported = notificationsSupported();
 
@@ -235,16 +268,68 @@ export const scheduleWorkspaceReminders = (
   });
   const overriddenIds = new Set(personalizedEvents.filter((event) => personalizations[event.eventId]?.reminderLeadMinutes != null)
     .map((event) => event.eventId.slice(event.eventId.indexOf(":") + 1)));
-  const catchUp = buildReminderQueue(
+  const isDeadlineReminderSuppressed = (
+    deadlineId: string,
+    fireAtIso: string
+  ): boolean => {
+    const p = personalizations[`calendar:${deadlineId}`] ??
+      personalizations[`deadline:${deadlineId}`] ??
+      personalizations[deadlineId];
+    if (!p || !p.completed) return false;
+    if (!p.completedAt) return true;
+    const completedMs = Date.parse(p.completedAt);
+    const fireAtMs = Date.parse(fireAtIso);
+    return Number.isFinite(completedMs) && Number.isFinite(fireAtMs) && completedMs <= fireAtMs;
+  };
+
+  const courseLeadMinutes = typeof settings.courseReminderLeadMinutes === "number" && Number.isFinite(settings.courseReminderLeadMinutes)
+    ? [Math.max(0, Math.min(120, Math.trunc(settings.courseReminderLeadMinutes)))]
+    : settings.leadMinutes;
+  const deadlineLeadMinutes = normalizeReminderLeadMinutes([...settings.leadMinutes, 180, 1440]);
+
+  const courseReminders = buildReminderQueue(
     (snapshot?.courses ?? []).filter((course) => !overriddenIds.has(course.id)),
+    [],
+    courseLeadMinutes,
+    now.toISOString()
+  );
+
+  const deadlineReminders = buildReminderQueue(
+    [],
     (snapshot?.deadlines ?? []).filter((deadline) => !overriddenIds.has(deadline.id)),
-    settings.leadMinutes,
+    deadlineLeadMinutes,
+    now.toISOString()
+  ).filter((reminder) => !isDeadlineReminderSuppressed(reminder.id.replace(/-lead-\d+$/, ""), reminder.fireAt));
+
+  const catchUpCourses = buildReminderQueue(
+    (snapshot?.courses ?? []).filter((course) => !overriddenIds.has(course.id)),
+    [],
+    courseLeadMinutes,
     new Date(now.getTime() - STARTUP_CATCH_UP_MS).toISOString()
   ).filter((reminder) => Date.parse(reminder.fireAt) <= now.getTime() && Date.parse(reminder.eventStartAt) >= now.getTime());
+
+  const catchUpDeadlines = buildReminderQueue(
+    [],
+    (snapshot?.deadlines ?? []).filter((deadline) => !overriddenIds.has(deadline.id)),
+    deadlineLeadMinutes,
+    new Date(now.getTime() - STARTUP_CATCH_UP_MS).toISOString()
+  ).filter((reminder) =>
+    Date.parse(reminder.fireAt) <= now.getTime() &&
+    Date.parse(reminder.eventStartAt) >= now.getTime() &&
+    !isDeadlineReminderSuppressed(reminder.id.replace(/-lead-\d+$/, ""), reminder.fireAt)
+  );
+
   const sortedReminders: ScheduledReminder[] = [...new Map([
-    ...(snapshot?.reminders ?? []),
-    ...catchUp,
-    ...personalizedReminders,
+    ...(snapshot?.reminders ?? []).filter((reminder) =>
+      reminder.kind !== "deadline" || !isDeadlineReminderSuppressed(reminder.id.replace(/-lead-\d+$/, ""), reminder.fireAt)
+    ),
+    ...courseReminders,
+    ...deadlineReminders,
+    ...catchUpCourses,
+    ...catchUpDeadlines,
+    ...personalizedReminders.filter((reminder) =>
+      reminder.kind !== "deadline" || !isDeadlineReminderSuppressed(reminder.id, reminder.fireAt)
+    ),
     ...buildLocalTaskReminders(localTasks, settings.leadMinutes, now)
   ].map((reminder) => [reminder.id, reminder])).values()].sort(
     (left, right) =>
