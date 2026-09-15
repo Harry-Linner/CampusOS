@@ -1,7 +1,7 @@
-export { AcademicView, AcademicView as Component } from "./AcademicView";
+export { AcademicView, AcademicView as Component, resetAcademicViewCache } from "./AcademicView";
 export { manifest } from "./manifest";
-export { Component as GradesView } from "./GradesView";
-export { Component as ExamCountdownView } from "./ExamCountdownView";
+export { Component as GradesView, resetGradesCache } from "./GradesView";
+export { Component as ExamCountdownView, resetExamCache } from "./ExamCountdownView";
 export {
   calculateAcademicGpa,
   inferGpaScale,
@@ -9,3 +9,4 @@ export {
   summarizeAcademicGrades
 } from "./gradesModel";
 export { computeExamCountdowns } from "./examCountdown";
+

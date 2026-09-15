@@ -17,6 +17,12 @@ const numberFormatter = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2
 });
 
+let cachedGradesRecords: CapabilityRecord<AcademicGradesData>[] | null = null;
+
+export const resetGradesCache = (): void => {
+  cachedGradesRecords = null;
+};
+
 export const Component = ({
   capabilities,
   loading: workspaceLoading,
@@ -24,9 +30,9 @@ export const Component = ({
   snapshot
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<CapabilityRecord<AcademicGradesData>[]>(
-    []
+    () => cachedGradesRecords ?? []
   );
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => Boolean(cachedGradesRecords));
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshRequest, setRefreshRequest] = useState(0);
@@ -34,11 +40,14 @@ export const Component = ({
 
   useEffect(() => {
     let active = true;
-    setLoaded(false);
+    if (!cachedGradesRecords) {
+      setLoaded(false);
+    }
 
     void capabilities.read<AcademicGradesData>("academic.grades@1")
       .then((nextRecords) => {
         if (!active) return;
+        cachedGradesRecords = nextRecords;
         setRecords(nextRecords);
         setError(null);
       })

@@ -97,6 +97,27 @@ const buildTimetableSemesters = (
     );
 };
 
+interface AcademicViewCache {
+  timetableRecords: CapabilityRecord<AcademicTimetableData>[] | null;
+  calendar: AcademicCalendarConfigData | null;
+  catalogRecords: CapabilityRecord<AcademicCourseCatalogData>[] | null;
+  practiceRecords: CapabilityRecord<AcademicPracticeData>[] | null;
+}
+
+const academicViewCache: AcademicViewCache = {
+  timetableRecords: null,
+  calendar: null,
+  catalogRecords: null,
+  practiceRecords: null
+};
+
+export const resetAcademicViewCache = (): void => {
+  academicViewCache.timetableRecords = null;
+  academicViewCache.calendar = null;
+  academicViewCache.catalogRecords = null;
+  academicViewCache.practiceRecords = null;
+};
+
 const TimetablePanel = ({
   capabilities,
   snapshot,
@@ -104,15 +125,20 @@ const TimetablePanel = ({
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<
     CapabilityRecord<AcademicTimetableData>[]
-  >([]);
-  const [calendar, setCalendar] = useState<AcademicCalendarConfigData | null>(null);
+  >(() => academicViewCache.timetableRecords ?? []);
+  const [calendar, setCalendar] = useState<AcademicCalendarConfigData | null>(
+    () => academicViewCache.calendar
+  );
   const [termKey, setTermKey] = useState("");
   const [summerOnly, setSummerOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !academicViewCache.timetableRecords);
 
   useEffect(() => {
     let active = true;
+    if (!academicViewCache.timetableRecords) {
+      setLoading(true);
+    }
     void Promise.allSettled([
       readRecords<AcademicTimetableData>(capabilities, "academic.timetable@1"),
       readRecords<AcademicCalendarConfigData>(
@@ -123,21 +149,22 @@ const TimetablePanel = ({
       if (!active) return;
       setLoading(false);
       if (timetableResult.status === "rejected") {
-        setRecords([]);
+        if (!academicViewCache.timetableRecords) setRecords([]);
         setError(
           timetableResult.reason instanceof Error
             ? timetableResult.reason.message
             : "课表读取失败。"
         );
       } else {
+        academicViewCache.timetableRecords = timetableResult.value;
         setRecords(timetableResult.value);
         setError(null);
       }
-      setCalendar(
-        calendarResult.status === "fulfilled"
-          ? calendarResult.value.find((record) => record.data)?.data ?? null
-          : null
-      );
+      if (calendarResult.status === "fulfilled") {
+        const cal = calendarResult.value.find((record) => record.data)?.data ?? null;
+        academicViewCache.calendar = cal;
+        setCalendar(cal);
+      }
     });
     return () => {
       active = false;
@@ -352,26 +379,32 @@ const CourseCatalogPanel = ({
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<
     CapabilityRecord<AcademicCourseCatalogData>[]
-  >([]);
+  >(() => academicViewCache.catalogRecords ?? []);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !academicViewCache.catalogRecords);
 
   useEffect(() => {
     let active = true;
+    if (!academicViewCache.catalogRecords) {
+      setLoading(true);
+    }
     void capabilities
       .read<AcademicCourseCatalogData>("academic.course-catalog@1")
       .then((next) => {
         if (!active) return;
         setLoading(false);
+        academicViewCache.catalogRecords = next;
         setRecords(next);
         setError(null);
       })
       .catch((reason: unknown) => {
         if (active) {
           setLoading(false);
-          setError(reason instanceof Error ? reason.message : "课程目录读取失败。");
+          setError(
+            reason instanceof Error ? reason.message : "课程目录读取失败。"
+          );
         }
       });
     return () => {
@@ -497,21 +530,24 @@ const PracticePanel = ({
   loading: workspaceLoading
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<CapabilityRecord<AcademicPracticeData>[]>(
-    []
+    () => academicViewCache.practiceRecords ?? []
   );
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !academicViewCache.practiceRecords);
   const [refreshRequest, setRefreshRequest] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    if (!academicViewCache.practiceRecords) {
+      setLoading(true);
+    }
     void capabilities
       .read<AcademicPracticeData>("practice.records@1")
       .then((next) => {
         if (!active) return;
         setLoading(false);
+        academicViewCache.practiceRecords = next;
         setRecords(next);
         setError(null);
       })

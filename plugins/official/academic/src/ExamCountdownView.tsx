@@ -3,14 +3,22 @@ import type { CalendarEventsData, CapabilityRecord, PluginComponentProps } from 
 import { computeExamCountdowns, type ExamCountdownEntry } from "./examCountdown";
 import { Button } from "@/components/ui/button";
 
+let cachedExamRecords: CapabilityRecord<CalendarEventsData>[] | null = null;
+
+export const resetExamCache = (): void => {
+  cachedExamRecords = null;
+};
+
 export const Component = ({
   capabilities,
   loading: workspaceLoading,
   onRefresh,
   snapshot
 }: PluginComponentProps): JSX.Element => {
-  const [records, setRecords] = useState<CapabilityRecord<CalendarEventsData>[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [records, setRecords] = useState<CapabilityRecord<CalendarEventsData>[]>(
+    () => cachedExamRecords ?? []
+  );
+  const [loaded, setLoaded] = useState(() => Boolean(cachedExamRecords));
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -23,12 +31,15 @@ export const Component = ({
 
   useEffect(() => {
     let active = true;
-    setLoaded(false);
+    if (!cachedExamRecords) {
+      setLoaded(false);
+    }
 
     void capabilities.read<CalendarEventsData>("calendar.events@1")
-      .then((records) => {
+      .then((nextRecords) => {
         if (!active) return;
-        setRecords(records);
+        cachedExamRecords = nextRecords;
+        setRecords(nextRecords);
         setError(null);
       })
       .catch((e: unknown) => {

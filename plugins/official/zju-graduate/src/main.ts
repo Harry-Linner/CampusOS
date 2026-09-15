@@ -587,6 +587,56 @@ export const createZjuGraduateConnector = ({
       return { sourceId: manifest.id, status: "unavailable", updatedAt, message };
     }
 
+    // 缓存优先（Cache-First）：启动时在发起耗时网络请求前，先行发布本地已有的课表、考试、成绩及课程目录缓存
+    const [cachedTimetableInitial, cachedExamsInitial, cachedGradesInitial, cachedCatalogInitial] =
+      await Promise.all([
+        loadCachedTimetable(proof.studentId).catch(() => null),
+        loadCachedExams(proof.studentId).catch(() => null),
+        loadCachedGrades(proof.studentId).catch(() => null),
+        loadCachedCourseCatalog?.(proof.studentId).catch(() => null) ?? Promise.resolve(null)
+      ]);
+
+    if (cachedTimetableInitial) {
+      await publish({
+        capability: "academic.timetable@1",
+        accountId: proof.studentId,
+        state: "cache",
+        updatedAt,
+        data: cachedTimetableInitial,
+        message: "已预载本地课表缓存，正在后台检查更新…"
+      });
+    }
+    if (cachedExamsInitial) {
+      await publish({
+        capability: "academic.exams@1",
+        accountId: proof.studentId,
+        state: "cache",
+        updatedAt,
+        data: cachedExamsInitial,
+        message: "已预载本地考试缓存，正在后台检查更新…"
+      });
+    }
+    if (cachedGradesInitial) {
+      await publish({
+        capability: "academic.grades@1",
+        accountId: proof.studentId,
+        state: "cache",
+        updatedAt,
+        data: cachedGradesInitial,
+        message: "已预载本地成绩缓存，正在后台检查更新…"
+      });
+    }
+    if (cachedCatalogInitial) {
+      await publish({
+        capability: "academic.course-catalog@1",
+        accountId: proof.studentId,
+        state: "cache",
+        updatedAt,
+        data: cachedCatalogInitial,
+        message: "已预载本地课程目录缓存，正在后台检查更新…"
+      });
+    }
+
     const timetableQueries = createGraduateTimetableQueries(refreshedAt);
     const examQueries = [academicYearStartFor(refreshedAt), academicYearStartFor(refreshedAt) + 1]
       .flatMap((academicYearStart) => ([12, 11] as const).map((term) => ({ academicYearStart, term })));

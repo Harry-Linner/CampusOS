@@ -190,4 +190,25 @@ describe("DashboardView", () => {
     }).not.toThrow();
     expect(screen.getByLabelText("正在加载总览")).toBeDefined();
   });
+
+  it("dynamically projects today courses from full course list when cached snapshot was from yesterday", () => {
+    const snapshot = createUpcomingSnapshot();
+    // 模拟快照来自昨天 2026-09-14，todayCourses 记录的是昨天的历史课
+    snapshot.generatedAt = "2026-09-14T20:00:00.000Z";
+    snapshot.todayCourses = [snapshot.courses[0]]; // 历史旧课 2026-06-30
+
+    // 显式传入当前系统时间为 2026-09-15（周二）
+    const todayDate = new Date("2026-09-15T09:00:00+08:00");
+    render(createElement(DashboardView, {
+      loading: false,
+      snapshot,
+      currentDate: todayDate
+    }));
+
+    // 验证左上角显示 9月15日
+    expect(screen.getByText("9月15日星期二")).toBeDefined();
+    // 验证今日事项动态筛选出 9月15日的秋季周二课程，而排除了昨天的旧课
+    expect(screen.getByText("秋季周二课程")).toBeDefined();
+    expect(screen.queryByText("历史课程")).toBeNull();
+  });
 });

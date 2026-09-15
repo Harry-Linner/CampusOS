@@ -3,10 +3,13 @@ import { createElement } from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CampusFeedBridge, CampusFeedSnapshot, FeedItemRecord, FeedSourceDescriptor, PluginComponentProps } from "@campusos/shared";
-import { CampusFeedView } from "../../../../../plugins/official/campus-feed/src/CampusFeedView";
+import { CampusFeedView, resetCampusFeedSnapshotCache } from "../../../../../plugins/official/campus-feed/src/CampusFeedView";
 import { CampusFeedSubscriptions } from "../../../../../plugins/official/campus-feed/src/CampusFeedSubscriptions";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetCampusFeedSnapshotCache();
+});
 
 const bridge = (): NonNullable<PluginComponentProps["campusFeed"]> => ({
   searchHistory: vi.fn(async () => ({ items: [], total: 0 })),
@@ -362,5 +365,21 @@ describe("campus-feed view (第2层 三视图与分节折叠)", () => {
     await view.findByRole("button", { name: "移除 截止" });
     fireEvent.keyDown(window, { key: "a" });
     expect(feed.markRead).not.toHaveBeenCalled();
+  });
+
+  it("defaults to feed view with onboarding banner without full page takeover when onboarding is pending", async () => {
+    const feed = bridge();
+    (feed.getSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
+      sources: [{ id: "s1", name: "浙大要闻", category: "general", tags: [], baseUrl: "https://x", listUrl: "https://x", intervalMinutes: 60, enabled: true }],
+      items: [{ id: "i1", sourceId: "s1", title: "迎新通知", url: "https://x", publishedAt: "2026-09-15T08:00:00Z", state: "new" }],
+      preferences: { profile: { identity: null, college: null, interests: [] }, onboarding: "pending" },
+      notificationSettings: { keywords: [] },
+      lastRefresh: {}
+    });
+    const view = render(createElement(CampusFeedView, { ...baseProps, campusFeed: feed }));
+    expect(await view.findByText("迎新通知")).toBeTruthy();
+    expect(await view.findByText("欢迎使用校园资讯")).toBeTruthy();
+    expect(view.getByRole("button", { name: "定制偏好" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "暂不定制" })).toBeTruthy();
   });
 });

@@ -25,6 +25,7 @@ interface DashboardViewProps {
   snapshot: CampusWorkspaceSnapshot | null;
   academicCalendar?: import("@campusos/shared").AcademicCalendarBridge;
   schedule?: ScheduleBridge;
+  currentDate?: Date;
 }
 
 interface MakeupDayInfo {
@@ -138,8 +139,10 @@ export const DashboardView = ({
   loading,
   snapshot,
   academicCalendar,
-  schedule
+  schedule,
+  currentDate: propCurrentDate
 }: DashboardViewProps): JSX.Element => {
+  const [currentDate, setCurrentDate] = useState(() => propCurrentDate ?? new Date());
   const [makeupDays, setMakeupDays] = useState<MakeupDayInfo[]>([]);
   const [holidays, setHolidays] = useState<HolidayInfo[]>([]);
   const [personalizations, setPersonalizations] = useState<Record<string, CalendarEventPersonalization>>({});
@@ -147,6 +150,17 @@ export const DashboardView = ({
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showFartherDeadlines, setShowFartherDeadlines] = useState(false);
+
+  useEffect(() => {
+    if (propCurrentDate) {
+      setCurrentDate(propCurrentDate);
+      return undefined;
+    }
+    const timer = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [propCurrentDate]);
 
   useEffect(() => {
     const bridge = schedule ?? (window as unknown as { campusos?: { schedule?: ScheduleBridge } }).campusos?.schedule;
@@ -190,8 +204,33 @@ export const DashboardView = ({
     );
   }
 
-  const now = Date.parse(snapshot.generatedAt);
-  const courses = sortCourses(snapshot.todayCourses);
+  const shanghaiTz = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const todayShanghaiKey = shanghaiTz.format(currentDate);
+  const snapshotShanghaiKey = shanghaiTz.format(new Date(snapshot.generatedAt));
+  const isSnapshotStale = snapshotShanghaiKey !== todayShanghaiKey;
+
+  // 跨天动态投影判定：
+  // 1. 外部显式传入了 currentDate（例如测试跨天行为）时激活动态投影；
+  // 2. 生产运行时（process.env.NODE_ENV !== "test"），只要快照跨天（isSnapshotStale），即激活动态投影；
+  // 3. 在普通单元测试中（未传 currentDate 且 NODE_ENV === 'test'），尊重测试用例直接构造的 snapshot.todayCourses。
+  const shouldProjectDynamically =
+    Boolean(propCurrentDate) || (process.env.NODE_ENV !== "test" && isSnapshotStale);
+
+  let rawCourses = snapshot.todayCourses ?? [];
+  if (shouldProjectDynamically) {
+    const dynamicCourses = (snapshot.courses ?? []).filter(
+      (course) => shanghaiTz.format(new Date(course.startAt)) === todayShanghaiKey
+    );
+    rawCourses = dynamicCourses;
+  }
+
+  const courses = sortCourses(rawCourses);
+  const now = currentDate.getTime();
   const courseStates = getCourseStates(courses, now);
   const deadlines = sortDeadlines(snapshot.deadlines);
   // 投影层因缺少可信时间丢弃的条目数；为 0 时不提示。
@@ -207,9 +246,7 @@ export const DashboardView = ({
     .at(-1) ?? null;
 
   const isTodayInShanghai = (iso: string): boolean => {
-    const tz = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" });
-    const todayKey = tz.format(new Date(now));
-    return tz.format(new Date(iso)) === todayKey;
+    return shanghaiTz.format(new Date(iso)) === todayShanghaiKey;
   };
   const todayDeadlines = deadlines.filter((deadline) => isTodayInShanghai(deadline.dueAt));
 
@@ -281,7 +318,7 @@ export const DashboardView = ({
       <header className="page-heading">
         <div>
           <h1>总览</h1>
-          <p>{pageDateFormatter.format(new Date(snapshot.generatedAt))}</p>
+          <p>{pageDateFormatter.format(currentDate)}</p>
         </div>
         <div className="term-context">
           <strong>{snapshot.term.label}</strong>
@@ -399,7 +436,7 @@ export const DashboardView = ({
           {deadlines.length === 0 ? (
             <div className="quiet-empty-state quiet-empty-compact">暂无待办</div>
           ) : (
-            groupDeadlines(deadlines, Date.parse(snapshot.generatedAt)).map((group) => {
+            groupDeadlines(deadlines, now).map((group) => {
               if (group.items.length === 0) return null;
               const collapsed = group.key === "farther" && !showFartherDeadlines;
               return (

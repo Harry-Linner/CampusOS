@@ -9,10 +9,11 @@ import type {
   PluginCapability,
   PluginCapabilityClient
 } from "@campusos/shared";
-import { GradesView as AcademicGradesView } from "@campusos/plugin-academic";
+import { GradesView as AcademicGradesView, resetGradesCache } from "@campusos/plugin-academic";
 
 afterEach(() => {
   cleanup();
+  resetGradesCache();
   delete window.campusos;
 });
 

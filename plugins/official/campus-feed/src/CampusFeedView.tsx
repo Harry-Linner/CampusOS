@@ -59,12 +59,18 @@ const formatCandidateTime = (value: string | null): string => {
   }).format(date);
 };
 
+let globalFeedSnapshotCache: CampusFeedSnapshot | null = null;
+
+export const resetCampusFeedSnapshotCache = (): void => {
+  globalFeedSnapshotCache = null;
+};
+
 export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const feed = props.campusFeed;
   const [tab, setTab] = useState<FeedTab>("feed");
-  const [snapshot, setSnapshot] = useState<CampusFeedSnapshot | null>(null);
+  const [snapshot, setSnapshot] = useState<CampusFeedSnapshot | null>(() => globalFeedSnapshotCache);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [reading, setReading] = useState(Boolean(feed));
+  const [reading, setReading] = useState(() => Boolean(feed) && !globalFeedSnapshotCache);
   const [readError, setReadError] = useState<string | null>(null);
   const [readAttempt, setReadAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -91,13 +97,18 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   const busyRef = useRef(false);
   const handledNavigationRef = useRef<string | null>(null);
 
+  const updateSnapshot = useCallback((next: CampusFeedSnapshot | null): void => {
+    globalFeedSnapshotCache = next;
+    setSnapshot(next);
+  }, []);
+
   const refreshAll = useCallback(async (): Promise<void> => {
     if (!feed || busyRef.current) return;
     busyRef.current = true;
     setRefreshing((current) => new Set(current).add("*"));
     try {
       await feed.refreshAll();
-      setSnapshot(await feed.getSnapshot());
+      updateSnapshot(await feed.getSnapshot());
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "刷新失败。");
@@ -105,14 +116,14 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
       busyRef.current = false;
       setRefreshing(new Set());
     }
-  }, [feed]);
+  }, [feed, updateSnapshot]);
 
   const refreshSource = useCallback(async (sourceId: string): Promise<void> => {
     if (!feed) return;
     setRefreshing((current) => new Set(current).add(sourceId));
     try {
       await feed.refreshSource(sourceId);
-      setSnapshot(await feed.getSnapshot());
+      updateSnapshot(await feed.getSnapshot());
     } catch (cause) {
       toast.error("刷新失败", { description: cause instanceof Error ? cause.message : "该信息源暂时不可用。" });
     } finally {
@@ -122,15 +133,17 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
         return next;
       });
     }
-  }, [feed]);
+  }, [feed, updateSnapshot]);
 
   useEffect(() => {
     if (!feed) return;
     let active = true;
-    setReading(true);
+    if (!globalFeedSnapshotCache) {
+      setReading(true);
+    }
     setReadError(null);
     void feed.getSnapshot().then((next) => {
-      if (active) { setSnapshot(next); setError(null); setReadError(null); }
+      if (active) { updateSnapshot(next); setError(null); setReadError(null); }
     }).catch((cause) => {
       if (active) {
         const message = cause instanceof Error ? cause.message : "无法读取校园资讯。";
@@ -139,10 +152,10 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
       }
     }).finally(() => { if (active) setReading(false); });
     const unsubscribe = feed.subscribe((next) => {
-      if (active) { setSnapshot(next); setReadError(null); setError(null); setReading(false); }
+      if (active) { updateSnapshot(next); setReadError(null); setError(null); setReading(false); }
     });
     return () => { active = false; unsubscribe(); };
-  }, [feed, readAttempt]);
+  }, [feed, readAttempt, updateSnapshot]);
 
   const openOriginal = useCallback((item: FeedItemRecord): void => {
     if (!feed) return;
@@ -339,21 +352,27 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
   };
 
   useEffect(() => {
-    if (tab !== "feed" || !feed || preferencesOpen || snapshot?.preferences?.onboarding === "pending" || scheduleOpen) return;
+    if (tab !== "feed" || !feed || preferencesOpen || scheduleOpen) return;
     const onKey = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement | null;
-      if (target?.isContentEditable || target?.closest("input, textarea, select, button, a, [role='combobox'], [role='switch'], [role='tab'], [contenteditable='true']")) return;
+      if (target?.isContentEditable || target?.closest("input, textarea, select, button, a, [role='combobox'], [role='switch'], [role='tab'], [contenteditable='true'], [role='dialog']")) return;
+      if (document.querySelector("[role='dialog']")) return;
       if (orderedItems.length === 0) return;
-      if (event.key === "j") {
+      if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
         focusedIndexRef.current = Math.min(focusedIndexRef.current + 1, orderedItems.length - 1);
         scrollToFocused();
-      } else if (event.key === "k") {
+      } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
         focusedIndexRef.current = Math.max(focusedIndexRef.current - 1, 0);
         scrollToFocused();
+      } else if (event.key === "o") {
+        event.preventDefault();
+        const item = orderedItems[focusedIndexRef.current];
+        if (item) openOriginal(item);
       } else if (event.key === "m") {
+        event.preventDefault();
         const item = orderedItems[focusedIndexRef.current];
         if (item && item.state === "new") void feed.markRead([item.id]);
       } else if (event.key.toLowerCase() === "a") {
@@ -366,14 +385,14 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, feed, orderedItems, markAllRead, openOriginal, preferencesOpen, snapshot?.preferences?.onboarding, scheduleOpen]);
+  }, [tab, feed, orderedItems, markAllRead, openOriginal, preferencesOpen, scheduleOpen]);
 
-  if (feed && snapshot && (snapshot.preferences?.onboarding === "pending" || preferencesOpen)) {
+  if (feed && snapshot && preferencesOpen) {
     return <CampusFeedOnboarding catalog={snapshot.catalog ?? snapshot.sources} initialProfile={snapshot.preferences?.profile}
-      initialSelected={snapshot.preferences?.onboarding === "pending" ? undefined : snapshot.sources.map((source) => source.id)}
-      initialDisabled={snapshot.preferences?.onboarding === "pending" ? undefined : snapshot.sources.filter((source) => !source.enabled).map((source) => source.id)}
-      onCancel={snapshot.preferences?.onboarding === "pending" ? undefined : () => setPreferencesOpen(false)}
-      onSave={async (input) => { setSnapshot(await feed.savePreferences(input)); setPreferencesOpen(false); }} />;
+      initialSelected={snapshot.sources.map((source) => source.id)}
+      initialDisabled={snapshot.sources.filter((source) => !source.enabled).map((source) => source.id)}
+      onCancel={() => setPreferencesOpen(false)}
+      onSave={async (input) => { updateSnapshot(await feed.savePreferences(input)); setPreferencesOpen(false); }} />;
   }
 
   const failedSources = Object.entries(snapshot?.health ?? {}).filter(([id, health]) => enabledSources.some((source) => source.id === id) && !["ok", "empty"].includes(health.status));
@@ -396,6 +415,27 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
         </div>
       </header>
 
+      {snapshot?.preferences?.onboarding === "pending" && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+          <div>
+            <p className="text-sm font-medium text-foreground">欢迎使用校园资讯</p>
+            <p className="text-xs text-muted-foreground mt-0.5">选择你的身份与感兴趣的学院、部门，获得更精准的官方通知与活动推送。</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={async () => {
+              if (feed) {
+                const next = await feed.savePreferences({
+                  profile: snapshot?.preferences?.profile ?? { identity: null, college: null, interests: [] },
+                  selectedSourceIds: snapshot?.sources.map((source) => source.id) ?? [],
+                  skip: true
+                });
+                updateSnapshot(next);
+              }
+            }}>暂不定制</Button>
+            <Button size="sm" variant="outline" onClick={() => setPreferencesOpen(true)}>定制偏好</Button>
+          </div>
+        </div>
+      )}
       {snapshot?.preferences?.onboarding === "existing" && <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4"><p className="text-sm text-muted-foreground">已有订阅已保留。选择身份和兴趣，可以找到更多相关官网。</p><Button size="sm" variant="outline" onClick={() => setPreferencesOpen(true)}>完善偏好</Button></div>}
       {failedSources.length > 0 && <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3" role="status"><p className="text-sm text-muted-foreground">{failedSources.length} 个来源暂未更新，仍可阅读缓存。</p><Button variant="ghost" size="sm" onClick={() => setTab("sources")}>管理订阅</Button></div>}
 

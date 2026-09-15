@@ -19,9 +19,12 @@ import type {
   PluginCapability,
   PluginCapabilityClient
 } from "@campusos/shared";
-import { AcademicView } from "@campusos/plugin-academic";
+import { AcademicView, resetAcademicViewCache } from "@campusos/plugin-academic";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetAcademicViewCache();
+});
 
 describe("practice availability", () => {
   it("keeps a source failure visible with a working retry instead of an empty-success state", async () => {
