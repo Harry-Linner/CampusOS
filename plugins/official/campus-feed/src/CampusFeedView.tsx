@@ -389,8 +389,8 @@ export const CampusFeedView = (props: PluginComponentProps): JSX.Element => {
 
   if (feed && snapshot && preferencesOpen) {
     return <CampusFeedOnboarding catalog={snapshot.catalog ?? snapshot.sources} initialProfile={snapshot.preferences?.profile}
-      initialSelected={snapshot.sources.map((source) => source.id)}
-      initialDisabled={snapshot.sources.filter((source) => !source.enabled).map((source) => source.id)}
+      initialSelected={snapshot.preferences?.onboarding === "pending" ? undefined : snapshot.sources.map((source) => source.id)}
+      initialDisabled={snapshot.preferences?.onboarding === "pending" ? undefined : snapshot.sources.filter((source) => !source.enabled).map((source) => source.id)}
       onCancel={() => setPreferencesOpen(false)}
       onSave={async (input) => { updateSnapshot(await feed.savePreferences(input)); setPreferencesOpen(false); }} />;
   }

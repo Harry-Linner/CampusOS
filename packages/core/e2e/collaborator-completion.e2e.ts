@@ -207,6 +207,7 @@ test("college and academic office subscriptions are complete, and optional inter
     await page.setViewportSize({ width: 1440, height: 960 });
     await prepareFixtureWorkspace(page);
     await page.getByLabel("主导航").getByRole("button", { name: "校园资讯" }).click();
+    await page.getByRole("button", { name: "定制偏好" }).click();
     await expect(page.getByRole("button", { name: "教职工", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "其他", exact: true })).toHaveCount(0);
     await page.getByRole("combobox", { name: /学院或学园/ }).selectOption("材料学院");
@@ -250,6 +251,7 @@ test("master identity alone does not select unrelated college feeds", async ({ b
     await page.setViewportSize({ width: 1440, height: 960 });
     await prepareFixtureWorkspace(page);
     await page.getByLabel("主导航").getByRole("button", { name: "校园资讯" }).click();
+    await page.getByRole("button", { name: "定制偏好" }).click();
     await page.getByRole("button", { name: "硕士生", exact: true }).click();
     await page.getByRole("button", { name: "查看推荐来源" }).click();
     await expect(page.getByText("2 个来源已选", { exact: true })).toBeVisible();
@@ -334,6 +336,7 @@ test(
       await prepareFixtureWorkspace(page);
 
       await page.getByLabel("主导航").getByRole("button", { name: "校园资讯" }).click();
+      await page.getByRole("button", { name: "定制偏好" }).click();
       const feedSetup = page.getByRole("region", { name: "校园资讯首次设置" });
       await expect(feedSetup).toBeVisible();
       await page.getByRole("button", { name: "本科生", exact: true }).click();
