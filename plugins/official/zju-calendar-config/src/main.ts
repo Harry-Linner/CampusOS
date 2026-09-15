@@ -17,8 +17,7 @@ export { ZJU_ACADEMIC_TERM_RULES } from "./termRules";
 /**
  * 浙江大学标准节次时间表（紫金港/玉泉/西溪/华家池/之江同表）。
  *
- * 来源：官方校历（本科与研究生同表），逐条核对见
- * `docs/references/zju-academic-calendar.md`。共 **13 节**：上午 1–5、下午 6–10、
+ * 来源：学校官方校历（本科与研究生同表）。共 **13 节**：上午 1–5、下午 6–10、
  * 晚上 11–13，没有第 14、15 节。海宁国际校区院历另行制定，不在本表范围内。
  */
 export const ZJU_STANDARD_PERIOD_TIMES: PeriodTimeRecord[] = [

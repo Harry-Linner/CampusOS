@@ -20,6 +20,9 @@ test-results/
 docs-internal/
 scripts-internal/
 
+# 全部文档均不公开：产品文档、设计决策、发布说明与截图一律留在维护者本地。
+/docs/
+
 # 协作 agent 的本地工作区指令：含私有基线约束、内部文档路径与个人环境信息，不入公开仓库。
 /AGENTS.md
 /CLAUDE.md
