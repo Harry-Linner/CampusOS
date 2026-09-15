@@ -13,7 +13,6 @@ const workspaceRuntimeDependencies = [
   "@campusos/plugin-deadline-assistant",
   "@campusos/plugin-ai-assistant",
   "@campusos/plugin-campus-feed",
-  "@campusos/plugin-daily-brief",
   "@campusos/plugin-materials",
   "@campusos/plugin-schedule",
   "@campusos/plugin-zju-calendar-config",

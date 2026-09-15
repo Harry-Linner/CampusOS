@@ -18,7 +18,7 @@
     "verify:zju-auth": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/zjuUnifiedAuth.live.test.ts --reporter=verbose",
     "verify:campus-feed": "node ../../scripts/repair-expect-type.mjs && vitest run src/main/campusFeedSources.live.test.ts --reporter=verbose",
     "verify:headless-sandbox": "electron-vite build && node ../../scripts/run-headless-sandbox-smoke.mjs",
-    "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials && node ../../scripts/run-eslint.mjs plugins/official/ai-assistant && node ../../scripts/run-eslint.mjs plugins/official/daily-brief && node ../../scripts/run-eslint.mjs plugins/official/campus-feed"
+    "lint": "node ../../scripts/run-eslint.mjs packages/core && node ../../scripts/run-eslint.mjs plugins/official/academic && node ../../scripts/run-eslint.mjs plugins/official/schedule && node ../../scripts/run-eslint.mjs plugins/official/materials && node ../../scripts/run-eslint.mjs plugins/official/ai-assistant && node ../../scripts/run-eslint.mjs plugins/official/campus-feed"
   },
   "dependencies": {
     "@campusos/plugin-academic": "workspace:*",
@@ -26,7 +26,6 @@
     "@campusos/plugin-academic-timetable-events": "workspace:*",
     "@campusos/plugin-ai-assistant": "workspace:*",
     "@campusos/plugin-campus-feed": "workspace:*",
-    "@campusos/plugin-daily-brief": "workspace:*",
     "@campusos/plugin-deadline-assistant": "workspace:*",
     "@campusos/plugin-materials": "workspace:*",
     "@campusos/plugin-schedule": "workspace:*",

@@ -48,9 +48,6 @@ importers:
       '@campusos/plugin-campus-feed':
         specifier: workspace:*
         version: link:../../plugins/official/campus-feed
-      '@campusos/plugin-daily-brief':
-        specifier: workspace:*
-        version: link:../../plugins/official/daily-brief
       '@campusos/plugin-deadline-assistant':
         specifier: workspace:*
         version: link:../../plugins/official/deadline-assistant

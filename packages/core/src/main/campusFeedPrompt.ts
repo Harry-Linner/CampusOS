@@ -1,8 +1,9 @@
 /**
  * Campus-feed AI extraction prompt and structured-output schema.
  *
- * Mirrors the daily-brief envelope pattern (system prompt + JSON Schema via the
- * shared AI provider adapter, ADR-0004 structured generation).
+ * Uses the same envelope pattern as the other structured-generation prompts
+ * (system prompt + JSON Schema through the shared AI provider adapter,
+ * ADR-0004 structured generation).
  */
 
 export const CAMPUS_FEED_PROMPT_VERSION = "campus-feed-schedule-v3";

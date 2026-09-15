@@ -1,6 +1,6 @@
 /* Manual visual-capture helper (NOT part of CI).
- * Launches the built CampusOS app and captures the dashboard + daily-brief
- * views in the three themes for Phase A visual-regression review.
+ * Launches the built CampusOS app and captures the dashboard view in the three
+ * themes for visual-regression review.
  * Run from packages/core:  node scripts/capture-ui.mjs   (requires `pnpm build` first)
  */
 import { _electron as electron } from "playwright";
@@ -38,12 +38,6 @@ try {
     // Let the dashboard settle after hydration.
     await page.waitForTimeout(1500);
     await page.screenshot({ path: join(outputRoot, `dashboard-${theme}.png`), fullPage: true });
-
-    await page.locator('[data-activity-id="daily-brief"]').click();
-    await page.getByRole("heading", { name: "早报", exact: true }).waitFor({ timeout: 15_000 });
-    // Let the auto-generated refresh finish (fetch + AI attempt).
-    await page.waitForTimeout(4000);
-    await page.screenshot({ path: join(outputRoot, `brief-${theme}.png`), fullPage: true });
   }
   console.log("captured to", outputRoot);
 } finally {

@@ -3,7 +3,7 @@ import {
   BRIEF_PROMPT_VERSION,
   BRIEF_SCHEMA,
   BRIEF_SYSTEM_PROMPT
-} from "../../../../plugins/official/daily-brief/src/prompt";
+} from "./briefPrompt";
 
 describe("daily brief prompt contract", () => {
   it("exposes a versioned prompt", () => {

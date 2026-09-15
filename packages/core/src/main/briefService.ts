@@ -32,7 +32,7 @@ import {
   BRIEF_PROMPT_VERSION,
   BRIEF_SCHEMA,
   BRIEF_SYSTEM_PROMPT
-} from "@campusos/plugin-daily-brief/prompt";
+} from "./briefPrompt";
 import {
   AiProviderAdapterError,
   createAiProviderAdapter,
