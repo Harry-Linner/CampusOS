@@ -27,8 +27,7 @@ scripts-internal/
 /AGENTS.md
 /CLAUDE.md
 
-# 已停止开发的早报（daily-brief）插件：2026-08-25 移出官方模块名单，不再接线；
-# 文件保留在本地以便日后恢复。core 侧保留的早报服务与 IPC 不再依赖它。
+# 已停止开发的废弃插件：源码留在本地工作区，core 侧的对应服务与 IPC 不再依赖它。
 /plugins/official/daily-brief/
 
 # 本地诊断与 .dsh 备份（可能含会话/路径等隐私信息，禁止入库）

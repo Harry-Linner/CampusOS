@@ -18,10 +18,6 @@ import { manifest as campusFeedManifest } from "@campusos/plugin-campus-feed/man
 
 /**
  * User-selectable Modules. Each contributes exactly one activity entry.
- *
- * daily-brief（早报）已于 2026-08-25 用户决议移出官方名单并暂停开发
- * （功能边界未厘清、设计过重），故不再出现在本列表；其代码与 IPC 保留，
- * 未从仓库删除，后续如需恢复开发再重新接入。
  */
 export const officialUserPluginManifests: PluginManifestV2[] = [
   academicManifest,

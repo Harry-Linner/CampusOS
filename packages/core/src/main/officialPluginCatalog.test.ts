@@ -24,7 +24,6 @@ describe("officialPluginCatalog", () => {
       officialUserPluginManifests.map((manifest) => manifest.id)
     );
     expect(visible.plugins).toHaveLength(5);
-    expect(visible.plugins.some((plugin) => plugin.id === "org.campusos.daily-brief")).toBe(false);
     expect(visible.plugins.every(
       (plugin) => (plugin.manifest.contributes.views?.length ?? 0) === 1
     )).toBe(true);

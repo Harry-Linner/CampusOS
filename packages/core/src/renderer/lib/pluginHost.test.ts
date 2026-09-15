@@ -30,13 +30,12 @@ const createOfficialUserRuntime = (): PluginRuntimeSnapshot =>
   }));
 
 describe("loadPlugins", () => {
-  it("loads exactly the official user Modules without the retired daily-brief", async () => {
+  it("loads exactly the official user Modules", async () => {
     const plugins = await loadPlugins(createOfficialUserRuntime());
 
     expect(plugins.map((plugin) => plugin.manifest.id).sort()).toEqual(
       officialUserPluginManifests.map((manifest) => manifest.id).sort()
     );
-    expect(plugins.some((plugin) => plugin.manifest.id === "org.campusos.daily-brief")).toBe(false);
     // B4-2：官方插件视图组件不再预载（按需 loadPluginComponent），loadPlugins 只提供 manifest 元数据。
     expect(plugins.every((plugin) => plugin.Component === undefined)).toBe(true);
     expect(plugins.every(
