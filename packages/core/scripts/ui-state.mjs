@@ -13,8 +13,7 @@
 // Run it against the same dev session before and after the change (start dev with
 // CAMPUSOS_DEV_CDP_PORT=9223). Some views load their data asynchronously and are not
 // deterministic - run `collect` twice before the change to learn which ones, and only
-// treat a difference as a regression when it exceeds that noise. See
-// docs/specs/refactor-tax-program.md.
+// treat a difference as a regression when it exceeds that noise.
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";

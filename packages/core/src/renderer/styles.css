@@ -1,16 +1,15 @@
 /*
  * Legacy stylesheet, now an ordered aggregator.
  *
- * Batch 27 introduced the aggregator and the parts below are the legacy rules split
- * into modules, in the order they used to appear. A nested unlayered @import inherits
- * this file's layer context, so the main window (layer(legacy) via globals.css) and
- * the desk-calendar window (which loads this file a second time, unlayered) both keep
- * the exact order and priority the rules had while they lived in one file; the
- * production build proves it, because the main-window CSS asset keeps its hash.
+ * The parts below are the legacy rules split into modules, in the order they used to
+ * appear. A nested unlayered @import inherits this file's layer context, so the main
+ * window (layer(legacy) via globals.css) and the desk-calendar window (which loads this
+ * file a second time, unlayered) both keep the exact order and priority the rules had
+ * while they lived in one file; the production build proves it, because the main-window
+ * CSS asset keeps its hash.
  *
  * Move whole rules between parts only with scripts/peel-css-module.mjs, and add new
- * styles to styles/<module>.css imported where they are used. The recipe and the
- * evidence for every batch live in docs/specs/refactor-tax-program.md.
+ * styles to styles/<module>.css imported where they are used.
  */
 @import "./styles/base.css";
 @import "./styles/app-shell.css";

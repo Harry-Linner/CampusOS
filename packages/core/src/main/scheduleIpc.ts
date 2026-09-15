@@ -139,8 +139,9 @@ export const saveScheduleTask = async (input: LocalTaskInput): Promise<LocalTask
         }
       });
     } else if (existing.type === "fixed" && existing.repeatType !== "norepeat") {
-      // Celechron has no stable occurrence/segment model. This implements the
-      // approved scope contract in docs/specs/desk-calendar-and-recurrence.md.
+      // A repeating series keeps a stable per-occurrence status and can be edited by
+      // scope (single / future / series); occurrences are addressed by
+      // `seriesOccurrenceOffset`, and a split re-roots the remaining occurrences.
       const groupId = existing.seriesGroupId ?? existing.id;
       const group = source.filter((task) => (task.seriesGroupId ?? task.id) === groupId)
         .sort((a, b) => (a.seriesOccurrenceOffset ?? 0) - (b.seriesOccurrenceOffset ?? 0));

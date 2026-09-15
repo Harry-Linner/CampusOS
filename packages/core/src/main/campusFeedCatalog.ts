@@ -2,7 +2,6 @@ import type { FeedSourceDescriptor, FeedSourceVerification } from "@campusos/sha
 import { MVP_CAMPUS_FEED_SOURCES } from "./campusFeedSourceCatalog";
 
 // Evidence timestamps are historical audit data, not simulated current dates.
-// Full observations: docs/campus-feed/source-audit-2026-09-05.json and audit notes.
 const CHECKED_AT = "2026-09-13";
 const verification: Record<string, FeedSourceVerification> = {
   "xgb-zxtz": { status: "list-only", checkedAt: "2026-09-14", note: "最新通知综合栏目；已核对官网前两页，含资助、评奖、勤工助学和课程安排。" },

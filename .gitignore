@@ -20,6 +20,10 @@ test-results/
 docs-internal/
 scripts-internal/
 
+# 协作 agent 的本地工作区指令：含私有基线约束、内部文档路径与个人环境信息，不入公开仓库。
+/AGENTS.md
+/CLAUDE.md
+
 # 本地诊断与 .dsh 备份（可能含会话/路径等隐私信息，禁止入库）
 /diagnostics-*.zip
 /.dsh.before.zip

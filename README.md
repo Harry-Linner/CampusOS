@@ -2,9 +2,9 @@
 
 CampusOS 是面向浙江大学学生的桌面校园工作台，用于查看课表、考试、成绩和课程资料，管理日程与校园资讯。
 
-**项目仍在开发，尚未达到公开发布条件。** 本科账号链路已通过阶段验收；桌面截图、真实桌面通知、多设备引导、全新 Windows 安装和研究生真实账号验收仍未完成，正式 GitHub Release 与 CC98 发布也尚未完成。2026-09-14 已先行分发[预发布内测包](#下载内测版)。当前进展与验收记录由维护者在本地跟踪，不随仓库发布。
+**项目仍在开发，尚未达到公开发布条件。** 2026-09-14 已先行分发[预发布内测包](#下载内测版)。
 
-项目源代码采用 [MIT License](LICENSE)，第三方媒体资源及其许可见 [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。领域术语与运行时决策由维护者在内部维护。
+项目源代码采用 [MIT License](LICENSE)，第三方媒体资源及其许可见 [THIRD_PARTY_ASSETS.md](THIRD_PARTY_ASSETS.md)，贡献约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 - **学业**：课表、课程、考试、成绩与实践记录。
 - **日程**：汇总课程、作业、考试和个人安排，支持智云课堂一键直达对应节次的回放、课前上课提醒与桌面日历/桌宠联动、学在浙大 DDL 倒计时与提交状态追踪，提供沉浸式桌面日历。
@@ -28,15 +28,15 @@ CampusOS 是面向浙江大学学生的桌面校园工作台，用于查看课�
 - `学业`模块的成绩页：通过主进程鉴权的只读 capability IPC 获取当前已验证账号的 `academic.grades@1`；旧账号缓存不可见，加权绩点只使用教务明确返回的绩点和学分，不推测缺失映射
 - 官方校历连接器：只读取浙江大学官方 HTTPS 页面中的学季边界和开课日，动态计算当前/下一学季；节次钟点使用官方标准 13 节表（本科与研究生同表，见 [`docs/references/zju-academic-calendar.md`](docs/references/zju-academic-calendar.md)），并把按学年内置的官方放假/调休/停课考试规则用于排课，未收录学年不猜测节假日
 - 学在浙大连接器：核心完整消费登录跳转并保管业务 `session`；每轮刷新读取 `/api/todos`、学期、全部课程分页及逐课 activities/uploads，发布 `learning.assignments@1`（`/api/todos` 的未完成待办 + 逐课 `activities` 里的作业型条目，按 activity id 去重）和 `learning.materials@1`。作业更新或移除会替换旧 DDL/提醒；课件目录每 60–120 秒全量重取，并以本地文件缺失或大小不符判断是否需要重新下载
-- 学在浙大课件下载：主进程携带当前业务 `session`，固定按 reference blob → preview blob 请求，最多 5 次指数退避；下载队列保留 HTTP Range 断点续传、`.part` 临时文件和最终大小校验。真实目录链和一份授权私有课件的认证下载已通过；多设备现场验收仍待完成
-- 校园资讯（官方第五模块）：Core 主进程按源聚合校内外公开信息，首次进入可按身份、学院和兴趣选择推荐订阅，也可从完整目录增删来源；正文、附件、来源健康度和 AI 日程候选均保留可核验证据，确认后才写入日程。逐源审计见 [`docs/campus-feed`](docs/campus-feed)
+- 学在浙大课件下载：主进程携带当前业务 `session`，固定按 reference blob → preview blob 请求，最多 5 次指数退避；下载队列保留 HTTP Range 断点续传、`.part` 临时文件和最终大小校验
+- 校园资讯（官方第五模块）：Core 主进程按源聚合校内外公开信息，首次进入可按身份、学院和兴趣选择推荐订阅，也可从完整目录增删来源；正文、附件、来源健康度和 AI 日程候选均保留可核验证据，确认后才写入日程
 - AI 助手：多 provider（OpenAI/DeepSeek/Anthropic/Gemini 兼容）受控抽取用户显式消息为日程候选；支持自动、日程提取、只读学业查询三种模式和模型发现
 - AI 桌宠：可选的独立透明窗口，接收用户主动拖入的跨应用文字、TXT/Markdown 或消息截图，也可显式读取一次剪贴板；原文和解析任务只保留在当前会话，结果回到 AI 助手逐项确认后才能写入
 - 诊断与测试：真实刷新结果由主进程持久化，可在设置页查看、清空并导出自动脱敏的 TXT
 - 数据源状态（如实标注）：
   - 已接入 Core 连接器：教务处（本科/研究生教务）、学在浙大、素拓、在线校历
-  - 校园资讯抓取面：校内外公开信息源（源码级清单见 `docs/campus-feed/zju-sources-guide.md`）
-- 桌面日历：Electron 独立 `BrowserWindow` overlay（`deskCalendarHost`），需求决策由维护者内部跟踪
+  - 校园资讯抓取面：校内外公开信息源
+- 桌面日历：Electron 独立 `BrowserWindow` overlay（`deskCalendarHost`）
 - 钉钉消息导入尚未支持，设置页不展示占位入口。
 - 已验证的 Windows x64 NSIS 安装包构建（发布和全新 Windows 验收仍待完成）
 
@@ -44,13 +44,9 @@ CampusOS 是面向浙江大学学生的桌面校园工作台，用于查看课�
 
 ## 下载内测版
 
-Windows x64 预发布内测包 `0.1.0-beta.2` 见 [Releases 页面](https://github.com/Harry-Linner/CampusOS/releases)。这是**预发布**版本，功能与稳定性都不完整。
+Windows x64 预发布内测包 `0.1.0-beta.3` 见 [Releases 页面](https://github.com/Harry-Linner/CampusOS/releases)。这是**预发布**版本，功能与稳定性都不完整。
 
-> 2026-09-14：本仓库为迁移后的公开仓库，内容为清理过的**单一初始提交**；迁移前的前置内部开发仓库已转为私有保留，迁移原因与清理范围见 [分发记录](docs/specs/windows-beta-distribution.md)。
-
-下载后双击安装，按向导选择安装目录即可，无需 Node、Python 等开发环境。安装包未签名，首次运行可能出现「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」继续；**该提示只在首次安装出现**，之后的版本升级在应用内完成。完整安装说明、SHA-256 校验值与未验收项见 [发布说明](docs/releases/0.1.0-beta.2.md)。
-
-> 正式 `v0.1.0` 尚未发布：现场 Alpha 验收门槛（3 名学生在 3 台 Windows 设备完成安装、认证、同步与提醒）仍未通过。
+下载后双击安装，按向导选择安装目录即可，无需 Node、Python 等开发环境。安装包未签名，首次运行可能出现「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」继续；**该提示只在首次安装出现**，之后的版本升级在应用内完成。完整安装说明与 SHA-256 校验值见 [发布说明](docs/releases/0.1.0-beta.3.md)。
 
 ## 致谢
 
@@ -69,4 +65,4 @@ CampusOS 的实现参考了以下开源项目，但**不包含它们的源码或
 6. Electron E2E：`pnpm --filter @campusos/core test:e2e`
 7. 构建：`pnpm build`
 
-> 真实账号链路（浙大统一认证）的验收脚本依赖本机凭据文件，属维护者本地工具，**不随本仓库发布**。贡献者无需运行它：`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build` 与 Electron E2E 已覆盖其余全部检查。
+> 需要真实浙大账号的链路只能由具备账号的维护者自行验证。贡献者无需这些账号：`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build` 与 Electron E2E 已覆盖其余全部检查。
