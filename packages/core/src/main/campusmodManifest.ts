@@ -1,7 +1,7 @@
 /**
  * Campusmod manifest parsing (Core, main).
  *
- * Split out of campusmodPackageRegistry.ts in batch 21 of the ADR-0006 program:
+ * Split out of campusmodPackageRegistry.ts:
  * the entrypoint shape, the contributes copy and the manifest validator work from
  * manifest bytes and entry names alone, so they need neither the registry's
  * filesystem access nor its install state.

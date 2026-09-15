@@ -1,7 +1,7 @@
 /*
  * Settings panel styles: connector health and the diagnostic log list.
  *
- * Peeled out of styles.css in batch 15 of the ADR-0006 program. globals.css
+ * Peeled out of styles.css. globals.css
  * imports it inside the same `legacy` cascade layer, directly after
  * styles.css. Only SettingsHealthPanel.tsx and SettingsDiagnosticPanel.tsx use
  * these selectors, and no other rule in styles.css matches them.

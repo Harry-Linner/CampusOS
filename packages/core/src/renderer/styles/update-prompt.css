@@ -1,7 +1,7 @@
 /*
  * Update prompt styles.
  *
- * Peeled out of styles.css in batch 23 of the ADR-0006 program. globals.css
+ * Peeled out of styles.css. globals.css
  * imports it inside the same `legacy` cascade layer, directly after
  * styles.css. The block owns its selectors (.update-prompt*), so its position in
  * the cascade does not matter.

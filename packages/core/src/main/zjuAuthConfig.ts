@@ -1,9 +1,9 @@
 /*
  * ZJU auth URLs, timeouts and limits.
  *
- * Moved verbatim out of zjuUnifiedAuth.ts in batch 43 of the ADR-0006 program. These
- * values are part of the request shape that Celechron 1.3.0 defines, so treat this file
- * as data: changing a URL or a timeout changes what the upstream sees.
+ * Moved out of zjuUnifiedAuth.ts. These values are part of the request shape
+ * the upstream defines, so treat this file as data: changing a URL or a timeout
+ * changes what the upstream sees.
  */
 
 export const ZJU_AUTH_LOGIN_URL = "https://zjuam.zju.edu.cn/cas/login";
@@ -61,8 +61,7 @@ export const LEARNING_API_TIMEOUT_MS = 30_000;
 export const LEARNING_API_MAX_ATTEMPTS = 6;
 export const LEARNING_API_INITIAL_RETRY_DELAY_MS = 100;
 export const QUALITY_DEVELOPMENT_PRACTICE_TIMEOUT_MS = 12_000;
-// Celechron lib/http/zjuServices/sztz.dart::_practiceAccept is preserved
-// verbatim for the TypeScript transport adapter.
+// The Accept header below is required by the upstream transport adapter.
 export const QUALITY_DEVELOPMENT_PRACTICE_ACCEPT =
   "text/html,application/xhtml+xml,application/xml;q=0.9," +
   "image/avif,image/webp,image/apng,*/*;q=0.8," +

@@ -1,7 +1,7 @@
 /*
  * SQLite schema migrations for the CampusOS database.
  *
- * Extracted from databaseService.ts in batch 41 of the ADR-0006 program; the DDL text and
+ * Extracted from databaseService.ts; the DDL text and
  * the order of the steps are unchanged, so an existing database runs exactly the same
  * statements as before. The chain is append-only: add a new applyMigration(n, ...) at the
  * end and never edit an applied step, because schema_migrations records what a user's

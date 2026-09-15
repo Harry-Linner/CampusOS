@@ -1,7 +1,7 @@
 /**
  * Campus-feed AI connection helpers (Core, main).
  *
- * Split out of campusFeedService.ts in batch 18 of the ADR-0006 program: the
+ * Split out of campusFeedService.ts: the
  * stored-connection shape, its validation, the projection to the renderer-safe
  * connection and the provider-error mapping are independent of the scheduler.
  */

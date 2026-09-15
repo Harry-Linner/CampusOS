@@ -1,7 +1,7 @@
 /**
  * Campusmod package limits (Core, main).
  *
- * Split out of campusmodPackageRegistry.ts in batch 20 of the ADR-0006 program so
+ * Split out of campusmodPackageRegistry.ts so
  * the archive unpacker and the registry enforce the same numbers.
  */
 

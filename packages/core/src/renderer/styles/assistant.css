@@ -1,7 +1,7 @@
 /*
  * AI assistant styles.
  *
- * Peeled out of styles.css in batch 13 of the ADR-0006 program. globals.css
+ * Peeled out of styles.css. globals.css
  * imports it inside the same `legacy` cascade layer, directly after
  * styles.css. Only AssistantView.tsx uses these selectors, and styles.css has no
  * other rule matching them, so the section is position-independent.

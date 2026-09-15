@@ -108,9 +108,9 @@ const asNumber = (value: unknown): number | null => {
   return null;
 };
 
-// Celechron lib/model/grade.dart:28-34. The raw source id remains available
+// The raw source id remains available
 // for provenance; realId is the stable course key shown to the user.
-export const deriveCelechronRealId = (id: string): string => {
+export const deriveCourseRealId = (id: string): string => {
   const match = id.match(/(\(.*\)-.*?)-.*/);
   return match?.[1] ?? (id.length < 22 ? id : id.slice(0, 22));
 };
@@ -172,8 +172,7 @@ const weekPatternFor = (weeks: readonly number[]): "all" | "odd" | "even" => {
 };
 
 const halfFlags = (responseTerm: number, requestedTerm: number): { firstHalf: boolean; secondHalf: boolean } => {
-  // Behavior reference: Celechron 1.3.0 grs_new.dart:542-549. 15/16 are
-  // response flags spanning both halves, not additional query terms.
+  // 15/16 are response flags spanning both halves, not additional query terms.
   if (responseTerm === 15 || responseTerm === 16) {
     return { firstHalf: true, secondHalf: true };
   }
@@ -299,7 +298,7 @@ export const parseGraduateExamsResponse = (
     const endClock = parseClock(item.jssj ?? combinedTimes[1]);
     const startAt = date && startClock ? toShanghaiDateTime(date, startClock) : null;
     const endAt = date && endClock ? toShanghaiDateTime(date, endClock) : null;
-    // Deviation from Celechron 1.3.0 lib/http/zjuServices/grs_new.dart:346-353,
+    // Deviation from the upstream default,
     // which falls back a missing start clock to 08:00 and a missing end clock to
     // 22:00 (a full-day placeholder). CampusOS deliberately does NOT invent
     // clocks: an exam without an explicit clock keeps startAt/endAt null and
@@ -355,12 +354,12 @@ export const parseGraduateGradesResponse = (body: string): AcademicGradesData =>
     const period = parseAcademicPeriod(sourceId);
     return [{
       sourceId,
-      realId: deriveCelechronRealId(sourceId),
+      realId: deriveCourseRealId(sourceId),
       courseCode: asString(item.kcbh) ?? asString(item.kcdm),
       courseName,
       credit: asNumber(item.xf) ?? 0,
       originalScore: asString(item.zf) ?? "",
-      // Celechron lib/http/zjuServices/grs_new.dart:276-286 sets graduate
+      // The upstream sets graduate
       // fivePoint to 0 and gpaIncluded to false regardless of jd payload.
       gradePoint: null,
       isMajorCourse: true,
@@ -391,7 +390,7 @@ export const buildGraduateCourseCatalog = ({
     sourceToKey.set(grade.sourceId, key);
     byKey.set(key, {
       sourceId: grade.sourceId,
-      realId: grade.realId ?? deriveCelechronRealId(grade.sourceId),
+      realId: grade.realId ?? deriveCourseRealId(grade.sourceId),
       courseCode: grade.courseCode,
       courseName: grade.courseName,
       teachers: [],
@@ -466,7 +465,7 @@ export const buildGraduateCourseCatalog = ({
       `unknown:unknown:${exam.courseName}`;
     const existing = byKey.get(existingKey) ?? {
       sourceId: exam.courseId,
-      realId: deriveCelechronRealId(exam.courseId),
+      realId: deriveCourseRealId(exam.courseId),
       courseCode: exam.courseId,
       courseName: exam.courseName,
       teachers: [],

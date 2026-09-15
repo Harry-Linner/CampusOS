@@ -1,8 +1,7 @@
 import { Solar } from "lunar-typescript";
 
 /**
- * Desk-calendar date, lunar and grouping helpers (Batch 11 of the ADR-0006
- * program).
+ * Desk-calendar date, lunar and grouping helpers.
  *
  * These were inlined in `desk-calendar.tsx`, where they were only reachable
  * through the 800-line window component and its end-to-end test. They are pure

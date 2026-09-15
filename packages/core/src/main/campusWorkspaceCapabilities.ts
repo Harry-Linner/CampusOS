@@ -365,8 +365,8 @@ export const mergeAcademicCalendarIntoWorkspace = (
     (quarter) => quarter.classesBeginDate > today
   );
 
-  // Celechron lib/model/scholar.dart:97-110 keeps the latest semester current
-  // only for 14 days after its final period. CampusOS applies the same boundary
+  // The latest semester stays current
+  // only for 14 days after its final period. That boundary is applied
   // to 2|夏 so 小学期 remains visible briefly, then exposes the next complete
   // autumn-winter semester for the remaining summer break.
   const recentSpringSummerEnd = quarters
@@ -468,8 +468,8 @@ const toDeadline = (
 ): CampusDeadline | null => {
   const kind = deadlineKindForEvent(event.kind);
   if (!kind || !isAbsoluteDateTime(event.startAt)) return null;
-  // Celechron scholar_controller.dart:130-143 removes expired todos before
-  // projection. CampusOS applies the requested Shanghai calendar-day boundary.
+  // Expired todos are removed before projection, using the requested
+  // Shanghai calendar-day boundary.
   if (formatShanghaiDate(event.startAt) < today) {
     return null;
   }

@@ -1,7 +1,7 @@
 /*
  * Undergraduate academic-affairs family of the ZJU unified-auth client.
  *
- * Split out of zjuUnifiedAuth.ts in batch 47 of the ADR-0006 program. The bodies are the
+ * Split out of zjuUnifiedAuth.ts. The bodies are the
  * originals with only mechanical renames: the session maps belong to this class and the
  * shared request/CAS helpers arrive through the injected host. The 教务处 session is a
  * cookie jar established through the CAS service callback, cached per username.
@@ -136,9 +136,9 @@ export class ZjuUndergraduateApi {
           : UNDERGRADUATE_GRADES_URL;
     const requestBody =
       request.operation === "timetable"
-        // Celechron lib/http/ugrs_spider.dart:383-491 passes the full academic
-        // year label to zdbk.dart:508. The endpoint accepts a start year but can
-        // silently return another schedule instead of the requested term.
+        // The full academic year label is sent. The endpoint accepts a start
+        // year but can silently return another schedule instead of the
+        // requested term.
         ? `xnm=${request.academicYearStart}-${request.academicYearStart + 1}&xqm=${request.season}&captcha_value=null`
         : "";
     const requestContext = request.operation === "timetable"

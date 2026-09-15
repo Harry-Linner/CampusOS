@@ -55,7 +55,7 @@ const createAcademicCredentialVault = (): AcademicCredentialVault => {
       }
     },
     write: async (payload: StoredAcademicCredentialPayload) => {
-      // Authentication still follows Celechron via createService; only its encrypted
+      // Authentication still goes through createService; only its encrypted
       // persistence destination changes so connecting B never overwrites A's vault.
       const destination = accountProfiles?.credentialPath(payload) ?? storagePath;
       await mkdir(dirname(destination), { recursive: true, mode: 0o700 });

@@ -3,9 +3,9 @@ import type { ZjuAuthHttpResponse } from "./zjuAuthContracts";
 /*
  * Cookie jar and header helpers of the ZJU unified-auth client.
  *
- * Moved verbatim out of zjuUnifiedAuth.ts in batch 43 of the ADR-0006 program.
- * Celechron's Dart implementation keeps the same rules (domain/path matching, splitting a
- * combined Set-Cookie header), so the behaviour here mirrors lib/http/zjuServices.
+ * Moved out of zjuUnifiedAuth.ts.
+ * The upstream implementation keeps the same rules (domain/path matching,
+ * splitting a combined Set-Cookie header).
  */
 
 interface StoredCookie {
@@ -211,7 +211,7 @@ export class CookieJar {
       return learningCookies;
     }
 
-    // Celechron scopes the CAS-issued SSO credential to zju.edu.cn before
+    // The CAS-issued SSO credential is scoped to zju.edu.cn before
     // starting the courses redirect chain. The server may omit Domain, which
     // otherwise makes this cookie host-only for zjuam.zju.edu.cn.
     learningCookies.#cookies.set(

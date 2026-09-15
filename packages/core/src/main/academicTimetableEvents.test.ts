@@ -227,7 +227,7 @@ describe("academic timetable events", () => {
       ]
     };
 
-    // CampusOS diverges from Celechron (current-term-only schedule): every
+    // Projection is not limited to the current term: every
     // term with an official-calendar window is projected, whatever the date.
     const result = deriveTimetableCalendarEvents(
       [multiSemesterRecord],
@@ -329,7 +329,7 @@ describe("academic timetable events", () => {
     expect(result.events[1].startAt).toBe("2026-09-28T08:00:00+08:00");
   });
 
-  it("continues Celechron custom repeats after week 16", () => {
+  it("continues repeats after week 16", () => {
     const extendedCalendar: AcademicCalendarConfigData = {
       ...calendarConfig,
       quarters: calendarConfig.quarters.map((quarter) =>
@@ -367,7 +367,7 @@ describe("academic timetable events", () => {
     ]);
   });
 
-  it("omits unconfirmed sessions and short custom repeats like Celechron", () => {
+  it("omits unconfirmed sessions and short custom repeats", () => {
     const result = deriveTimetableCalendarEvents(
       [{
         ...timetableRecord,

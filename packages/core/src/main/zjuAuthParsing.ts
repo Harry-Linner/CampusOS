@@ -4,9 +4,9 @@ import type { ZjuAuthHttpResponse, ZjuAuthenticatedProfile } from "./zjuAuthCont
 /*
  * Parsing, validation and encryption helpers of the ZJU unified-auth client.
  *
- * Moved verbatim out of zjuUnifiedAuth.ts in batch 43 of the ADR-0006 program. These are
+ * Moved out of zjuUnifiedAuth.ts. These are
  * the pure functions: HTML/JSON parsing, redirect and callback validation, session-expiry
- * detection, and the CAS password encryption Celechron performs in Dart.
+ * detection, and the CAS password encryption.
  */
 
 const decodeHtmlAttribute = (value: string): string =>

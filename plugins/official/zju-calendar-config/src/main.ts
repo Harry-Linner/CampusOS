@@ -280,7 +280,7 @@ export const createZjuCalendarConfigConnector = ({
       }
 
       const message = error instanceof Error ? error.message : "官网校历请求失败。";
-      // Deviation from Celechron 1.3.0 lib/http/time_config_service.dart:137-181,
+      // Deviation from the upstream default,
       // which falls back to a safe default calendar generated from the last valid
       // configuration when both the online page and the exact-semester cache are
       // missing. CampusOS deliberately stops at "unavailable" instead of

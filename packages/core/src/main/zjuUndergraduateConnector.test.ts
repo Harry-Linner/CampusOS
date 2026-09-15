@@ -20,7 +20,7 @@ import {
 } from "@campusos/plugin-zju-undergraduate/main";
 
 describe("zju undergraduate connector", () => {
-  it("normalizes undated exam-week labels like Celechron", () => {
+  it("normalizes undated exam-week labels", () => {
     const exams = parseExamsResponse(JSON.stringify({
       items: [{
         xkkh: "(2025-2026-2)-TEST-1",
@@ -383,7 +383,7 @@ describe("zju undergraduate connector", () => {
     }));
   });
 
-  it("derives enrollment history through the next academic-year probe like Celechron", () => {
+  it("derives enrollment history through the next academic-year probe", () => {
     const queries = createTimetableQueries(
       new Date("2026-07-19T04:00:00.000Z"),
       "3240100001"
@@ -732,7 +732,7 @@ describe("undergraduate major-grade projection", () => {
     expect(result.grades.map((grade) => grade.isMajorCourse)).toEqual([true, false]);
   });
 
-  it("uses Celechron's zero point when the transcript omits jd", () => {
+  it("uses the zero point when the transcript omits jd", () => {
     const result = parseGradesResponse(JSON.stringify({
       items: [{ xkkh: "(2025-2026-1)-MISSING-001-1", kcmc: "missing", xf: 2, cj: "不及格" }]
     }));
@@ -787,7 +787,7 @@ describe("undergraduate practice and course catalog projections", () => {
     ]);
   });
 
-  it("follows the Celechron summary priority and strict passed mapping", () => {
+  it("follows the practice summary priority and strict passed mapping", () => {
     const updatedAt = "2026-08-04T00:00:00.000Z";
     const summary = parsePracticeSummaryResponse(JSON.stringify({
       extend: { myInfo: { dektJf: "1.5", dsktJf: null, dsiktJf: 2, myTg: "yes", lyTg: "0.0" } }
@@ -870,7 +870,7 @@ describe("undergraduate practice and course catalog projections", () => {
     }));
   });
 
-  it("joins timetable sessions and exams into one course record using Celechron merge rules", () => {
+  it("joins timetable sessions and exams into one course record using the merge rules", () => {
     const sessionBase = {
       sourceId: "session-1",
       courseName: "catalog-course",
@@ -982,10 +982,10 @@ describe("undergraduate practice and course catalog projections", () => {
     expect(catalog.courses[1]?.examSourceIds).toEqual(["exam-b"]);
   });
 
-  it("merges a no-xkkh timetable session into the graded course by term+name (Celechron)", () => {
+  it("merges a no-xkkh timetable session into the graded course by term+name", () => {
     // 用户场景：课表排课没有 xkkh（ZDBK 不给课号），成绩有 xkkh + 学分。
-    // Celechron 以「学期号 + 课程名」归组，课表排课必须并入成绩课程，而不是
-    // 生成 0 学分派生重复条目（semester.dart:384-441）。
+    // 以「学期号 + 课程名」归组，课表排课必须并入成绩课程，而不是
+    // 生成 0 学分派生重复条目。
     const catalog = buildCourseCatalog({
       terms: [{
         academicYearStart: 2025,
@@ -1031,7 +1031,7 @@ describe("undergraduate practice and course catalog projections", () => {
     expect(catalog.courses[0]?.sessions[0]?.sourceId).toBe("session-noxkkh");
   });
 
-  it("collapses 秋/冬 and 春/夏 into the same term course identity (Celechron semKey)", () => {
+  it("collapses 秋/冬 and 春/夏 into the same term course identity (semester merge key)", () => {
     const catalog = buildCourseCatalog({
       terms: [{
         academicYearStart: 2025,

@@ -1,8 +1,8 @@
 /*
  * HTTP transports of the ZJU unified-auth client.
  *
- * Moved verbatim out of zjuUnifiedAuth.ts in batch 43 of the ADR-0006 program. Three
- * transports exist because Celechron changes the TLS fingerprint and header shape per
+ * Moved out of zjuUnifiedAuth.ts. Three
+ * transports exist because the TLS fingerprint and header shape change per
  * service: fetch for the CAS flow, fetch for learning-platform downloads, and node:https
  * for the undergraduate endpoints.
  */

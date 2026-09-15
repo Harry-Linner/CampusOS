@@ -353,7 +353,7 @@ describe("grade change notifications", () => {
     }
   });
 
-  it("uses Celechron's first repeated-course attempt for the GPA baseline", async () => {
+  it("uses the first repeated-course attempt for the GPA baseline", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-grade-notification-"));
     temporaryDirectories.push(storageRoot);
     const database = createDatabaseService({

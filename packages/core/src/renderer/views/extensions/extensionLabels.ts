@@ -2,7 +2,7 @@ import type { CampusPermission, PluginRuntimeStatus } from "@campusos/shared";
 import type { PluginPackageInspection } from "../../../shared/pluginBridge";
 
 /**
- * Extension view labels (Batch 16 of the ADR-0006 program).
+ * Extension view labels.
  *
  * These four mappings and the size formatter were inlined in the 607-line
  * ExtensionsView.tsx, where only the view's end-to-end and component tests could

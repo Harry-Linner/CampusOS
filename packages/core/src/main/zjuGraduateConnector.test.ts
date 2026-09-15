@@ -101,7 +101,7 @@ describe("zju graduate connector", () => {
       const result = parseGraduateTimetableResponse({ academicYearStart: 2026, term: 13, season: "1|秋" }, timetableBody.replaceAll('"pkxq":13', `"pkxq":${responseTerm}`));
       expect(result[0]).toMatchObject({ firstHalf: true, secondHalf: true });
     }
-    // Celechron grs_new.dart uses the request half unless the response says full-semester.
+    // The request half applies unless the response says full-semester.
     expect(parseGraduateTimetableResponse({ academicYearStart: 2026, term: 14, season: "1|冬" }, timetableBody)[0]).toMatchObject({ firstHalf: false, secondHalf: true });
   });
   it("parses timetable weeks and never invents missing exam times or grade points", () => {

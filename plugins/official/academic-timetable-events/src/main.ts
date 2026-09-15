@@ -210,8 +210,8 @@ const dateForExactWeek = (
   if (!Number.isInteger(week) || week < 1) return null;
   const target = dayOfWeekToNumber(dayOfWeek);
   if (week > 16) {
-    // Celechron lib/model/semester.dart:323-335 continues custom repeats
-    // after the normal 16-week calendar from the eighth Sunday's anchor.
+    // Custom repeats continue after the normal 16-week calendar, using the
+    // eighth Sunday's anchor.
     const secondStart = parseDateOnly(windows[1]?.startDate ?? "");
     if (!secondStart) return null;
     const firstSundayOffset = (7 - (secondStart.getUTCDay() || 7) + 7) % 7;
@@ -337,11 +337,10 @@ export const deriveTimetableCalendarEvents = (
     events: []
   };
 
-  // Flatten every term's sessions with their provider context. CampusOS
-  // deliberately diverges from Celechron here: Celechron exposes only the
-  // current semester's schedule (lib/model/scholar.dart:97-110), while the
-  // user-facing requirement is that courses from every term — including past
-  // and future semesters — stay visible in the calendar.
+  // Flatten every term's sessions with their provider context. The projection
+  // deliberately covers more than the current term: the user-facing requirement
+  // is that courses from every term — including past and future semesters —
+  // stay visible in the calendar.
   const expanded: AcademicTimetableSessionContext[] = [];
   for (const record of timetableRecords) {
     const terms = record.data?.terms ?? [];

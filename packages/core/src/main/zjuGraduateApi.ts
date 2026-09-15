@@ -1,10 +1,10 @@
 /*
  * Graduate academic-affairs family of the ZJU unified-auth client.
  *
- * Split out of zjuUnifiedAuth.ts in batch 45 of the ADR-0006 program. The bodies are the
+ * Split out of zjuUnifiedAuth.ts. The bodies are the
  * originals with only mechanical renames: the session maps belong to this class and the
  * shared request/CAS helpers arrive through the injected host. The token handshake
- * (connect, then X-Access-Token on every call) mirrors Celechron's graduate service flow.
+ * (connect, then X-Access-Token on every call) mirrors the graduate service flow.
  */
 import { computeRequestFingerprint } from "./requestFingerprint";
 import { GRADUATE_ACADEMIC_SERVICE_URL, GRADUATE_EXAMS_URL, GRADUATE_GRADES_URL, GRADUATE_TIMETABLE_URL, GRADUATE_VALIDATE_LOGIN_URL, ZJU_AUTH_LOGIN_URL } from "./zjuAuthConfig";

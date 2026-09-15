@@ -241,8 +241,8 @@ export const createTaskRecord = (
   if (record.type === "fixedlegacy") {
     throw new Error("不能新建过去日程。");
   }
-  // Celechron lib/page/task/task_edit_page.dart:41-63 rejects an empty repeat
-  // range. Validate commands here, not stored segments truncated by a split.
+  // An empty repeat range is rejected. Validate the incoming command here, not
+  // stored segments, which a split may have truncated.
   if (record.type === "fixed" && record.repeatType !== "norepeat" && record.repeatEndMode === "date") {
     const date = new Date(`${record.repeatEndsOn}T00:00:00+08:00`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.repeatEndsOn) || !Number.isFinite(date.getTime()) || dateOnlyIso(date.toISOString(), "重复结束日期") !== record.repeatEndsOn || record.repeatEndsOn < dateOnlyIso(record.startAt, "开始日期")) {
@@ -400,8 +400,8 @@ export const refreshLocalTasks = (
       continue;
     }
 
-    // Stable occurrence status is a user-approved extension to Celechron's
-    // rolling task.dart:249-263 lifecycle; never reset explicit completion.
+    // An occurrence keeps its own status across the series lifecycle;
+    // never reset an explicit completion.
     if (task.type === "fixed" && task.status !== "suspended" && task.status !== "completed") {
       task.status = "running";
     }

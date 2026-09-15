@@ -118,7 +118,7 @@ export const createTimetableQueries = (
   now: Date,
   studentId?: string
 ): TimetableQuery[] => {
-  // Celechron derives the academic year from the university's Shanghai
+  // The academic year comes from the university's Shanghai
   // calendar, rather than the host process timezone.
   const parts = shanghaiAcademicClock.formatToParts(now);
   const calendarYear = Number(
@@ -129,8 +129,7 @@ export const createTimetableQueries = (
   );
   const currentAcademicYearStart =
     calendarMonth >= 9 ? calendarYear : calendarYear - 1;
-  // Celechron lib/http/ugrs_spider.dart:354-371 and
-  // lib/http/calendar_config_parser.dart:14-51 derive the enrollment year
+  // The enrollment year is derived
   // from the student number, fetch every year through the current academic
   // year, then probe exactly one future year without crossing graduation.
   const enrollmentDigits = studentId?.trim().match(/^\d(\d{2})/)?.[1];
@@ -186,9 +185,9 @@ const asNumber = (value: unknown): number | null => {
   return null;
 };
 
-// Celechron lib/model/grade.dart:28-34. Keep the raw xkkh as sourceId while
+// Keep the raw xkkh as sourceId while
 // exposing the same stable display id used to join a course's public details.
-export const deriveCelechronRealId = (id: string): string => {
+export const deriveCourseRealId = (id: string): string => {
   const match = id.match(/(\(.*\)-.*?)-.*/);
   return match?.[1] ?? (id.length < 22 ? id : id.slice(0, 22));
 };
@@ -438,14 +437,14 @@ const parseGradeRecord = (
 
   return {
     sourceId,
-    realId: deriveCelechronRealId(sourceId),
+    realId: deriveCourseRealId(sourceId),
     courseCode: asString(item.kch)?.trim() || termMatch?.[4] || null,
     courseName: (asString(item.kcmc)?.trim() || "未知课程")
       .replaceAll("(", "（")
       .replaceAll(")", "）"),
     credit: credit !== null && credit >= 0 ? credit : 0,
     originalScore: asString(item.cj)?.trim() ?? "",
-    // Celechron lib/model/grade.dart:80-87 defaults a missing jd to 0.0.
+    // A missing jd defaults to 0.0.
     gradePoint: gradePoint !== null && gradePoint >= 0 ? gradePoint : 0,
     academicYearStart,
     termNumber,
@@ -489,7 +488,7 @@ const majorGradeHundredPoint = (grade: AcademicGradeRecord): number => {
   return labels[grade.originalScore] ?? Number.parseInt(grade.originalScore.match(/\d+/)?.[0] ?? "0", 10);
 };
 
-/** Mirrors Celechron lib/http/zjuServices/zdbk.dart:getMajorGrade. */
+/** Parses the dedicated major-grade summary response. */
 export const parseMajorGradeSummaryResponse = (body: string): AcademicMajorGradeSummary => {
   const payload = JSON.parse(body) as { items?: unknown };
   if (!Array.isArray(payload.items)) {
@@ -569,7 +568,7 @@ const academicTermFromSourceId = (
 };
 
 /**
- * Celechron's scholar model exposes one course record which owns its grade,
+ * One course record owns its grade,
  * sessions and exams. CampusOS keeps the same projection at the capability
  * boundary so the renderer never has to join raw connector responses.
  */
@@ -587,8 +586,8 @@ export const buildCourseCatalog = ({
   const gradeKeysById = new Map<string, string>();
   const sessionBucketsByName = new Map<string, string>();
 
-  // Celechron Semester merge key: "$semesterId$name"（semester.dart:384-441）。
-  // semesterId 只有 1|2 两档（ugrs_spider.dart:493 按 season.startsWith('1') 折叠），
+  // Semester merge key: "$semesterId$name"。
+  // semesterId 只有 1|2 两档（按 season.startsWith('1') 折叠），
   // 秋/冬合并到 1、春/夏合并到 2；课表接口（ZDBK）不返回 xkkh，因此本科课程必须
   // 以「学期号 + 课程名」归组，再在同一 Course 内合并成绩/考试/排课。
   const termNumberForSeason = (season: AcademicTimetableSeason | null): number | null =>
@@ -603,7 +602,7 @@ export const buildCourseCatalog = ({
     identityKeysByName.set(nameKey, keys);
   };
 
-  /** 名字兜底：同名同学期恰好只有一个「成绩支撑」的课程时，返回其键（Celechron 归组规则）。 */
+  /** 名字兜底：同名同学期恰好只有一个「成绩支撑」的课程时，返回其键。 */
   const gradeBackedKeyByName = (nameKey: string): string | null => {
     const candidates = [...(identityKeysByName.get(nameKey) ?? [])]
       .filter((key) => byKey.get(key)?.gradeSourceId !== null && byKey.get(key)?.gradeSourceId !== undefined);
@@ -650,7 +649,7 @@ export const buildCourseCatalog = ({
     const key = `id:${grade.sourceId}`;
     const course: AcademicCourseRecord = {
       sourceId: grade.sourceId,
-      realId: grade.realId ?? deriveCelechronRealId(grade.sourceId),
+      realId: grade.realId ?? deriveCourseRealId(grade.sourceId),
       courseCode: grade.courseCode,
       courseName: grade.courseName,
       teachers: [],
@@ -676,15 +675,15 @@ export const buildCourseCatalog = ({
     const academicYearStart = term?.academicYearStart ?? null;
     const season = seasonForTerm(term?.termNumber ?? null);
     const nameKey = termNameKey(academicYearStart, season, exam.courseName);
-    // 优先按 xkkh 挂到成绩记录；xkkh 缺失/不一致时按 Celechron 的「学期号+课程名」归组，
-    // 避免生成 0 学分重复条目（grade.dart/semester.dart 对照）。
+    // 优先按 xkkh 挂到成绩记录；xkkh 缺失/不一致时按「学期号 + 课程名」归组，
+    // 避免生成 0 学分重复条目。
     const key = gradeKeysById.get(exam.courseId)
       ?? gradeBackedKeyByName(nameKey)
       ?? (identityKeysByName.get(nameKey)?.size === 1 ? [...identityKeysByName.get(nameKey)!][0] : null)
       ?? `id:${exam.courseId}`;
     const existing = byKey.get(key) ?? {
       sourceId: exam.courseId,
-      realId: deriveCelechronRealId(exam.courseId),
+      realId: deriveCourseRealId(exam.courseId),
       courseCode: null,
       courseName: exam.courseName,
       teachers: [],
@@ -709,7 +708,7 @@ export const buildCourseCatalog = ({
   for (const term of terms) {
     for (const session of term.sessions) {
       const nameKey = termNameKey(term.academicYearStart, term.season, session.courseName);
-      // xkkh 优先（成绩/考试已有精确键）；否则回退 Celechron 的「学期号+课程名」归组，
+      // xkkh 优先（成绩/考试已有精确键）；否则回退「学期号 + 课程名」归组，
       // 使无 xkkh 的课表排课并入成绩课程，消除 0 学分派生重复。
       const key = session.courseId && gradeKeysById.has(session.courseId)
         ? gradeKeysById.get(session.courseId)!
@@ -719,7 +718,7 @@ export const buildCourseCatalog = ({
           ?? `session:${nameKey}`;
       const existing = byKey.get(key) ?? {
         sourceId: session.courseId ?? session.sourceId,
-        realId: session.courseId ? deriveCelechronRealId(session.courseId) : null,
+        realId: session.courseId ? deriveCourseRealId(session.courseId) : null,
         courseCode: null,
         courseName: session.courseName,
         teachers: [],
@@ -854,7 +853,7 @@ export const parsePracticeRecordsResponse = (body: string): AcademicPracticeReco
       activityEnd: parseDateValue(item.hdjssj),
       updatedAt: parseDateValue(item.gxsj)
       };
-      // Celechron parseSztzItems uses putIfAbsent: the first valid record wins.
+      // putIfAbsent semantics: the first valid record wins.
       if (!record.deleted && !records.has(id)) records.set(id, record);
     } catch {
       // A malformed item must not invalidate the rest of the practice list.
@@ -1059,7 +1058,7 @@ export const createZjuUndergraduateConnector = ({
     );
     if (result.ok) {
       try {
-        // Celechron: lib/http/ugrs_spider.dart:667-702, 792-795 fetches the
+        // Fetch the
         // transcript and dedicated major transcript, then projects xkkh IDs.
         let data: AcademicGradesData = parseGradesResponse(
           result.body,
@@ -1364,9 +1363,9 @@ export const createZjuUndergraduateConnector = ({
       }
 
       if (result.body.trim() === "null") {
-        // Celechron lib/http/zjuServices/zdbk.dart:539-567 treats null as an
-        // empty decode result. CampusOS keeps it unavailable so the user's
-        // same-term cache protection can apply; kbList:[] remains live empty.
+        // A null is treated as an empty decode result. CampusOS keeps it
+        // unavailable so the user's same-term cache protection can apply;
+        // kbList:[] remains live empty.
         return {
           ...query,
           state: "unavailable" as const,
@@ -1395,7 +1394,7 @@ export const createZjuUndergraduateConnector = ({
     const currentAcademicYear = createTimetableQueries(refreshedAt)[0].academicYearStart;
     const etaSemesters = new Map<string, Promise<AcademicTimetableSession[]>>();
     let etaUsed = false;
-    // User-authorized ETA tier, following Elychron ugrs_spider.dart:525-552:
+    // ETA tier:
     // request once per full semester after zdbk fails/is empty; never probe the
     // future year through ETA. Its empty historical response is not success.
     if (fetchEtaTimetable) {
@@ -1435,17 +1434,17 @@ export const createZjuUndergraduateConnector = ({
         .map((term) => [timetableTermKey(term), term])
     );
     const cacheFallbackFailures: { query: TimetableQuery; message: string }[] = [];
-    // User-authorized departure from Celechron zdbk.dart:539-567: preserve a
+    // Deliberate deviation from the upstream response-only view: keep a
     // non-empty same-account/same-term snapshot when a successful response is
-    // empty. This borrows Elychron's behavior, not its GPL implementation.
+    // empty, so a blank answer never erases a term the user already saw.
     const effectiveTerms = terms.map((term) => {
           const isEmptyLiveTerm = term.state === "live" && term.sessions.length === 0;
           if (!isEmptyLiveTerm && term.state !== "unavailable") return term;
 
           const cachedTerm = cachedTerms.get(timetableTermKey(term));
           if (!cachedTerm || (isEmptyLiveTerm && cachedTerm.sessions.length === 0)) {
-            // Celechron ugrs_spider.dart:484-532 treats an unpublished future
-            // year's probe as expected. Do not suppress real request failures.
+            // An unpublished future year's probe returning null is expected.
+            // Do not suppress real request failures.
             const response = resultByQuery.get(timetableTermKey(term));
             if (term.academicYearStart > currentAcademicYear && response?.ok && response.body.trim() === "null") {
               return { ...term, state: "live" as const, message: "下一学年探测未返回课表。" };

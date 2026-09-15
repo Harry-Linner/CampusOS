@@ -1,10 +1,9 @@
 /*
  * Types and the error class of the ZJU unified-auth client.
  *
- * Moved verbatim out of zjuUnifiedAuth.ts in batch 43 of the ADR-0006 program. The
- * transport and service contracts are what the client, the credential store and the tests
- * agree on, and the error class has to stay a single identity because callers use
- * `instanceof` on it.
+ * Split out of zjuUnifiedAuth.ts. The transport and service contracts are what the client,
+ * the credential store and the tests agree on, and the error class has to stay a single
+ * identity because callers use `instanceof` on it.
  */
 import type { AcademicAuthenticatedProfile, AcademicProgram } from "../shared/credentialBridge";
 

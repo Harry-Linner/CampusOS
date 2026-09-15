@@ -6,7 +6,7 @@ export type IpcTrustPolicy = (event: IpcMainInvokeEvent) => void;
 
 /**
  * Registers an invokable IPC channel that only the trusted CampusOS renderer can
- * reach (ADR-0006). Keeping the trust check on the registration path means a new
+ * reach. Keeping the trust check on the registration path means a new
  * channel cannot be added without it, and handlers stop repeating
  * `assertTrustedRenderer(event)` as their first statement.
  *

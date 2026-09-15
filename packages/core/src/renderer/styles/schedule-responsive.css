@@ -1,8 +1,8 @@
 /*
  * schedule-responsive styles.
  *
- * Ordered part of the legacy stylesheet, kept in cascade order by the ADR-0006
- * styles.css program: styles.css imports the parts in rule order and a nested
+ * Ordered part of the legacy stylesheet, kept in cascade order: styles.css
+ * imports the parts in rule order and a nested
  * unlayered @import inherits the caller's layer context, so the main window
  * (layer(legacy)) and the desk-calendar window (unlayered) both see exactly the order
  * these rules were written in. Keep that property when editing this file: move whole

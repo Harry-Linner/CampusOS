@@ -27,7 +27,7 @@ export class ZjuItcApi {
 
   async #follow(start: string, cookies: CookieJar): Promise<ZjuAuthHttpResponse> {
     let current = new URL(start);
-    // Celechron courses.dart _doLogin: store cookies before following each
+    // Store cookies before following each
     // redirect. ITC adaptation limits all hops to its own host. Its real
     // 2026-09-13 callback is HTTP -> HTTPS -> HTTP -> HTTPS, not a fallback.
     for (let hop = 0; hop < 15; hop++) {
@@ -72,14 +72,14 @@ export class ZjuItcApi {
 
   async #connect(credentials: ZjuAuthCredentials, refreshed = false): Promise<{ cookies: CookieJar; page: ZjuAuthHttpResponse }> {
     const generation = this.#generation;
-    // Celechron zjuam.dart getSsoCookie/getServiceCallback (46-74,108-181):
+    // SSO cookie exchange:
     // reuse the existing single-flight SSO and consume a fresh service ticket.
     const cas = await this.host.authenticateCas(credentials);
     const service = new URL(ZJU_AUTH_LOGIN_URL);
     service.searchParams.set("service", ITC_CAS_SERVICE);
     const response = await this.host.request("GET", service.href, { cookie: cas.cookies.header(service.href) });
-    // Celechron zjuam.dart getServiceCallback classifies 200/401/403 as expired;
-    // courses.dart retries with fresh SSO once, never loops authentication.
+    // 200/401/403 are classified as an expired session; a retry uses fresh
+    // SSO once and never loops authentication.
     if ([200, 401, 403].includes(response.status) && !refreshed && this.host.invalidateCas && generation === this.#generation) {
       this.host.invalidateCas(credentials.username.trim());
       return this.#connect(credentials, true);
@@ -90,7 +90,7 @@ export class ZjuItcApi {
     if (callback.origin !== "http://itc.zju.edu.cn" || callback.pathname !== "/90618/list.psp" || callback.username || callback.password || !callback.searchParams.get("ticket")) {
       throw new ZjuUnifiedAuthError("service-verification-failed", "信息技术中心认证回调无效。");
     }
-    // Celechron courses.dart _doLogin starts an isolated service jar with SSO.
+    // Each login starts an isolated service jar with SSO.
     // ITC adaptation preserves the CAS-issued domain/path/security unchanged.
     const cookies = cas.cookies.createServiceSessionJar();
     const page = await this.#follow(callback.href, cookies);

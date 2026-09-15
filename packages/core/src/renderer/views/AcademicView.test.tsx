@@ -313,7 +313,7 @@ describe("AcademicView", () => {
     );
 
     // 2026-07-15 is 10 days after the 2|夏 window ended (2026-07-05), so the
-    // Celechron-aligned 14-day fallback keeps 小学期 courses visible.
+    // aligned 14-day fallback keeps 小学期 courses visible.
     const semester = await screen.findByRole("combobox", { name: "学期" });
     expect((semester as HTMLSelectElement).value).toBe("2025:2");
     expect(screen.getByText("历史学期课程")).toBeDefined();

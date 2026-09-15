@@ -6,7 +6,7 @@ import {
 } from "@campusos/plugin-academic/gradesModel";
 
 describe("academic grades feature", () => {
-  it("matches Celechron's four GPA projections and keeps unknown terms separate", () => {
+  it("matches the four GPA projections and keeps unknown terms separate", () => {
     const grades: AcademicGradeRecord[] = [
       {
         sourceId: "grade-1",
@@ -67,7 +67,7 @@ describe("academic grades feature", () => {
   });
 });
 
-describe("Celechron GPA conversion", () => {
+describe("GPA conversion", () => {
   it("returns zero GPA projections when no course contributes GPA", () => {
     const result = calculateAcademicGpa([
       {
@@ -122,7 +122,7 @@ describe("inferGpaScale", () => {
   });
 });
 
-describe("Celechron grade inclusion rules", () => {
+describe("grade inclusion rules", () => {
   it("excludes deferred and binary grades while retaining failed GPA weight", () => {
     const grades: AcademicGradeRecord[] = [
       {
@@ -176,7 +176,7 @@ describe("Celechron grade inclusion rules", () => {
   });
 });
 
-describe("Celechron repeated-course GPA projection", () => {
+describe("repeated-course GPA projection", () => {
   const repeatedGrades: AcademicGradeRecord[] = [
     {
       sourceId: "attempt-1",
@@ -218,7 +218,7 @@ describe("Celechron repeated-course GPA projection", () => {
     }
   ];
 
-  it("uses Celechron's first attempt without double-counting credits", () => {
+  it("uses the first attempt without double-counting credits", () => {
     const summary = summarizeAcademicGrades(repeatedGrades);
 
     expect(summary.totalCredits).toBe(5);
@@ -235,7 +235,7 @@ describe("Celechron repeated-course GPA projection", () => {
     expect(selected.totalCredits).toBe(6);
   });
 
-  it("falls back from an empty realId and accepts Celechron's independent major summary", () => {
+  it("falls back from an empty realId and accepts the independent major summary", () => {
     const grades: AcademicGradeRecord[] = [
       { ...repeatedGrades[0], sourceId: "empty-real-id", realId: "", courseCode: "CS201" },
       { ...repeatedGrades[1], sourceId: "empty-real-id-2", realId: "", courseCode: "CS201" }

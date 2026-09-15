@@ -27,9 +27,9 @@ export const parseEtaTimetable = (body: string, year: number, semester: 1 | 2): 
   if (payload?.code !== 0 || !list) throw new ZjuUnifiedAuthError("service-verification-failed", "ETA 未返回有效课程列表。");
   const sessions: AcademicTimetableSession[] = [];
   let rawCount = 0;
-  // Elychron eta.dart:169-225 documents xqj/ksj/ks, xxq and dsz.
+  // Documents the xqj/ksj/ks, xxq and dsz fields.
   // Mechanical adaptation: publish typed sessions and stable local IDs instead
-  // of Dart Session objects. Only the first ke record represents this entry.
+  // of provider session objects. Only the first ke record represents this entry.
   for (const group of Object.values(list)) {
     if (!Array.isArray(group)) throw new ZjuUnifiedAuthError("protocol-error", "ETA 课程分组格式异常。");
     for (const raw of group) {
@@ -74,7 +74,7 @@ export class ZjuEtaApi {
 
   async #connect(credentials: ZjuAuthCredentials): Promise<CookieJar> {
     const generation = this.#generation;
-    // ETA eta.dart:37-92 uses the existing CAS SSO, its exact HTTP service,
+    // The ETA tier reuses the existing CAS SSO, its exact HTTP service,
     // then upgrades only that fixed ticket callback to HTTPS. Unlike zdbk,
     // this exchange must not depend on undergraduate service availability.
     const cas = await this.host.authenticateCas(credentials);

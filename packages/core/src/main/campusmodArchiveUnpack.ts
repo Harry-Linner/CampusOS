@@ -1,7 +1,7 @@
 /**
  * Campusmod archive unpacking (Core, main).
  *
- * Split out of campusmodPackageRegistry.ts in batch 20 of the ADR-0006 program.
+ * Split out of campusmodPackageRegistry.ts.
  * Reads a zip archive into an in-memory entry map while enforcing entry count,
  * per-file and total unpacked limits, rejecting duplicate and case-colliding
  * entry names, unsupported compression methods and file/directory path clashes.

@@ -94,14 +94,14 @@ export const selectAcademicSemesterWindow = (
   if (windows.length === 0) return null;
   const today = formatShanghaiDate(generatedAt);
 
-  // Celechron lib/model/scholar.dart:97-110 exposes one current Semester.
+  // The upstream model exposes one current Semester.
   // CampusOS mechanically groups ZJU's two quarter records into that Semester.
   const active = windows.find(
     (window) => window.startDate <= today && today <= window.endDate
   );
   if (active) return active;
 
-  // Celechron lib/model/scholar.dart:97-110 keeps its second loaded semester
+  // The second loaded semester stays
   // current only while the latest period ended within the previous 14 days.
   // CampusOS mechanically applies that boundary to the spring-summer window so
   // 小学期 remains visible briefly after classes end, without hiding the next
@@ -126,7 +126,7 @@ export const selectAcademicSemesterWindow = (
   );
 };
 
-/** Celechron 对照：最近一学期结束后 14 天内仍视为当前学期。 */
+/** 14 天内仍视为当前学期。 */
 export const SUMMER_TERM_FALLBACK_DAYS = 14;
 
 const sameRepeatPattern = (
@@ -140,7 +140,6 @@ const sameRepeatPattern = (
 export const mergeAcademicTimetableSessions = (
   entries: readonly AcademicTimetableSessionContext[]
 ): AcademicTimetableSessionContext[] => {
-  // Celechron lib/model/semester.dart:384-403 and course.dart:109-157.
   // The context fields only preserve provider and semester provenance.
   const courses = new Map<string, AcademicTimetableSessionContext[]>();
   for (const entry of entries) {

@@ -3,7 +3,7 @@
  *
  * Pure data: the declared sources with their list URLs, selectors and legacy
  * `enabled` flags, split out of campusFeedSources.ts in batch 17 of the
- * ADR-0006 program so that fetching logic and catalogue data have separate
+ * so that fetching logic and catalogue data have separate
  * modules. The header of campusFeedSources.ts still explains what the flags
  * mean; `campusFeedCatalog.ts` overlays verification metadata on top.
  */

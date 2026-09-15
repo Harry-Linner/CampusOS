@@ -6,8 +6,8 @@ import type { BriefCachedItem } from "@campusos/shared";
 import type { NotificationRecord } from "../shared/notificationBridge";
 import { migrate } from "./databaseMigrations";
 
-// Legacy schema compatibility only. New academic GPA business logic follows
-// Celechron's first returned attempt and never reads or writes this table.
+// Legacy schema compatibility only. New academic GPA business logic always
+// uses the first returned attempt and never reads or writes this table.
 type LegacyAcademicGpaStrategy = "best" | "first";
 
 export interface StoredWorkspaceSnapshot {

@@ -1,7 +1,7 @@
 /*
  * Quality-development family of the ZJU unified-auth client.
  *
- * Split out of zjuUnifiedAuth.ts in batch 46 of the ADR-0006 program. The bodies are the
+ * Split out of zjuUnifiedAuth.ts. The bodies are the
  * originals with only mechanical renames: the session maps belong to this class and the
  * shared request/CAS helpers arrive through the injected host. DekT needs a separate
  * cookie jar and hands back the authenticated profile the login flow reports.
@@ -152,9 +152,8 @@ export class ZjuQualityApi {
 
     // Only the first expired response can continue; every later path exits.
     for (let attempt = 0; ; attempt += 1) {
-      // Celechron lib/http/zjuServices/sztz.dart::login uses _loginFuture to
-      // consume a CAS ticket once. This map is the TypeScript single-flight
-      // adaptation for concurrent practice/summary calls.
+      // A single in-flight login consumes a CAS ticket once; this map is the
+      // TypeScript single-flight adaptation for concurrent practice/summary calls.
       const session = await this.#getSession(credentials);
 
       const response = await this.#host.request("GET", requestUrl, {
@@ -166,8 +165,8 @@ export class ZjuQualityApi {
           "Cache-Control": "no-cache",
           Pragma: "no-cache"
         },
-        // Celechron lib/http/zjuServices/sztz.dart::_requestPracticeData uses
-        // a 12-second timeout; #request supplies AbortSignal to Node HTTPS.
+        // The practice request uses a 12-second timeout; #request supplies
+        // AbortSignal to Node HTTPS.
         timeoutMs: request.operation === "practice"
           ? QUALITY_DEVELOPMENT_PRACTICE_TIMEOUT_MS
           : this.#host.timeoutMs

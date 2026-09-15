@@ -1,7 +1,7 @@
 /**
  * Campus-feed validation and normalisation rules (Core, main).
  *
- * Split out of campusFeedService.ts in batch 18 of the ADR-0006 program. These
+ * Split out of campusFeedService.ts. These
  * are the pure rules behind the service: descriptor validation, notification
  * keyword normalisation and matching, interval clamping, the global item sort
  * and the AI schedule-candidate guard.

@@ -28,7 +28,7 @@ export interface RefreshRunOptions {
 }
 
 const backgroundInterval = (sourceId: string): number => {
-  // Celechron 1.3.0 grs_spider.dart uses a 15-minute academic refresh threshold.
+  // Academic sources use a 15-minute background refresh threshold.
   if (sourceId === "org.campusos.zju-undergraduate" || sourceId === "org.campusos.zju-graduate") return 15 * 60_000;
   if (sourceId === "org.campusos.zju-calendar-config") return 6 * 60 * 60_000;
   if (sourceId === "org.campusos.zju-learning") return 60_000;

@@ -1,7 +1,7 @@
 /**
  * Campusmod archive path safety (Core, main).
  *
- * Split out of campusmodPackageRegistry.ts in batch 19 of the ADR-0006 program.
+ * Split out of campusmodPackageRegistry.ts.
  * Every archive entry name passes through `normalizeArchivePath` before it is
  * written to disk; the directory-name patterns identify this registry's own
  * staging, trash and backup directories. Pure string work - no filesystem, no

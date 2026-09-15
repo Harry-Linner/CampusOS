@@ -1,11 +1,11 @@
 /*
  * Learning-platform (学在浙大) family of the ZJU unified-auth client.
  *
- * Split out of zjuUnifiedAuth.ts in batch 48 of the ADR-0006 program. The bodies are the
+ * Split out of zjuUnifiedAuth.ts. The bodies are the
  * originals with only mechanical renames: the session maps belong to this class and the
  * shared request/CAS helpers arrive through the injected host, while the download transport
  * is passed in because only this family uses it. The connect path retries a transient
- * session timeout once and falls back to a fresh CAS login, as Celechron does.
+ * session timeout once and falls back to a fresh CAS login.
  */
 import { computeRequestFingerprint } from "./requestFingerprint";
 import { LEARNING_API_INITIAL_RETRY_DELAY_MS, LEARNING_API_MAX_ATTEMPTS, LEARNING_API_TIMEOUT_MS, LEARNING_COURSES_URL, LEARNING_SEMESTERS_URL, LEARNING_SERVICE_HOME_URL, LEARNING_TODOS_URL, ZJU_BROWSER_USER_AGENT } from "./zjuAuthConfig";
@@ -161,8 +161,7 @@ export class ZjuLearningApi {
   async #connectWithRetry(
     casCookies: CookieJar
   ): Promise<CookieJar> {
-    // Celechron 1.3.0 lib/http/ugrs_spider.dart:_fetchWithRetry retries
-    // transient timeout/network failures once after 300 ms.
+    // Transient timeout/network failures are retried once after 300 ms.
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         return await this.#connect(casCookies);

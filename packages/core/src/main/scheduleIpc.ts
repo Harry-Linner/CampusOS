@@ -82,7 +82,7 @@ export const loadSchedulePeriods = (input: { startAt: string; endAt: string }): 
     throw new Error("日程范围无效。");
   }
   // The recurrence and day-chopping rules are kept in scheduleDomain.ts,
-  // directly ported from Celechron task.dart getPeriodOfDay/chopDatePeriod.
+  // where the period-of-day and day-chopping helpers are implemented.
   return getTaskCalendarPeriods(loadScheduleTasks().tasks, start, end);
 };
 

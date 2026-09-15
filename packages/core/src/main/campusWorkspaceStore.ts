@@ -112,7 +112,7 @@ const buildGeneratedRecord = async (
 ): Promise<CampusWorkspaceRecord> => {
   const now = new Date();
   const initialCredential = await readAcademicCredentialRecord();
-  // Celechron scholar.dart:209-216 stops a refresh at the authentication boundary.
+  // A refresh stops at the authentication boundary.
   // Electron adaptation: validate the OS vault before any per-semester requests,
   // so one local decryption failure cannot masquerade as 16 upstream outages.
   // E2E fixture sources replace the external authenticated data boundary.

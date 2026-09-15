@@ -1,7 +1,7 @@
 /*
  * Materials workspace styles.
  *
- * Peeled out of styles.css in batch 14 of the ADR-0006 program. globals.css
+ * Peeled out of styles.css. globals.css
  * imports it inside the same `legacy` cascade layer, directly after
  * styles.css. Only the materials plugin (plugins/official/materials) uses these
  * selectors. The single `.materials-course-option:focus-visible` rule stays in

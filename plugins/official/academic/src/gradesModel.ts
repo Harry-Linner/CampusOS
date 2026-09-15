@@ -160,8 +160,8 @@ const repeatedCourseKey = (grade: AcademicGradeRecord): string => {
   const provider = separator > 0 ? grade.sourceId.slice(0, separator) : "";
   const sourceId = separator > 0 ? grade.sourceId.slice(separator + 1) : grade.sourceId;
 
-  // Celechron lib/model/scholar.dart:557-574 groups normal repeats by course
-  // code and keeps PPAE/401 physical-education registrations term-specific.
+  // Groups normal repeats by course code and keeps PPAE/401 physical-education
+  // registrations term-specific.
   const match = sourceId.match(/(\(.*\)-(.*?))-.*/);
   let key = match?.[2] || grade.realId?.trim() || grade.courseCode?.trim() || sourceId;
   if (key.startsWith("PPAE") || key.startsWith("401")) {
@@ -179,7 +179,7 @@ export const selectAcademicGpaGrades = (
     groups.set(key, [...(groups.get(key) ?? []), grade]);
   }
 
-  // Celechron lib/model/scholar.dart:576-589 uses the first response item
+  // The first response item is used
   // for the academic GPA projection. Its highest-score aboard projection is a
   // separate value and is not exposed as a CampusOS GPA setting.
   return [...groups.values()].map((attempts) => attempts[0]);
@@ -224,7 +224,7 @@ export const calculateAcademicGpa = (
   const credits = included.reduce((total, grade) => total + validCredit(grade), 0);
   const earnedCredits = selected.reduce((total, grade) => total + earnedCredit(grade), 0);
   if (credits <= 0) {
-    // Celechron lib/utils/gpa_helper.dart:12-14 returns zero projections when
+    // Zero projections are returned when
     // no course contributes GPA, while preserving earned credits.
     return { fivePoint: 0, fourPoint: 0, fourPointLegacy: 0, hundredPoint: 0, credits: 0, earnedCredits };
   }
