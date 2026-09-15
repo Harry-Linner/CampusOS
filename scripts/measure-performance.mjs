@@ -2,7 +2,7 @@
  * CampusOS — Performance Baseline Measurement
  *
  * Measures cold-start latency and background memory on the current machine and checks
- * them against the NFR budget in PRD.md.
+ * them against the NFR targets below.
  *
  * Background memory is reported twice, because the Electron process model has a floor
  * that no application code can remove: the total over every Electron process, and the
