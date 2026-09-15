@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld("deskCalendar", {
   },
   completeTask: (id: string, completed: boolean, occurrenceKey?: string) =>
     ipcRenderer.invoke("campusos:desk-calendar:complete-task", id, completed, occurrenceKey),
+  openZhiyunClassroom: (input: { courseName: string; teacher?: string | null; startAt?: string | null; customUrl?: string | null }) =>
+    ipcRenderer.invoke("campusos:desk-calendar:zhiyun:open", input),
   saveEvent: (input: Record<string, unknown>) =>
     ipcRenderer.invoke("campusos:desk-calendar:save-event", input),
   moveWindow: (dx: number, dy: number) => ipcRenderer.send("campusos:desk-calendar:drag-move", { dx, dy }),

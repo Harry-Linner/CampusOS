@@ -35,6 +35,21 @@ export const LEARNING_TODOS_URL = "https://courses.zju.edu.cn/api/todos";
 export const LEARNING_SEMESTERS_URL = "https://courses.zju.edu.cn/api/my-semesters?";
 export const LEARNING_COURSES_URL = "https://courses.zju.edu.cn/api/my-courses";
 export const QUALITY_DEVELOPMENT_SERVICE_URL = "https://sztz.zju.edu.cn/dekt/";
+// 智云课堂（classroom.zju.edu.cn）不直接吃 CAS 票据：先用统一认证的 SSO 凭据走
+// CMC 的 auType=cmc 登录桥，再由它把登录态落到 classroom.zju.edu.cn。
+// 对照实现：PeiPei233/zju-learning-assistant（MIT）src-tauri/src/zju_assist.rs:306。
+export const ZHIYUN_SERVICE_HOME_URL = "https://classroom.zju.edu.cn/";
+export const ZHIYUN_SSO_BRIDGE_URL =
+  "https://tgmedia.cmc.zju.edu.cn/index.php?r=auth/login&auType=cmc&tenant_code=112&forward=https%3A%2F%2Fclassroom.zju.edu.cn%2F";
+export const ZHIYUN_MY_COURSES_MONTH_URL =
+  "https://classroom.zju.edu.cn/courseapi/v2/course-live/get-my-course-month";
+export const ZHIYUN_MY_COURSES_DAY_URL =
+  "https://classroom.zju.edu.cn/courseapi/v2/course-live/get-my-course-day";
+// 回放页（interactivemeta）在跳转前会先用这个端点确认节次有没有可播放的录像：
+// 智云前端只在 `sub_status == 6`（回放已就绪）时才打开 `#/replay`。
+export const ZHIYUN_SUB_INFO_URL =
+  "https://classroom.zju.edu.cn/courseapi/v3/portal-home-setting/get-sub-info";
+export const ZHIYUN_API_TIMEOUT_MS = 20_000;
 export const QUALITY_DEVELOPMENT_CONTEXT_URL =
   "https://sztz.zju.edu.cn/dekt/ctx";
 export const QUALITY_DEVELOPMENT_PROFILE_URL =

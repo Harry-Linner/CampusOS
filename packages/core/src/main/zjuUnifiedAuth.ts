@@ -1,7 +1,7 @@
 import type { AcademicProgram } from "../shared/credentialBridge";
 import { DEFAULT_TIMEOUT_MS, GRADUATE_GRADES_URL, SSO_PROCESS_COOKIE_LIFETIME_MS, ZJU_AUTH_LOGIN_URL, ZJU_AUTH_PUBLIC_KEY_URL, ZJU_BROWSER_USER_AGENT } from "./zjuAuthConfig";
 import { ZjuUnifiedAuthError } from "./zjuAuthContracts";
-import type { ZjuAuthCredentials, ZjuAuthHttpResponse, ZjuAuthTransport, ZjuAuthenticatedProfile, ZjuAuthenticationResult, ZjuGraduateServiceRequest, ZjuGraduateServiceResponse, ZjuLearningDownloadRequest, ZjuLearningDownloadTransport, ZjuLearningServiceRequest, ZjuLearningServiceResponse, ZjuQualityDevelopmentServiceRequest, ZjuQualityDevelopmentServiceResponse, ZjuUndergraduateServiceRequest, ZjuUndergraduateServiceResponse } from "./zjuAuthContracts";
+import type { ZjuAuthCredentials, ZjuAuthHttpResponse, ZjuAuthTransport, ZjuAuthenticatedProfile, ZjuAuthenticationResult, ZjuGraduateServiceRequest, ZjuGraduateServiceResponse, ZjuLearningDownloadRequest, ZjuLearningDownloadTransport, ZjuLearningServiceRequest, ZjuLearningServiceResponse, ZjuQualityDevelopmentServiceRequest, ZjuQualityDevelopmentServiceResponse, ZjuUndergraduateServiceRequest, ZjuUndergraduateServiceResponse, ZjuZhiyunServiceRequest, ZjuZhiyunServiceResponse } from "./zjuAuthContracts";
 import { CookieJar, getHeaderValues } from "./zjuAuthCookies";
 import type { ActiveCasSession } from "./zjuAuthCookies";
 import { createFetchZjuLearningDownloadTransport, createNodeHttpsZjuAuthTransport } from "./zjuAuthTransports";
@@ -10,6 +10,7 @@ import { ZjuGraduateApi } from "./zjuGraduateApi";
 import { ZjuQualityApi } from "./zjuQualityApi";
 import { ZjuUndergraduateApi } from "./zjuUndergraduateApi";
 import { ZjuLearningApi } from "./zjuLearningApi";
+import { ZjuZhiyunApi } from "./zjuZhiyunApi";
 import { ZjuItcApi } from "./zjuItcApi";
 import { ZjuEtaApi } from "./zjuEtaApi";
 
@@ -27,6 +28,7 @@ class ZjuUnifiedAuthClient {
   readonly #now: () => Date;
   readonly #undergraduate: ZjuUndergraduateApi;
   readonly #learning: ZjuLearningApi;
+  readonly #zhiyun: ZjuZhiyunApi;
   readonly #quality: ZjuQualityApi;
   readonly #graduate: ZjuGraduateApi;
   readonly #itc: ZjuItcApi;
@@ -84,6 +86,13 @@ class ZjuUnifiedAuthClient {
       },
       this.#learningDownloadTransport
     );
+    // 智云课堂按需连接：不参与 authenticate() 的登录扇出，避免为一个入口拉长登录链路。
+    this.#zhiyun = new ZjuZhiyunApi({
+      request: (method, url, options) => this.#request(method, url, options),
+      authenticateCas: (credentials) => this.#authenticateCas(credentials),
+      timeoutMs: this.#timeoutMs,
+      now: () => this.#now()
+    });
   }
 
   async #request(
@@ -329,6 +338,13 @@ class ZjuUnifiedAuthClient {
     return this.#learning.requestDownload(credentials, request);
   }
 
+  requestZhiyunService(
+    credentials: ZjuAuthCredentials,
+    request: ZjuZhiyunServiceRequest
+  ): Promise<ZjuZhiyunServiceResponse> {
+    return this.#zhiyun.requestService(credentials, request);
+  }
+
   requestQualityDevelopmentService(
     credentials: ZjuAuthCredentials,
     request: ZjuQualityDevelopmentServiceRequest
@@ -356,6 +372,7 @@ class ZjuUnifiedAuthClient {
     this.#eta.clear();
     this.#undergraduate.clear();
     this.#learning.clear();
+    this.#zhiyun.clear();
     this.#quality.clear();
     this.#graduate.clear();
     this.#activeCasSessions.clear();

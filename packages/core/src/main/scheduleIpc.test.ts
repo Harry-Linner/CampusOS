@@ -7,7 +7,8 @@ import { createDatabaseService, type DatabaseService } from "./databaseService";
 const electronState = vi.hoisted(() => ({
   documentsPath: "",
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
-  openPath: vi.fn(async () => "")
+  openPath: vi.fn(async () => ""),
+  openExternal: vi.fn(async () => undefined)
 }));
 const databaseState = vi.hoisted(() => ({ database: null as DatabaseService | null }));
 const workspaceState = vi.hoisted(() => ({
@@ -27,7 +28,8 @@ vi.mock("electron", () => ({
     })
   },
   shell: {
-    openPath: electronState.openPath
+    openPath: electronState.openPath,
+    openExternal: electronState.openExternal
   }
 }));
 
@@ -163,6 +165,8 @@ beforeEach(async () => {
   electronState.handlers.clear();
   electronState.openPath.mockReset();
   electronState.openPath.mockResolvedValue("");
+  electronState.openExternal.mockReset();
+  electronState.openExternal.mockResolvedValue(undefined);
   databaseState.database = createDatabaseService({ databasePath: join(root, "campusos.sqlite") });
   workspaceState.snapshot = snapshot;
   registerScheduleHandlers();
@@ -185,6 +189,7 @@ describe("schedule IPC", () => {
       "campusos:schedule:task:mutate",
       "campusos:schedule:personalizations:load",
       "campusos:schedule:personalization:save",
+      "campusos:schedule:zhiyun:open",
       "campusos:schedule:calendar-data:load",
       "campusos:schedule:ical:export"
     ]);
@@ -192,6 +197,37 @@ describe("schedule IPC", () => {
     const loaded = await invoke<{ tasks: LocalTaskRecord[]; updatedAt: string }>("campusos:schedule:tasks:load");
     expect(loaded.tasks).toEqual([]);
     expect(databaseState.database?.loadLocalTasks()?.tasks).toEqual([]);
+  });
+
+  it("opens the user's custom Zhiyun replay link without asking upstream", async () => {
+    const customUrl = "https://interactivemeta.cmc.zju.edu.cn/#/replay?course_id=1&sub_id=2&tenant_code=112";
+    const result = await invoke<{ ok: boolean; matched: boolean; url: string; message?: string }>(
+      "campusos:schedule:zhiyun:open",
+      { courseName: "计算机网络", customUrl }
+    );
+    expect(result).toMatchObject({ ok: true, matched: true, url: customUrl });
+    expect(result.message).toBeUndefined();
+    expect(electronState.openExternal).toHaveBeenCalledWith(customUrl);
+  });
+
+  it("reports the failure honestly instead of landing on an empty search page", async () => {
+    // 未连接统一身份认证时查不到智云节次。此时必须如实报告，并且**不允许**把用户送到
+    // 智云的平台级检索页——上游该搜索经常返回 0 条，停在 0 结果页等于什么都没做。
+    const result = await invoke<{ ok: boolean; matched: boolean; url: string; message?: string }>(
+      "campusos:schedule:zhiyun:open",
+      { courseName: "计算机网络", teacher: "张三", startAt: "2026-09-15T10:00:00+08:00" }
+    );
+    expect(result.ok).toBe(true);
+    expect(result.matched).toBe(false);
+    expect(result.url).toBe("https://classroom.zju.edu.cn/");
+    expect(result.message).toBeTruthy();
+    expect(electronState.openExternal).toHaveBeenCalledWith(result.url);
+  });
+
+  it("rejects an unusable Zhiyun request before resolving anything", async () => {
+    await expect(invoke("campusos:schedule:zhiyun:open", { courseName: "   " })).rejects.toThrow("智云课堂请求无效。");
+    await expect(invoke("campusos:schedule:zhiyun:open", "not-an-object")).rejects.toThrow("智云课堂请求无效。");
+    expect(electronState.openExternal).not.toHaveBeenCalled();
   });
 
   it("rejects an untrusted renderer before touching the data service", async () => {

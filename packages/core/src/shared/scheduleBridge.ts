@@ -6,7 +6,9 @@ import type {
   LocalTaskMutation,
   LocalTaskPeriod,
   LocalTasksData,
-  UnifiedCalendarData
+  UnifiedCalendarData,
+  ZhiyunClassroomOpenInput,
+  ZhiyunClassroomOpenResult
 } from "@campusos/shared";
 
 export interface ScheduleBridge {
@@ -16,6 +18,7 @@ export interface ScheduleBridge {
   mutateTask: (input: LocalTaskMutation) => Promise<LocalTasksData>;
   loadPersonalizations?: () => Promise<Record<string, CalendarEventPersonalization>>;
   savePersonalization?: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null; zhiyunUrl?: string | null; completed?: boolean; completedAt?: string | null }) => Promise<CalendarEventPersonalization>;
+  openZhiyunClassroom?: (input: ZhiyunClassroomOpenInput) => Promise<ZhiyunClassroomOpenResult>;
   loadCalendarData?: (input: { today: string; startAt: string; endAt: string }) => Promise<UnifiedCalendarData>;
   exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
   subscribe: (listener: () => void) => () => void;

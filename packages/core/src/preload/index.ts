@@ -126,8 +126,10 @@ contextBridge.exposeInMainWorld("campusos", {
       occurrenceKey?: string;
     }) => ipcRenderer.invoke("campusos:schedule:task:mutate", input),
     loadPersonalizations: () => ipcRenderer.invoke("campusos:schedule:personalizations:load"),
-    savePersonalization: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null }) =>
+    savePersonalization: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null; zhiyunUrl?: string | null; completed?: boolean; completedAt?: string | null }) =>
       ipcRenderer.invoke("campusos:schedule:personalization:save", eventId, input),
+    openZhiyunClassroom: (input: { courseName: string; teacher?: string | null; startAt?: string | null; customUrl?: string | null }) =>
+      ipcRenderer.invoke("campusos:schedule:zhiyun:open", input),
     loadCalendarData: (input: { today: string; startAt: string; endAt: string }) =>
       ipcRenderer.invoke("campusos:schedule:calendar-data:load", input),
     exportIcal: (input: {

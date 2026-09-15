@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from "electron";
+import { app, BrowserWindow, screen, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import type { AiAssistantExtractedField, AiAssistantExtractionResult, DesktopPetInput } from "@campusos/shared";
 import { existsSync } from "node:fs";
@@ -180,7 +180,12 @@ const createMainWindow = async (): Promise<BrowserWindow> => {
   attachWindowStatePersistence(window);
 
   await attachMainWindowLifecycle(window);
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
   window.webContents.on("will-frame-navigate", (details) => {
     const initiatorUrl = details.initiator?.url;
     if (!initiatorUrl?.startsWith(`${CAMPUSMOD_RENDERER_SCHEME}:`)) return;

@@ -327,6 +327,8 @@
 .dk-info-card strong { display: block; font-size: 14px; color: var(--ink); margin-bottom: 6px; }
 .dk-info-card p { margin: 2px 0; font-size: 12px; color: var(--ink-soft); }
 .dk-info-card .dk-info-note { color: var(--ink); }
+/* 「打开智云课堂」的如实回执：未命中班级或有失败原因时显示，用 warning 而非 danger——链接仍然可用。 */
+.dk-info-card .dk-info-notice { color: var(--warning); }
 .dk-info-card .dk-info-actions {
   display: flex;
   gap: 8px;

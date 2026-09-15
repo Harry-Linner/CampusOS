@@ -18,6 +18,7 @@ import {
 } from "./campusWorkspaceStore";
 import { readReminderSettingsRecord } from "./reminderSettingsStore";
 import { loadCalendarEventPersonalizations, saveCalendarEventPersonalization } from "./deskCalendarStateStore";
+import { openZhiyunClassroom, parseZhiyunClassroomOpenInput } from "./zhiyunClassroom";
 import { loadUnifiedCalendarData } from "./calendarDataService";
 import {
   applyTaskMutation,
@@ -283,6 +284,11 @@ export const registerScheduleHandlers = (options?: { onChanged?: () => void | Pr
     notifyScheduleChanged();
     await rescheduleCampusWorkspaceReminders(await readReminderSettingsRecord());
     return result;
+  });
+  registerTrustedIpcHandler("campusos:schedule:zhiyun:open", async (input: unknown) => {
+    const parsed = parseZhiyunClassroomOpenInput(input);
+    if (!parsed) throw new Error("智云课堂请求无效。");
+    return openZhiyunClassroom(parsed);
   });
   registerTrustedIpcHandler("campusos:schedule:calendar-data:load", async (input: { today: string; startAt: string; endAt: string }) => {
     if (!input || typeof input.today !== "string") throw new Error("日历范围无效。");

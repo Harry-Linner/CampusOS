@@ -23,6 +23,7 @@ import type {
   LocalTasksData,
   PluginCapabilityClient
 } from "./pluginCapabilities";
+import type { ZhiyunClassroomOpenInput, ZhiyunClassroomOpenResult } from "./zhiyunClassroom";
 
 export * from "./campus";
 export * from "./academicSemester";
@@ -37,6 +38,7 @@ export * from "./desktopPet";
 export * from "./retryClassification";
 export * from "./localTaskReminder";
 export * from "./zhiyunUrl";
+export * from "./zhiyunClassroom";
 export * from "./countdown";
 export * from "./meetingNumber";
 export * from "./reminderBridge";
@@ -192,6 +194,8 @@ export interface PluginComponentProps {
     mutateTask: (input: LocalTaskMutation) => Promise<LocalTasksData>;
     loadPersonalizations?: () => Promise<Record<string, CalendarEventPersonalization>>;
     savePersonalization?: (eventId: string, input: { note?: string; reminderLeadMinutes?: number | null; zhiyunUrl?: string | null; completed?: boolean; completedAt?: string | null }) => Promise<CalendarEventPersonalization>;
+    /** 解析该课程的智云课堂班级并交给系统浏览器打开（核心主进程负责会话与回退）。 */
+    openZhiyunClassroom?: (input: ZhiyunClassroomOpenInput) => Promise<ZhiyunClassroomOpenResult>;
     loadCalendarData?: (input: { today: string; startAt: string; endAt: string }) => Promise<UnifiedCalendarData>;
     exportIcal: (input: CalendarExportInput) => Promise<CalendarExportResult>;
     subscribe: (listener: () => void) => () => void;

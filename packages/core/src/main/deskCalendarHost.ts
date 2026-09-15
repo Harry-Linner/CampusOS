@@ -3,14 +3,15 @@ import { getAccountBrowserSession } from "./accountBrowserSession";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { registerWindowIpcHandler } from "./trustedIpc";
-import { resolveLocalTaskReminderAt } from "@campusos/shared";
+import { extractTeacherFromScheduleNote, resolveLocalTaskReminderAt } from "@campusos/shared";
 
 // datetime-local controls describe the calendar's Shanghai clock, regardless
 // of the operating system's timezone. Already-qualified ISO timestamps survive.
 const calendarInputTime = (value: string): string => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value) ? `${value}+08:00` : value;
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, shell, type IpcMainEvent, type IpcMainInvokeEvent, type Rectangle } from "electron";
 import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadSchedulePeriods, loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
+import { openZhiyunClassroom, parseZhiyunClassroomOpenInput } from "./zhiyunClassroom";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
 import { loadUnifiedCalendarData } from "./calendarDataService";
 import {
@@ -49,6 +50,8 @@ interface DeskCalendarData {
     color?: string;
     note?: string;
     location?: string;
+    /** 上游投影没有结构化的教师字段（教师只写在 note 里），这里在上游边界解析一次。 */
+    instructor?: string | null;
     zhiyunUrl?: string | null;
     status?: string;
     origin: "local" | "upstream";
@@ -243,6 +246,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       time: shanghaiTimeOf(start),
       note: personalizations[id]?.note || event.note || undefined,
       location: event.location ?? undefined,
+      instructor: extractTeacherFromScheduleNote(event.note),
       status: personalizations[id]?.completed ? "completed" : undefined,
       zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
@@ -268,6 +272,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       color: "var(--accent)",
       note: personalizations[id]?.note || course.note || undefined,
       location: course.location ?? undefined,
+      instructor: extractTeacherFromScheduleNote(course.note),
       zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
       startAt: start,
@@ -407,7 +412,12 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
   });
   // 保持可交互的桌面层级：桌面之上、普通应用之下，不提供置顶模式。
   win.setMenu(null);
-  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https://") || url.startsWith("http://")) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
   win.webContents.on("will-navigate", (event, url) => { if (url !== calendarUrl()) event.preventDefault(); });
   win.webContents.on("will-redirect", (event) => event.preventDefault());
   deskCalendarTransparency = settings.opacity;
@@ -581,6 +591,13 @@ export const registerDeskCalendarHostHandlers = (): void => {
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "操作失败。" };
     }
+  });
+  registerWindowIpcHandler("campusos:desk-calendar:zhiyun:open", assertCalendarOrMain, async (_event, input) => {
+    const parsed = parseZhiyunClassroomOpenInput(input);
+    if (!parsed) {
+      return { ok: false, matched: false, url: null, message: "该课程没有可用的智云课堂信息。" };
+    }
+    return openZhiyunClassroom(parsed);
   });
   registerWindowIpcHandler("campusos:desk-calendar:save-event", assertCalendarOrMain, async (_event, input) => {
     try {

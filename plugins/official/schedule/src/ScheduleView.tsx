@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   extractMeetingNumber,
+  extractTeacherFromScheduleNote,
   formatCountdown,
-  resolveLocalTaskReminderAt,
-  resolveZhiyunCourseUrl
+  resolveLocalTaskReminderAt
 } from "@campusos/shared";
 import type {
   CalendarEventPersonalization,
@@ -35,6 +35,8 @@ type ScheduleEvent = {
   endAt: string;
   location?: string;
   note?: string;
+  /** 从上游原始备注解析出的教师名（上游只把教师写在 note 里）；用户自定义备注不会覆盖它。 */
+  instructor?: string | null;
   taskId?: string;
   status?: LocalTaskRecord["status"];
   origin?: "local" | "upstream";
@@ -308,6 +310,7 @@ const buildEvents = (
       endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
       location: event.location ?? undefined,
       note: personalizations[`calendar:${event.id}`]?.note || event.note || undefined,
+      instructor: extractTeacherFromScheduleNote(event.note),
       status: (personalizations[`calendar:${event.id}`]?.completed ? "completed" : undefined) as LocalTaskRecord["status"] | undefined,
       origin: "upstream" as const
     })),
@@ -321,6 +324,7 @@ const buildEvents = (
         endAt: course.endAt,
         location: course.location,
         note: personalizations[`course:${course.id}`]?.note || course.note,
+        instructor: extractTeacherFromScheduleNote(course.note),
         origin: "upstream" as const
       })),
   ];
@@ -1430,11 +1434,21 @@ export const ScheduleView = ({
                     variant="outline"
                     type="button"
                     onClick={() => {
-                      const url = resolveZhiyunCourseUrl({
-                        customUrl: personalizations[selectedEvent.id]?.zhiyunUrl,
-                        courseName: selectedEvent.title
+                      setNotice(null);
+                      if (!schedule?.openZhiyunClassroom) {
+                        setNotice("当前运行环境不支持打开智云课堂。");
+                        return;
+                      }
+                      void schedule.openZhiyunClassroom({
+                        courseName: selectedEvent.title,
+                        teacher: selectedEvent.instructor ?? null,
+                        startAt: selectedEvent.startAt,
+                        customUrl: personalizations[selectedEvent.id]?.zhiyunUrl ?? null
+                      }).then((result) => {
+                        if (result.message) setNotice(result.message);
+                      }).catch((cause: unknown) => {
+                        setNotice(cause instanceof Error ? cause.message : "无法打开智云课堂。");
                       });
-                      window.open(url, "_blank");
                     }}
                   >
                     <AppIcon name="external-link" className="size-4 mr-1" />

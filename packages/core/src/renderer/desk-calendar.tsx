@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, Fragment, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { extractMeetingNumber, resolveZhiyunCourseUrl } from "@campusos/shared";
+import { extractMeetingNumber } from "@campusos/shared";
 import {
   addDays,
   buildMonthDays,
@@ -44,6 +44,8 @@ interface ScheduleEvent {
   endAt: string;
   location?: string;
   note?: string;
+  /** 由主进程在投影边界从上游 note 解析出的教师名；用户自定义备注不会覆盖它。 */
+  instructor?: string | null;
   taskId?: string;
   status?: string;
   zhiyunUrl?: string | null;
@@ -74,6 +76,7 @@ interface RawItem {
   time?: string;
   note?: string;
   location?: string;
+  instructor?: string | null;
   status?: string;
   zhiyunUrl?: string | null;
   origin: "local" | "upstream";
@@ -136,6 +139,7 @@ declare global {
       subscribeSettings: (cb: (s: DeskCalendarSettings) => void) => () => void;
       onOpenSettings: (cb: () => void) => () => void;
       completeTask: (id: string, completed: boolean, occurrenceKey?: string) => Promise<{ ok: boolean; error?: string }>;
+      openZhiyunClassroom: (input: { courseName: string; teacher?: string | null; startAt?: string | null; customUrl?: string | null }) => Promise<{ ok: boolean; matched: boolean; url: string | null; message?: string }>;
       saveEvent: (input: {
         id?: string;
         origin?: "local" | "upstream";
@@ -265,12 +269,15 @@ export default function DeskCalendar(): JSX.Element {
   const [cursor, setCursor] = useState<{ y: number; m: number; d: number } | null>(null);
   const [, setSelected] = useState<string | null>(null);
   const [infoEvent, setInfoEvent] = useState<ScheduleEvent | null>(null);
+  // 「打开智云课堂」的如实回执：未命中班级或唤起失败时告诉用户实际发生了什么。
+  const [zhiyunNotice, setZhiyunNotice] = useState<string | null>(null);
   const [form, setForm] = useState<TaskForm | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const saveErrorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (!form) setSaveError(null); }, [form]);
   useEffect(() => { if (saveError) saveErrorRef.current?.focus(); }, [saveError]);
+  useEffect(() => { setZhiyunNotice(null); }, [infoEvent]);
   const [glass, setGlass] = useState(false);
 
   const applySettings = useCallback((s: DeskCalendarSettings): void => {
@@ -327,6 +334,7 @@ export default function DeskCalendar(): JSX.Element {
         return {
           id: item.id, title: item.title, kind, startAt: item.startAt, endAt: item.endAt,
           taskId: item.taskId, location: item.location, note: item.note, status: item.status,
+          instructor: item.instructor,
           zhiyunUrl: item.zhiyunUrl,
           origin: item.origin, occurrenceKey: item.occurrenceKey, repeatType: item.repeatType,
           repeatPeriod: item.repeatPeriod, repeatEndsOn: item.repeatEndsOn,
@@ -682,11 +690,19 @@ export default function DeskCalendar(): JSX.Element {
                   type="button"
                   className="dk-info-primary"
                   onClick={() => {
-                    const url = resolveZhiyunCourseUrl({
-                      customUrl: infoEvent.zhiyunUrl,
-                      courseName: infoEvent.title
+                    setZhiyunNotice(null);
+                    void window.deskCalendar?.openZhiyunClassroom({
+                      courseName: infoEvent.title,
+                      teacher: infoEvent.instructor ?? null,
+                      startAt: infoEvent.startAt,
+                      customUrl: infoEvent.zhiyunUrl ?? null
+                    }).then((result) => {
+                      /* istanbul ignore next -- 桥缺失只在非 Electron 环境发生 */
+                      if (!result) return;
+                      if (result.message) setZhiyunNotice(result.message);
+                    }).catch((cause: unknown) => {
+                      setZhiyunNotice(cause instanceof Error ? cause.message : "无法打开智云课堂。");
                     });
-                    window.open(url, "_blank");
                   }}
                 >
                   打开智云课堂
@@ -716,6 +732,7 @@ export default function DeskCalendar(): JSX.Element {
               ) : null}
               <button type="button" onClick={() => setInfoEvent(null)}>关闭</button>
             </div>
+            {zhiyunNotice ? <p className="dk-info-notice" role="status">{zhiyunNotice}</p> : null}
           </div>
         </div>
       ) : null}

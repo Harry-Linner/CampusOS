@@ -364,6 +364,42 @@ export const resolveLearningRedirect = (value: string, source: URL): URL => {
   return target;
 };
 
+// 智云课堂登录链路上真实出现过的浙大主机：SSO 登录桥（tgmedia）签发后会把登录态
+// 交回课堂门户（classroom）与其 CMC API（yjapi）；CAS 自身也允许出现。
+const ZHIYUN_REDIRECT_HOSTS = new Set([
+  "classroom.zju.edu.cn",
+  "tgmedia.cmc.zju.edu.cn",
+  "yjapi.cmc.zju.edu.cn",
+  "zjuam.zju.edu.cn",
+  "identity.zju.edu.cn"
+]);
+
+export const validateZhiyunRedirect = (target: URL): void => {
+  if (
+    target.protocol !== "https:" ||
+    !ZHIYUN_REDIRECT_HOSTS.has(target.hostname.toLowerCase())
+  ) {
+    throw new ZjuUnifiedAuthError(
+      "protocol-error",
+      "智云课堂登录返回了不受信任的跳转地址。"
+    );
+  }
+};
+
+export const resolveZhiyunRedirect = (value: string, source: URL): URL => {
+  let target: URL;
+  try {
+    target = new URL(value, source);
+  } catch {
+    throw new ZjuUnifiedAuthError(
+      "protocol-error",
+      "智云课堂登录返回了无法解析的跳转地址。"
+    );
+  }
+  validateZhiyunRedirect(target);
+  return target;
+};
+
 export const findLearningMetaRefreshTarget = (
   body: string,
   sourceUrl: string

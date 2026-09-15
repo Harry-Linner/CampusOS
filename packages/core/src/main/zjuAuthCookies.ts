@@ -227,6 +227,14 @@ export class CookieJar {
     return learningCookies;
   }
 
+  /**
+   * 把 CAS 签发的 SSO 凭据放宽到 `zju.edu.cn`，用于「登录桥 + 业务域名」这类
+   * 非 courses.zju.edu.cn 的服务（智云课堂走 tgmedia.cmc.zju.edu.cn 登录桥）。
+   */
+  createSsoScopedSessionJar(): CookieJar {
+    return this.createLearningServiceSessionJar();
+  }
+
   createLearningApiSessionJar(targetUrl = LEARNING_TODOS_URL): CookieJar {
     const target = new URL(targetUrl);
     const hostname = target.hostname.toLowerCase();
@@ -263,6 +271,23 @@ export const cookieHeaderHasName = (
   header
     ?.split(";")
     .some((entry) => entry.trim().startsWith(`${expectedName}=`)) ?? false;
+
+/** 取出 `name=value` Cookie 头里某个 cookie 的原始值（未解码）。 */
+export const cookieValueFromHeader = (
+  header: string | null,
+  expectedName: string
+): string | null => {
+  if (!header) return null;
+  for (const entry of header.split(";")) {
+    const trimmed = entry.trim();
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+    if (trimmed.slice(0, separator) === expectedName) {
+      return trimmed.slice(separator + 1);
+    }
+  }
+  return null;
+};
 
 export const splitCombinedSetCookieHeader = (value: string): string[] =>
   value.split(/,(?=\s*[^;,=\s]+=[^;,]*)/g).map((item) => item.trim());

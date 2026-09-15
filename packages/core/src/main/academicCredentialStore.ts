@@ -18,7 +18,7 @@ import { registerTrustedIpcHandler } from "./trustedIpc";
 import { createZjuUnifiedAuthClient } from "./zjuUnifiedAuth";
 import { ZjuUnifiedAuthError } from "./zjuAuthContracts";
 import type { AccountProfileStore } from "./accountProfileStore";
-import type { ZjuGraduateServiceRequest, ZjuGraduateServiceResponse, ZjuLearningDownloadRequest, ZjuLearningServiceRequest, ZjuLearningServiceResponse, ZjuQualityDevelopmentServiceRequest, ZjuQualityDevelopmentServiceResponse, ZjuUndergraduateServiceRequest, ZjuUndergraduateServiceResponse } from "./zjuAuthContracts";
+import type { ZjuGraduateServiceRequest, ZjuGraduateServiceResponse, ZjuLearningDownloadRequest, ZjuLearningServiceRequest, ZjuLearningServiceResponse, ZjuQualityDevelopmentServiceRequest, ZjuQualityDevelopmentServiceResponse, ZjuUndergraduateServiceRequest, ZjuUndergraduateServiceResponse, ZjuZhiyunServiceRequest, ZjuZhiyunServiceResponse } from "./zjuAuthContracts";
 
 const ACADEMIC_CREDENTIAL_FILE = "academic-affairs.json";
 const zjuUnifiedAuth = createZjuUnifiedAuthClient();
@@ -193,6 +193,20 @@ export const requestZjuLearningDownload = async (
   }
 
   return zjuUnifiedAuth.requestLearningDownload(secret, request);
+};
+
+export const requestZjuZhiyunService = async (
+  request: ZjuZhiyunServiceRequest
+): Promise<ZjuZhiyunServiceResponse> => {
+  const secret = await readAcademicCredentialSecret();
+  if (!secret) {
+    throw new AcademicCredentialServiceError(
+      "invalid-input",
+      "尚未连接统一身份认证账号。"
+    );
+  }
+
+  return zjuUnifiedAuth.requestZhiyunService(secret, request);
 };
 
 export const requestZjuQualityDevelopmentService = async (
