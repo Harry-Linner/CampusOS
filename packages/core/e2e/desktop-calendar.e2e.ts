@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import koffi from "koffi";
-import { desktopPort, connectDesktop, calendarPanel } from "./desktopFixture";
+import { desktopPort, connectDesktop, calendarPanel, closeCalendarPanel } from "./desktopFixture";
 
 test("desktop calendar isolates DPI, saves through primary IPC and closes its native host", async () => {
   test.setTimeout(120000);
@@ -24,7 +24,7 @@ test("desktop calendar isolates DPI, saves through primary IPC and closes its na
       await expect(settings.getByRole("heading", { name: "日历设置", exact: true })).toBeVisible();
       await settings.getByLabel("农历", { exact: true }).click();
       await expect.poll(() => desk.evaluate(async () => (await window.deskCalendar!.getSettings()).showLunar)).toBe(cycle % 2 === 0);
-      await settings.getByRole("button", { name: "关闭", exact: true }).click();
+      await closeCalendarPanel(settings);
       if (process.platform === "win32") {
         const session = await desk.context().browser()!.newBrowserCDPSession();
         const info = await session.send("SystemInfo.getProcessInfo");

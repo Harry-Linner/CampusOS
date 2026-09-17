@@ -30,3 +30,19 @@ export async function calendarPanel(app: ElectronApplication, desktop: Page, act
   await page.waitForURL(/desk-calendar\.html\?panel=1$/);
   return page;
 }
+
+export async function closeCalendarPanel(page: Page): Promise<void> {
+  const close = page.getByRole("button", { name: "关闭", exact: true }).click();
+  if (process.platform !== "win32") {
+    await close;
+    return;
+  }
+  try {
+    await close;
+  } catch (error) {
+    // Closing the native panel can destroy its page before Playwright receives
+    // the click acknowledgement. The closed page is the expected outcome.
+    if (!page.isClosed()) throw error;
+  }
+  await expect.poll(() => page.isClosed()).toBe(true);
+}

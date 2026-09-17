@@ -1,5 +1,5 @@
 import { prepareFixtureWorkspace } from "./fixtureWorkspace";
-import { desktopPort, connectDesktop, calendarPanel } from "./desktopFixture";
+import { desktopPort, connectDesktop, calendarPanel, closeCalendarPanel } from "./desktopFixture";
 import {
   expect,
   test,
@@ -500,7 +500,7 @@ test(
       await settingsPage.screenshot({
         path: testInfo.outputPath("desktop-calendar-settings.png")
       });
-      await settingsPage.getByRole("button", { name: "关闭", exact: true }).click();
+      await closeCalendarPanel(settingsPage);
 
       await page.evaluate(async (assistantBaseUrl) => {
         const assistant = window.campusos?.assistant;
