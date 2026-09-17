@@ -44,12 +44,15 @@ const positional = () => args.filter((a) => !a.startsWith("--"));
 
 async function withBrowser(fn) {
   const browser = await chromium.connectOverCDP(endpoint);
+  const desktopEndpoint = `http://127.0.0.1:${process.env.CAMPUSOS_DESKTOP_CDP_PORT ?? Number(port) + 1}`;
+  const desktop = await chromium.connectOverCDP(desktopEndpoint, { timeout: 1000 }).catch(() => null);
   try {
     const context = browser.contexts()[0];
     if (!context) throw new Error("no browser context; is the dev app running with CAMPUSOS_DEV_CDP_PORT set?");
-    return await fn(context.pages());
+    return await fn([...context.pages(), ...(desktop?.contexts().flatMap(context => context.pages()) ?? [])]);
   } finally {
     await browser.close();
+    await desktop?.close();
   }
 }
 

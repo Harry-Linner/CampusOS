@@ -29,6 +29,15 @@
   user-select: none;
 }
 
+.desk-cal-resize-row { display: flex; justify-content: flex-end; }
+.desk-cal-resize-row button { cursor: nwse-resize; border: 0; background: transparent; color: var(--ink-faint); padding: 0 8px; }
+.desk-cal-panel .dk-form-backdrop,
+.desk-cal-panel .dk-settings-backdrop,
+.desk-cal-panel .dk-info-backdrop { position: static; flex: 1; min-height: 0; overflow: auto; padding: 20px; background: var(--paper); align-items: flex-start; }
+.desk-cal-panel .dk-form-card,
+.desk-cal-panel .dk-settings-card,
+.desk-cal-panel .dk-info-card { width: 100%; max-height: none; box-shadow: none; }
+
 .desk-cal-header {
   display: flex;
   align-items: center;
@@ -242,6 +251,7 @@
   gap: 2px;
 }
 .dk-month-cell-list .schedule-event {
+  flex-shrink: 0;
   display: block;
   width: 100%;
   border-width: 0 0 0 2px;
@@ -295,6 +305,7 @@
 .dk-week-col header strong { color: var(--ink); font-size: 16px; font-family: var(--font-mono); }
 .dk-week-col-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
 .dk-week-col-list .schedule-event {
+  flex-shrink: 0;
   display: block; width: 100%;
   border-width: 0 0 0 2px; border-left-style: solid; border-radius: 0;
   background: transparent; padding: 3px 5px; text-align: left;

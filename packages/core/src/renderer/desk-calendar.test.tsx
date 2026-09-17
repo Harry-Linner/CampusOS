@@ -50,6 +50,25 @@ beforeEach(() => {
 });
 
 describe("desk calendar", () => {
+  it("opens a normal editor with the actual occurrence and reminder fields from the desktop layer", async () => {
+    const openPanel = vi.fn(async () => undefined);
+    window.deskCalendar = { ...window.deskCalendar!, desktopLayer: true, openPanel };
+    render(<DeskCalendar />);
+    await screen.findByText("任务A");
+    fireEvent.doubleClick(screen.getByText("任务A"));
+    await waitFor(() => expect(openPanel).toHaveBeenCalledWith({ kind: "edit", form: expect.objectContaining({ taskId: "t1", occurrenceKey: "0", reminderMode: "custom", reminderAt: "2026-09-03T08:30", timeNeededMinutes: 75 }) }));
+    expect(screen.queryByLabelText("名称")).toBeNull();
+    fireEvent.click(screen.getByText("⚙ 设置"));
+    expect(openPanel).toHaveBeenLastCalledWith({ kind: "settings" });
+  });
+  it("reports a failed popup request without pretending an editor opened", async () => {
+    window.deskCalendar = { ...window.deskCalendar!, desktopLayer: true, openPanel: vi.fn(async () => { throw new Error("host unavailable"); }) };
+    render(<DeskCalendar />);
+    await screen.findByText("任务A");
+    fireEvent.doubleClick(screen.getByText("任务A"));
+    expect((await screen.findByRole("alert")).textContent).toContain("窗口未能打开");
+    expect(screen.queryByLabelText("名称")).toBeNull();
+  });
   it("offers a close action through the window bridge", async () => {
     render(<DeskCalendar />);
     await screen.findByText("2026年9月");

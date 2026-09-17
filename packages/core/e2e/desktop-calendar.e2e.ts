@@ -1,75 +1,73 @@
 import { test, expect, _electron as electron } from "@playwright/test";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import koffi from "koffi";
+import { desktopPort, connectDesktop, calendarPanel } from "./desktopFixture";
 
-test("desktop calendar has a working preload, native top-level input and bounded IPC lifecycle", async () => {
+test("desktop calendar isolates DPI, saves through primary IPC and closes its native host", async () => {
+  test.setTimeout(120000);
   const profile = await mkdtemp(join(tmpdir(), "campusos-desk-e2e-"));
-  await mkdir(join(profile, "settings"));
-  await writeFile(join(profile, "settings/desk-calendar-settings.json"), JSON.stringify({ alwaysOnTop: true, opacity: 0.9 }));
-  const app = await electron.launch({
-    args: [resolve("out/main/main.js"), `--user-data-dir=${profile}`],
-    env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1" }
-  });
-  const channels = ["drag-move", "drag-end", "transparency", "close"].map((name) => `campusos:desk-calendar:${name}`);
+  const port = await desktopPort();
+  const app = await electron.launch({ args: [resolve("out/main/main.js"), `--user-data-dir=${profile}`], env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1", CAMPUSOS_DESKTOP_CDP_PORT: port } });
   try {
     const main = await app.firstWindow();
+    const before = await main.evaluate(() => ({ ratio: devicePixelRatio, width: innerWidth, height: innerHeight }));
     for (let cycle = 0; cycle < 3; cycle++) {
-      const opened = app.waitForEvent("window");
-      await main.evaluate(() => Promise.all([
-        window.campusos.desktopCalendarHost.start(),
-        window.campusos.desktopCalendarHost.start()
-      ]));
-      const desk = await opened;
-      await desk.waitForLoadState();
-      expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
-        .filter((win) => win.webContents.getURL().includes("desk-calendar")).length)).toBe(1);
-      await expect.poll(() => desk.evaluate(() => typeof (window as unknown as { deskCalendar?: unknown }).deskCalendar)).toBe("object");
+      await main.evaluate(() => Promise.all([window.campusos.desktopCalendarHost.start(), window.campusos.desktopCalendarHost.start()]));
+      const desk = await connectDesktop(app, port);
+      await expect(desk.getByRole("button", { name: "周", exact: true })).toBeVisible();
       await desk.getByRole("button", { name: "周", exact: true }).click();
       await expect(desk.getByRole("button", { name: "周", exact: true })).toHaveClass("is-active");
-      await desk.getByRole("button", { name: "⚙ 设置" }).click();
-      await expect(desk.getByRole("heading", { name: "日历设置", exact: true })).toBeVisible();
-      await expect(desk.getByLabel("置顶", { exact: true })).toHaveCount(0);
-
+      expect(await main.evaluate(() => ({ ratio: devicePixelRatio, width: innerWidth, height: innerHeight }))).toEqual(before);
+      const settings = await calendarPanel(app, desk, () => desk.getByRole("button", { name: "⚙ 设置" }).click());
+      await expect(settings.getByRole("heading", { name: "日历设置", exact: true })).toBeVisible();
+      await settings.getByLabel("农历", { exact: true }).click();
+      await expect.poll(() => desk.evaluate(async () => (await window.deskCalendar!.getSettings()).showLunar)).toBe(cycle % 2 === 0);
+      await settings.getByRole("button", { name: "关闭", exact: true }).click();
       if (process.platform === "win32") {
-        const hwnd = await app.evaluate(({ BrowserWindow }) => Number(BrowserWindow.getAllWindows()
-          .find((win) => win.webContents.getURL().includes("desk-calendar"))!.getNativeWindowHandle().readBigUInt64LE()));
-        const getAncestor = koffi.load("user32.dll").func("GetAncestor", "uintptr_t", ["uintptr_t", "uint32"]);
-        // CDP bypasses desktop hit testing. At least enforce the native parent
-        // invariant in CI; real coordinate clicks remain a local acceptance gate.
-        expect(Number(getAncestor(hwnd, 2))).toBe(hwnd);
-        const getStyle = koffi.load("user32.dll").func("GetWindowLongPtrW", "intptr_t", ["uintptr_t", "int32"]);
-        await expect.poll(() => Number(getStyle(hwnd, -20)) & 8).toBe(0);
-        const mainHwnd = await app.evaluate(({ BrowserWindow }) => Number(BrowserWindow.getAllWindows()
-          .find((win) => !win.webContents.getURL().includes("desk-calendar"))!.getNativeWindowHandle().readBigUInt64LE()));
-        const getWindow = koffi.load("user32.dll").func("GetWindow", "uintptr_t", ["uintptr_t", "uint32"]);
-        await expect.poll(() => {
-          const visited = new Set<number>();
-          let current = mainHwnd;
-          // The z-order chain is as long as the desktop has windows: a clean CI runner
-          // reaches the calendar in a few hundred hops, a developer machine with a lot of
-          // open windows measured 1135. The cap only guards against a cycle, so keep it
-          // well above anything a real desktop produces.
-          while (current && !visited.has(current) && visited.size < 8192) {
-            if (current === hwnd) return true;
-            visited.add(current);
-            current = Number(getWindow(current, 2));
-          }
-          return false;
-        }).toBe(true); // Activating the calendar must not put it above the main app.
-        const showWindow = koffi.load("user32.dll").func("ShowWindow", "bool", ["uintptr_t", "int32"]);
-        const isVisible = koffi.load("user32.dll").func("IsWindowVisible", "bool", ["uintptr_t"]);
-        showWindow(hwnd, 0); // Simulate Explorer SW_HIDE, bypassing Electron's cache.
-        await expect.poll(() => Boolean(isVisible(hwnd))).toBe(true);
+        const session = await desk.context().browser()!.newBrowserCDPSession();
+        const info = await session.send("SystemInfo.getProcessInfo");
+        const pid = info.processInfo.find(item => item.type === "browser")!.id;
+        expect(pid).not.toBe(app.process().pid);
+        const lib = koffi.load("user32.dll");
+        const callbackType = koffi.proto(`bool __stdcall CampusDesktopEnum${cycle}(uintptr_t hwnd, intptr_t arg)`);
+        const enumChildren = lib.func("EnumChildWindows", "bool", ["uintptr_t", koffi.pointer(callbackType), "intptr_t"]);
+        const threadPid = lib.func("GetWindowThreadProcessId", "uint32", ["uintptr_t", koffi.out(koffi.pointer("uint32"))]);
+        const parentOf = lib.func("GetParent", "uintptr_t", ["uintptr_t"]);
+        const style = lib.func("GetWindowLongPtrW", "intptr_t", ["uintptr_t", "int32"]);
+        const desktop = lib.func("GetDesktopWindow", "uintptr_t", []);
+        let hwnd = 0;
+        const callback = koffi.register((handle: number) => { const result = [0]; threadPid(handle, result); if (result[0] === pid && (Number(style(handle, -16)) & 0x40000000) !== 0) hwnd = Number(handle); return true; }, koffi.pointer(callbackType));
+        try { enumChildren(desktop(), callback, 0); } finally { koffi.unregister(callback); }
+        expect(hwnd).toBeGreaterThan(0);
+        expect(Number(parentOf(hwnd))).toBeGreaterThan(0);
+        expect(Number(style(hwnd, -20)) & 8).toBe(0);
+        await session.detach();
       }
-      const counts = await app.evaluate(({ ipcMain }, names) => names.map((name) => ipcMain.listenerCount(name)), channels);
-      expect(counts).toEqual([1, 1, 1, 1]);
+      await desk.getByRole("button", { name: "月", exact: true }).click();
+      const editor = await calendarPanel(app, desk, () => desk.locator(".dk-month-cell.is-today time").dblclick());
+      await expect(editor.getByRole("heading", { name: "新增事件" })).toBeVisible();
+      await editor.getByLabel("名称", { exact: true }).fill(`Desktop persistence ${cycle}`);
+      await editor.getByRole("button", { name: "保存", exact: true }).click();
+      await expect.poll(() => main.evaluate(async () => (await window.campusos.schedule.loadTasks()).tasks.length)).toBe(cycle + 1);
+      await expect(desk.getByText(`Desktop persistence ${cycle}`, { exact: true })).toBeVisible();
       await main.evaluate(() => window.campusos.desktopCalendarHost.stop());
-      expect(await app.evaluate(({ ipcMain }, names) => names.map((name) => ipcMain.listenerCount(name)), channels)).toEqual([0, 0, 0, 0]);
+      await expect.poll(() => main.evaluate(() => window.campusos.desktopCalendarHost.status())).toEqual({ running: false });
+      if (process.platform === "win32") await expect.poll(() => desk.isClosed()).toBe(true);
     }
-  } finally {
-    await app.close();
-    await rm(profile, { recursive: true, force: true });
-  }
+    if (process.platform === "win32") {
+      await main.evaluate(() => window.campusos.desktopCalendarHost.start());
+      const crashed = await connectDesktop(app, port);
+      const session = await crashed.context().browser()!.newBrowserCDPSession();
+      const info = await session.send("SystemInfo.getProcessInfo");
+      const pid = info.processInfo.find(item => item.type === "browser")!.id;
+      process.kill(pid); // Only this test's isolated host; primary owns recovery.
+      await expect.poll(() => crashed.isClosed()).toBe(true);
+      await expect.poll(() => main.evaluate(() => window.campusos.desktopCalendarHost.status()), { timeout: 15000 }).toEqual({ running: true });
+      const recovered = await connectDesktop(app, port);
+      await expect(recovered.getByText("Desktop persistence 2", { exact: true })).toBeVisible();
+      await main.evaluate(() => window.campusos.desktopCalendarHost.stop());
+    }
+  } finally { await app.close(); await rm(profile, { recursive: true, force: true }); }
 });

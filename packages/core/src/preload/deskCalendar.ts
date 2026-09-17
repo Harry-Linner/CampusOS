@@ -3,6 +3,24 @@ import { contextBridge, ipcRenderer } from "electron";
 // 桌面日历窗口的受控桥：只暴露渲染需要的只读数据 + 窗口/贴底控制。
 contextBridge.exposeInMainWorld("deskCalendar", {
   platform: process.platform,
+  desktopLayer: process.platform === "win32",
+  onDoubleClickTime: (listener: (duration: number) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, duration: number) => listener(duration);
+    ipcRenderer.on("campusos:desk-calendar:input-settings", handler);
+    return () => ipcRenderer.removeListener("campusos:desk-calendar:input-settings", handler);
+  },
+  openPanel: (input: unknown) => ipcRenderer.invoke("campusos:desk-calendar:panel:open", input),
+  getPanel: () => ipcRenderer.invoke("campusos:desk-calendar:panel:init"),
+  closePanel: () => ipcRenderer.invoke("campusos:desk-calendar:panel:close"),
+  dragStart: () => ipcRenderer.send("campusos:desk-calendar:drag-start"),
+  resizeStart: () => ipcRenderer.send("campusos:desk-calendar:resize-start"),
+  resizeMove: () => ipcRenderer.send("campusos:desk-calendar:resize-move"),
+  resizeEnd: () => ipcRenderer.send("campusos:desk-calendar:resize-end"),
+  onWheel: (listener: (values: number[]) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, values: number[]) => listener(values);
+    ipcRenderer.on("campusos:desk-calendar:wheel", handler);
+    return () => ipcRenderer.removeListener("campusos:desk-calendar:wheel", handler);
+  },
   getCalendarData: (range?: { startAt: string; endAt: string }) => ipcRenderer.invoke("campusos:desk-calendar:data", range),
   subscribe: (listener: (data: unknown) => void) => {
     const channel = "campusos:desk-calendar:changed";

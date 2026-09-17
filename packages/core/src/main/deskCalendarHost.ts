@@ -13,6 +13,8 @@ import { hydrateCampusWorkspace } from "./campusWorkspaceStore";
 import { loadSchedulePeriods, loadScheduleTasks, saveScheduleTask, mutateScheduleTask } from "./scheduleIpc";
 import { openZhiyunClassroom, parseZhiyunClassroomOpenInput } from "./zhiyunClassroom";
 import { pinWindowToDesktopBottom } from "./desktopPinning";
+import { DesktopProcess } from "./desktopProcess";
+import { isDesktopRequest, PREFIX } from "../desktop/protocol";
 import { loadUnifiedCalendarData } from "./calendarDataService";
 import {
   DESK_CALENDAR_STATE_KEYS,
@@ -77,6 +79,26 @@ interface DeskCalendarData {
 }
 
 let deskCalendarWindow: BrowserWindow | null = null;
+let desktopProcess: DesktopProcess | null = null;
+let panelWindow: BrowserWindow | null = null;
+let panelInput: unknown = null;
+let calendarWanted = false;
+let recoveryAttempts = 0;
+let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+let desktopStopping: Promise<void> = Promise.resolve();
+const recoverDesktop = (): void => {
+  if (!calendarWanted || recoveryAttempts >= 3 || recoveryTimer) return;
+  recoveryAttempts++;
+  recoveryTimer = setTimeout(() => {
+    recoveryTimer = null;
+    if (calendarWanted) void launchDeskCalendar().catch(recoverDesktop);
+  }, recoveryAttempts * 1500);
+};
+const calendarHandlers = new Map<string, (...args: unknown[]) => unknown>();
+const registerCalendarHandler = (channel: string, handler: (...args: unknown[]) => unknown): void => {
+  calendarHandlers.set(channel, handler);
+  registerWindowIpcHandler(channel, assertCalendarOrMain, (_event, ...args) => handler(...args));
+};
 let launchPending: Promise<void> | null = null;
 let lifecycleRevision = 0;
 let refreshRevision = 0;
@@ -89,7 +111,9 @@ const isCalendarFrame = (event: IpcMainEvent | IpcMainInvokeEvent, win = deskCal
   !!win && !win.isDestroyed() && event.sender === win.webContents &&
   event.senderFrame === win.webContents.mainFrame && event.senderFrame?.url === calendarUrl();
 const assertCalendarOrMain = (event: IpcMainInvokeEvent): void => {
-  if (!isCalendarFrame(event)) assertTrustedRenderer(event);
+  const isPanel = panelWindow && !panelWindow.isDestroyed() && event.sender === panelWindow.webContents &&
+    event.senderFrame === panelWindow.webContents.mainFrame && event.senderFrame?.url === calendarUrl() + "?panel=1";
+  if (!isPanel && !isCalendarFrame(event)) assertTrustedRenderer(event);
 };
 let deskCalendarVisible = false;
 let deskCalendarTransparency = 0.98;
@@ -100,6 +124,7 @@ interface SavedDeskCalendarGeometry {
   y: number;
   width: number;
   height: number;
+  physicalBounds?: Rectangle;
 }
 
 const hasMeaningfulVisibleArea = (geometry: SavedDeskCalendarGeometry, area: Rectangle): boolean => {
@@ -122,7 +147,9 @@ const getSavedDeskCalendarGeometry = (): SavedDeskCalendarGeometry | null => {
   const parsed = geometries[displaySignature()];
   if (parsed && typeof parsed.x === "number" && typeof parsed.y === "number" &&
       typeof parsed.width === "number" && typeof parsed.height === "number") {
-    return { x: parsed.x, y: parsed.y, width: parsed.width, height: parsed.height };
+    const physical = parsed.physicalBounds;
+    return { x: parsed.x, y: parsed.y, width: parsed.width, height: parsed.height,
+      ...(physical && [physical.x, physical.y, physical.width, physical.height].every(Number.isFinite) && physical.width > 0 && physical.height > 0 ? { physicalBounds: physical } : {}) };
   }
   // One-time import of the old single-layout JSON.
   const legacy = loadDesktopState<Partial<SavedDeskCalendarGeometry>>(
@@ -136,7 +163,7 @@ const getSavedDeskCalendarGeometry = (): SavedDeskCalendarGeometry | null => {
   return null;
 };
 
-const saveDeskCalendarGeometry = (window: BrowserWindow): void => {
+const saveDeskCalendarGeometry = (window: { getBounds: () => Rectangle; getPhysicalBounds?: () => Rectangle }): void => {
   try {
     const bounds = window.getBounds();
     // 防 WorkerW 子窗口 getBounds 异常(巨负坐标/超屏尺寸)：仅当与某显示器可见区有交集才保存，
@@ -149,7 +176,7 @@ const saveDeskCalendarGeometry = (window: BrowserWindow): void => {
     );
     saveDesktopState(DESK_CALENDAR_STATE_KEYS.geometries, {
       ...geometries,
-      [displaySignature()]: bounds
+      [displaySignature()]: { ...bounds, ...(window.getPhysicalBounds ? { physicalBounds: window.getPhysicalBounds() } : {}) }
     });
   } catch {
     // 保存失败静默，不影响窗口。
@@ -365,11 +392,14 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
 
 const sendDataToWindow = async (): Promise<void> => {
   const window = deskCalendarWindow;
-  if (!window || window.isDestroyed()) return;
+  const child = desktopProcess;
+  if ((!window || window.isDestroyed()) && (!child || child.isDestroyed()) && !panelWindow) return;
   const revision = ++refreshRevision;
   const data = await buildDeskCalendarData();
-  if (revision !== refreshRevision || window !== deskCalendarWindow || window.isDestroyed()) return;
-  window.webContents.send("campusos:desk-calendar:changed", data);
+  if (revision !== refreshRevision) return;
+  if (window && !window.isDestroyed()) window.webContents.send("campusos:desk-calendar:changed", data);
+  child?.send("campusos:desk-calendar:changed", data);
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.webContents.send("campusos:desk-calendar:changed", data);
 };
 
 export const writeDeskCalendarFeed = async (): Promise<void> => {
@@ -480,11 +510,51 @@ const createDeskCalendarWindow = async (): Promise<BrowserWindow> => {
 };
 
 export const launchDeskCalendar = (): Promise<void> => {
+  calendarWanted = true;
   if (launchPending) return launchPending;
   const revision = ++lifecycleRevision;
   const operation = (async () => {
     await writeVisibilityFlag(true);
     if (revision !== lifecycleRevision) return;
+    if (process.platform === "win32") {
+      await desktopStopping;
+      if (revision !== lifecycleRevision) return;
+      if (desktopProcess && !desktopProcess.isDestroyed()) return;
+      const saved = getSavedDeskCalendarGeometry();
+      const bounds = resolveDeskCalendarPlacement(saved, screen.getAllDisplays(), screen.getPrimaryDisplay().workArea);
+      const settings = loadDeskCalendarSettings();
+      const child = new DesktopProcess({
+        url: calendarUrl(), preload: join(mainBundleDirectory, "../preload/deskCalendar.cjs"),
+        helper: app.isPackaged ? join(process.resourcesPath, "desktop-calendar/DesktopHost.exe") : join(mainBundleDirectory, "../native/DesktopHost.exe"),
+        bounds, physicalBounds: !bounds.useDefault && saved?.physicalBounds ? saved.physicalBounds : screen.dipToScreenRect(null, bounds), opacity: settings.opacity, locked: settings.locked
+      }, async (channel, args) => {
+        if (child !== desktopProcess || !isDesktopRequest(channel)) throw new Error("Desktop connection expired");
+        const handler = calendarHandlers.get(channel);
+        if (!handler) throw new Error("Unknown desktop request");
+        return handler(...args);
+      }, () => saveDeskCalendarGeometry(child), (unexpected) => {
+        if (desktopProcess === child) {
+          desktopProcess = null; deskCalendarVisible = false; refreshRevision++;
+          if (unexpected) recoverDesktop(); else calendarWanted = false;
+        }
+      });
+      desktopProcess = child;
+      try { await child.start(); }
+      catch (error) {
+        desktopStopping = Promise.all([desktopStopping, child.destroy()]).then(() => undefined);
+        await desktopStopping;
+        if (desktopProcess === child) desktopProcess = null;
+        deskCalendarVisible = false;
+        throw error;
+      }
+      if (revision !== lifecycleRevision) {
+        desktopStopping = Promise.all([desktopStopping, child.destroy()]).then(() => undefined);
+        await desktopStopping;
+        return;
+      }
+      await sendDataToWindow();
+      return;
+    }
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
       deskCalendarWindow.showInactive();
       return;
@@ -511,6 +581,7 @@ export const launchDeskCalendar = (): Promise<void> => {
 /** 打开桌历的设置面板：确保桌历窗口存在并显示，然后通知渲染层打开设置。 */
 export const openDeskCalendarSettings = async (): Promise<void> => {
   await launchDeskCalendar();
+  if (process.platform === "win32") { await openCalendarPanel({ kind: "settings" }); return; }
   if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
     deskCalendarWindow.showInactive();
     deskCalendarWindow.webContents.send("campusos:desk-calendar:open-settings");
@@ -519,30 +590,45 @@ export const openDeskCalendarSettings = async (): Promise<void> => {
 
 /** 关闭（隐藏/销毁）：真正销毁窗口，避免贴底守护把隐藏窗口重新拉回（问题：点关闭后又弹出）。 */
 export const closeDeskCalendar = async (): Promise<void> => {
+  calendarWanted = false;
+  if (recoveryTimer) { clearTimeout(recoveryTimer); recoveryTimer = null; }
   lifecycleRevision++;
   launchPending = null;
   await writeVisibilityFlag(false);
+  const stopping = desktopProcess?.destroy();
+  desktopStopping = Promise.all([desktopStopping, stopping]).then(() => undefined);
+  desktopProcess = null;
+  panelWindow?.destroy();
   if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
     deskCalendarWindow.destroy();
   }
   deskCalendarWindow = null;
+  await desktopStopping;
 };
 
 /** 应用退出时销毁桌面日历窗口。 */
-export const killDeskCalendar = (): void => {
+export const killDeskCalendar = async (): Promise<void> => {
+  calendarWanted = false;
+  if (recoveryTimer) { clearTimeout(recoveryTimer); recoveryTimer = null; }
   lifecycleRevision++;
   launchPending = null;
+  const stopping = desktopProcess?.destroy();
+  desktopStopping = Promise.all([desktopStopping, stopping]).then(() => undefined);
+  desktopProcess = null;
+  panelWindow?.destroy();
   if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
     deskCalendarWindow.destroy();
   }
   deskCalendarWindow = null;
+  await desktopStopping;
 };
 
 export const isDeskCalendarRunning = (): boolean =>
-  deskCalendarVisible && deskCalendarWindow !== null && !deskCalendarWindow.isDestroyed();
+  deskCalendarVisible && ((desktopProcess !== null && !desktopProcess.isDestroyed()) || (deskCalendarWindow !== null && !deskCalendarWindow.isDestroyed()));
 
 export const enforceDeskCalendarAutoStartDependency = (campusAutoStartEnabled: boolean): void => {
   enforceCampusAutoStartDependency(campusAutoStartEnabled);
+  desktopProcess?.send(PREFIX + "settings-changed", loadDeskCalendarSettings());
   if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
     deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", loadDeskCalendarSettings());
   }
@@ -553,25 +639,57 @@ export const restoreDeskCalendarOnCampusStart = async (): Promise<void> => {
   if (settings.campusAutoStartEnabled && settings.autoStart) await launchDeskCalendar();
 };
 
+const openCalendarPanel = async (input: unknown): Promise<void> => {
+  if (!input || typeof input !== "object" || JSON.stringify(input).length > 65536) throw new Error("Invalid calendar panel");
+  const value = input as { kind?: string; form?: unknown; event?: unknown };
+  if (value.kind !== "settings" && !(value.kind === "edit" && value.form && typeof value.form === "object") && !(value.kind === "info" && value.event && typeof value.event === "object")) throw new Error("Invalid calendar panel");
+  // Never replace an existing unsaved draft with a second desktop double-click.
+  if (panelWindow && !panelWindow.isDestroyed()) { panelWindow.show(); panelWindow.focus(); return; }
+  panelInput = input;
+  const win = new BrowserWindow({
+    title: value.kind === "settings" ? "日历设置" : "日历事件", width: 640, height: 780,
+    minWidth: 540, minHeight: 480, show: false, autoHideMenuBar: true,
+    webPreferences: { session: getAccountBrowserSession(), preload: join(mainBundleDirectory, "../preload/deskCalendar.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
+  panelWindow = win;
+  const url = calendarUrl() + "?panel=1";
+  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.webContents.on("will-navigate", (event, next) => { if (next !== url) event.preventDefault(); });
+  win.webContents.on("will-redirect", (event) => event.preventDefault());
+  win.on("closed", () => { if (panelWindow === win) { panelWindow = null; panelInput = null; } });
+  try { await win.loadURL(url); if (!win.isDestroyed()) { win.show(); win.focus(); } }
+  catch (error) { win.destroy(); throw error; }
+};
+
 export const registerDeskCalendarHostHandlers = (): void => {
 
-  registerWindowIpcHandler("campusos:desk-calendar:process:start", assertCalendarOrMain, async () => {
+  registerCalendarHandler(PREFIX + "panel:open", openCalendarPanel);
+  registerWindowIpcHandler(PREFIX + "panel:init", assertCalendarOrMain, () => panelInput);
+  registerWindowIpcHandler(PREFIX + "panel:close", assertCalendarOrMain, (event) => {
+    if (event.sender === panelWindow?.webContents) panelWindow.close();
+  });
+
+  registerCalendarHandler("campusos:desk-calendar:process:start", async () => {
+    recoveryAttempts = 0;
     await launchDeskCalendar();
     return { running: isDeskCalendarRunning() };
   });
-  registerWindowIpcHandler("campusos:desk-calendar:process:stop", assertCalendarOrMain, async () => {
+  registerCalendarHandler("campusos:desk-calendar:process:stop", async () => {
     await closeDeskCalendar();
     return { running: false };
   });
-  registerWindowIpcHandler("campusos:desk-calendar:process:status", assertCalendarOrMain, async () => ({
+  registerCalendarHandler("campusos:desk-calendar:process:status", async () => ({
     running: isDeskCalendarRunning()
   }));
-  registerWindowIpcHandler("campusos:desk-calendar:data", assertCalendarOrMain, async (_event, range) => buildDeskCalendarData((range ?? {}) as { startAt?: string; endAt?: string }));
-  registerWindowIpcHandler("campusos:desk-calendar:settings:load", assertCalendarOrMain, async () => loadDeskCalendarSettings());
-  registerWindowIpcHandler("campusos:desk-calendar:settings:save", assertCalendarOrMain, async (_event, patch) => {
+  registerCalendarHandler("campusos:desk-calendar:data", async (range) => buildDeskCalendarData((range ?? {}) as { startAt?: string; endAt?: string }));
+  registerCalendarHandler("campusos:desk-calendar:settings:load", async () => loadDeskCalendarSettings());
+  registerCalendarHandler("campusos:desk-calendar:settings:save", async (patch) => {
     const next = saveDeskCalendarSettings((patch ?? {}) as Partial<DeskCalendarSettings>);
     deskCalendarTransparency = next.opacity;
     applyTransparency();
+    desktopProcess?.settings(next.opacity, next.locked);
+    desktopProcess?.send(PREFIX + "settings-changed", next);
+    panelWindow?.webContents.send(PREFIX + "settings-changed", next);
     if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
       deskCalendarWindow.setResizable(!next.locked);
       deskCalendarWindow.setMovable(!next.locked);
@@ -579,7 +697,7 @@ export const registerDeskCalendarHostHandlers = (): void => {
     }
     return next;
   });
-  registerWindowIpcHandler("campusos:desk-calendar:complete-task", assertCalendarOrMain, async (_event, id, completed, occurrenceKey) => {
+  registerCalendarHandler("campusos:desk-calendar:complete-task", async (id, completed, occurrenceKey) => {
     if (typeof id !== "string" || !id) return { ok: false, error: "任务不存在。" };
     try {
       // completed=true -> 置为 completed；false -> restore（按类型回退为 running/overdue/running）。
@@ -592,14 +710,14 @@ export const registerDeskCalendarHostHandlers = (): void => {
       return { ok: false, error: err instanceof Error ? err.message : "操作失败。" };
     }
   });
-  registerWindowIpcHandler("campusos:desk-calendar:zhiyun:open", assertCalendarOrMain, async (_event, input) => {
+  registerCalendarHandler("campusos:desk-calendar:zhiyun:open", async (input) => {
     const parsed = parseZhiyunClassroomOpenInput(input);
     if (!parsed) {
       return { ok: false, matched: false, url: null, message: "该课程没有可用的智云课堂信息。" };
     }
     return openZhiyunClassroom(parsed);
   });
-  registerWindowIpcHandler("campusos:desk-calendar:save-event", assertCalendarOrMain, async (_event, input) => {
+  registerCalendarHandler("campusos:desk-calendar:save-event", async (input) => {
     try {
     const { id, origin, taskId, occurrenceKey, editScope, date, title, startAt, endAt, location, note, reminderMode, reminderLeadMinutes, reminderAt, type, timeSpentMinutes, timeNeededMinutes, breakable, blocksPlanning, repeatType, repeatPeriod, repeatEndsOn, repeatEndMode, repeatCount, repeatWeekdays } = (input ?? {}) as {
       id?: string;
@@ -677,7 +795,7 @@ export const registerDeskCalendarHostHandlers = (): void => {
     }
   });
   // Compatibility for older renderer bundles during an application update.
-  registerWindowIpcHandler("campusos:desk-calendar:create-event", assertCalendarOrMain, async (_event, input) => {
+  registerCalendarHandler("campusos:desk-calendar:create-event", async (input) => {
     const handlerInput = (input ?? {}) as Record<string, unknown>;
     const { date, title } = handlerInput;
     if (typeof date !== "string" || typeof title !== "string" || !date || !title) return { ok: false, error: "日期和名称不能为空。" };
@@ -696,7 +814,7 @@ export const registerDeskCalendarHostHandlers = (): void => {
     await sendDataToWindow();
     return { ok: true };
   });
-  registerWindowIpcHandler("campusos:desk-calendar:feed:refresh", assertCalendarOrMain, async () => {
+  registerCalendarHandler("campusos:desk-calendar:feed:refresh", async () => {
     await sendDataToWindow();
     return { ok: true };
   });

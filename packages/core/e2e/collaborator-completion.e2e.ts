@@ -1,4 +1,5 @@
 import { prepareFixtureWorkspace } from "./fixtureWorkspace";
+import { desktopPort, connectDesktop, calendarPanel } from "./desktopFixture";
 import {
   expect,
   test,
@@ -316,6 +317,7 @@ test(
     void _browserName;
     test.setTimeout(120_000);
     const userDataPath = await mkdtemp(join(tmpdir(), "campusos-collaborator-e2e-"));
+    const port = await desktopPort();
     const { server, baseUrl } = await startAssistantFixtureServer();
     let app = await electron.launch({
       args: [
@@ -323,6 +325,7 @@ test(
         `--user-data-dir=${userDataPath}`
       ],
       env: {
+        CAMPUSOS_DESKTOP_CDP_PORT: port,
         ...process.env,
         CAMPUSOS_E2E_FIXTURE: "1"
       }
@@ -454,7 +457,7 @@ test(
         if (!calendarHost) throw new Error("Desktop calendar host bridge is unavailable.");
         await calendarHost.start();
       });
-      const calendarPage = await waitForWindow(app, "desk-calendar.html");
+      const calendarPage = await connectDesktop(app, port);
       await expect.poll(() => page.evaluate(async () =>
         window.campusos?.desktopCalendarHost.status()
       )).toMatchObject({ running: true });
@@ -481,11 +484,11 @@ test(
       await expect(calendarPage.getByRole("button", { name: "日", exact: true }))
         .toHaveClass("is-active");
       await calendarPage.getByRole("button", { name: "今天", exact: true }).click();
-      await calendarPage.getByRole("button", { name: "⚙ 设置" }).click();
-      const calendarSettings = calendarPage.getByRole("heading", { name: "日历设置" });
+      const settingsPage = await calendarPanel(app, calendarPage, () => calendarPage.getByRole("button", { name: "⚙ 设置" }).click());
+      const calendarSettings = settingsPage.getByRole("heading", { name: "日历设置" });
       await expect(calendarSettings).toBeVisible();
-      await expect(calendarPage.getByLabel("随 CampusOS 开机恢复")).toBeDisabled();
-      const lunarToggle = calendarPage.getByLabel("农历", { exact: true });
+      await expect(settingsPage.getByLabel("随 CampusOS 开机恢复")).toBeDisabled();
+      const lunarToggle = settingsPage.getByLabel("农历", { exact: true });
       await expect(lunarToggle).not.toBeChecked();
       // The controlled input updates after the settings IPC has persisted the
       // change. check() asserts synchronously after clicking and races that reply.
@@ -494,10 +497,10 @@ test(
       await expect.poll(() => calendarPage.evaluate(async () =>
         (await window.deskCalendar?.getSettings())?.showLunar
       )).toBe(true);
-      await calendarPage.screenshot({
+      await settingsPage.screenshot({
         path: testInfo.outputPath("desktop-calendar-settings.png")
       });
-      await calendarPage.getByRole("button", { name: "关闭", exact: true }).click();
+      await settingsPage.getByRole("button", { name: "关闭", exact: true }).click();
 
       await page.evaluate(async (assistantBaseUrl) => {
         const assistant = window.campusos?.assistant;

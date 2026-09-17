@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createAccountProfileStore } from "../src/main/accountProfileStore";
 import { prepareFixtureWorkspace } from "./fixtureWorkspace";
+import { desktopPort, connectDesktop, calendarPanel } from "./desktopFixture";
 
 test("recurrence editing keeps the occurrence reminder and rejected drafts, with SQLite notification recovery", async () => {
   const profile = await mkdtemp(join(tmpdir(), "campusos-recovery-e2e-"));
@@ -13,7 +14,8 @@ test("recurrence editing keeps the occurrence reminder and rejected drafts, with
   const legacy = { id: "fixture-notification", title: "Fixture notification", body: "SQLite recovery fixture", kind: "system", state: "unread", createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86_400_000).toISOString(), actionTarget: "schedule", source: "system" };
   await mkdir(join(profile, "notifications"));
   await writeFile(join(profile, "notifications/notifications.json"), JSON.stringify([legacy]));
-  const launch = () => electron.launch({ args: [resolve("out/main/main.js"), `--user-data-dir=${profile}`], env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1" } });
+  const port = await desktopPort();
+  const launch = () => electron.launch({ args: [resolve("out/main/main.js"), `--user-data-dir=${profile}`], env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1", CAMPUSOS_DESKTOP_CDP_PORT: port } });
   let app = await launch();
   try {
     const main = await app.firstWindow();
@@ -50,26 +52,25 @@ test("recurrence editing keeps the occurrence reminder and rejected drafts, with
     await main.mouse.up();
     await expect.poll(async () => (await main.evaluate(() => window.campusos.schedule.loadTasks())).tasks.find((task) => task.id === taskId)?.occurrenceOverrides?.["4"]?.reminderAt)
       .toBe(new Date(`${today}T09:00:00+08:00`).toISOString());
-    const opened = app.waitForEvent("window");
     await main.evaluate(() => window.campusos.desktopCalendarHost.start());
-    const desk = await opened;
+    const desk = await connectDesktop(app, port);
     await desk.getByRole("button", { name: "日", exact: true }).click();
-    await desk.getByText("Series acceptance", { exact: true }).first().dblclick();
-    await expect(desk.getByLabel("提醒时间", { exact: true })).toHaveValue(`${today}T09:00`);
-    await desk.getByLabel("名称", { exact: true }).fill("Edited occurrence");
-    await desk.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(desk.getByLabel("名称", { exact: true })).toHaveCount(0);
+    let editor = await calendarPanel(app, desk, () => desk.getByText("Series acceptance", { exact: true }).first().dblclick());
+    await expect(editor.getByLabel("提醒时间", { exact: true })).toHaveValue(`${today}T09:00`);
+    await editor.getByLabel("名称", { exact: true }).fill("Edited occurrence");
+    await editor.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(desk.getByText("Edited occurrence", { exact: true }).first()).toBeVisible();
     const saved = await main.evaluate(() => window.campusos.schedule.loadTasks());
     expect(saved.tasks.find((task) => task.id === taskId)?.occurrenceOverrides?.["4"]?.reminderAt)
       .toBe(new Date(`${today}T09:00:00+08:00`).toISOString());
-    await desk.getByText("Edited occurrence", { exact: true }).first().dblclick();
-    await desk.getByLabel(/编辑范围/).selectOption("series");
-    await desk.locator("select").filter({ has: desk.locator('option[value="never"]') }).selectOption("date");
-    await desk.getByLabel("结束日期", { exact: true }).fill(new Date(rootStart.getTime() - 86_400_000).toISOString().slice(0, 10));
-    await desk.getByRole("button", { name: "保存", exact: true }).click();
-    await expect(desk.getByRole("alert")).toContainText("重复结束日期");
-    await expect(desk.getByLabel("名称", { exact: true })).toHaveValue("Edited occurrence");
-    await desk.screenshot({ path: test.info().outputPath("invalid-range-draft.png") });
+    editor = await calendarPanel(app, desk, () => desk.getByText("Edited occurrence", { exact: true }).first().dblclick());
+    await editor.getByLabel(/编辑范围/).selectOption("series");
+    await editor.locator("select").filter({ has: editor.locator('option[value="never"]') }).selectOption("date");
+    await editor.getByLabel("结束日期", { exact: true }).fill(new Date(rootStart.getTime() - 86_400_000).toISOString().slice(0, 10));
+    await editor.getByRole("button", { name: "保存", exact: true }).click();
+    await expect(editor.getByRole("alert")).toContainText("重复结束日期");
+    await expect(editor.getByLabel("名称", { exact: true })).toHaveValue("Edited occurrence");
+    await editor.screenshot({ path: test.info().outputPath("invalid-range-draft.png") });
     expect((await main.evaluate(() => window.campusos.schedule.loadTasks())).tasks).toEqual(saved.tasks);
     await main.evaluate(() => window.campusos.notifications.markHandled("fixture-notification"));
     await app.close();

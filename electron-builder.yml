@@ -13,6 +13,8 @@ files:
 extraResources:
   - from: ../../build/icon.ico
     to: icon.ico
+  - from: out/native/DesktopHost.exe
+    to: desktop-calendar/DesktopHost.exe
 
 win:
   target:

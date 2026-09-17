@@ -277,13 +277,14 @@ const startCampusApp = (): void => {
       profiles: accountProfiles,
       onProfileChange: () => {
         suppressNotifications();
+        const desktopStopped = killDeskCalendar();
         for (const window of BrowserWindow.getAllWindows()) window.hide();
         workspaceRefreshScheduler.stop();
         // A process boundary prevents old repositories, downloads, reminders and
         // auxiliary renderers from surviving into the newly selected account.
-        setImmediate(() => {
+        void desktopStopped.then(async () => {
           if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-            stopCampusServices();
+            await stopCampusServices();
             app.exit(75);
           } else {
             app.relaunch({ args: process.argv.slice(1).filter(argument => argument !== "--hidden") });
@@ -432,13 +433,21 @@ if (!hasSingleInstanceLock) {
 
 app.on("window-all-closed", () => undefined);
 
-const stopCampusServices = (): void => {
+const stopCampusServices = async (): Promise<void> => {
   markCampusAppQuitting();
-  killDeskCalendar();
+  await killDeskCalendar();
   desktopPetHost?.dispose();
   desktopPetHost = null;
   workspaceRefreshScheduler.stop();
   resetOfficialCapabilityRepository();
   closeOfficialDatabaseService();
 };
-app.on("before-quit", stopCampusServices);
+let shutdownComplete = false;
+let shutdownPending = false;
+app.on("before-quit", (event) => {
+  if (shutdownComplete) return;
+  event.preventDefault();
+  if (shutdownPending) return;
+  shutdownPending = true;
+  void stopCampusServices().finally(() => { shutdownComplete = true; app.quit(); });
+});

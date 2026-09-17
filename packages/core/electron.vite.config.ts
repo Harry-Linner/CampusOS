@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
+import { buildDesktopHost } from "./scripts/build-desktop-host.mjs";
 
 const rootDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRuntimeDependencies = [
@@ -23,20 +24,21 @@ const workspaceRuntimeDependencies = [
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({
+    plugins: [{ name: "campusos-native-desktop-host", buildStart: buildDesktopHost }, externalizeDepsPlugin({
       exclude: workspaceRuntimeDependencies
     })],
     build: {
       rollupOptions: {
         input: {
-          main: resolve(rootDir, "src/main/main.ts"),
+          main: resolve(rootDir, "src/main/bootstrap.ts"),
           headlessSandboxHost: resolve(
             rootDir,
             "src/utility/headlessSandboxHost.ts"
           )
         },
         output: {
-          entryFileNames: "[name].js"
+          entryFileNames: "[name].js",
+          chunkFileNames: "[name]-[hash].js"
         }
       }
     },

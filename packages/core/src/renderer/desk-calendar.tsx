@@ -128,6 +128,16 @@ interface CalData {
 declare global {
   interface Window {
     deskCalendar?: {
+      desktopLayer?: boolean;
+      onDoubleClickTime?: (listener: (duration: number) => void) => () => void;
+      openPanel?: (input: { kind: "edit"; form: TaskForm } | { kind: "settings" } | { kind: "info"; event: ScheduleEvent }) => Promise<void>;
+      getPanel?: () => Promise<{ kind: "edit"; form: TaskForm } | { kind: "settings" } | { kind: "info"; event: ScheduleEvent }>;
+      closePanel?: () => Promise<void>;
+      dragStart?: () => void;
+      resizeStart?: () => void;
+      resizeMove?: () => void;
+      resizeEnd?: () => void;
+      onWheel?: (listener: (values: number[]) => void) => () => void;
       getCalendarData: (range?: { startAt: string; endAt: string }) => Promise<CalData>;
       subscribe: (cb: (d: CalData) => void) => () => void;
       setTransparency: (v: number) => void;
@@ -261,6 +271,8 @@ const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
 };
 
 export default function DeskCalendar(): JSX.Element {
+  const isPanel = new URLSearchParams(window.location.search).get("panel") === "1";
+  const desktopLayer = window.deskCalendar?.desktopLayer && !isPanel;
   const windowDrag = useRef<{ x: number; y: number } | null>(null);
   const [data, setData] = useState<CalData>({ today: "", items: [] });
   const [settings, setSettings] = useState<DeskCalendarSettings>(DEFAULT_DESK_SETTINGS);
@@ -279,6 +291,40 @@ export default function DeskCalendar(): JSX.Element {
   useEffect(() => { if (saveError) saveErrorRef.current?.focus(); }, [saveError]);
   useEffect(() => { setZhiyunNotice(null); }, [infoEvent]);
   const [glass, setGlass] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [doubleClickTime, setDoubleClickTime] = useState(desktopLayer ? 500 : 250);
+  useEffect(() => window.deskCalendar?.onDoubleClickTime?.(setDoubleClickTime), []);
+  const openPanel = (input: Parameters<NonNullable<NonNullable<Window["deskCalendar"]>["openPanel"]>>[0]): void => {
+    setPanelError(null);
+    void window.deskCalendar?.openPanel?.(input).catch(() => setPanelError("窗口未能打开，请重试。"));
+  };
+  const editForm = (next: TaskForm): void => {
+    if (desktopLayer) openPanel({ kind: "edit", form: next }); else setForm(next);
+  };
+  const closeForm = (): void => { if (isPanel) void window.deskCalendar?.closePanel?.(); else setForm(null); };
+  const closeInfo = (): void => { if (isPanel) void window.deskCalendar?.closePanel?.(); else setInfoEvent(null); };
+  const closeSettings = (): void => { if (isPanel) void window.deskCalendar?.closePanel?.(); else setShowSettings(false); };
+  useEffect(() => {
+    if (!isPanel) return;
+    void window.deskCalendar?.getPanel?.().then((input) => {
+      if (input.kind === "edit") setForm(input.form);
+      else if (input.kind === "info") setInfoEvent(input.event);
+      else setShowSettings(true);
+    });
+  }, [isPanel]);
+  useEffect(() => window.deskCalendar?.onWheel?.(([x, y, delta, width, height]) => {
+    let element = document.elementFromPoint(x / width * window.innerWidth, y / height * window.innerHeight);
+    while (element instanceof HTMLElement) {
+      const style = getComputedStyle(element);
+      if (/(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight) {
+        const amount = -delta / 120 * 100;
+        if ((amount > 0 && element.scrollTop < element.scrollHeight - element.clientHeight) || (amount < 0 && element.scrollTop > 0)) {
+          element.scrollBy({ top: amount }); return;
+        }
+      }
+      element = element.parentElement;
+    }
+  }), []);
 
   const applySettings = useCallback((s: DeskCalendarSettings): void => {
     const next: DeskCalendarSettings = {
@@ -288,7 +334,7 @@ export default function DeskCalendar(): JSX.Element {
     };
     setSettings(next);
     setGlass(next.glass);
-    window.deskCalendar?.setTransparency(next.opacity);
+    if (!isPanel) window.deskCalendar?.setTransparency(next.opacity);
     const root = document.documentElement;
     const setVar = (name: string, value: string): void => {
       if (value) root.style.setProperty(name, value);
@@ -300,7 +346,7 @@ export default function DeskCalendar(): JSX.Element {
     setVar("--dk-lunar-fg", next.colors.lunar);
     setVar("--dk-holiday-fg", next.colors.holiday);
     setVar("--dk-bg", next.bgColor);
-  }, []);
+  }, [isPanel]);
   const patchSetting = (patch: Partial<DeskCalendarSettings>): void => {
     void window.deskCalendar?.saveSettings(patch).then(applySettings);
   };
@@ -428,13 +474,13 @@ export default function DeskCalendar(): JSX.Element {
   // 双击空白格子 → 新增（日期默认那天）
   const onDoubleDay = (day: { y: number; m: number; d: number }): void => {
     const dkey = dayKey(fromShanghaiParts(day.y, day.m, day.d));
-    setForm(emptyForm(dkey));
+    editForm(emptyForm(dkey));
   };
   // 双击事件条 → 编辑
   const onDoubleEvent = (event: ScheduleEvent): void => {
     const dk = dayKey(new Date(event.startAt));
     const weekday = getShanghaiWeekday(new Date(event.startAt));
-    setForm({
+    editForm({
       ...emptyForm(dk),
       id: event.id,
       origin: event.origin,
@@ -464,7 +510,7 @@ export default function DeskCalendar(): JSX.Element {
     });
   };
   // 单击事件条 → 信息卡片，显示节次/时间/教师/地点
-  const onInfoClick = (event: ScheduleEvent): void => setInfoEvent(event);
+  const onInfoClick = (event: ScheduleEvent): void => { if (desktopLayer) openPanel({ kind: "info", event }); else setInfoEvent(event); };
   // 单击/双击区分：单击延迟 ~250ms 等待第二次左键；若期间来了第二次则为双击(编辑)，取消信息卡片。
   // 否则到点弹信息卡片。避免"单击已弹卡片、双击编辑"冲突。
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -473,7 +519,7 @@ export default function DeskCalendar(): JSX.Element {
     clickTimer.current = setTimeout(() => {
       clickTimer.current = null;
       onInfoClick(event);
-    }, 250);
+    }, doubleClickTime + (desktopLayer ? 50 : 0));
   };
   const onEventDoubleClick = (event: ScheduleEvent): void => {
     if (clickTimer.current) clearTimeout(clickTimer.current);
@@ -520,7 +566,7 @@ export default function DeskCalendar(): JSX.Element {
       reminderAt: form.origin === "local" && form.reminderMode === "custom" ? form.reminderAt || null : null
     });
     if (!result?.ok) throw new Error(result?.error ?? "日程服务不可用，请重新打开桌历。");
-    setForm(null);
+    closeForm();
     void loadData(eventRange);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "日程保存失败。");
@@ -535,7 +581,7 @@ export default function DeskCalendar(): JSX.Element {
     const completed = event.status !== "completed";
     const res = await window.deskCalendar?.completeTask(event.taskId, completed, event.occurrenceKey);
     if (res?.ok) {
-      setInfoEvent(null);
+      closeInfo();
       void loadData(eventRange);
     }
   };
@@ -546,11 +592,12 @@ export default function DeskCalendar(): JSX.Element {
   const headerLabel = viewMode === "week" ? weekLabel : viewMode === "day" ? dayLabel : monthLabel;
 
   return (
-    <div className="desk-cal-root" data-glass={glass ? "on" : "off"} data-show-weeks={settings.showWeeks ? "on" : "off"} data-show-holidays={settings.showHolidays ? "on" : "off"}>
+    <div className={`desk-cal-root${isPanel ? " desk-cal-panel" : ""}`} data-glass={glass ? "on" : "off"} data-show-weeks={settings.showWeeks ? "on" : "off"} data-show-holidays={settings.showHolidays ? "on" : "off"}>
+      {!isPanel ? <>
       <header className="desk-cal-header">
         <div className="desk-cal-title">
           <button type="button" className="desk-cal-mini" aria-label="移动日历" disabled={settings.locked}
-            onPointerDown={(event) => { if (settings.locked || event.button !== 0) return; windowDrag.current = { x: event.screenX, y: event.screenY }; event.currentTarget.setPointerCapture(event.pointerId); }}
+            onPointerDown={(event) => { if (settings.locked || event.button !== 0) return; window.deskCalendar?.dragStart?.(); windowDrag.current = { x: event.screenX, y: event.screenY }; event.currentTarget.setPointerCapture(event.pointerId); }}
             onPointerMove={(event) => { if (windowDrag.current) window.deskCalendar?.moveWindow(event.screenX - windowDrag.current.x, event.screenY - windowDrag.current.y); }}
             onPointerUp={() => { windowDrag.current = null; window.deskCalendar?.dragEnd(); }}
             onPointerCancel={() => { windowDrag.current = null; window.deskCalendar?.dragEnd(); }}>⠿</button>
@@ -566,7 +613,7 @@ export default function DeskCalendar(): JSX.Element {
           </nav>
           <button className="desk-cal-mini" type="button" onClick={goToday}>今天</button>
           <button className="desk-cal-mini" type="button" onClick={() => setGlass((g) => !g)} aria-pressed={glass}>玻璃</button>
-          <button className="desk-cal-mini" type="button" onClick={() => setShowSettings(true)}>⚙ 设置</button>
+          <button className="desk-cal-mini" type="button" onClick={() => desktopLayer ? openPanel({ kind: "settings" }) : setShowSettings(true)}>⚙ 设置</button>
           <button className="desk-cal-mini" type="button" aria-label="关闭日历" onClick={() => window.deskCalendar?.closeWindow()}>×</button>
         </div>
       </header>
@@ -662,8 +709,14 @@ export default function DeskCalendar(): JSX.Element {
       </div>
 
       {/* 单击事件 → 信息小卡片 */}
+      {desktopLayer && !settings.locked ? <footer className="desk-cal-resize-row"><button type="button" aria-label="调整日历大小"
+        onPointerDown={(event) => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); window.deskCalendar?.resizeStart?.(); }}
+        onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) window.deskCalendar?.resizeMove?.(); }}
+        onPointerUp={() => window.deskCalendar?.resizeEnd?.()} onPointerCancel={() => window.deskCalendar?.resizeEnd?.()}>↘</button></footer> : null}
+      </> : null}
+      {panelError ? <p role="alert">{panelError}</p> : null}
       {infoEvent ? (
-        <div className="dk-info-backdrop" onClick={() => setInfoEvent(null)}>
+        <div className="dk-info-backdrop" onClick={closeInfo}>
           <div className="dk-info-card" onClick={(e) => e.stopPropagation()}>
             <strong>{infoEvent.title}</strong>
             {infoEvent.note ? <p className="dk-info-note">{infoEvent.note}</p> : null}
@@ -730,7 +783,7 @@ export default function DeskCalendar(): JSX.Element {
                   {infoEvent.status === "completed" ? "恢复未完成" : "标记完成"}
                 </button>
               ) : null}
-              <button type="button" onClick={() => setInfoEvent(null)}>关闭</button>
+              <button type="button" onClick={closeInfo}>关闭</button>
             </div>
             {zhiyunNotice ? <p className="dk-info-notice" role="status">{zhiyunNotice}</p> : null}
           </div>
@@ -739,7 +792,7 @@ export default function DeskCalendar(): JSX.Element {
 
       {/* 新增/编辑事件窗口 */}
       {form ? (
-        <div className="dk-form-backdrop" onClick={() => setForm(null)}>
+        <div className="dk-form-backdrop" onClick={closeForm}>
           <div className="dk-form-card" onClick={(e) => e.stopPropagation()}>
             <h3>{form.id ? "编辑事件" : "新增事件"}</h3>
             {form.origin === "upstream" ? <p className="dk-form-hint">课程、考试和抓取内容的名称、时间、地点由数据源维护；这里可保存个人备注和提醒。</p> : null}
@@ -791,7 +844,7 @@ export default function DeskCalendar(): JSX.Element {
               {form.reminderMode === "custom" ? <label>提醒时间<input type="datetime-local" value={form.reminderAt} onChange={(e) => setForm({ ...form, reminderAt: e.target.value })} /></label> : null}
             </div>}
             <div className="dk-form-actions">
-              <button type="button" disabled={saving} onClick={() => setForm(null)}>取消</button>
+              <button type="button" disabled={saving} onClick={closeForm}>取消</button>
               <button type="button" className="dk-primary" disabled={saving} onClick={() => void saveEvent()}>{saving ? "保存中…" : "保存"}</button>
             </div>
             {saveError ? <p role="alert" tabIndex={-1} ref={saveErrorRef}>{saveError}</p> : null}
@@ -801,7 +854,7 @@ export default function DeskCalendar(): JSX.Element {
 
       {/* 设置面板：显示项/外观/颜色/通用 */}
       {showSettings ? (
-        <div className="dk-settings-backdrop" onClick={() => setShowSettings(false)}>
+        <div className="dk-settings-backdrop" onClick={closeSettings}>
           <div className="dk-settings-card" onClick={(e) => e.stopPropagation()}>
             <h3>日历设置</h3>
             <section className="dk-settings-section">
@@ -833,7 +886,7 @@ export default function DeskCalendar(): JSX.Element {
               {!settings.campusAutoStartEnabled ? <p className="dk-form-hint">请先在 CampusOS 设置中开启“开机启动”。</p> : null}
               <label className="dk-settings-row">锁定位置/大小（图钉）<input type="checkbox" checked={settings.locked} onChange={(e) => patchSetting({ locked: e.target.checked })} /></label>
             </section>
-            <div className="dk-form-actions"><button type="button" onClick={() => setShowSettings(false)}>关闭</button></div>
+            <div className="dk-form-actions"><button type="button" onClick={closeSettings}>关闭</button></div>
           </div>
         </div>
       ) : null}
