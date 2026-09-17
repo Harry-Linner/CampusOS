@@ -1,12 +1,12 @@
 {
   "name": "campus-os",
   "private": true,
-  "version": "0.1.0-beta.5",
+  "version": "0.1.0-beta.6",
   "packageManager": "pnpm@10.29.2",
   "scripts": {
     "dev": "pnpm --filter @campusos/core dev",
     "build": "pnpm --filter @campusos/core build && node scripts/verify-bundled-workspace.mjs",
-    "dist": "pnpm --filter @campusos/core rebuild:electron && pnpm build && electron-builder --win --projectDir packages/core --config ../../electron-builder.yml",
+    "dist": "pnpm --filter @campusos/core rebuild:electron && pnpm build && electron-builder --win --projectDir packages/core --config ../../electron-builder.yml --publish never",
     "typecheck": "pnpm --filter @campusos/shared typecheck && pnpm --filter @campusos/core typecheck",
     "test": "npm --prefix packages/core rebuild better-sqlite3 && pnpm --filter @campusos/core test",
     "test:coverage": "npm --prefix packages/core rebuild better-sqlite3 && pnpm --filter @campusos/core test:coverage",
