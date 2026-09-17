@@ -51,6 +51,12 @@ export const getDownloadPreferences = async () =>
 export const saveDownloadPreferences = async (input: { completionSound: boolean }) =>
   requireCampusosBridge().downloads.savePreferences(input);
 
+export const chooseDownloadDirectory = async () => {
+  const chooseDirectory = requireCampusosBridge().downloads.chooseDownloadDirectory;
+  if (!chooseDirectory) throw new Error("当前版本不支持更改课件下载文件夹。");
+  return chooseDirectory();
+};
+
 export const subscribeToDownloadChanges = (listener: () => void): (() => void) =>
   requireCampusosBridge().downloads.subscribe(listener);
 

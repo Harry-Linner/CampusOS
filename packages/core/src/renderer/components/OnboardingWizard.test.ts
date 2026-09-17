@@ -215,7 +215,10 @@ const installBridge = (
       reveal: vi.fn(async () => undefined),
       verify: vi.fn(async () => ({ status: "missing" as const, actualBytes: null, expectedBytes: null })),
       clearHistory: vi.fn(async () => 0),
-      getPreferences: vi.fn(async () => ({ completionSound: true })),
+      getPreferences: vi.fn(async () => ({
+        completionSound: true,
+        downloadDirectory: "C:\\CampusOS\\downloads"
+      })),
       savePreferences: vi.fn(async (input) => input),
       subscribe: vi.fn(() => () => undefined),
       subscribeToCompletionSound: vi.fn(() => () => undefined)

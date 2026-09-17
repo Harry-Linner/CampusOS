@@ -12,6 +12,23 @@ test-results/
 .env.*
 *.env
 !.env.example
+
+# 本地账号、会话、数据库与签名材料（禁止进入源码、CI 和发布包）
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*cookies*.json
+*session*.json
+*storage-state*.json
+*auth-state*.json
 .agents/
 .claude/
 
@@ -35,3 +52,10 @@ scripts-internal/
 
 # dsh-vision-toolkit 的临时截图 Artifact（视觉验收产物，不入库）
 /.dsh-vision-toolkit/
+
+# 本地安装包与自动更新元数据
+*.exe
+*.msi
+*.msix
+*.blockmap
+/latest.yml

@@ -16,6 +16,35 @@ afterEach(async () => {
 });
 
 describe("DownloadEngine", () => {
+  it("uses an updated root for new downloads without rewriting existing task paths", async () => {
+    const storageRoot = await mkdtemp(join(tmpdir(), "campusos-download-root-"));
+    temporaryDirectories.push(storageRoot);
+    const originalRoot = join(storageRoot, "original");
+    const updatedRoot = join(storageRoot, "updated");
+    const engine = new DownloadEngine({
+      downloadRoot: originalRoot,
+      persistencePath: join(storageRoot, "queue.json"),
+      resolveResponse: async () => new Response("courseware", {
+        status: 200,
+        headers: { "content-length": "10" }
+      })
+    });
+
+    engine.setDownloadRoot(updatedRoot);
+    await engine.enqueue({
+      url: "https://example.edu/courseware.pdf",
+      title: "courseware.pdf",
+      courseName: "Course",
+      sourceId: "learning-platform",
+      semester: "2026-fall"
+    });
+    await engine.waitForIdle();
+
+    expect(engine.getSummary()[0]?.targetPath).toBe(
+      join(updatedRoot, "2026-fall", "Course", "courseware.pdf")
+    );
+  });
+
   it("sorts persisted history newest first, verifies files, and clears terminal records", async () => {
     const storageRoot = await mkdtemp(join(tmpdir(), "campusos-download-history-"));
     temporaryDirectories.push(storageRoot);

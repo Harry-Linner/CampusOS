@@ -285,7 +285,10 @@ const sessionToEvent = (
     timezone: "Asia/Shanghai",
     location: session.location,
     courseName: session.courseName,
-    note: session.teacher ? `教师：${session.teacher}` : null
+    // Celechron semester.dart:231 keeps teacher in description. CampusOS's user-
+    // requested presentation separates teacher metadata from the editable note.
+    instructor: session.teacher || null,
+    note: null
   };
 };
 

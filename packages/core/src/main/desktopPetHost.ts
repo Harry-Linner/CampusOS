@@ -198,7 +198,7 @@ export const registerDesktopPetHost = (hostOptions: DesktopPetHostOptions): Desk
       if (disposed) throw new Error("桌宠宿主已关闭。");
       const bounds = resolveDesktopPetBounds(isSavedPosition(rawPosition) ? rawPosition : null, settings.scale, screen.getAllDisplays().map((display) => display.workArea));
       const window = new BrowserWindow({ ...bounds, title: "CampusOS 桌宠", transparent: true, frame: false, resizable: false, maximizable: false, minimizable: false, fullscreenable: false, hasShadow: false, skipTaskbar: true, alwaysOnTop: settings.alwaysOnTop, show: false,
-        webPreferences: { session: getAccountBrowserSession(), preload: desktopPetPreloadPath, contextIsolation: true, nodeIntegration: false, sandbox: true } });
+        webPreferences: { session: getAccountBrowserSession(), preload: desktopPetPreloadPath, contextIsolation: true, nodeIntegration: false, sandbox: true, autoplayPolicy: "no-user-gesture-required" } });
       petWindow = window;
       window.setMenu(null);
       window.on("page-title-updated", event => event.preventDefault());

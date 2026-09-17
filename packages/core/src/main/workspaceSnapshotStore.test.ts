@@ -75,6 +75,14 @@ describe("workspace snapshot store", () => {
         savedAt: "2026-07-20T08:01:00.000Z",
         storagePath: join(storageRoot, "campusos.sqlite")
       });
+      const withTimetable = {
+        ...snapshot,
+        academicTimetable: { records: [], calendar: null }
+      } satisfies CampusWorkspaceSnapshot;
+      await store.save(withTimetable);
+      await expect(store.load()).resolves.toMatchObject({
+        snapshot: withTimetable
+      });
     } finally {
       database.close();
     }

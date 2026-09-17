@@ -104,7 +104,9 @@ export const Component = ({
                 </strong>
                 <span className="meta-line">
                   {entry.courseName ?? "未知课程"}
-                  {entry.location ? ` · ${entry.location}` : ""}
+                </span>
+                <span className="meta-line">
+                  教室：{entry.location ?? "未公布"} · 座位：{entry.seat ?? "未公布"}
                 </span>
               </div>
               <div className="row-side">

@@ -96,13 +96,16 @@ const toEvent = (
   originCapability: "learning.assignments@1",
   sourceId: "learning-platform",
   kind: "assignment",
-  title: `${assignment.title} - ${assignment.courseName}`,
-  startAt: toDeadlineStart(assignment.dueAt),
+  title: `${assignment.activityType === "quiz" ? "[小测] " : assignment.activityType === "classroom" ? "[课堂互动] " : ""}${assignment.title} - ${assignment.courseName}`,
+  startAt: assignment.activityType && assignment.activityType !== "homework" && assignment.startAt && Date.parse(assignment.startAt) < Date.parse(assignment.dueAt)
+    ? assignment.startAt : toDeadlineStart(assignment.dueAt),
   endAt: assignment.dueAt,
   timezone: "Asia/Shanghai",
   location: null,
   courseName: assignment.courseName,
-  note: buildAssignmentNote(assignment)
+  note: buildAssignmentNote(assignment),
+  ...(assignment.submissionStatus ? { submissionStatus: assignment.submissionStatus } : {}),
+  ...(assignment.activityType ? { activityType: assignment.activityType } : {})
 });
 
 export const deriveDeadlineEvents = (

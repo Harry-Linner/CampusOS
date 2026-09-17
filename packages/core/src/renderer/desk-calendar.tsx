@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, Fragment, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { extractMeetingNumber } from "@campusos/shared";
+import { extractMeetingNumber, isCalendarEventComplete } from "@campusos/shared";
+import { useCalendarClock } from "./hooks/useCalendarClock";
 import {
   addDays,
   buildMonthDays,
@@ -43,8 +44,9 @@ interface ScheduleEvent {
   startAt: string;
   endAt: string;
   location?: string;
+  seat?: string | null;
   note?: string;
-  /** 由主进程在投影边界从上游 note 解析出的教师名；用户自定义备注不会覆盖它。 */
+  /** 由主进程提供的源教师信息（含旧快照适配），不随简介编辑改变。 */
   instructor?: string | null;
   taskId?: string;
   status?: string;
@@ -76,6 +78,7 @@ interface RawItem {
   time?: string;
   note?: string;
   location?: string;
+  seat?: string | null;
   instructor?: string | null;
   status?: string;
   zhiyunUrl?: string | null;
@@ -188,7 +191,7 @@ declare global {
 const formatEventMeta = (event: ScheduleEvent): string =>
   event.kind === "deadline" ? `截止 ${formatDateTime(event.endAt)}` : formatTimeRange(event.startAt, event.endAt);
 const eventClassName = (event: ScheduleEvent, isImminent = false): string =>
-  `schedule-event schedule-event-${event.kind}${event.status === "completed" ? " is-complete" : ""}${isImminent ? " is-imminent" : ""}`;
+  `schedule-event schedule-event-${event.kind}${isCalendarEventComplete(event) ? " is-complete" : ""}${isImminent ? " is-imminent" : ""}`;
 
 const REPEAT_OPTIONS: { value: RepeatType; label: string }[] = [
   { value: "norepeat", label: "不重复" },
@@ -215,6 +218,7 @@ interface TaskForm {
   startAt: string;
   endAt: string;
   location: string;
+  instructor?: string | null;
   note: string;
   type: TaskType;
   timeSpentMinutes: number;
@@ -271,6 +275,7 @@ const DEFAULT_DESK_SETTINGS: DeskCalendarSettings = {
 };
 
 export default function DeskCalendar(): JSX.Element {
+  useCalendarClock();
   const isPanel = new URLSearchParams(window.location.search).get("panel") === "1";
   const desktopLayer = window.deskCalendar?.desktopLayer && !isPanel;
   const windowDrag = useRef<{ x: number; y: number } | null>(null);
@@ -379,7 +384,7 @@ export default function DeskCalendar(): JSX.Element {
         const kind: CalKind = item.kind === "assignment" ? "deadline" : item.kind;
         return {
           id: item.id, title: item.title, kind, startAt: item.startAt, endAt: item.endAt,
-          taskId: item.taskId, location: item.location, note: item.note, status: item.status,
+          taskId: item.taskId, location: item.location, seat: item.seat, note: item.note, status: item.status,
           instructor: item.instructor,
           zhiyunUrl: item.zhiyunUrl,
           origin: item.origin, occurrenceKey: item.occurrenceKey, repeatType: item.repeatType,
@@ -489,6 +494,7 @@ export default function DeskCalendar(): JSX.Element {
       editScope: event.repeatType && event.repeatType !== "norepeat" ? "single" : "series",
       title: event.title,
       location: event.location ?? "",
+      instructor: event.instructor,
       note: event.note ?? "",
       startAt: toDateInput(new Date(event.startAt)) + "T" + getShanghaiDateParts(new Date(event.startAt)).hour + ":" + getShanghaiDateParts(new Date(event.startAt)).minute,
       endAt: toDateInput(new Date(event.endAt)) + "T" + getShanghaiDateParts(new Date(event.endAt)).hour + ":" + getShanghaiDateParts(new Date(event.endAt)).minute,
@@ -719,8 +725,12 @@ export default function DeskCalendar(): JSX.Element {
         <div className="dk-info-backdrop" onClick={closeInfo}>
           <div className="dk-info-card" onClick={(e) => e.stopPropagation()}>
             <strong>{infoEvent.title}</strong>
+            <dl className="schedule-event-metadata">
+              {infoEvent.kind === "exam" ? <div><dt>教室</dt><dd>{infoEvent.location ?? "未公布"}</dd></div> : infoEvent.location ? <div><dt>地点</dt><dd>{infoEvent.location}</dd></div> : null}
+              {infoEvent.kind === "exam" ? <div><dt>座位</dt><dd>{infoEvent.seat ?? "未公布"}</dd></div> : null}
+              {infoEvent.instructor ? <div><dt>教师</dt><dd>{infoEvent.instructor}</dd></div> : null}
+            </dl>
             {infoEvent.note ? <p className="dk-info-note">{infoEvent.note}</p> : null}
-            {infoEvent.location ? <p>📍 {infoEvent.location}</p> : null}
             <p>{formatEventMeta(infoEvent)}</p>
             {(() => {
               const meetingNumber = extractMeetingNumber(`${infoEvent.location ?? ""} ${infoEvent.note ?? ""}`);
@@ -795,7 +805,7 @@ export default function DeskCalendar(): JSX.Element {
         <div className="dk-form-backdrop" onClick={closeForm}>
           <div className="dk-form-card" onClick={(e) => e.stopPropagation()}>
             <h3>{form.id ? "编辑事件" : "新增事件"}</h3>
-            {form.origin === "upstream" ? <p className="dk-form-hint">课程、考试和抓取内容的名称、时间、地点由数据源维护；这里可保存个人备注和提醒。</p> : null}
+            {form.origin === "upstream" ? <p className="dk-form-hint">课程、考试和抓取内容的名称、时间、地点由数据源维护；简介与详情共用，修改后保存在本地；也可设置提醒。</p> : null}
             <label>名称<input type="text" disabled={form.origin === "upstream"} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
             {form.origin === "local" ? <>
               <label>事件类型<select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as TaskType })}><option value="deadline">截止事项</option><option value="fixed">固定日程</option></select></label>
@@ -825,8 +835,11 @@ export default function DeskCalendar(): JSX.Element {
               <label>开始<input type="datetime-local" disabled={form.origin === "upstream"} value={form.startAt} onChange={(e) => setForm({ ...form, startAt: e.target.value })} /></label>
               <label>结束<input type="datetime-local" disabled={form.origin === "upstream"} value={form.endAt} onChange={(e) => setForm({ ...form, endAt: e.target.value })} /></label>
             </div>
-            <label>地点<input type="text" disabled={form.origin === "upstream"} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></label>
-            <label>备注<textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
+            <div className="dk-form-row">
+              <label>地点<input type="text" disabled={form.origin === "upstream"} value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></label>
+              {form.instructor ? <label>教师<input type="text" disabled value={form.instructor} /></label> : null}
+            </div>
+            <label>简介<textarea aria-label="简介" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></label>
             {form.origin === "upstream" ? <div className="dk-form-remind">
               <label className="dk-remind-toggle"><input type="checkbox" checked={form.remindEnabled} onChange={(e) => setForm({ ...form, remindEnabled: e.target.checked })} /> 提醒</label>
               <div className="dk-form-row">

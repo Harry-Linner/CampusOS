@@ -2,7 +2,7 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DesktopPetBridge, DesktopPetState } from "../../../shared/src/desktopPet";
+import type { DesktopPetBridge, DesktopPetState, DesktopPetReminderEvent } from "../../../shared/src/desktopPet";
 import { DesktopPet, inputFromDrop } from "./desktop-pet";
 
 const baseState: DesktopPetState = {
@@ -15,10 +15,12 @@ const parseClipboard = vi.fn(async () => "job-clipboard");
 const saveSettings = vi.fn(async () => baseState);
 const openReview = vi.fn(async () => undefined);
 let stateListener: ((state: DesktopPetState) => void) | undefined;
+const reminderListeners = new Set<(event: DesktopPetReminderEvent) => void>();
 const bridge: DesktopPetBridge = {
   show: vi.fn(async () => undefined), openPanel: vi.fn(async () => undefined), closePanel: vi.fn(async () => undefined),
   setPanelView: vi.fn(async () => undefined),
   getState, submit, parseClipboard, saveSettings, openReview,
+  onReminder: listener => { reminderListeners.add(listener); return () => { reminderListeners.delete(listener); }; },
   dismiss: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined), retry: vi.fn(async () => undefined), move: vi.fn(async () => undefined),
   subscribe: vi.fn((listener) => { stateListener = listener; return () => { stateListener = undefined; }; })
 };
@@ -26,11 +28,21 @@ const bridge: DesktopPetBridge = {
 beforeEach(() => {
   vi.clearAllMocks();
   stateListener = undefined;
+  reminderListeners.clear();
   (window as unknown as { desktopPet: DesktopPetBridge }).desktopPet = bridge;
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); delete (window as unknown as { desktopPet?: DesktopPetBridge }).desktopPet; });
 
 describe("desktop pet renderer", () => {
+  it("plays a reminder sound with the bubble, without duplicating it in the assistant panel", async () => {
+    const play = vi.fn(async () => undefined);
+    vi.stubGlobal("Audio", class { preload = ""; currentTime = 0; play = play; });
+    render(<><DesktopPet surface="pet" /><DesktopPet surface="panel" /></>);
+    await waitFor(() => expect(reminderListeners.size).toBe(2));
+    act(() => reminderListeners.forEach(listener => listener({ type: "course", title: "上课提醒", body: "准备出发", time: new Date().toISOString() })));
+    expect(screen.getAllByText("准备出发").length).toBeGreaterThan(0);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+  });
   it("keeps all retained jobs reachable for review and dismissal", async () => {
     render(<DesktopPet surface="panel" />);
     await waitFor(() => expect(getState).toHaveBeenCalled());

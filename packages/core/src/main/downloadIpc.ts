@@ -1,8 +1,9 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, dialog, shell, type OpenDialogOptions } from "electron";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, normalize } from "node:path";
 import type {
+  CampusDownloadPreferenceInput,
   CampusDownloadPreferences,
   CampusDownloadRequest,
   CampusDownloadTask,
@@ -21,20 +22,37 @@ let initialization: Promise<DownloadEngine> | null = null;
 let downloadPreferences: CampusDownloadPreferences | null = null;
 
 const preferencesPath = (): string => join(app.getPath("userData"), "settings", "download-preferences.json");
+const defaultDownloadDirectory = (): string => join(app.getPath("userData"), "downloads");
+
+const normalizeDownloadDirectory = (value: unknown): string => {
+  if (typeof value !== "string" || value.trim().length === 0 || !isAbsolute(value.trim())) {
+    return defaultDownloadDirectory();
+  }
+  return normalize(value.trim());
+};
 
 const loadDownloadPreferences = async (): Promise<CampusDownloadPreferences> => {
   if (downloadPreferences) return { ...downloadPreferences };
   try {
     const input = JSON.parse(await readFile(preferencesPath(), "utf8")) as Partial<CampusDownloadPreferences>;
-    downloadPreferences = { completionSound: input.completionSound !== false };
+    downloadPreferences = {
+      completionSound: input.completionSound !== false,
+      downloadDirectory: normalizeDownloadDirectory(input.downloadDirectory)
+    };
   } catch {
-    downloadPreferences = { completionSound: true };
+    downloadPreferences = {
+      completionSound: true,
+      downloadDirectory: defaultDownloadDirectory()
+    };
   }
   return { ...downloadPreferences };
 };
 
 const saveDownloadPreferences = async (input: CampusDownloadPreferences): Promise<CampusDownloadPreferences> => {
-  downloadPreferences = { completionSound: input.completionSound === true };
+  downloadPreferences = {
+    completionSound: input.completionSound === true,
+    downloadDirectory: normalizeDownloadDirectory(input.downloadDirectory)
+  };
   const target = preferencesPath();
   await mkdir(dirname(target), { recursive: true });
   const temporary = `${target}.${randomUUID()}.tmp`;
@@ -52,12 +70,17 @@ interface DownloadHandlerEngine {
   clearAll: () => Promise<number>;
   verify: (id: string) => Promise<CampusDownloadVerification>;
   clearHistory: () => Promise<number>;
+  setDownloadRoot: (path: string) => void;
 }
 
 interface DownloadHandlerDependencies {
   loadEngine?: () => Promise<DownloadHandlerEngine>;
   openPath?: (path: string) => Promise<string>;
   showItemInFolder?: (path: string) => void;
+  loadPreferences?: () => Promise<CampusDownloadPreferences>;
+  savePreferences?: (input: CampusDownloadPreferences) => Promise<CampusDownloadPreferences>;
+  selectDownloadDirectory?: (currentPath: string) => Promise<string | null>;
+  ensureDirectory?: (path: string) => Promise<void>;
 }
 
 export const DOWNLOAD_COMPLETION_SOUND_CHANNEL =
@@ -138,24 +161,29 @@ const notifyDownloadChange = (): void => {
 
 const getInitializedDownloadEngine = async (): Promise<DownloadEngine> => {
   if (initialization) return initialization;
-  const engine = downloadEngine ?? new DownloadEngine({
-    onChanged: notifyDownloadChange,
-    queuePersistence: getOfficialDownloadQueuePersistence(),
-    resolveResponse: async ({ item, headers, signal }) => {
-      const classification = classifyCampusDownloadRequest(item);
-      if (classification.kind === "public") {
-        return fetch(item.url, { headers, signal });
+  initialization = (async () => {
+    const preferences = await loadDownloadPreferences();
+    const engine = downloadEngine ?? new DownloadEngine({
+      downloadRoot: preferences.downloadDirectory,
+      onChanged: notifyDownloadChange,
+      queuePersistence: getOfficialDownloadQueuePersistence(),
+      resolveResponse: async ({ item, headers, signal }) => {
+        const classification = classifyCampusDownloadRequest(item);
+        if (classification.kind === "public") {
+          return fetch(item.url, { headers, signal });
+        }
+        return requestZjuLearningDownload({
+          uploadId: classification.uploadId,
+          referenceId: classification.referenceId,
+          range: headers.Range,
+          signal
+        });
       }
-      return requestZjuLearningDownload({
-        uploadId: classification.uploadId,
-        referenceId: classification.referenceId,
-        range: headers.Range,
-        signal
-      });
-    }
-  });
-  downloadEngine = engine;
-  initialization = engine.loadPersisted().then(() => engine);
+    });
+    downloadEngine = engine;
+    await engine.loadPersisted();
+    return engine;
+  })();
   return initialization;
 };
 
@@ -185,7 +213,24 @@ const toReadyTask = (
 export const registerDownloadHandlers = ({
   loadEngine = getInitializedDownloadEngine,
   openPath = shell.openPath,
-  showItemInFolder = shell.showItemInFolder
+  showItemInFolder = shell.showItemInFolder,
+  loadPreferences = loadDownloadPreferences,
+  savePreferences = saveDownloadPreferences,
+  selectDownloadDirectory = async (currentPath) => {
+    const options: OpenDialogOptions = {
+      title: "选择课件下载文件夹",
+      defaultPath: currentPath,
+      properties: ["openDirectory", "createDirectory"]
+    };
+    const parent = BrowserWindow.getFocusedWindow();
+    const result = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  },
+  ensureDirectory = async (path) => {
+    await mkdir(path, { recursive: true });
+  }
 }: DownloadHandlerDependencies = {}): void => {
   registerTrustedIpcHandler("campusos:downloads:list", async () => {
     return (await loadEngine()).getSummary();
@@ -227,13 +272,30 @@ export const registerDownloadHandlers = ({
     return (await loadEngine()).clearHistory();
   });
   registerTrustedIpcHandler("campusos:downloads:get-preferences", async () => {
-    return loadDownloadPreferences();
+    return loadPreferences();
   });
   registerTrustedIpcHandler("campusos:downloads:save-preferences", async (input: unknown) => {
     if (typeof input !== "object" || input === null ||
       typeof (input as { completionSound?: unknown }).completionSound !== "boolean") {
       throw new Error("下载提醒设置无效。");
     }
-    return saveDownloadPreferences(input as CampusDownloadPreferences);
+    const current = await loadPreferences();
+    return savePreferences({
+      ...current,
+      completionSound: (input as CampusDownloadPreferenceInput).completionSound
+    });
+  });
+  registerTrustedIpcHandler("campusos:downloads:choose-directory", async () => {
+    const current = await loadPreferences();
+    const selected = await selectDownloadDirectory(current.downloadDirectory);
+    if (selected === null) return null;
+    const downloadDirectory = normalizeDownloadDirectory(selected);
+    await ensureDirectory(downloadDirectory);
+    const preferences = await savePreferences({
+      ...current,
+      downloadDirectory
+    });
+    (await loadEngine()).setDownloadRoot(preferences.downloadDirectory);
+    return preferences;
   });
 };

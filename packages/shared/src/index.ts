@@ -1,4 +1,4 @@
-import type { CampusDownloadPreferences, CampusDownloadRequest, CampusDownloadVerification, CampusWorkspaceSnapshot } from "./campus";
+import type { CampusDownloadPreferenceInput, CampusDownloadPreferences, CampusDownloadRequest, CampusDownloadVerification, CampusWorkspaceSnapshot } from "./campus";
 import type { AppNavigationRequest } from "./appNavigationBridge";
 import type { BriefBridge } from "./brief";
 import type { CampusFeedBridge } from "./campusFeed";
@@ -42,6 +42,8 @@ export * from "./zhiyunClassroom";
 export * from "./countdown";
 export * from "./meetingNumber";
 export * from "./reminderBridge";
+export * from "./calendarEventNote";
+export * from "./calendarCompletion";
 
 export type CampusPermission =
   | `network:${string}`
@@ -185,7 +187,8 @@ export interface PluginComponentProps {
     verify?: (id: string) => Promise<CampusDownloadVerification>;
     clearHistory?: () => Promise<number>;
     getPreferences?: () => Promise<CampusDownloadPreferences>;
-    savePreferences?: (input: CampusDownloadPreferences) => Promise<CampusDownloadPreferences>;
+    savePreferences?: (input: CampusDownloadPreferenceInput) => Promise<CampusDownloadPreferences>;
+    chooseDownloadDirectory?: () => Promise<CampusDownloadPreferences | null>;
   };
   schedule?: {
     loadTasks: () => Promise<LocalTasksData>;

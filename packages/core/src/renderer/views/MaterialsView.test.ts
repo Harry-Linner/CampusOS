@@ -276,14 +276,24 @@ describe("MaterialsView", () => {
   it("reports local verification, clears terminal history, and saves the sound preference", async () => {
     const verify = vi.fn(async () => ({ status: "verified" as const, actualBytes: 10, expectedBytes: 10 }));
     const clearHistory = vi.fn(async () => 2);
-    const savePreferences = vi.fn(async (input: { completionSound: boolean }) => input);
+    const savePreferences = vi.fn(async (input: { completionSound: boolean }) => ({
+      ...input,
+      downloadDirectory: "C:\\CampusOS\\downloads"
+    }));
+    const chooseDownloadDirectory = vi.fn(async () => ({
+      completionSound: true,
+      downloadDirectory: "D:\\Courseware"
+    }));
     render(createElement(MaterialsView, {
       capabilities: { read: vi.fn(async () => []) } as PluginCapabilityClient,
       downloads: {
         enqueue: vi.fn(async () => undefined), pause: vi.fn(async () => undefined),
         resume: vi.fn(async () => undefined), cancel: vi.fn(async () => undefined),
         open: vi.fn(async () => undefined), reveal: vi.fn(async () => undefined), verify,
-        clearHistory, getPreferences: vi.fn(async () => ({ completionSound: true })), savePreferences,
+        clearHistory, getPreferences: vi.fn(async () => ({
+          completionSound: true,
+          downloadDirectory: "C:\\CampusOS\\downloads"
+        })), savePreferences, chooseDownloadDirectory,
         clearAll: vi.fn(async () => 0)
       },
       loading: false, onRefresh: vi.fn(async () => undefined), snapshot
@@ -293,6 +303,10 @@ describe("MaterialsView", () => {
     expect(await screen.findByText(/本地文件校验通过/)).toBeDefined();
     fireEvent.click(screen.getByRole("checkbox", { name: "完成时播放提示音" }));
     await waitFor(() => expect(savePreferences).toHaveBeenCalledWith({ completionSound: false }));
+    fireEvent.click(screen.getByRole("button", { name: "更改文件夹" }));
+    await waitFor(() => expect(chooseDownloadDirectory).toHaveBeenCalledOnce());
+    expect(await screen.findByText("D:\\Courseware")).toBeDefined();
+    expect(screen.getByText(/只影响新加入的课件/)).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "清除历史" }));
     await waitFor(() => expect(clearHistory).toHaveBeenCalled());
   });

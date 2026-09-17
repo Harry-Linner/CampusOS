@@ -86,6 +86,24 @@ const createSchedule = (initialTasks: LocalTaskRecord[] = [record]) => {
 };
 
 describe("ScheduleView", () => {
+  it("shows teacher and location as peer metadata, separate from the editable description", async () => {
+    const schedule = createSchedule([]);
+    schedule.loadPersonalizations = vi.fn(async () => ({}));
+    const courseSnapshot: CampusWorkspaceSnapshot = { ...snapshot, courses: [{
+      id: "description-course", title: "Description course", sourceId: "academic-affairs",
+      startAt: start.toISOString(), endAt: end.toISOString(), location: "Room 2", note: "教师：测试教师"
+    }] };
+    render(createElement(ScheduleView, { loading: false, snapshot: courseSnapshot,
+      capabilities: { read: vi.fn(async () => []) }, onRefresh: vi.fn(async () => undefined), schedule }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Description course" }))[0]);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Room 2")).toBeTruthy();
+    expect(within(dialog).getByText("教师")).toBeTruthy();
+    expect(within(dialog).getByText("测试教师")).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "编辑简介与提醒" }));
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect((screen.getByLabelText("简介") as HTMLTextAreaElement).value).toBe("");
+  });
   it("opens the exact event requested by desktop calendar navigation", async () => {
     render(createElement(ScheduleView, {
       loading: false,
@@ -268,7 +286,7 @@ describe("ScheduleView", () => {
 
     expect(screen.getByRole("heading", { name: "个性化“Read-only course”" })).toBeTruthy();
     expect(screen.queryByLabelText("标题")).toBeNull();
-    fireEvent.change(screen.getByLabelText("个人备注"), { target: { value: "Bring notes" } });
+    fireEvent.change(screen.getByLabelText("简介"), { target: { value: "Bring notes" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(schedule.savePersonalization).toHaveBeenCalledWith(
       "course:course-readonly",
@@ -432,6 +450,7 @@ describe("schedule event ranges", () => {
         endAt: end.toISOString(),
         timezone: "Asia/Shanghai",
         location: "Room 2",
+        seat: "A-12",
         courseName: "Course",
         note: "Seat 1"
       }]
@@ -444,7 +463,10 @@ describe("schedule event ranges", () => {
       schedule: createSchedule([])
     }));
 
-    expect((await screen.findAllByText("Canonical exam")).length).toBeGreaterThan(0);
+    const exams = await screen.findAllByText("Canonical exam");
+    expect(exams.length).toBeGreaterThan(0);
+    fireEvent.click(exams[0]);
+    expect(await screen.findByText("A-12")).toBeTruthy();
   });
 
   it("keeps baseline courses visible when a canonical feed is empty or partial", async () => {

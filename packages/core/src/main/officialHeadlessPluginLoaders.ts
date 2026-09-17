@@ -278,6 +278,15 @@ export const createOfficialHeadlessPluginLoaders = ({
           };
         }
       },
+      fetchCourseAssessment: async (courseId, operation) => {
+        try {
+          const response = await requestZjuLearningService({ operation, courseId });
+          fingerprintCollector.add(response.requestFingerprint);
+          return { ok: true as const, body: response.body };
+        } catch {
+          return { ok: false as const, message: "学在浙大提交状态或小测查询暂不可用。" };
+        }
+      },
       loadCachedAssignments: async (accountId) => {
         const records =
           await capabilityRepository.read<LearningAssignmentsData>(

@@ -269,7 +269,7 @@
 }
 .desk-cal-root .schedule-event.is-complete {
   text-decoration: line-through;
-  opacity: 0.5;
+  opacity: 0.58;
   color: var(--ink-faint, #888);
 }
 .desk-cal-root .schedule-event.is-imminent {

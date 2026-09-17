@@ -177,8 +177,8 @@ export { isOpenableExternalUrl, resolveZhiyunCourseUrl } from "./zhiyunUrl";
 /**
  * 从上游课表事件的备注里取出教师名。
  *
- * 教务投影把教师塞在备注文本里（`教师：张三`），结构化字段并不承载教师；这里按
- * `extractMeetingNumber` 同款做法在消费端解析。只应传入**上游原始备注**：用户自定义
+ * 旧教务快照把教师放在备注文本里（`教师：张三`），此函数保留旧文本读取用途；
+ * 新投影使用独立 instructor 字段。只应传入**上游原始备注**：用户自定义
  * 备注会覆盖显示用 note，不应参与教师消歧。
  */
 const TEACHER_NOTE_PATTERN = /教师\s*[：:]\s*([^\s,，;；、]+)/;

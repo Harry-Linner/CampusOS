@@ -222,6 +222,7 @@ export const scheduleWorkspaceReminders = (
   let personalizations: ReturnType<typeof loadCalendarEventPersonalizations> = {};
   try { personalizations = loadCalendarEventPersonalizations(); } catch { /* Database unavailable in isolated schedulers. */ }
   const canonicalEventIds = new Set(snapshot?.calendarEvents?.map((event) => event.id) ?? []);
+  const submittedIds = new Set(snapshot?.calendarEvents?.filter(event => event.submissionStatus === "submitted").map(event => event.id) ?? []);
   const personalizedEvents: Array<{
     eventId: string;
     title: string;
@@ -233,7 +234,7 @@ export const scheduleWorkspaceReminders = (
       eventId: `calendar:${event.id}`,
       title: event.title,
       kind: event.kind === "course" ? "course" as const : "deadline" as const,
-      eventStartAt: event.startAt,
+      eventStartAt: event.kind === "assignment" ? (event.endAt ?? event.startAt) : event.startAt,
       location: event.location ?? undefined
     })),
     ...(snapshot?.courses ?? []).filter((course) => !canonicalEventIds.has(course.id)).map((course) => ({
@@ -251,6 +252,7 @@ export const scheduleWorkspaceReminders = (
     }))
   ];
   const personalizedReminders: ScheduledReminder[] = personalizedEvents.flatMap((event) => {
+    if (personalizations[event.eventId]?.completed || submittedIds.has(event.eventId.replace(/^calendar:/, ""))) return [];
     const leadMinutes = personalizations[event.eventId]?.reminderLeadMinutes;
     if (leadMinutes === null || leadMinutes === undefined) return [];
     const eventStartAt = event.eventStartAt;
@@ -272,6 +274,7 @@ export const scheduleWorkspaceReminders = (
     deadlineId: string,
     fireAtIso: string
   ): boolean => {
+    if (submittedIds.has(deadlineId)) return true;
     const p = personalizations[`calendar:${deadlineId}`] ??
       personalizations[`deadline:${deadlineId}`] ??
       personalizations[deadlineId];

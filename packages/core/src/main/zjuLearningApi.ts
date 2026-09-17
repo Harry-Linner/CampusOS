@@ -274,12 +274,22 @@ export class ZjuLearningApi {
       if (!/^[1-9]\d*$/.test(request.courseId)) {
         throw new ZjuUnifiedAuthError("invalid-input", "学在浙大课程标识无效。");
       }
-      // 路径中的动态 courseId 归一化为 {courseId}，避免课程列表变化引发上游变化误报。
+      // Endpoint shapes verified against ZJU-live-better reliableTodolist.js
+      // (d63adc8, lines 127-131); independent adapter, no third-party code copied.
+      const paths = {
+        "course-activities": "/api/courses/{courseId}/activities",
+        "homework-submissions": "/api/course/{courseId}/homework/submission-status?no-intercept=true",
+        "course-exams": "/api/courses/{courseId}/exams",
+        "submitted-exams": "/api/courses/{courseId}/submitted-exams?no-intercept=true",
+        "classrooms": "/api/courses/{courseId}/classroom-list"
+      };
+      const path = paths[request.operation];
+      if (!path) throw new ZjuUnifiedAuthError("invalid-input", "学在浙大操作无效。");
       return {
-        endpoint: `https://courses.zju.edu.cn/api/courses/${request.courseId}/activities`,
+        endpoint: `https://courses.zju.edu.cn${path.replace("{courseId}", request.courseId)}`,
         requestFingerprint: computeRequestFingerprint(
           "GET",
-          "https://courses.zju.edu.cn/api/courses/{courseId}/activities"
+          `https://courses.zju.edu.cn${path}`
         )
       };
     })();

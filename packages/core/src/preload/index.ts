@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld("campusos", {
     getPreferences: () => ipcRenderer.invoke("campusos:downloads:get-preferences"),
     savePreferences: (input: { completionSound: boolean }) =>
       ipcRenderer.invoke("campusos:downloads:save-preferences", input),
+    chooseDownloadDirectory: () =>
+      ipcRenderer.invoke("campusos:downloads:choose-directory"),
     subscribe: (listener: () => void) => {
       const channel = "campusos:downloads:changed";
       const handler = () => listener();

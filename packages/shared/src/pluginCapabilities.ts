@@ -243,6 +243,11 @@ export interface LearningAssignmentRecord {
   title: string;
   courseName: string;
   dueAt: string | null;
+  activityType?: "homework" | "quiz" | "classroom";
+  startAt?: string | null;
+  /** 本次成功读取小测/课堂互动的时间；缓存保留旧值，不能冒充新发现。 */
+  assessmentObservedAt?: string;
+  submissionStatus?: "submitted" | "pending" | "unknown";
   /** 学在浙大网页上的作业描述（抓取时已转成纯文本），作为事件简介展示。 */
   description?: string | null;
   /** 该作业的附件文件名（含后缀名），追加在事件简介里。 */
@@ -264,6 +269,7 @@ export interface LearningCourseRecord {
   academicYearId: string | null;
   semesterId: string | null;
   semesterName: string | null;
+  isClosed?: boolean;
 }
 
 export interface LearningMaterialRecord {
@@ -302,8 +308,13 @@ export interface CalendarEventRecord {
   endAt: string | null;
   timezone: "Asia/Shanghai";
   location: string | null;
+  /** 教务考试的座位号；与教室地点分开，未公布时为空。 */
+  seat?: string | null;
+  instructor?: string | null;
   courseName: string | null;
   note: string | null;
+  submissionStatus?: "submitted" | "pending" | "unknown";
+  activityType?: "homework" | "quiz" | "classroom";
 }
 
 export interface CalendarEventsData {
@@ -617,6 +628,8 @@ export interface LocalTaskPeriod {
 
 export interface CalendarEventPersonalization {
   note: string;
+  /** Distinguishes an explicitly cleared description from legacy empty defaults. */
+  noteEdited?: boolean;
   reminderLeadMinutes: number | null;
   updatedAt: string;
   zhiyunUrl?: string | null;

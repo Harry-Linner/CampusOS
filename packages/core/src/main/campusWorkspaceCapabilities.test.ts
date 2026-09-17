@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type {
+  AcademicTimetableData,
   CalendarEventsData,
   CapabilityRecord,
   CampusWorkspaceSnapshot
@@ -8,6 +9,7 @@ import {
   createEmptyWorkspaceSnapshot,
   createLiveWorkspaceSnapshot,
   findCalendarEventRecords,
+  mergeAcademicTimetableIntoWorkspace,
   mergeAcademicCalendarIntoWorkspace,
   mergeCalendarEventsIntoWorkspace,
   mergeLearningMaterialsIntoWorkspace,
@@ -165,6 +167,62 @@ const learningEventsRecord: CapabilityRecord<CalendarEventsData> = {
 };
 
 describe("workspace capability integration", () => {
+  it("backfills an old snapshot from the current account timetable cache without accepting an empty refresh", () => {
+    const oldSnapshot = createLiveWorkspaceSnapshot({
+      generatedAt: "2026-09-17T04:00:00.000Z",
+      accountId: "account"
+    });
+    const session = {
+      sourceId: "cached-session",
+      courseName: "缓存课程",
+      teacher: "任课教师",
+      location: "教学楼 101",
+      dayOfWeek: 1,
+      periods: [1, 2],
+      firstHalf: true,
+      secondHalf: false,
+      weekPattern: "all" as const,
+      confirmed: true
+    };
+    const cached: CapabilityRecord<AcademicTimetableData> = {
+      capability: "academic.timetable@1",
+      providerId: "provider",
+      accountId: "account",
+      state: "live",
+      updatedAt: "2026-09-17T03:00:00.000Z",
+      data: { terms: [{ academicYearStart: 2026, season: "1|秋", state: "live", sessions: [session] }] }
+    };
+    const empty: CapabilityRecord<AcademicTimetableData> = {
+      ...cached,
+      state: "live",
+      updatedAt: "2026-09-17T04:01:00.000Z",
+      data: { terms: [{ academicYearStart: 2026, season: "1|秋", state: "live", sessions: [] }] }
+    };
+    expect(mergeAcademicTimetableIntoWorkspace(oldSnapshot, [], null, "account", ["provider"]))
+      .toBe(oldSnapshot);
+    const migrated = mergeAcademicTimetableIntoWorkspace(
+      oldSnapshot,
+      [cached],
+      null,
+      "account",
+      ["provider"]
+    );
+    expect(migrated.academicTimetable?.records).toEqual([cached]);
+
+    const withPrevious = { ...migrated, generatedAt: "2026-09-17T04:02:00.000Z" };
+    const retained = mergeAcademicTimetableIntoWorkspace(
+      withPrevious,
+      [empty],
+      null,
+      "account",
+      ["provider"]
+    );
+    expect(retained.academicTimetable?.records[0]).toMatchObject({
+      state: "cache",
+      data: cached.data
+    });
+  });
+
   it("keeps an unverified workspace empty and marks authenticated sources unavailable", () => {
     const snapshot = createEmptyWorkspaceSnapshot({
       generatedAt: "2026-08-05T04:00:00.000Z"

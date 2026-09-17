@@ -12,7 +12,7 @@ interface DownloadCompletionSoundOptions {
   cooldownMs?: number;
 }
 
-export const createDownloadCompletionSoundPlayer = ({
+export const createNotificationSoundPlayer = ({
   createAudio = (source) => new Audio(source),
   now = Date.now,
   cooldownMs = 3_000
@@ -37,4 +37,6 @@ export const createDownloadCompletionSoundPlayer = ({
 };
 
 export const playDownloadCompletionSound =
-  createDownloadCompletionSoundPlayer();
+  createNotificationSoundPlayer();
+
+export const createDownloadCompletionSoundPlayer = createNotificationSoundPlayer;

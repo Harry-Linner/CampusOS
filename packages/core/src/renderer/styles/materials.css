@@ -220,6 +220,60 @@
   padding-top: 18px;
 }
 
+.materials-download-settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-deep);
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+}
+
+.materials-download-location {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.materials-download-location > span,
+.materials-download-location > small {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.materials-download-location > strong {
+  overflow: hidden;
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.materials-download-settings-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.materials-download-settings-actions label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 0.76rem;
+}
+
+.materials-download-settings-actions input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  accent-color: var(--accent);
+}
+
 .materials-download-row {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(160px, 0.6fr) auto;
@@ -260,6 +314,15 @@
     grid-template-columns: minmax(0, 1fr) minmax(140px, 0.5fr);
   }
 
+  .materials-download-settings {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .materials-download-settings-actions {
+    justify-content: space-between;
+  }
+
   .materials-download-row .inline-actions {
     grid-column: 1 / -1;
     justify-content: flex-start;
@@ -292,6 +355,11 @@
 
   .materials-selection-actions {
     justify-content: space-between;
+  }
+
+  .materials-download-settings-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .materials-file-row,

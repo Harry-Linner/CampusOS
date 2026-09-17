@@ -118,7 +118,8 @@ const projectExams = (exams: AcademicExamsData | undefined): unknown[] =>
     scheduleText: trimText(exam.scheduleText),
     startAt: trimText(exam.startAt),
     endAt: trimText(exam.endAt),
-    location: trimText(exam.location)
+    location: trimText(exam.location),
+    seat: trimText(exam.seat)
   }));
 
 const projectEvents = (events: CalendarEventsData | undefined): unknown[] =>
@@ -128,7 +129,8 @@ const projectEvents = (events: CalendarEventsData | undefined): unknown[] =>
     startAt: trimText(event.startAt),
     endAt: trimText(event.endAt),
     courseName: trimText(event.courseName),
-    location: trimText(event.location)
+    location: trimText(event.location),
+    seat: trimText(event.seat)
   }));
 
 export interface AcademicQueryContextResult {

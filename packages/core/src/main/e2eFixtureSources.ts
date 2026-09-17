@@ -115,8 +115,8 @@ const exams: AcademicExamsData = {
       startAt: "2027-01-05T09:00:00+08:00",
       endAt: "2027-01-05T11:00:00+08:00",
       dateLabel: "2027年1月5日",
-      location: "紫金港校区",
-      seat: null
+      location: "东1A-101",
+      seat: "18"
     }
   ]
 };

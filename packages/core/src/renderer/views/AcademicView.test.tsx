@@ -3,6 +3,7 @@
 import { createElement } from "react";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -20,6 +21,7 @@ import type {
   PluginCapabilityClient
 } from "@campusos/shared";
 import { AcademicView, resetAcademicViewCache } from "@campusos/plugin-academic";
+import { createEmptyWorkspaceSnapshot } from "../../main/campusWorkspaceCapabilities";
 
 afterEach(() => {
   cleanup();
@@ -282,6 +284,34 @@ const createCapabilities = (reads: string[]): PluginCapabilityClient => ({
 });
 
 describe("AcademicView", () => {
+  it("renders a persisted timetable before network completion and retains it on an empty refresh", async () => {
+    let finish!: (records: CapabilityRecord<AcademicTimetableData>[]) => void;
+    const pending = new Promise<CapabilityRecord<AcademicTimetableData>[]>(resolve => { finish = resolve; });
+    const capabilities: PluginCapabilityClient = { read: async <T,>(capability: PluginCapability) =>
+      (capability === "academic.timetable@1" ? await pending : [record("academic.calendar-config@1", calendar)]) as CapabilityRecord<T>[] };
+    const snapshot = { ...createEmptyWorkspaceSnapshot({ generatedAt: "2026-09-17T00:00:00Z" }),
+      academicTimetable: { records: [record("academic.timetable@1", timetable)], calendar } };
+    render(createElement(AcademicView, { capabilities, snapshot, loading: true, onRefresh: async () => undefined }));
+    expect(screen.getByText("目标学期课程")).toBeTruthy();
+    expect(screen.queryByText("当前没有可用课表。")).toBeNull();
+    expect(screen.queryByText("正在读取课表…")).toBeNull();
+    await act(async () => { finish([]); });
+    expect(screen.getByText("目标学期课程")).toBeTruthy();
+    expect(screen.getByText("本次未获取到新课表，继续显示本地快照。")).toBeTruthy();
+  });
+  it("retains a persisted timetable when a refresh only returns empty terms", async () => {
+    const capabilities: PluginCapabilityClient = {
+      read: async <T,>(capability: PluginCapability) => capability === "academic.timetable@1"
+        ? [{ ...record(capability, { terms: [{ ...timetable.terms[0], sessions: [] }] }), state: "live" }] as unknown as CapabilityRecord<T>[]
+        : [record("academic.calendar-config@1", calendar)] as unknown as CapabilityRecord<T>[]
+    };
+    const snapshot = { ...createEmptyWorkspaceSnapshot({ generatedAt: "2026-09-17T00:00:00Z" }),
+      academicTimetable: { records: [record("academic.timetable@1", timetable)], calendar } };
+    render(createElement(AcademicView, { capabilities, snapshot, loading: true, onRefresh: async () => undefined }));
+    expect(screen.getByText("目标学期课程")).toBeTruthy();
+    expect(await screen.findByText("本次未获取到新课表，继续显示本地快照。")).toBeTruthy();
+    expect(screen.getByText("目标学期课程")).toBeTruthy();
+  });
   it("selects the next complete autumn-winter semester after the summer fallback window", async () => {
     render(
       createElement(AcademicView, {

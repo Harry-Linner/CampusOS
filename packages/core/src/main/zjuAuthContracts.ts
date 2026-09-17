@@ -94,7 +94,7 @@ export type ZjuLearningServiceRequest =
   | { operation: "todos" }
   | { operation: "semesters" }
   | { operation: "courses"; page: number; scope?: "active" | "all" }
-  | { operation: "course-activities"; courseId: string };
+  | { operation: "course-activities" | "homework-submissions" | "course-exams" | "submitted-exams" | "classrooms"; courseId: string };
 
 export interface ZjuLearningServiceResponse {
   status: number;

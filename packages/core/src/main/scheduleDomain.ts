@@ -1,5 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
+import { resolveCalendarEventNote, resolveCourseEventDetails } from "@campusos/shared";
 import type {
+  CalendarEventRecord,
+  CalendarEventPersonalization,
   CampusWorkspaceSnapshot,
   CalendarExportInput,
   LocalTaskInput,
@@ -633,11 +636,27 @@ interface IcalEvent {
   endAt: string;
 }
 
+const courseExportDescription = (source: { note?: string | null; instructor?: string | null }, saved?: CalendarEventPersonalization): string => {
+  const details = resolveCourseEventDetails(source, saved);
+  return [details.note, details.instructor ? `教师：${details.instructor}` : ""].filter(Boolean).join("\n");
+};
+
+const calendarExportDescription = (
+  event: CalendarEventRecord,
+  saved?: CalendarEventPersonalization
+): string => {
+  const note = resolveCalendarEventNote(event.note, saved);
+  return [note, event.kind === "exam" && event.seat ? `座位：${event.seat}` : ""]
+    .filter(Boolean)
+    .join("\n");
+};
+
 export const createIcalContent = (
   snapshot: CampusWorkspaceSnapshot,
   tasks: LocalTaskRecord[],
   input: CalendarExportInput,
-  now = new Date()
+  now = new Date(),
+  personalizations: Record<string, CalendarEventPersonalization> = {}
 ): { content: string; eventCount: number } => {
   const events: IcalEvent[] = [];
   const canonicalEventIds = new Set(
@@ -650,14 +669,14 @@ export const createIcalContent = (
       ? Date.parse(event.endAt)
       : startMs + 60 * MINUTE_MS;
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) continue;
-    const isDueAtEvent = event.kind === "assignment";
+    const isDueAtEvent = event.kind === "assignment" && !event.endAt;
     const startAt = isDueAtEvent
       ? new Date(startMs - 60 * MINUTE_MS).toISOString()
       : new Date(startMs).toISOString();
     events.push({
       id: `calendar:${event.id}`,
       title: event.title,
-      description: event.note ?? undefined,
+      description: event.kind === "course" ? courseExportDescription(event, personalizations[`calendar:${event.id}`]) : calendarExportDescription(event, personalizations[`calendar:${event.id}`]),
       location: event.location ?? undefined,
       startAt,
       endAt: isDueAtEvent ? new Date(startMs).toISOString() : new Date(endMs).toISOString()
@@ -668,7 +687,7 @@ export const createIcalContent = (
     events.push({
       id: `course:${course.id}`,
       title: course.title,
-      description: course.note,
+      description: courseExportDescription(course, personalizations[`course:${course.id}`]),
       location: course.location,
       startAt: course.startAt,
       endAt: course.endAt
@@ -681,7 +700,7 @@ export const createIcalContent = (
     events.push({
       id: `deadline:${deadline.id}`,
       title: deadline.title,
-      description: deadline.note,
+      description: resolveCalendarEventNote(deadline.note, personalizations[`deadline:${deadline.id}`]),
       location: "",
       startAt: start.toISOString(),
       endAt: deadline.dueAt

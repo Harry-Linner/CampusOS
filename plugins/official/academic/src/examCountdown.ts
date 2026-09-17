@@ -6,6 +6,7 @@ export interface ExamCountdownEntry {
   courseName: string | null;
   startAt: string;
   location: string | null;
+  seat: string | null;
   daysUntil: number;
   hoursUntil: number;
   isUrgent: boolean;
@@ -40,6 +41,7 @@ export const computeExamCountdowns = (
       courseName: exam.courseName,
       startAt: exam.startAt,
       location: exam.location,
+      seat: exam.seat ?? null,
       daysUntil,
       hoursUntil,
       isUrgent: remainingMs <= URGENT_THRESHOLD_DAYS * MS_PER_DAY

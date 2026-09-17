@@ -94,6 +94,23 @@ describe("desk calendar", () => {
     await waitFor(() => expect(completeTask).toHaveBeenCalledWith("t1", true, "0"));
   });
 
+  it("shows an exam room and seat as separate fields", async () => {
+    getData.mockResolvedValue({
+      today: "2026-09-03",
+      theme: "light",
+      items: [{
+        id: "calendar:exam-1", title: "期末考试", date: "2026-09-03", kind: "exam",
+        time: "14:00", location: "东一 201", seat: "A-12", origin: "upstream",
+        startAt: "2026-09-03T14:00:00+08:00", endAt: "2026-09-03T16:00:00+08:00"
+      }]
+    });
+    render(<DeskCalendar />);
+    fireEvent.click(await screen.findByText("期末考试"));
+    expect(await screen.findByText("东一 201")).toBeTruthy();
+    expect(screen.getByText("A-12")).toBeTruthy();
+    expect(screen.getByText("座位")).toBeTruthy();
+  });
+
   it("switches views and updates the header (week/day)", async () => {
     render(<DeskCalendar />);
     await screen.findByText("2026年9月");
@@ -167,7 +184,7 @@ describe("desk calendar", () => {
     expect(screen.getByLabelText("开始")).toHaveProperty("disabled", true);
     expect(screen.getByLabelText("结束")).toHaveProperty("disabled", true);
     expect(screen.getByLabelText("地点")).toHaveProperty("disabled", true);
-    fireEvent.change(screen.getByLabelText("备注"), { target: { value: "靠窗座位" } });
+    fireEvent.change(screen.getByLabelText("简介"), { target: { value: "靠窗座位" } });
     fireEvent.click(screen.getByText("保存"));
     await waitFor(() => expect(saveEvent).toHaveBeenCalledWith(expect.objectContaining({
       id: "course:c1",

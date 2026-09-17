@@ -125,18 +125,27 @@ const TimetablePanel = ({
 }: PluginComponentProps): JSX.Element => {
   const [records, setRecords] = useState<
     CapabilityRecord<AcademicTimetableData>[]
-  >(() => academicViewCache.timetableRecords ?? []);
+  >(() => snapshot?.academicTimetable?.records?.length
+    ? snapshot.academicTimetable.records
+    : academicViewCache.timetableRecords ?? []);
   const [calendar, setCalendar] = useState<AcademicCalendarConfigData | null>(
-    () => academicViewCache.calendar
+    () => snapshot?.academicTimetable?.calendar ?? academicViewCache.calendar
   );
   const [termKey, setTermKey] = useState("");
   const [summerOnly, setSummerOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(() => !academicViewCache.timetableRecords);
+  const [loading, setLoading] = useState(() => !snapshot?.academicTimetable?.records.length && !academicViewCache.timetableRecords?.length);
 
   useEffect(() => {
     let active = true;
-    if (!academicViewCache.timetableRecords) {
+    const persisted = snapshot?.academicTimetable;
+    if (persisted?.records.length) {
+      academicViewCache.timetableRecords = persisted.records;
+      academicViewCache.calendar = persisted.calendar;
+      setRecords(persisted.records);
+      setCalendar(persisted.calendar);
+      setLoading(false);
+    } else if (!academicViewCache.timetableRecords?.length) {
       setLoading(true);
     }
     void Promise.allSettled([
@@ -156,14 +165,21 @@ const TimetablePanel = ({
             : "课表读取失败。"
         );
       } else {
-        academicViewCache.timetableRecords = timetableResult.value;
-        setRecords(timetableResult.value);
-        setError(null);
+        const hasData = timetableResult.value.some(record =>
+          record.data?.terms.some((term) => term.sessions.length > 0)
+        );
+        if (hasData || !academicViewCache.timetableRecords?.length) {
+          academicViewCache.timetableRecords = timetableResult.value;
+          setRecords(timetableResult.value);
+        }
+        setError(hasData ? null : academicViewCache.timetableRecords?.length ? "本次未获取到新课表，继续显示本地快照。" : null);
       }
       if (calendarResult.status === "fulfilled") {
-        const cal = calendarResult.value.find((record) => record.data)?.data ?? null;
-        academicViewCache.calendar = cal;
-        setCalendar(cal);
+        const cal = calendarResult.value.find((record) => record.data?.quarters.length)?.data ?? null;
+        if (cal) {
+          academicViewCache.calendar = cal;
+          setCalendar(cal);
+        }
       }
     });
     return () => {
@@ -344,7 +360,7 @@ const TimetablePanel = ({
       ) : null}
       {!loading && !selected ? (
         <p className="muted">当前没有可用课表。</p>
-      ) : visibleSessions.length === 0 ? (
+      ) : !loading && visibleSessions.length === 0 ? (
         <p className="muted">
           {summerOnly ? "这个学期暂时没有短学期课程安排。" : "这个学期暂时没有课程安排。"}
         </p>

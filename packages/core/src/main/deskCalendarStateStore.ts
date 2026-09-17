@@ -53,6 +53,7 @@ export const saveCalendarEventPersonalization = (
   const existing = records[eventId];
   const next: CalendarEventPersonalization = {
     note: typeof input.note === "string" ? input.note.slice(0, 4_000) : (existing?.note ?? ""),
+    noteEdited: typeof input.note === "string" || existing?.noteEdited === true,
     reminderLeadMinutes: input.reminderLeadMinutes === null
       ? null
       : Number.isFinite(input.reminderLeadMinutes)

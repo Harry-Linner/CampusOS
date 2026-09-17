@@ -96,9 +96,12 @@ describe("academic calendar event plugins", () => {
         id: "org.campusos.academic-exams:org.campusos.zju-undergraduate:exam-1",
         originId: "exam-1",
         kind: "exam",
+        location: "紫金港东1A-101",
+        seat: "18",
         timezone: "Asia/Shanghai"
       })
     ]);
+    expect(feed.events[0].note).toBe("考试时间：2026年7月20日 09:00-11:00");
   });
 
   it("combines exams from multiple academic providers without ID collisions", () => {

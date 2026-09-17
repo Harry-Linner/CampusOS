@@ -25,6 +25,7 @@ import { ExtensionsView } from "./views/ExtensionsView";
 import { SettingsView } from "./views/SettingsView";
 import {
   cancelDownload,
+  chooseDownloadDirectory,
   clearDownloadHistory,
   clearAllDownloads,
   enqueueDownload,
@@ -312,7 +313,8 @@ export const App = (): JSX.Element => {
             verify: verifyDownload,
             clearHistory: clearDownloadHistory,
             getPreferences: getDownloadPreferences,
-            savePreferences: saveDownloadPreferences
+            savePreferences: saveDownloadPreferences,
+            chooseDownloadDirectory
           },
           schedule: window.campusos?.schedule,
           assistant: window.campusos?.assistant,

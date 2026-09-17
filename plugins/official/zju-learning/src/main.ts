@@ -21,6 +21,7 @@ export type LearningAssignmentsFetchResult =
   | { ok: false; message: string };
 
 export type LearningJsonFetchResult = LearningAssignmentsFetchResult;
+export type LearningAssessmentOperation = "homework-submissions" | "course-exams" | "submitted-exams" | "classrooms";
 
 interface ConnectorRefreshResult {
   sourceId: typeof manifest.id;
@@ -35,6 +36,7 @@ export interface ZjuLearningConnectorDependencies {
   fetchCoursesPage: (page: number) => Promise<LearningJsonFetchResult>;
   fetchSemesters: () => Promise<LearningJsonFetchResult>;
   fetchCourseActivities: (courseId: string) => Promise<LearningJsonFetchResult>;
+  fetchCourseAssessment?: (courseId: string, operation: LearningAssessmentOperation) => Promise<LearningJsonFetchResult>;
   loadCachedAssignments: (
     accountId: string | null
   ) => Promise<LearningAssignmentsData | null>;
@@ -185,6 +187,44 @@ const collectHomeworkActivities = (
   }
 };
 
+/** Independently parsed protocol facts; see research/learning-assessments-2026-09.md. */
+export const parseLearningSubmissionStatus = (body: string): Map<string, "submitted" | "pending" | "unknown"> => {
+  const payload = parseJsonObject(body, "作业提交状态");
+  if (payload.homework_activities === null) return new Map();
+  if (!Array.isArray(payload.homework_activities)) throw new Error("作业提交状态结构无效。");
+  return new Map(payload.homework_activities.flatMap((value) => {
+    const item = asRecord(value); const id = asText(item?.id);
+    return item && id ? [[id, item.status_code === "submitted" ? "submitted" as const : item.status_code === "absent" ? "pending" as const : "unknown" as const] as const] : [];
+  }));
+};
+
+export const parseLearningAssessments = (examsBody: string, submittedBody: string, classroomsBody: string, course: LearningCourseRecord, now: string): LearningAssignmentRecord[] => {
+  const exams = parseJsonObject(examsBody, "小测").exams;
+  const submitted = parseJsonObject(submittedBody, "小测提交状态").exam_ids;
+  const classrooms = parseJsonObject(classroomsBody, "课堂互动").classrooms;
+  if (!Array.isArray(exams) || !Array.isArray(submitted) || !Array.isArray(classrooms)) throw new Error("小测或课堂互动结构无效。");
+  const submittedIds = new Set(submitted.map(asText));
+  const result: LearningAssignmentRecord[] = [];
+  for (const value of exams) {
+    const item = asRecord(value); const id = asText(item?.id);
+    if (!item || !id || !isStudentTodo(item.published)) continue;
+    result.push({ sourceId: `quiz:${course.sourceId}:${id}`, activityType: "quiz", courseName: course.name,
+      title: asText(item.title) || "未命名小测", startAt: normalizeDueAt(item.start_time), dueAt: normalizeDueAt(item.end_time), assessmentObservedAt: now,
+      description: asText(item.description) ? htmlToPlainText(String(item.description)) : null,
+      submissionStatus: submittedIds.has(id) ? "submitted" : "pending" });
+  }
+  for (const value of classrooms) {
+    const item = asRecord(value); const id = asText(item?.id);
+    if (!item || !id || item.status !== "start") continue;
+    const startAt = normalizeDueAt(item.start_at);
+    const dueAt = normalizeDueAt(item.end_at) ?? normalizeDueAt(item.finish_at);
+    if ((startAt && Date.parse(startAt) > Date.parse(now)) || (dueAt && Date.parse(dueAt) <= Date.parse(now))) continue;
+    result.push({ sourceId: `classroom:${course.sourceId}:${id}`, activityType: "classroom", courseName: course.name,
+      title: asText(item.title) || "课堂互动", startAt, dueAt, assessmentObservedAt: now, submissionStatus: "unknown" });
+  }
+  return result;
+};
+
 /**
  * 一份作业一条记录：身份取「课程 + 标题」（同一门课同名作业视为同一份，避免老师改动 DDL
  * 后上游返回两条从而在日历上跨天重复）。冲突时以**较晚的抓取/更新时间**为准：
@@ -192,7 +232,7 @@ const collectHomeworkActivities = (
  * `sourceId` 保留获胜条目的 activity id，事件 id 稳定由投影层保证。
  */
 const assignmentIdentity = (item: LearningAssignmentRecord): string =>
-  `${item.courseName}|${item.title}`;
+  `${item.activityType === "quiz" || item.activityType === "classroom" ? item.activityType : "homework"}|${item.courseName}|${item.title}`;
 
 const isNewerAssignment = (
   candidate: LearningAssignmentRecord,
@@ -221,6 +261,9 @@ const mergeAssignments = (
     const existing = byIdentity.get(key);
     if (!existing || isNewerAssignment(item, existing)) {
       byIdentity.set(key, existing ? { ...item, sourceId: existing.sourceId } : item);
+    } else if (item.submissionStatus !== undefined) {
+      byIdentity.set(key, { ...existing, description: item.description ?? existing.description,
+        attachments: item.attachments ?? existing.attachments, submissionStatus: item.submissionStatus });
     }
   }
   return [...byIdentity.values()];
@@ -307,7 +350,8 @@ export const parseLearningCoursesResponse = (
       name: asText(item.name) || "未命名课程",
       academicYearId: asText(item.academic_year_id),
       semesterId,
-      semesterName: semesterId ? semesterNames.get(semesterId) ?? null : null
+      semesterName: semesterId ? semesterNames.get(semesterId) ?? null : null,
+      ...(typeof item.is_closed === "boolean" ? { isClosed: item.is_closed } : {})
     }];
   });
   return { courses, pages };
@@ -402,6 +446,7 @@ export const createZjuLearningConnector = ({
   fetchCoursesPage,
   fetchSemesters,
   fetchCourseActivities,
+  fetchCourseAssessment,
   loadCachedAssignments,
   loadCachedMaterials,
   publish,
@@ -466,11 +511,38 @@ export const createZjuLearningConnector = ({
       // zju-learning-assistant refreshes every selected course's activities before
       // publishing a new list; a partial directory must not replace the last snapshot.
       const homework: LearningAssignmentRecord[] = [];
+      const previousAssignments = await loadCachedAssignments(accountId);
+      let assessmentFailures = 0;
       const materials = (await mapWithConcurrency(courses, 4, async (course, index) => {
         try {
           const result = await fetchCourseActivities(course.sourceId);
           if (!result.ok) throw new Error(result.message);
-          homework.push(...collectHomeworkActivities(result.body, course));
+          const courseHomework = collectHomeworkActivities(result.body, course);
+          if (fetchCourseAssessment) {
+            try {
+              const statusResult = await fetchCourseAssessment(course.sourceId, "homework-submissions");
+              if (!statusResult.ok) throw new Error("Submission state unavailable");
+              const statuses = parseLearningSubmissionStatus(statusResult.body);
+              for (const item of courseHomework) item.submissionStatus = statuses.get(item.sourceId) ?? "unknown";
+            } catch {
+              assessmentFailures++;
+              for (const item of courseHomework) item.submissionStatus = previousAssignments?.assignments.find(previous => previous.sourceId === item.sourceId)?.submissionStatus ?? "unknown";
+            }
+            if (!course.isClosed) {
+              try {
+                // Keep total concurrency at four courses, not sixteen requests.
+                const exams = await fetchCourseAssessment(course.sourceId, "course-exams");
+                const submitted = await fetchCourseAssessment(course.sourceId, "submitted-exams");
+                const classrooms = await fetchCourseAssessment(course.sourceId, "classrooms");
+                if (!exams.ok || !submitted.ok || !classrooms.ok) throw new Error("Assessment list unavailable");
+                courseHomework.push(...parseLearningAssessments(exams.body, submitted.body, classrooms.body, course, updatedAt));
+              } catch {
+                assessmentFailures++;
+                courseHomework.push(...(previousAssignments?.assignments ?? []).filter(item => item.courseName === course.name && (item.activityType === "quiz" || item.activityType === "classroom")));
+              }
+            }
+          }
+          homework.push(...courseHomework);
           return parseLearningActivitiesResponse(result.body, course, updatedAt);
         } catch (error) {
           const message = error instanceof Error
@@ -490,7 +562,7 @@ export const createZjuLearningConnector = ({
         },
         message: `课件探针：课程 ${courses.length} 门，作业型条目 ${homework.length} 条。`
       });
-      return { status: "live", homework };
+      return { status: "live", homework, ...(assessmentFailures ? { message: `有 ${assessmentFailures} 项提交状态或小测查询失败，保留上次已确认状态。` } : {}) };
     } catch (error) {
       return publishMaterialsFallback(
         accountId,
@@ -503,7 +575,8 @@ export const createZjuLearningConnector = ({
   const refreshAssignments = async (
     accountId: string,
     updatedAt: string,
-    homework: readonly LearningAssignmentRecord[] = []
+    homework: readonly LearningAssignmentRecord[] = [],
+    assessmentWarning?: string
   ): Promise<{ status: "live" | "cache" | "unavailable"; message?: string }> => {
     const result = await fetchAssignments().catch(
       (error: unknown): LearningAssignmentsFetchResult => ({
@@ -546,12 +619,12 @@ export const createZjuLearningConnector = ({
       await publish({
         capability: "learning.assignments@1",
         accountId,
-        state: "live",
+        state: assessmentWarning ? "cache" : "live",
         updatedAt,
         data: { assignments },
-        message: `作业探针：${todoNote}；逐课作业 ${homework.length} 条；按作业归并后 ${assignments.length} 条（含可信截止时间 ${withDueAt} 条；同名作业多 DDL 组 ${multiDeadline} 组；有说明 ${withDescription} 条；有附件 ${withAttachments} 条）。`
+        message: `作业探针：${todoNote}；逐课作业 ${homework.length} 条；按作业归并后 ${assignments.length} 条（含可信截止时间 ${withDueAt} 条；同名作业多 DDL 组 ${multiDeadline} 组；有说明 ${withDescription} 条；有附件 ${withAttachments} 条）。${assessmentWarning ?? ""}`
       });
-      return { status: "live" };
+      return { status: assessmentWarning ? "cache" : "live", message: assessmentWarning };
     }
 
     const cached = await loadCachedAssignments(accountId);
@@ -612,7 +685,7 @@ export const createZjuLearningConnector = ({
 
     // 课件分支同时抓取逐课作业（同一个 activities 响应），因此先跑它再把作业交给作业分支。
     const materials = await refreshMaterials(proof.studentId, updatedAt);
-    const assignments = await refreshAssignments(proof.studentId, updatedAt, materials.homework);
+    const assignments = await refreshAssignments(proof.studentId, updatedAt, materials.homework, materials.message);
     const statuses = [assignments.status, materials.status];
     const status = statuses.every((value) => value === "live")
       ? "live"

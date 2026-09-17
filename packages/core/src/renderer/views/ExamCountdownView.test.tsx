@@ -53,7 +53,8 @@ describe("ExamCountdownView", () => {
         startAt: "2026-08-04T02:01:00.000Z",
         endAt: "2026-08-04T03:01:00.000Z",
         timezone: "Asia/Shanghai",
-        location: null,
+        location: "东一 201",
+        seat: "A-12",
         courseName: "Course",
         note: null
       }]
@@ -85,6 +86,7 @@ describe("ExamCountdownView", () => {
 
     render(createElement(ExamCountdownView, props));
     await vi.waitFor(() => expect(screen.getByText("2 小时")).toBeTruthy());
+    expect(screen.getByText("教室：东一 201 · 座位：A-12")).toBeTruthy();
 
     vi.advanceTimersByTime(120_000);
     await vi.waitFor(() => expect(screen.getByText("1 小时")).toBeTruthy());

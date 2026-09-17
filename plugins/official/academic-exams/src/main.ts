@@ -54,13 +54,7 @@ const hasConcreteSchedule = (
 };
 
 const buildExamNote = (exam: AcademicExamRecord): string =>
-  [
-    `考试时间：${exam.scheduleText}`,
-    exam.location ? `地点：${exam.location}` : null,
-    exam.seat ? `座位：${exam.seat}` : null
-  ]
-    .filter((value): value is string => value !== null)
-    .join("；");
+  `考试时间：${exam.scheduleText}`;
 
 const toEvent = (
   exam: AcademicExamRecord & { startAt: string; endAt: string },
@@ -76,6 +70,7 @@ const toEvent = (
   endAt: exam.endAt,
   timezone: "Asia/Shanghai",
   location: exam.location,
+  seat: exam.seat,
   courseName: exam.courseName,
   note: buildExamNote(exam)
 });

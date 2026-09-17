@@ -159,6 +159,10 @@ export class DownloadEngine {
     return [...this.items.values()];
   }
 
+  setDownloadRoot(downloadRoot: string): void {
+    this.downloadRoot = downloadRoot;
+  }
+
   async enqueue(task: {
     url: string;
     fallbackUrl?: string;

@@ -161,8 +161,7 @@ describe("buildAcademicQueryContext", () => {
     expect(payload.grades[0]).toMatchObject({ courseName: "高等数学", originalScore: "92", gradePoint: 4.5 });
     expect(payload.grades[0]).not.toHaveProperty("sourceId");
     expect(payload.grades[0]).not.toHaveProperty("isMajorCourse");
-    expect(payload.exams[0]).toMatchObject({ courseName: "高等数学", kind: "final", location: "东一 201" });
-    expect(payload.exams[0]).not.toHaveProperty("seat");
+    expect(payload.exams[0]).toMatchObject({ courseName: "高等数学", kind: "final", location: "东一 201", seat: "A-12" });
     expect(payload.calendarEvents[0]).toMatchObject({ kind: "course", title: "高等数学", startAt: "2026-09-14T00:00:00.000Z" });
     expect(payload.calendarEvents[0]).not.toHaveProperty("originId");
 

@@ -166,6 +166,7 @@ export const Component = ({
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [completionSound, setCompletionSound] = useState(true);
+  const [downloadDirectory, setDownloadDirectory] = useState("");
 
   // 下载队列按"入队时间"倒序：越新加入的排越靠上。旧数据可能没有 createdAt，
   // 回退用 id/次序。
@@ -185,9 +186,10 @@ export const Component = ({
   );
 
   useEffect(() => {
-    void downloads?.getPreferences?.().then((preferences) =>
-      setCompletionSound(preferences.completionSound)
-    ).catch(() => undefined);
+    void downloads?.getPreferences?.().then((preferences) => {
+      setCompletionSound(preferences.completionSound);
+      setDownloadDirectory(preferences.downloadDirectory);
+    }).catch(() => undefined);
   }, [downloads]);
   const selectedSemesterKey = semesterGroups.some(
     (semester) => semester.key === semesterKey
@@ -339,6 +341,25 @@ export const Component = ({
       await onRefresh();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "下载队列刷新失败。");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const changeDownloadDirectory = async (): Promise<void> => {
+    if (!downloads?.chooseDownloadDirectory) return;
+    setBusyId("download-directory");
+    setActionError(null);
+    setNotice(null);
+    try {
+      const preferences = await downloads.chooseDownloadDirectory();
+      if (preferences) {
+        setDownloadDirectory(preferences.downloadDirectory);
+        setCompletionSound(preferences.completionSound);
+        setNotice("下载文件夹已更新，之后新加入的课件会保存到新位置。");
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "下载文件夹设置失败。");
     } finally {
       setBusyId(null);
     }
@@ -580,11 +601,6 @@ export const Component = ({
           <header className="section-heading">
             <h2>下载队列</h2>
             <div className="section-heading-actions">
-              {downloads?.savePreferences ? <label><input type="checkbox" checked={completionSound} onChange={(event) => {
-                const checked = event.currentTarget.checked;
-                setCompletionSound(checked);
-                void downloads.savePreferences!({ completionSound: checked }).catch(() => setActionError("下载提示音设置保存失败。"));
-              }} /> 完成时播放提示音</label> : null}
               <span className="download-in-progress-count">
                 {snapshot.downloads.filter((item) => isDownloadInProgress(item.status)).length} 个进行中
               </span>
@@ -636,6 +652,37 @@ export const Component = ({
               ) : null}
             </div>
           </header>
+          {(downloads?.getPreferences || downloads?.chooseDownloadDirectory) ? (
+            <div className="materials-download-settings" aria-label="课件下载设置">
+              <div className="materials-download-location">
+                <span>课件下载位置</span>
+                <strong title={downloadDirectory || undefined}>
+                  {downloadDirectory || "正在读取下载文件夹…"}
+                </strong>
+                <small>更改后只影响新加入的课件，已有文件仍保留在原位置。</small>
+              </div>
+              <div className="materials-download-settings-actions">
+                {downloads?.savePreferences ? <label><input type="checkbox" checked={completionSound} onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setCompletionSound(checked);
+                  void downloads.savePreferences!({ completionSound: checked })
+                    .then((preferences) => setDownloadDirectory(preferences.downloadDirectory))
+                    .catch(() => setActionError("下载提示音设置保存失败。"));
+                }} /> 完成时播放提示音</label> : null}
+                {downloads?.chooseDownloadDirectory ? (
+                  <Button
+                    variant="outline"
+                    type="button"
+                    size="sm"
+                    disabled={busyId === "download-directory"}
+                    onClick={() => void changeDownloadDirectory()}
+                  >
+                    {busyId === "download-directory" ? "正在选择" : "更改文件夹"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           {orderedDownloads.length > 0 ? (
             <ul className="materials-download-list">
               {orderedDownloads.map((download) => (

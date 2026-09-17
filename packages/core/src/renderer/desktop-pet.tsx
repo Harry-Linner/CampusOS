@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useRef, useState, type DragEvent, type PointerEv
 import { createRoot } from "react-dom/client";
 import type { DesktopPetAppearance, DesktopPetBridge, DesktopPetForm, DesktopPetInput, DesktopPetJobSummary, DesktopPetState } from "../../../shared/src/desktopPet";
 import "./styles/desktop-pet.css";
+import { playReminderSound } from "./lib/reminderSound";
 
 declare global { interface Window { desktopPet?: DesktopPetBridge } }
 
@@ -64,13 +65,14 @@ export function DesktopPet({ surface = new URLSearchParams(window.location.searc
     const unsubscribe = bridge.subscribe((next) => setState(next));
     const unsubReminder = bridge.onReminder?.((reminder) => {
       setActiveReminder({ title: reminder.title, body: reminder.body });
+      if (!isPanel) void playReminderSound();
     });
     return () => {
       active = false;
       unsubscribe();
       unsubReminder?.();
     };
-  }, [bridge]);
+  }, [bridge, isPanel]);
 
   useEffect(() => {
     if (!activeReminder) return;

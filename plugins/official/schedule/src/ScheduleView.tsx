@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   extractMeetingNumber,
-  extractTeacherFromScheduleNote,
+  resolveCourseEventDetails,
+  isCalendarEventComplete,
+  resolveCalendarEventNote,
   formatCountdown,
   resolveLocalTaskReminderAt
 } from "@campusos/shared";
@@ -16,6 +18,7 @@ import { AppIcon } from "./AppIcon";
 import { formatDateTime, formatTimeRange } from "./formatters";
 import { ScheduleSettingsDialog } from "./ScheduleSettingsDialog";
 import { Button } from "@/components/ui/button";
+import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   exportElementAsPng,
@@ -34,13 +37,15 @@ type ScheduleEvent = {
   startAt: string;
   endAt: string;
   location?: string;
+  seat?: string | null;
   note?: string;
-  /** 从上游原始备注解析出的教师名（上游只把教师写在 note 里）；用户自定义备注不会覆盖它。 */
+  /** 数据源维护的教师信息，与地点并列，不随简介编辑改变。 */
   instructor?: string | null;
   taskId?: string;
   status?: LocalTaskRecord["status"];
   origin?: "local" | "upstream";
   occurrenceKey?: string;
+  sourceSubmitted?: boolean;
 };
 
 /**
@@ -283,6 +288,7 @@ const taskEventsFromPeriods = (periods: LocalTaskPeriod[]): ScheduleEvent[] => {
       startAt: period.occurrenceStartAt ?? period.startAt,
       endAt: period.occurrenceEndAt ?? period.endAt,
       location: period.location,
+      note: period.description,
       status: period.status,
       origin: "local",
       occurrenceKey: period.occurrenceKey
@@ -309,9 +315,10 @@ const buildEvents = (
       startAt: event.startAt,
       endAt: event.endAt ?? new Date(Date.parse(event.startAt) + 60 * 60 * 1000).toISOString(),
       location: event.location ?? undefined,
-      note: personalizations[`calendar:${event.id}`]?.note || event.note || undefined,
-      instructor: extractTeacherFromScheduleNote(event.note),
-      status: (personalizations[`calendar:${event.id}`]?.completed ? "completed" : undefined) as LocalTaskRecord["status"] | undefined,
+      seat: event.seat ?? null,
+      ...(event.kind === "course" ? resolveCourseEventDetails(event, personalizations[`calendar:${event.id}`]) : { note: resolveCalendarEventNote(event.note, personalizations[`calendar:${event.id}`]) }),
+      sourceSubmitted: event.submissionStatus === "submitted",
+      status: (event.submissionStatus === "submitted" || personalizations[`calendar:${event.id}`]?.completed ? "completed" : undefined) as LocalTaskRecord["status"] | undefined,
       origin: "upstream" as const
     })),
     ...snapshot.courses
@@ -323,8 +330,8 @@ const buildEvents = (
         startAt: course.startAt,
         endAt: course.endAt,
         location: course.location,
-        note: personalizations[`course:${course.id}`]?.note || course.note,
-        instructor: extractTeacherFromScheduleNote(course.note),
+        ...resolveCourseEventDetails(course, personalizations[`course:${course.id}`]),
+        status: personalizations[`course:${course.id}`]?.completed ? "completed" as const : undefined,
         origin: "upstream" as const
       })),
   ];
@@ -379,7 +386,7 @@ const formatEventMeta = (event: ScheduleEvent): string => {
 };
 
 const eventClassName = (event: ScheduleEvent): string =>
-  `schedule-event schedule-event-${event.kind}${event.status === "completed" ? " is-complete" : ""}`;
+  `schedule-event schedule-event-${event.kind}${isCalendarEventComplete(event) ? " is-complete" : ""}`;
 
 const eventRange = (mode: ScheduleViewMode, date: Date): { start: Date; end: Date } => {
   if (mode === "month" || mode === "agenda") {
@@ -409,6 +416,7 @@ export const ScheduleView = ({
   academicCalendar,
   desktopCalendarHost
 }: ScheduleViewProps): JSX.Element => {
+  useCalendarClock();
   const [viewMode, setViewMode] = useState<ScheduleViewMode>("month");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const schedulePageRef = useRef<HTMLElement | null>(null);
@@ -691,6 +699,7 @@ export const ScheduleView = ({
   };
 
   const editEvent = (event: ScheduleEvent): void => {
+    setSelectedEvent(null);
     if (event.origin === "local" && event.taskId) {
       const task = tasks.find((candidate) => candidate.id === event.taskId);
       if (task && task.type !== "fixedlegacy") setForm(taskToForm(task, event));
@@ -699,7 +708,7 @@ export const ScheduleView = ({
     const saved = personalizations[event.id];
     setPersonalizationForm({
       event,
-      note: saved?.note ?? event.note ?? "",
+      note: event.note ?? "",
       reminderLeadMinutes: saved?.reminderLeadMinutes ?? null,
       zhiyunUrl: saved?.zhiyunUrl ?? ""
     });
@@ -727,11 +736,9 @@ export const ScheduleView = ({
   const toggleUpstreamEventCompleted = async (event: ScheduleEvent): Promise<void> => {
     if (!schedule?.savePersonalization) return;
     const isCompleted = event.status === "completed";
-    const existing = personalizations[event.id];
     setBusy(true);
     try {
       const saved = await schedule.savePersonalization(event.id, {
-        ...existing,
         completed: !isCompleted,
         completedAt: !isCompleted ? new Date().toISOString() : null
       });
@@ -1409,7 +1416,12 @@ export const ScheduleView = ({
             </DialogHeader>
             <div className="space-y-3">
               <p className="text-sm leading-6 text-muted-foreground">{formatEventMeta(selectedEvent)}</p>
-              {selectedEvent.location || selectedEvent.note ? <p className="text-sm leading-6">{selectedEvent.location || selectedEvent.note}</p> : null}
+              <dl className="schedule-event-metadata">
+                {selectedEvent.kind === "exam" ? <div><dt>教室</dt><dd>{selectedEvent.location ?? "未公布"}</dd></div> : selectedEvent.location ? <div><dt>地点</dt><dd>{selectedEvent.location}</dd></div> : null}
+                {selectedEvent.kind === "exam" ? <div><dt>座位</dt><dd>{selectedEvent.seat ?? "未公布"}</dd></div> : null}
+                {selectedEvent.instructor ? <div><dt>教师</dt><dd>{selectedEvent.instructor}</dd></div> : null}
+              </dl>
+              {selectedEvent.note ? <p className="whitespace-pre-wrap text-sm leading-6">{selectedEvent.note}</p> : null}
               {(() => {
                 const meetingNumber = extractMeetingNumber(`${selectedEvent.location ?? ""} ${selectedEvent.note ?? ""}`);
                 return meetingNumber ? (
@@ -1459,20 +1471,20 @@ export const ScheduleView = ({
                   <Button
                     variant="outline"
                     type="button"
-                    disabled={busy}
+                    disabled={busy || selectedEvent.sourceSubmitted}
                     onClick={() => void toggleUpstreamEventCompleted(selectedEvent)}
                   >
-                    {selectedEvent.status === "completed" ? "标记为未完成" : "标记为已完成"}
+                    {selectedEvent.sourceSubmitted ? "已在学在浙大提交" : selectedEvent.status === "completed" ? "标记为未完成" : "标记为已完成"}
                   </Button>
                 ) : null}
                 {selectedTask && selectedTask.type !== "fixedlegacy" && selectedTask.status !== "deleted" ? (
                   <>
-                    <Button variant="outline" type="button" disabled={busy} onClick={() => setForm(taskToForm(selectedTask, selectedEvent))}>编辑</Button>
+                    <Button variant="outline" type="button" disabled={busy} onClick={() => editEvent(selectedEvent)}>编辑</Button>
                     {selectedEvent.status !== "completed" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void mutate(selectedTask, "completed", { occurrenceKey: selectedEvent.occurrenceKey })}>完成</Button> : null}
                     <Button variant="ghost" className="text-destructive" type="button" disabled={busy} onClick={() => void deleteTask(selectedTask, selectedEvent.occurrenceKey)}>删除</Button>
                   </>
                 ) : (
-                  <Button variant="outline" type="button" onClick={() => editEvent(selectedEvent)}>编辑个人备注与提醒</Button>
+                  <Button variant="outline" type="button" onClick={() => editEvent(selectedEvent)}>编辑简介与提醒</Button>
                 )}
               </div>
             </div>
@@ -1514,7 +1526,7 @@ export const ScheduleView = ({
                 />
               </label>
             ) : null}
-            <label className="schedule-personalization-field">个人备注<textarea value={personalizationForm.note} onChange={(event) => setPersonalizationForm({ ...personalizationForm, note: event.target.value })} /></label>
+            <label className="schedule-personalization-field">简介<textarea aria-label="简介" value={personalizationForm.note} onChange={(event) => setPersonalizationForm({ ...personalizationForm, note: event.target.value })} /></label>
             <label className="schedule-personalization-field">提醒<select value={personalizationForm.reminderLeadMinutes ?? "none"} onChange={(event) => setPersonalizationForm({ ...personalizationForm, reminderLeadMinutes: event.target.value === "none" ? null : Number(event.target.value) })}><option value="none">不额外提醒</option><option value="0">准时</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label>
             <div className="settings-actions"><Button type="button" disabled={busy} onClick={() => void savePersonalization()}>保存</Button></div>
           </DialogContent>

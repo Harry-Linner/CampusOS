@@ -208,6 +208,68 @@ export const findAcademicCalendarRecord = (
     (record) => record.providerId === providerId && record.accountId === null
   ) ?? null;
 
+const timetableRecordHasSessions = (
+  record: CapabilityRecord<AcademicTimetableData>
+): boolean => record.data?.terms.some((term) => term.sessions.length > 0) ?? false;
+
+/**
+ * Restore the persisted timetable projection from trusted capability cache.
+ * This is a migration of records already stored by Core; it does not activate
+ * a connector or perform an upstream request.
+ */
+export const mergeAcademicTimetableIntoWorkspace = (
+  snapshot: CampusWorkspaceSnapshot,
+  records: readonly CapabilityRecord<AcademicTimetableData>[],
+  calendarRecord: CapabilityRecord<AcademicCalendarConfigData> | null,
+  accountId: string,
+  providerIds: readonly string[],
+  preservePreviousCalendar = true
+): CampusWorkspaceSnapshot => {
+  const allowedProviders = new Set(providerIds);
+  const visible = (record: CapabilityRecord<AcademicTimetableData>): boolean =>
+    record.capability === "academic.timetable@1" &&
+    record.accountId === accountId &&
+    allowedProviders.has(record.providerId);
+  const nextRecords = records.filter(visible);
+  const previous = snapshot.academicTimetable;
+
+  for (const previousRecord of previous?.records ?? []) {
+    if (!visible(previousRecord) || !timetableRecordHasSessions(previousRecord)) {
+      continue;
+    }
+    const index = nextRecords.findIndex(
+      (record) => record.providerId === previousRecord.providerId
+    );
+    if (index >= 0 && timetableRecordHasSessions(nextRecords[index])) continue;
+    const retained = {
+      ...previousRecord,
+      state: "cache" as const,
+      message: "本次未获取到新课表，继续显示本地快照。"
+    };
+    if (index >= 0) nextRecords[index] = retained;
+    else nextRecords.push(retained);
+  }
+
+  const hasCalendar = (calendarRecord?.data?.quarters.length ?? 0) > 0;
+  if (!previous && nextRecords.length === 0 && !hasCalendar) {
+    return snapshot;
+  }
+
+  const calendar = hasCalendar
+    ? calendarRecord?.data ?? null
+    : preservePreviousCalendar
+      ? previous?.calendar ?? null
+      : null;
+
+  return {
+    ...snapshot,
+    academicTimetable: {
+      records: nextRecords,
+      calendar: calendar ?? (preservePreviousCalendar ? previous?.calendar : null) ?? null
+    }
+  };
+};
+
 export const findLearningMaterialsRecord = (
   records: CapabilityRecord<LearningMaterialsData>[],
   providerId: string,
@@ -454,6 +516,7 @@ const toCourse = (event: CalendarEventRecord): CampusCourseSession | null => {
     id: event.id,
     title: event.title,
     location: event.location ?? "地点未提供",
+    instructor: event.instructor ?? undefined,
     startAt: event.startAt,
     endAt: event.endAt,
     sourceId: event.sourceId,
@@ -466,18 +529,21 @@ const toDeadline = (
   now: number,
   today: string
 ): CampusDeadline | null => {
+  // Submitted items remain in calendar history but leave the actionable DDL list.
+  if (event.submissionStatus === "submitted") return null;
   const kind = deadlineKindForEvent(event.kind);
   if (!kind || !isAbsoluteDateTime(event.startAt)) return null;
+  const dueAt = event.kind === "assignment" && event.endAt ? event.endAt : event.startAt;
   // Expired todos are removed before projection, using the requested
   // Shanghai calendar-day boundary.
-  if (formatShanghaiDate(event.startAt) < today) {
+  if (formatShanghaiDate(dueAt) < today) {
     return null;
   }
-  const remaining = Date.parse(event.startAt) - now;
+  const remaining = Date.parse(dueAt) - now;
   return {
     id: event.id,
     title: event.title,
-    dueAt: event.startAt,
+    dueAt,
     sourceId: event.sourceId,
     kind,
     priority:

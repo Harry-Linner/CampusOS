@@ -5,6 +5,9 @@ import type {
   AcademicGradesData,
   CalendarEventsData,
   LearningMaterialsData,
+  LearningAssignmentsData,
+  AcademicTimetableData,
+  CapabilityRecord,
   LocalTaskRecord,
   PluginRuntimeSnapshot
 } from "@campusos/shared";
@@ -31,6 +34,7 @@ import {
   findAcademicCalendarRecord,
   findCalendarEventRecords,
   findLearningMaterialsRecord,
+  mergeAcademicTimetableIntoWorkspace,
   mergeAcademicCalendarIntoWorkspace,
   mergeCalendarEventsIntoWorkspace,
   mergeLearningMaterialsIntoWorkspace,
@@ -43,6 +47,7 @@ import { getOfficialPluginRuntimeService } from "./officialPluginRuntimeService"
 import { getWorkspaceDownloads } from "./downloadIpc";
 import { getOfficialDatabaseService } from "./officialDatabaseService";
 import { processGradeChangeNotification } from "./gradeChangeNotification";
+import { processLearningAssessmentNotifications } from "./learningAssessmentNotifications";
 import { createWorkspaceSnapshotStore } from "./workspaceSnapshotStore";
 import { appendDiagnosticEntry } from "./diagnosticLogStore";
 import { publishE2eFixtureCapabilities } from "./e2eFixtureSources";
@@ -229,8 +234,21 @@ const buildGeneratedRecord = async (
     verifiedAcademicAccountId
   );
   const downloads = await getWorkspaceDownloads();
+  const previousTimetable = (await getWorkspaceSnapshotStore().load())?.snapshot.academicTimetable;
+  const activeTimetableProviderIds = pluginRuntime.plugins
+    .filter((plugin) => plugin.status === "active" && plugin.manifest.provides.includes("academic.timetable@1"))
+    .map((plugin) => plugin.id);
   const snapshot = {
-    ...mergedSnapshot,
+    ...mergeAcademicTimetableIntoWorkspace(
+      { ...mergedSnapshot, academicTimetable: previousTimetable },
+      sourceRecords.filter((record) => record.capability === "academic.timetable@1") as CapabilityRecord<AcademicTimetableData>[],
+      calendarPluginActive
+        ? findAcademicCalendarRecord(calendarRecords, zjuCalendarConfigManifest.id)
+        : null,
+      verifiedAcademicAccountId ?? "",
+      verifiedAcademicAccountId ? activeTimetableProviderIds : [],
+      calendarPluginActive
+    ),
     downloads,
     summary: {
       ...mergedSnapshot.summary,
@@ -241,6 +259,12 @@ const buildGeneratedRecord = async (
   if (credentialScope(await readAcademicCredentialRecord()) !== scopeKey) throw new Error("账号已改变，请重新同步当前账号。");
   const stored = await getWorkspaceSnapshotStore().save(snapshot);
   scheduleWorkspaceReminders(stored.snapshot, reminderSettings, new Date(), readLocalReminderTasks());
+  if (verifiedAcademicAccountId) {
+    const assignments = await getOfficialCapabilityRepository().read<LearningAssignmentsData>("learning.assignments@1");
+    await processLearningAssessmentNotifications({ accountId: verifiedAcademicAccountId,
+      record: assignments.find(record => record.accountId === verifiedAcademicAccountId) ?? null,
+      enabled: reminderSettings.enabled, database: getOfficialDatabaseService(), refreshStartedAt: now });
+  }
 
   return {
     snapshot: stored.snapshot,
@@ -257,11 +281,32 @@ export const hydrateCampusWorkspace =
 
     if (stored) {
       const reminderSettings = await readReminderSettingsRecord();
-      const snapshot = pruneWorkspaceDeadlinesBeforeToday(
+      let snapshot = pruneWorkspaceDeadlinesBeforeToday(
         pruneUnsupportedWorkspaceSources(stored.snapshot),
         new Date().toISOString(),
         reminderSettings.leadMinutes
       );
+      // Migrate snapshots written before the academicTimetable projection was
+      // introduced from Core's already-persisted, account-scoped capability cache.
+      // No connector activation or upstream request occurs on this startup path.
+      if (!snapshot.academicTimetable) {
+        const credential = await readAcademicCredentialRecord();
+        if (credential.verificationState === "verified" && credential.authenticatedProfile && credential.program) {
+          const accountId = credential.authenticatedProfile.studentId;
+          const providerId = getAcademicConnectorSourceId(credential.program);
+          const [timetableRecords, calendarRecords] = await Promise.all([
+            getOfficialCapabilityRepository().read<AcademicTimetableData>("academic.timetable@1"),
+            getOfficialCapabilityRepository().read<AcademicCalendarConfigData>("academic.calendar-config@1")
+          ]);
+          snapshot = mergeAcademicTimetableIntoWorkspace(
+            snapshot,
+            timetableRecords,
+            findAcademicCalendarRecord(calendarRecords, zjuCalendarConfigManifest.id),
+            accountId,
+            [providerId]
+          );
+        }
+      }
       const hydrated = snapshot === stored.snapshot
         ? stored
         : await snapshotStore.save(snapshot);

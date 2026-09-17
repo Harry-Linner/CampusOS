@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CampusDownloadTask } from "@campusos/shared";
+import type { CampusDownloadPreferences, CampusDownloadTask } from "@campusos/shared";
 
 const electronState = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -71,7 +71,8 @@ describe("download IPC", () => {
     cancel: vi.fn(async () => true),
     clearAll: vi.fn(async () => 2),
     verify: vi.fn(async () => ({ status: "verified" as const, actualBytes: 1, expectedBytes: 1 })),
-    clearHistory: vi.fn(async () => 1)
+    clearHistory: vi.fn(async () => 1),
+    setDownloadRoot: vi.fn()
   };
 
   beforeEach(() => {
@@ -111,6 +112,43 @@ describe("download IPC", () => {
     await expect(invoke("campusos:downloads:clear-history")).resolves.toBe(1);
     expect(engine.verify).toHaveBeenCalledWith(readyTask.id);
     expect(engine.clearHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the current directory when saving sound settings and applies a chosen download directory", async () => {
+    const current = {
+      completionSound: true,
+      downloadDirectory: "C:\\CampusOS\\downloads"
+    };
+    const selected = "D:\\Courseware";
+    const loadPreferences = vi.fn(async () => current);
+    const savePreferences = vi.fn(async (input: CampusDownloadPreferences) => input);
+    const selectDownloadDirectory = vi.fn(async () => selected);
+    const ensureDirectory = vi.fn(async () => undefined);
+    engine.setDownloadRoot.mockReset();
+    registerDownloadHandlers({
+      loadEngine: async () => engine,
+      openPath: electronState.openPath,
+      showItemInFolder: electronState.showItemInFolder,
+      loadPreferences,
+      savePreferences,
+      selectDownloadDirectory,
+      ensureDirectory
+    });
+
+    await expect(invoke("campusos:downloads:save-preferences", {
+      completionSound: false
+    })).resolves.toEqual({
+      completionSound: false,
+      downloadDirectory: current.downloadDirectory
+    });
+    await expect(invoke("campusos:downloads:choose-directory")).resolves.toEqual({
+      completionSound: true,
+      downloadDirectory: selected
+    });
+
+    expect(selectDownloadDirectory).toHaveBeenCalledWith(current.downloadDirectory);
+    expect(ensureDirectory).toHaveBeenCalledWith(selected);
+    expect(engine.setDownloadRoot).toHaveBeenCalledWith(selected);
   });
 
   it("rejects unfinished, unknown, and OS-rejected open requests", async () => {

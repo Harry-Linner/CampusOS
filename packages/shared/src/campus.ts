@@ -108,6 +108,11 @@ export interface CampusDownloadVerification {
 
 export interface CampusDownloadPreferences {
   completionSound: boolean;
+  downloadDirectory: string;
+}
+
+export interface CampusDownloadPreferenceInput {
+  completionSound: boolean;
 }
 
 export interface CampusDownloadRequest {
@@ -175,6 +180,11 @@ export interface CampusWorkspaceSnapshot {
   deadlines: CampusDeadline[];
   /** Canonical calendar projection consumed by the Schedule module. */
   calendarEvents?: import("./pluginCapabilities").CalendarEventRecord[];
+  /** Persisted academic presentation data, available before plugin/network refresh. */
+  academicTimetable?: {
+    records: import("./pluginCapabilities").CapabilityRecord<import("./pluginCapabilities").AcademicTimetableData>[];
+    calendar: import("./pluginCapabilities").AcademicCalendarConfigData | null;
+  };
   /** Filtered learning-platform catalog used by the Materials workspace. */
   materialCourses?: CampusMaterialCourse[];
   materials: CampusMaterialRecord[];

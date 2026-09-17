@@ -237,7 +237,7 @@ export const writeScheduleIcalFile = async (
   input: CalendarExportInput,
   now = new Date()
 ): Promise<CalendarExportResult> => {
-  const { content, eventCount } = createIcalContent(snapshot, tasks, input, now);
+  const { content, eventCount } = createIcalContent(snapshot, tasks, input, now, loadCalendarEventPersonalizations());
   const directory = join(app.getPath("documents"), "CampusOS");
   await mkdir(directory, { recursive: true });
   const filePath = join(directory, `schedule-${sanitizeFilePart(input.termLabel)}.ics`);

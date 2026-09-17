@@ -3,7 +3,7 @@ import { getAccountBrowserSession } from "./accountBrowserSession";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { assertTrustedRenderer } from "./ipcSecurity";
 import { registerWindowIpcHandler } from "./trustedIpc";
-import { extractTeacherFromScheduleNote, resolveLocalTaskReminderAt } from "@campusos/shared";
+import { resolveCourseEventDetails, resolveLocalTaskReminderAt, resolveCalendarEventNote } from "@campusos/shared";
 
 // datetime-local controls describe the calendar's Shanghai clock, regardless
 // of the operating system's timezone. Already-qualified ISO timestamps survive.
@@ -52,6 +52,7 @@ interface DeskCalendarData {
     color?: string;
     note?: string;
     location?: string;
+    seat?: string | null;
     /** 上游投影没有结构化的教师字段（教师只写在 note 里），这里在上游边界解析一次。 */
     instructor?: string | null;
     zhiyunUrl?: string | null;
@@ -271,10 +272,10 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       date: shanghaiDateOf(start),
       kind: event.kind,
       time: shanghaiTimeOf(start),
-      note: personalizations[id]?.note || event.note || undefined,
+      ...(event.kind === "course" ? resolveCourseEventDetails(event, personalizations[id]) : { note: resolveCalendarEventNote(event.note, personalizations[id]) }),
       location: event.location ?? undefined,
-      instructor: extractTeacherFromScheduleNote(event.note),
-      status: personalizations[id]?.completed ? "completed" : undefined,
+      seat: event.seat ?? null,
+      status: event.submissionStatus === "submitted" || personalizations[id]?.completed ? "completed" : undefined,
       zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
       startAt: start,
@@ -297,9 +298,9 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       kind: "course",
       time: shanghaiTimeOf(start),
       color: "var(--accent)",
-      note: personalizations[id]?.note || course.note || undefined,
+      ...resolveCourseEventDetails(course, personalizations[id]),
       location: course.location ?? undefined,
-      instructor: extractTeacherFromScheduleNote(course.note),
+      status: personalizations[id]?.completed ? "completed" : undefined,
       zhiyunUrl: personalizations[id]?.zhiyunUrl ?? null,
       origin: "upstream",
       startAt: start,
@@ -326,7 +327,7 @@ const buildDeskCalendarData = async (range?: { startAt?: string; endAt?: string 
       kind: deadline.kind === "exam" ? "exam" : "assignment",
       time: shanghaiTimeOf(start),
       color: deadline.kind === "exam" ? "#c0392b" : "#a56d22",
-      note: personalizations[id]?.note || deadline.note || undefined,
+      note: resolveCalendarEventNote(deadline.note, personalizations[id]),
       status: personalizations[id]?.completed ? "completed" : undefined,
       origin: "upstream",
       startAt: start,

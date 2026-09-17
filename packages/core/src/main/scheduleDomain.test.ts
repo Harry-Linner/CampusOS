@@ -69,6 +69,7 @@ const calendarEvent = (
   endAt: "2026-08-04T13:00:00+08:00",
   timezone: "Asia/Shanghai",
   location: "Exam room",
+  seat: "A-12",
   courseName: "Final exam",
   note: "Seat 1",
   ...overrides
@@ -211,6 +212,7 @@ describe("schedule domain", () => {
     expect(result.content).toContain("SUMMARY:Final exam");
     expect(result.content).toContain("DTSTART;TZID=Asia/Shanghai:20260804T110000");
     expect(result.content).toContain("DTEND;TZID=Asia/Shanghai:20260804T130000");
+    expect(result.content).toContain("座位：A-12");
   });
 
   it("generates stable RFC 5545 content with escaped fields", () => {
@@ -227,6 +229,14 @@ describe("schedule domain", () => {
     expect(first.content).toContain("SUMMARY:Task\\; A");
     expect(first.content).toContain("DESCRIPTION:line 1\\nline 2");
     expect(first.content).toContain("LOCATION:Room\\, 1");
+  });
+
+  it("exports the edited description shown by both calendars", () => {
+    const event = calendarEvent();
+    const result = createIcalContent({ ...snapshot(), calendarEvents: [event] }, [],
+      { academicYearStart: 2026, termLabel: "Fixture" }, now,
+      { [`calendar:${event.id}`]: { note: "My course description", noteEdited: true, reminderLeadMinutes: null, updatedAt: now.toISOString() } });
+    expect(result.content).toContain("DESCRIPTION:My course description");
   });
 
   it("migrates a legacy floating task to a dated deadline", () => {
