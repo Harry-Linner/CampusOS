@@ -45,6 +45,7 @@ export const UpdatePrompt = (): JSX.Element | null => {
           <span className="update-prompt-current">当前 v{currentVersion ?? "—"}</span>
         </header>
         <p>{ready ? "新版本已经准备好。你可以现在重启安装，也可以稍后从设置中安装。" : "更新不会删除任务、通知、窗口布局或桌面日历状态。选择“下载更新”后才会开始下载。"}</p>
+        {status.source === "githubfast" ? <p>GitHub 直连不可用，本次更新将通过 GitHubFast 第三方镜像下载。</p> : null}
         {status.releaseNotes?.length ? (
           <div className="update-prompt-notes">
             <ul>{status.releaseNotes.slice(0, showNotes ? undefined : 5).map((note, index) => <li key={`${index}-${note}`}>{note}</li>)}</ul>

@@ -5,13 +5,13 @@ import { UpdatePrompt } from "./UpdatePrompt";
 
 afterEach(() => { cleanup(); delete (window as unknown as { campusos?: unknown }).campusos; });
 
-const installBridge = (state: "available" | "ready") => {
+const installBridge = (state: "available" | "ready", source?: "github" | "githubfast") => {
   const dismiss = vi.fn(async () => ({ state, version: "1.2.0", prompt: false }));
   const install = vi.fn(async () => undefined);
   const download = vi.fn(async () => ({ state: "downloading" as const, version: "1.2.0", progress: 0 }));
   (window as unknown as { campusos: unknown }).campusos = { updates: {
     getAppInfo: async () => ({ name: "CampusOS", version: "1.1.0", packaged: true, licenseName: "MIT", copyright: "" }),
-    getStatus: async () => ({ state, version: "1.2.0", prompt: true }),
+    getStatus: async () => ({ state, version: "1.2.0", prompt: true, source }),
     check: async () => ({ state }), download, cancelDownload: async () => ({ state }), dismiss, install,
     subscribe: () => () => undefined
   } };
@@ -32,5 +32,11 @@ describe("UpdatePrompt", () => {
     render(<UpdatePrompt />);
     fireEvent.click(await screen.findByRole("button", { name: "下载更新" }));
     await waitFor(() => expect(bridge.download).toHaveBeenCalled());
+  });
+
+  it("discloses when the update will use the GitHubFast mirror", async () => {
+    installBridge("available", "githubfast");
+    render(<UpdatePrompt />);
+    expect(await screen.findByText(/GitHubFast 第三方镜像/)).toBeTruthy();
   });
 });

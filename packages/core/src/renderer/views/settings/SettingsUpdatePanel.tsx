@@ -24,13 +24,16 @@ export const SettingsUpdatePanel = ({
     </header>
     <p className="page-copy">
       {status.state === "available"
-        ? `发现新版本 v${status.version ?? ""}`
+        ? `发现新版本 v${status.version ?? ""}${status.source === "githubfast" ? "（GitHubFast 镜像）" : ""}`
         : status.state === "ready"
           ? `v${status.version ?? "新版本"} 已准备好安装`
           : status.state === "up-to-date"
             ? "当前已是最新版本"
             : "通过 GitHub Releases 检查并安装 CampusOS 更新。"}
     </p>
+    {status.source === "githubfast" ? (
+      <p className="page-copy">GitHub 直连不可用，本次更新改用 GitHubFast 第三方镜像传输。</p>
+    ) : null}
     {status.releaseNotes?.length ? (
       <details className="update-notes-disclosure">
         <summary>查看更新内容</summary>

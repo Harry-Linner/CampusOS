@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const send = vi.fn();
+  const netFetch = vi.fn();
   const app = {
     isPackaged: false,
     getName: vi.fn(() => "CampusOS"),
@@ -23,9 +24,10 @@ const mocks = vi.hoisted(() => {
     checkForUpdates: vi.fn(async () => undefined),
     downloadUpdate: vi.fn(async () => undefined),
     cancelDownload: vi.fn(),
-    quitAndInstall: vi.fn()
+    quitAndInstall: vi.fn(),
+    setFeedURL: vi.fn()
   };
-  return { handlers, send, app, updater };
+  return { handlers, send, app, updater, netFetch };
 });
 
 vi.mock("electron", () => ({
@@ -39,7 +41,8 @@ vi.mock("electron", () => ({
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
       mocks.handlers.set(channel, handler);
     }
-  }
+  },
+  net: { fetch: mocks.netFetch }
 }));
 
 vi.mock("electron-updater", () => ({ autoUpdater: mocks.updater }));
@@ -50,7 +53,9 @@ import {
   downloadUpdate,
   getUpdateStatus,
   registerUpdateHandlers,
-  resolveAutoUpdater
+  resolveAutoUpdater,
+  extractLatestReleaseTag,
+  shouldTryGitHubFastFallback
 } from "./autoUpdater";
 
 describe("auto updater", () => {
@@ -62,6 +67,8 @@ describe("auto updater", () => {
     mocks.updater.downloadUpdate.mockReset();
     mocks.updater.cancelDownload.mockReset();
     mocks.updater.quitAndInstall.mockReset();
+    mocks.updater.setFeedURL.mockReset();
+    mocks.netFetch.mockReset();
     mocks.app.getPath.mockReturnValue(`/tmp/campusos-updater-${Date.now()}`);
     await checkForUpdates();
   });
@@ -75,6 +82,68 @@ describe("auto updater", () => {
     expect(resolveAutoUpdater({
       default: { autoUpdater: mocks.updater as never }
     })).toBe(mocks.updater);
+  });
+
+  it("accepts only the expected CampusOS release link from the mirrored Atom feed", () => {
+    expect(extractLatestReleaseTag('<link href="https://github.com/Harry-Linner/CampusOS/releases/tag/v0.1.0-beta.9"/>')).toBe("v0.1.0-beta.9");
+    expect(extractLatestReleaseTag('<link href="https://githubfast.com/Harry-Linner/CampusOS/releases/tag/v0.1.0-beta.9"/>')).toBe("v0.1.0-beta.9");
+    expect(() => extractLatestReleaseTag('<link href="https://github.com/other/repo/releases/tag/v9.9.9"/>')).toThrow();
+  });
+
+  it("uses GitHubFast only after a GitHub connectivity failure", async () => {
+    mocks.app.isPackaged = true;
+    mocks.netFetch.mockResolvedValue(new Response(
+      '<link href="https://github.com/Harry-Linner/CampusOS/releases/tag/v0.1.0-beta.9"/>',
+      { status: 200 }
+    ));
+    mocks.updater.checkForUpdates
+      .mockRejectedValueOnce(new Error("getaddrinfo ENOTFOUND github.com"))
+      .mockImplementationOnce(async () => {
+        mocks.updater.emit("update-available", { version: "0.1.0-beta.9" });
+      });
+
+    await expect(checkForUpdates()).resolves.toEqual({
+      state: "available",
+      version: "0.1.0-beta.9",
+      prompt: true,
+      source: "githubfast"
+    });
+    expect(mocks.netFetch).toHaveBeenCalledWith(
+      "https://githubfast.com/Harry-Linner/CampusOS/releases.atom",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(mocks.updater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: "generic",
+      channel: "latest",
+      url: "https://githubfast.com/Harry-Linner/CampusOS/releases/download/v0.1.0-beta.9/"
+    });
+    mocks.updater.downloadUpdate.mockImplementationOnce(async () => {
+      mocks.updater.emit("download-progress", { percent: 64 });
+      mocks.updater.emit("update-downloaded", { version: "0.1.0-beta.9" });
+    });
+    await expect(downloadUpdate()).resolves.toMatchObject({
+      state: "ready",
+      version: "0.1.0-beta.9",
+      source: "githubfast"
+    });
+  });
+
+  it("does not switch mirrors for a malformed release response", () => {
+    expect(shouldTryGitHubFastFallback(new Error("Cannot parse latest.yml from github.com"))).toBe(false);
+  });
+
+  it("reports when both GitHub and the mirror are unavailable", async () => {
+    mocks.app.isPackaged = true;
+    mocks.updater.checkForUpdates.mockRejectedValueOnce(
+      new Error("net::ERR_NAME_NOT_RESOLVED at github.com")
+    );
+    mocks.netFetch.mockResolvedValue(new Response("Forbidden", { status: 403 }));
+
+    await expect(checkForUpdates()).resolves.toEqual({
+      state: "error",
+      error: "GitHub 与 GitHubFast 镜像均无法连接，请稍后重试。",
+      source: "githubfast"
+    });
   });
 
   it("binds updater events and exposes the real available/download states", async () => {
@@ -92,14 +161,16 @@ describe("auto updater", () => {
     expect(await checkForUpdates()).toEqual({
       state: "available",
       version: "0.2.0",
-      prompt: true
+      prompt: true,
+      source: "github"
     });
     expect(mocks.updater.autoDownload).toBe(false);
     expect(await downloadUpdate()).toEqual({
       state: "ready",
       version: "0.2.0",
       progress: 100,
-      prompt: true
+      prompt: true,
+      source: "github"
     });
     expect(mocks.send).toHaveBeenCalledWith(
       "campusos:updater:changed",

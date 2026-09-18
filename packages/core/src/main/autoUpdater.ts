@@ -1,9 +1,10 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, net } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { autoUpdater as AutoUpdaterType } from "electron-updater";
 import type {
   CampusAppInfo,
+  UpdateSource,
   UpdateStatus
 } from "../shared/updateBridge";
 import { registerTrustedIpcHandler } from "./trustedIpc";
@@ -14,6 +15,11 @@ let currentStatus: UpdateStatus = app.isPackaged
 let updater: typeof AutoUpdaterType | null = null;
 let updaterEventsBound = false;
 let dismissedVersion: string | null | undefined;
+let activeUpdateSource: UpdateSource = "github";
+
+const GITHUB_OWNER = "Harry-Linner";
+const GITHUB_REPO = "CampusOS";
+const GITHUB_FAST_ORIGIN = "https://githubfast.com";
 
 type ElectronUpdaterModule = {
   autoUpdater?: typeof AutoUpdaterType;
@@ -60,6 +66,40 @@ const sanitizeUpdateError = (error: unknown): string => {
   return "更新操作失败，请稍后重试。";
 };
 
+export const shouldTryGitHubFastFallback = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error);
+  return /github\.com/i.test(message) &&
+    /(network|internet|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH|ECONN|ERR_NAME_NOT_RESOLVED|ERR_INTERNET_DISCONNECTED|ERR_CONNECTION|ERR_PROXY_CONNECTION_FAILED|timed?\s*out|403|407|429|5\d\d)/i.test(message);
+};
+
+export const extractLatestReleaseTag = (atom: string): string => {
+  const match = atom.match(
+    /href="https:\/\/(?:github\.com|githubfast\.com)\/Harry-Linner\/CampusOS\/releases\/tag\/(v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)"/
+  );
+  if (!match) throw new Error("GitHubFast 返回的版本列表无效。");
+  return match[1];
+};
+
+const configureGitHubProvider = (instance: typeof AutoUpdaterType): void => {
+  activeUpdateSource = "github";
+  instance.setFeedURL({ provider: "github", owner: GITHUB_OWNER, repo: GITHUB_REPO });
+};
+
+const configureGitHubFastProvider = async (instance: typeof AutoUpdaterType): Promise<void> => {
+  activeUpdateSource = "githubfast";
+  const atomUrl = `${GITHUB_FAST_ORIGIN}/${GITHUB_OWNER}/${GITHUB_REPO}/releases.atom`;
+  const response = await net.fetch(atomUrl, { signal: AbortSignal.timeout(12_000) });
+  if (!response.ok) {
+    throw new Error(`GitHubFast 版本列表请求失败（HTTP ${response.status}）。`);
+  }
+  const tag = extractLatestReleaseTag(await response.text());
+  instance.setFeedURL({
+    provider: "generic",
+    channel: "latest",
+    url: `${GITHUB_FAST_ORIGIN}/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/${encodeURIComponent(tag)}/`
+  });
+};
+
 const emit = (status: UpdateStatus): void => {
   currentStatus = status;
   for (const window of BrowserWindow.getAllWindows()) {
@@ -74,26 +114,27 @@ const bindUpdaterEvents = (instance: typeof AutoUpdaterType): void => {
   updaterEventsBound = true;
   instance.autoDownload = false;
   instance.autoInstallOnAppQuit = false;
-  instance.on("checking-for-update", () => emit({ state: "checking" }));
+  instance.on("checking-for-update", () => emit({ state: "checking", source: activeUpdateSource }));
   instance.on("update-available", (info) => {
     const releaseNotes = normalizeReleaseNotes(info.releaseNotes);
-    emit({ state: "available", version: info.version, prompt: dismissedVersion !== info.version, ...(releaseNotes.length ? { releaseNotes } : {}) });
+    emit({ state: "available", version: info.version, prompt: dismissedVersion !== info.version, source: activeUpdateSource, ...(releaseNotes.length ? { releaseNotes } : {}) });
   });
   instance.on("update-not-available", (info) =>
-    emit({ state: "up-to-date", version: info.version })
+    emit({ state: "up-to-date", version: info.version, source: activeUpdateSource })
   );
   instance.on("download-progress", (progress) =>
     emit({
       state: "downloading",
       version: currentStatus.version,
+      source: activeUpdateSource,
       progress: Math.max(0, Math.min(100, progress.percent))
     })
   );
   instance.on("update-downloaded", (info) =>
-    emit({ state: "ready", version: info.version, progress: 100, prompt: true })
+    emit({ state: "ready", version: info.version, progress: 100, prompt: true, source: activeUpdateSource })
   );
   instance.on("error", (error) =>
-    emit({ state: "error", error: sanitizeUpdateError(error) })
+    emit({ state: "error", error: sanitizeUpdateError(error), source: activeUpdateSource })
   );
 };
 
@@ -125,12 +166,29 @@ export const checkForUpdates = async (): Promise<UpdateStatus> => {
     return getUpdateStatus();
   }
 
+  let fallbackAttempted = false;
   try {
     await loadDismissedVersion();
-    emit({ state: "checking" });
-    await (await getAutoUpdater()).checkForUpdates();
+    const instance = await getAutoUpdater();
+    configureGitHubProvider(instance);
+    emit({ state: "checking", source: "github" });
+    try {
+      await instance.checkForUpdates();
+    } catch (error) {
+      if (!shouldTryGitHubFastFallback(error)) throw error;
+      fallbackAttempted = true;
+      await configureGitHubFastProvider(instance);
+      emit({ state: "checking", source: "githubfast" });
+      await instance.checkForUpdates();
+    }
   } catch (error) {
-    emit({ state: "error", error: sanitizeUpdateError(error) });
+    emit({
+      state: "error",
+      error: fallbackAttempted
+        ? "GitHub 与 GitHubFast 镜像均无法连接，请稍后重试。"
+        : sanitizeUpdateError(error),
+      source: activeUpdateSource
+    });
   }
   return getUpdateStatus();
 };
@@ -144,11 +202,12 @@ export const downloadUpdate = async (): Promise<UpdateStatus> => {
     emit({
       state: "downloading",
       version: currentStatus.version,
+      source: activeUpdateSource,
       progress: 0
     });
     await (await getAutoUpdater()).downloadUpdate();
   } catch (error) {
-    emit({ state: "error", error: sanitizeUpdateError(error) });
+    emit({ state: "error", error: sanitizeUpdateError(error), source: activeUpdateSource });
   }
   return getUpdateStatus();
 };
@@ -159,9 +218,9 @@ export const cancelDownload = async (): Promise<UpdateStatus> => {
     const instance = await getAutoUpdater();
     const cancellable = instance as typeof instance & { cancelDownload?: () => void };
     if (typeof cancellable.cancelDownload === "function") cancellable.cancelDownload();
-    emit({ state: "available", version: currentStatus.version });
+    emit({ state: "available", version: currentStatus.version, source: activeUpdateSource });
   } catch (error) {
-    emit({ state: "error", error: sanitizeUpdateError(error) });
+    emit({ state: "error", error: sanitizeUpdateError(error), source: activeUpdateSource });
   }
   return getUpdateStatus();
 };

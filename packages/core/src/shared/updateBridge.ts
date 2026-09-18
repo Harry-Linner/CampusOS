@@ -8,6 +8,8 @@ export type UpdateState =
   | "up-to-date"
   | "unavailable";
 
+export type UpdateSource = "github" | "githubfast";
+
 export interface UpdateStatus {
   state: UpdateState;
   version?: string;
@@ -15,6 +17,7 @@ export interface UpdateStatus {
   releaseNotes?: string[];
   error?: string;
   prompt?: boolean;
+  source?: UpdateSource;
 }
 
 export interface CampusAppInfo {
