@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { PluginRuntimeRecord, PluginRuntimeSnapshot } from "@campusos/shared";
 import {
   corePluginCapabilities,
+  officialCoreModuleManifests,
+  officialUserPluginManifests,
   officialRuntimeManifests
 } from "./officialPluginCatalog";
 import { resolvePluginRuntime } from "./pluginRuntime";
 import {
   augmentStartupCacheWithOfficialPlugins,
-  preparePluginRuntimeStartupCache
+  preparePluginRuntimeStartupCache,
+  restoreUserPluginRuntimeStartupCache
 } from "./pluginRuntimeCache";
 
 const createPlugin = (id: string): PluginRuntimeRecord => ({
@@ -152,5 +155,27 @@ describe("augmentStartupCacheWithOfficialPlugins", () => {
     );
     expect(materials?.enabled).toBe(false);
     expect(materials?.status).toBe("disabled");
+  });
+});
+
+describe("restoreUserPluginRuntimeStartupCache", () => {
+  it("does not expose cached Core adapters while a fresh user snapshot loads", () => {
+    const userPluginIds = officialUserPluginManifests.map((manifest) => manifest.id);
+    const caches = [
+      buildCacheSnapshot(userPluginIds),
+      buildCacheSnapshot(officialRuntimeManifests.map((manifest) => manifest.id))
+    ];
+
+    for (const cache of caches) {
+      const restored = restoreUserPluginRuntimeStartupCache(
+        cache,
+        new Set(userPluginIds),
+        new Set(officialCoreModuleManifests.map((manifest) => manifest.id)),
+        officialUserPluginManifests,
+        corePluginCapabilities
+      );
+
+      expect(restored.plugins.map((plugin) => plugin.id)).toEqual(userPluginIds);
+    }
   });
 });

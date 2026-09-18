@@ -28,8 +28,8 @@ import {
   type InstalledCampusmodPackage
 } from "./campusmodPackageRegistry";
 import {
-  augmentStartupCacheWithOfficialPlugins,
-  preparePluginRuntimeStartupCache
+  preparePluginRuntimeStartupCache,
+  restoreUserPluginRuntimeStartupCache
 } from "./pluginRuntimeCache";
 import { createPluginUpdateService, type PluginUpdateCandidate } from "./pluginUpdateService";
 
@@ -163,14 +163,13 @@ export const getOfficialPluginRuntimeService =
       try {
         const parsed = JSON.parse(await readFile(runtimeCachePath, "utf8")) as unknown;
         if (!isCachedRuntimeSnapshot(parsed)) return null;
-        // A cache written before an upgrade (which added a new official
-        // plugin) must not delay that plugin from appearing in the sidebar:
-        // append the missing official plugins with their default config
-        // instead of discarding the cache and forcing a slow full load.
-        return augmentStartupCacheWithOfficialPlugins(
+        // A cache written before an upgrade must not delay a new user-facing
+        // plugin from appearing, nor briefly expose Core-owned adapters.
+        return restoreUserPluginRuntimeStartupCache(
           parsed,
-          officialRuntimeIds,
-          officialRuntimeManifests,
+          officialUserPluginIds,
+          officialCoreModuleIds,
+          officialUserPluginManifests,
           corePluginCapabilities
         );
       } catch (error) {

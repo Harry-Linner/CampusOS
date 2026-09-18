@@ -63,3 +63,26 @@ export const augmentStartupCacheWithOfficialPlugins = (
   });
   return preparePluginRuntimeStartupCache(augmented, trustedPluginIds);
 };
+
+/**
+ * Restores the user-facing startup cache without briefly exposing Core-owned
+ * adapters that may remain in a cache written by an older build.
+ */
+export const restoreUserPluginRuntimeStartupCache = (
+  snapshot: PluginRuntimeSnapshot,
+  trustedUserPluginIds: ReadonlySet<string>,
+  hiddenCorePluginIds: ReadonlySet<string>,
+  officialUserManifests: readonly PluginManifestV2[],
+  coreCapabilities: readonly PluginCapability[]
+): PluginRuntimeSnapshot =>
+  augmentStartupCacheWithOfficialPlugins(
+    {
+      ...snapshot,
+      plugins: snapshot.plugins.filter(
+        (plugin) => !hiddenCorePluginIds.has(plugin.id)
+      )
+    },
+    trustedUserPluginIds,
+    officialUserManifests,
+    coreCapabilities
+  );
