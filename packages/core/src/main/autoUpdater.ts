@@ -15,6 +15,13 @@ let updater: typeof AutoUpdaterType | null = null;
 let updaterEventsBound = false;
 let dismissedVersion: string | null | undefined;
 
+type ElectronUpdaterModule = {
+  autoUpdater?: typeof AutoUpdaterType;
+  default?: {
+    autoUpdater?: typeof AutoUpdaterType;
+  };
+};
+
 const dismissalPath = (): string => join(app.getPath("userData"), "settings", "update-preferences.json");
 
 const loadDismissedVersion = async (): Promise<string | null> => {
@@ -90,10 +97,18 @@ const bindUpdaterEvents = (instance: typeof AutoUpdaterType): void => {
   );
 };
 
+export const resolveAutoUpdater = (module: ElectronUpdaterModule): typeof AutoUpdaterType => {
+  const instance = module.autoUpdater ?? module.default?.autoUpdater;
+  if (!instance) {
+    throw new Error("更新组件加载失败。");
+  }
+  return instance;
+};
+
 const getAutoUpdater = async (): Promise<typeof AutoUpdaterType> => {
   if (!updater) {
-    const module = await import("electron-updater");
-    updater = module.autoUpdater;
+    const module = await import("electron-updater") as ElectronUpdaterModule;
+    updater = resolveAutoUpdater(module);
     bindUpdaterEvents(updater);
   }
   return updater;

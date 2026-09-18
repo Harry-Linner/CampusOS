@@ -49,7 +49,8 @@ import {
   checkForUpdates,
   downloadUpdate,
   getUpdateStatus,
-  registerUpdateHandlers
+  registerUpdateHandlers,
+  resolveAutoUpdater
 } from "./autoUpdater";
 
 describe("auto updater", () => {
@@ -68,6 +69,12 @@ describe("auto updater", () => {
   it("reports development builds as unavailable without contacting a feed", async () => {
     expect(await checkForUpdates()).toEqual({ state: "unavailable" });
     expect(mocks.updater.checkForUpdates).not.toHaveBeenCalled();
+  });
+
+  it("resolves the CommonJS default export shape produced in packaged builds", () => {
+    expect(resolveAutoUpdater({
+      default: { autoUpdater: mocks.updater as never }
+    })).toBe(mocks.updater);
   });
 
   it("binds updater events and exposes the real available/download states", async () => {
