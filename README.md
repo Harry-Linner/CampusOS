@@ -45,7 +45,7 @@ CampusOS 是面向浙江大学学生的桌面校园工作台，用于查看课�
 
 ## 下载内测版
 
-Windows x64 预发布内测包 `0.1.0-beta.9` 见 [Releases 页面](https://github.com/Harry-Linner/CampusOS/releases)。这是**预发布**版本，功能与稳定性都不完整。
+Windows x64 预发布内测包 `0.1.0-beta.10` 见 [Releases 页面](https://github.com/Harry-Linner/CampusOS/releases)。这是**预发布**版本，功能与稳定性都不完整。
 
 下载后双击安装，按向导选择安装目录即可，无需 Node、Python 等开发环境。安装包未签名，首次运行可能出现「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」继续；**该提示只在首次安装出现**，之后的版本升级在应用内完成。安装包 SHA-256 校验值见 Releases 页面对应版本的说明。
 
