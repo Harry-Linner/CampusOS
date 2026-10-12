@@ -66,6 +66,14 @@ vi.mock("./ipcSecurity", () => ({
   assertTrustedRenderer: vi.fn()
 }));
 
+vi.mock("./deskCalendarHost", () => ({
+  launchDeskCalendar: vi.fn(),
+  closeDeskCalendar: vi.fn(),
+  isDeskCalendarRunning: vi.fn(() => false),
+  openDeskCalendarSettings: vi.fn(),
+  enforceDeskCalendarAutoStartDependency: vi.fn()
+}));
+
 const temporaryDirectories: string[] = [];
 
 beforeEach(() => {
@@ -114,6 +122,21 @@ const createWindow = () => {
 };
 
 describe("app lifecycle", () => {
+  it("notifies calendar settings on both enabling and disabling login startup", async () => {
+    await createStorageRoot();
+    const host = await import("./deskCalendarHost");
+    const notify = vi.spyOn(host, "enforceDeskCalendarAutoStartDependency").mockImplementation(() => undefined);
+    try {
+      const lifecycle = await import("./appLifecycle");
+      lifecycle.registerAppLifecycleHandlers();
+      await handlerFor("campusos:lifecycle:save")({}, { launchAtLogin: true });
+      expect(notify).toHaveBeenLastCalledWith(true);
+      await handlerFor("campusos:lifecycle:save")({}, { launchAtLogin: false });
+      expect(notify).toHaveBeenLastCalledWith(false);
+    } finally {
+      notify.mockRestore();
+    }
+  });
   it("offers one pet menu action and changes its label with the enabled state", async () => {
     await createStorageRoot();
     const lifecycle = await import("./appLifecycle");

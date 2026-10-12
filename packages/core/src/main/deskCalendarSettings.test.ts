@@ -8,7 +8,10 @@ const state = vi.hoisted(() => ({
 
 vi.mock("electron", () => ({
   app: {
-    getLoginItemSettings: vi.fn(() => ({ openAtLogin: state.openAtLogin }))
+    // Windows matches the complete registered command, including --hidden.
+    getLoginItemSettings: vi.fn((options?: { args?: string[] }) => ({
+      openAtLogin: state.openAtLogin && options?.args?.join(" ") === "--hidden"
+    }))
   }
 }));
 

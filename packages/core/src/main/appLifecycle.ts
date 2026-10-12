@@ -17,6 +17,7 @@ import type {
 } from "../shared/appLifecycleBridge";
 import type { AppNavigationRequest } from "@campusos/shared";
 import { registerTrustedIpcHandler } from "./trustedIpc";
+import { CAMPUS_LOGIN_ITEM_ARGS } from "./loginItemSettings";
 import {
   launchDeskCalendar,
   closeDeskCalendar,
@@ -69,7 +70,7 @@ const loadSettings = async (): Promise<AppLifecycleSettings> => {
       settings = defaults();
     }
   }
-  app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: settings.launchAtLogin ? ["--hidden"] : [] });
+  app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin, args: settings.launchAtLogin ? CAMPUS_LOGIN_ITEM_ARGS : [] });
   return { ...settings };
 };
 
@@ -85,9 +86,9 @@ const persistSettings = async (patch: AppLifecycleSettingsPatch): Promise<AppLif
   if (patch.launchAtLogin !== undefined) {
     app.setLoginItemSettings({
       openAtLogin: next.launchAtLogin,
-      args: next.launchAtLogin ? ["--hidden"] : []
+      args: next.launchAtLogin ? CAMPUS_LOGIN_ITEM_ARGS : []
     });
-    if (!next.launchAtLogin) enforceDeskCalendarAutoStartDependency(false);
+    enforceDeskCalendarAutoStartDependency(next.launchAtLogin);
   }
   return { ...next };
 };

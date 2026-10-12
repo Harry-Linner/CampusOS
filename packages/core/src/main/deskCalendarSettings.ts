@@ -1,4 +1,5 @@
 import { app } from "electron";
+import { CAMPUS_LOGIN_ITEM_ARGS } from "./loginItemSettings";
 import {
   DESK_CALENDAR_STATE_KEYS,
   loadDesktopState,
@@ -43,7 +44,7 @@ const DEFAULT_SETTINGS: DeskCalendarSettings = {
 };
 
 const isCampusAutoStartEnabled = (): boolean => {
-  try { return app.getLoginItemSettings().openAtLogin; } catch { return false; }
+  try { return app.getLoginItemSettings({ args: CAMPUS_LOGIN_ITEM_ARGS }).openAtLogin; } catch { return false; }
 };
 
 export const loadDeskCalendarSettings = (): DeskCalendarSettings => {

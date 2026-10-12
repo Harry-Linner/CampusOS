@@ -5,6 +5,42 @@ import { join, resolve } from "node:path";
 import koffi from "koffi";
 import { desktopPort, connectDesktop, calendarPanel, closeCalendarPanel } from "./desktopFixture";
 
+test("calendar startup unlocks live after enabling CampusOS login startup", async () => {
+  test.setTimeout(120000);
+  const profile = await mkdtemp(join(tmpdir(), "campusos-startup-e2e-"));
+  const port = await desktopPort();
+  const app = await electron.launch({ args: [resolve("out/main/main.js"), `--user-data-dir=${profile}`], env: { ...process.env, CAMPUSOS_E2E_FIXTURE: "1", CAMPUSOS_DESKTOP_CDP_PORT: port } });
+  try {
+    const main = await app.firstWindow();
+    await main.evaluate(() => window.campusos.desktopCalendarHost.start());
+    const desk = await connectDesktop(app, port);
+    const panel = await calendarPanel(app, desk, () => desk.getByRole("button", { name: "⚙ 设置" }).click());
+    const startup = panel.getByRole("checkbox", { name: "随 CampusOS 开机恢复" });
+    const hint = panel.getByText("请先在 CampusOS 设置中开启“开机启动”。", { exact: true });
+    await expect(startup).toBeDisabled();
+    await expect(hint).toBeVisible();
+    await main.evaluate(() => window.campusos.lifecycle.save({ launchAtLogin: true }));
+    await expect(startup).toBeEnabled();
+    await expect(hint).toHaveCount(0);
+    await startup.click();
+    await expect(startup).toBeChecked();
+    await expect.poll(() => desk.evaluate(async () => (await window.deskCalendar!.getSettings()).autoStart)).toBe(true);
+    await closeCalendarPanel(panel);
+    const reopened = await calendarPanel(app, desk, () => desk.getByRole("button", { name: "⚙ 设置" }).click());
+    await expect(reopened.getByRole("checkbox", { name: "随 CampusOS 开机恢复" })).toBeChecked();
+    await main.evaluate(() => window.campusos.lifecycle.save({ launchAtLogin: false }));
+    await expect(reopened.getByRole("checkbox", { name: "随 CampusOS 开机恢复" })).toBeDisabled();
+    await expect(reopened.getByRole("checkbox", { name: "随 CampusOS 开机恢复" })).not.toBeChecked();
+    await main.evaluate(() => window.campusos.lifecycle.save({ launchAtLogin: true }));
+    await expect(reopened.getByRole("checkbox", { name: "随 CampusOS 开机恢复" })).toBeEnabled();
+    await expect(reopened.getByRole("checkbox", { name: "随 CampusOS 开机恢复" })).not.toBeChecked();
+  } finally {
+    await app.evaluate(({ app: electronApp }) => electronApp.setLoginItemSettings({ openAtLogin: false }));
+    await app.close();
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
 test("desktop calendar isolates DPI, saves through primary IPC and closes its native host", async () => {
   test.setTimeout(120000);
   const profile = await mkdtemp(join(tmpdir(), "campusos-desk-e2e-"));

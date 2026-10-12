@@ -629,9 +629,11 @@ export const isDeskCalendarRunning = (): boolean =>
 
 export const enforceDeskCalendarAutoStartDependency = (campusAutoStartEnabled: boolean): void => {
   enforceCampusAutoStartDependency(campusAutoStartEnabled);
-  desktopProcess?.send(PREFIX + "settings-changed", loadDeskCalendarSettings());
+  const settings = loadDeskCalendarSettings();
+  desktopProcess?.send(PREFIX + "settings-changed", settings);
+  panelWindow?.webContents.send(PREFIX + "settings-changed", settings);
   if (deskCalendarWindow && !deskCalendarWindow.isDestroyed()) {
-    deskCalendarWindow.webContents.send("campusos:desk-calendar:settings-changed", loadDeskCalendarSettings());
+    deskCalendarWindow.webContents.send(PREFIX + "settings-changed", settings);
   }
 };
 
